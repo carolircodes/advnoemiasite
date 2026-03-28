@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JurisIA | Noêmia Paixão Advocacia</title>
+  <meta name="description" content="JurisIA — atendimento jurídico estratégico com clareza, autoridade e acolhimento. Previdenciário, consumidor e bancário, civil e família." />
+  <style>
+    :root {
+      --bg: #0b0f0d;
+      --bg-soft: #121814;
+      --bg-elevated: #182019;
+      --card: rgba(255,255,255,0.04);
+      --card-strong: rgba(255,255,255,0.06);
+      --gold: #c8a96b;
+      --gold-strong: #e2c78f;
+      --text: #f6f2ea;
+      --muted: #d5ccbc;
+      --muted-2: rgba(255,255,255,0.72);
+      --line: rgba(200,169,107,0.22);
+      --line-soft: rgba(255,255,255,0.08);
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+      --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.24);
+      --radius: 26px;
+      --max: 1200px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(200,169,107,0.08), transparent 20%),
+        radial-gradient(circle at left 25%, rgba(9,30,20,0.28), transparent 30%),
+        linear-gradient(180deg, #0c100d 0%, #080b09 100%);
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    .container {
+      width: min(calc(100% - 32px), var(--max));
+      margin: 0 auto;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+      color: var(--gold);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      background: rgba(8, 11, 9, 0.72);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .nav-inner {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: auto;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      line-height: 1.05;
+      min-width: 0;
+    }
+
+    .brand-text strong {
+      color: var(--gold);
+      font-size: 20px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      margin: 0 0 4px 0;
+      white-space: nowrap;
+    }
+
+    .brand-text small {
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      color: rgba(255,255,255,0.80);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+    }
+
+    .nav-links a {
+      transition: 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--gold-strong);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 50px;
+      padding: 0 22px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      transition: 0.25s ease;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #b9965a, #e2c98f);
+      color: #15110c;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 24px rgba(200,169,107,0.16);
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.02);
+      color: var(--text);
+    }
+
+    .hero {
+      position: relative;
+      padding: 110px 0 70px;
+      overflow: hidden;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 34px;
+      align-items: center;
+      min-height: 760px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero h1 {
+      max-width: 760px;
+      margin: 20px 0 22px;
+      font-size: clamp(46px, 6vw, 74px);
+      line-height: 0.96;
+      letter-spacing: -0.04em;
+    }
+
+    .hero h1 span {
+      color: var(--gold-strong);
+    }
+
+    .hero p.lead {
+      max-width: 720px;
+      margin: 0 0 34px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.7;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    .hero-points {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .point {
+      padding: 18px;
+      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(6px);
+    }
+
+    .point strong {
+      display: block;
+      color: var(--gold-strong);
+      font-size: 22px;
+      margin-bottom: 8px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .point span {
+      display: block;
+      color: var(--muted-2);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .hero-visual {
+      position: relative;
+      min-height: 640px;
+      border-radius: 34px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.42);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    }
+
+    .hero-visual::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(
+          to bottom,
+          rgba(8, 11, 9, 0.05) 0%,
+          rgba(8, 11, 9, 0.10) 28%,
+          rgba(8, 11, 9, 0.30) 52%,
+          rgba(8, 11, 9, 0.70) 78%,
+          rgba(8, 11, 9, 0.96) 100%
+        ),
+        linear-gradient(
+          to left,
+          rgba(8, 11, 9, 0.00) 35%,
+          rgba(8, 11, 9, 0.18) 55%,
+          rgba(8, 11, 9, 0.42) 72%,
+          rgba(8, 11, 9, 0.72) 88%,
+          rgba(8, 11, 9, 0.90) 100%
+        ),
+        url('imagens/mae.jpeg') center center / cover no-repeat;
+      opacity: 1;
+      transform: scale(1.01);
+    }
+
+    .hero-overlay {
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      bottom: 28px;
+      z-index: 2;
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(8, 10, 9, 0.56);
+      border: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-overlay h3 {
+      margin: 14px 0 10px;
+      font-size: 31px;
+      line-height: 1.08;
+    }
+
+    .hero-overlay p {
+      margin: 0;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    section {
+      padding: 44px 0;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 0.98;
+    }
+
+    .section-head p {
+      max-width: 560px;
+      margin: 0;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.75;
+      font-size: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      margin: 14px 0 12px;
+      font-size: 28px;
+      line-height: 1.12;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.78;
+      font-size: 15px;
+    }
+
+    .card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .institutional {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 22px;
+    }
+
+    .panel {
+      padding: 34px;
+      border-radius: 30px;
+      background: linear-gradient(180deg, rgba(200,169,107,0.10), rgba(255,255,255,0.02));
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .panel h3 {
+      margin: 16px 0 14px;
+      font-size: 42px;
+      line-height: 1.02;
+    }
+
+    .panel p {
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.85;
+    }
+
+    .list-clean {
+      list-style: none;
+      padding: 0;
+      margin: 24px 0 0;
+    }
+
+    .list-clean li {
+      padding: 14px 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted-2);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.65;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .step-number {
+      width: 48px;
+      height: 48px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      color: var(--gold-strong);
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .tech-main {
+      background:
+        radial-gradient(circle at top right, rgba(200,169,107,0.16), transparent 24%),
+        linear-gradient(135deg, rgba(18,27,22,0.96), rgba(8,12,10,0.92));
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      padding: 34px;
+      box-shadow: var(--shadow);
+    }
+
+    .tech-main h3 {
+      margin: 18px 0 16px;
+      font-size: 46px;
+      line-height: 0.98;
+    }
+
+    .tech-main p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.82;
+      font-size: 16px;
+    }
+
+    .benefits {
+      display: grid;
+      gap: 16px;
+    }
+
+    .benefit {
+      padding: 24px;
+      border-radius: 24px;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: var(--shadow);
+    }
+
+    .benefit h4 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    .benefit p {
+      margin: 0;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.75;
+      font-size: 15px;
+    }
+
+    .faq {
+      display: grid;
+      gap: 16px;
+    }
+
+    .faq-item {
+      padding: 24px 26px;
+      border-radius: 22px;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: var(--shadow);
+    }
+
+    .faq-item h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    .faq-item p {
+      margin: 0;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.8;
+    }
+
+    .cta {
+      display: grid;
+      grid-template-columns: 1.12fr 0.88fr;
+      gap: 24px;
+      align-items: center;
+      padding: 46px;
+      border-radius: 34px;
+      background:
+        linear-gradient(135deg, rgba(200,169,107,0.18), rgba(255,255,255,0.02)),
+        rgba(255,255,255,0.03);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .cta h2 {
+      margin: 14px 0 14px;
+      font-size: clamp(34px, 5vw, 60px);
+      line-height: 0.96;
+    }
+
+    .cta p {
+      margin: 0;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.82;
+      font-size: 16px;
+    }
+
+    .cta-box {
+      padding: 26px;
+      border-radius: 24px;
+      background: rgba(8,10,9,0.46);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .cta-box strong {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .cta-box span {
+      display: block;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.75;
+    }
+
+    .footer {
+      padding: 32px 0 56px;
+      color: rgba(255,255,255,0.62);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+    }
+
+    .footer-bar {
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .whatsapp-float {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: 58px;
+      height: 58px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      background: linear-gradient(135deg, #d8bc81, #b58f52);
+      box-shadow: 0 14px 30px rgba(0,0,0,0.24);
+    }
+
+    .whatsapp-float img {
+      width: 26px;
+      height: 26px;
+    }
+
+    @media (max-width: 1080px) {
+      .hero-grid,
+      .institutional,
+      .tech-grid,
+      .cta {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-3,
+      .steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hero-visual {
+        min-height: 520px;
+      }
+
+      .hero-points {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .nav-inner {
+        min-height: 68px;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .brand-mark img {
+        height: 36px !important;
+      }
+
+      .brand-text strong {
+        font-size: 16px;
+      }
+
+      .brand-text small {
+        font-size: 7px;
+        letter-spacing: 0.16em;
+      }
+
+      .hero {
+        padding-top: 58px;
+      }
+
+      .hero-grid,
+      .hero-points,
+      .grid-3,
+      .grid-2,
+      .steps {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        flex-direction: column;
+        align-items: start;
+      }
+
+      .hero-visual {
+        min-height: 420px;
+      }
+
+      .hero-overlay {
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+        padding: 18px;
+      }
+
+      .hero-overlay h3 {
+        font-size: 25px;
+      }
+
+      .cta {
+        padding: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="#inicio">
+        <div class="brand-mark">
+          <img src="imagens/logo.png" alt="Logo Noêmia Paixão Advocacia" style="height: 42px; width: auto;">
+        </div>
+        <div class="brand-text">
+          <strong>Noêmia Paixão Advocacia</strong>
+          <small>Atendimento Jurídico Estratégico</small>
+        </div>
+      </a>
+
+      <div class="nav-links">
+        <a href="#areas">Atuação</a>
+        <a href="#sobre">Autoridade</a>
+        <a href="#jurisia">JurisIA</a>
+        <a href="#faq">FAQ</a>
+        <a href="#contato">Contato</a>
+      </div>
+
+      <a class="btn btn-primary" href="https://wa.me/5584996248241?text=Olá,%20vim%20pelo%20site%20e%20gostaria%20de%20atendimento%20jurídico." target="_blank" rel="noopener noreferrer">Falar no WhatsApp</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="inicio">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <span class="tag">· Estratégia · Clareza · Confiança ·</span>
+
+        <h1>Seu problema jurídico pede <span>clareza, firmeza</span> e direção.</h1>
+
+        <p class="lead">
+          Atendimento jurídico pensado para quem precisa de segurança, orientação clara e postura profissional. Cada caso é conduzido com estratégia, sensibilidade e alto nível de atenção.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://wa.me/5584996248241?text=Olá,%20vim%20pelo%20site%20e%20gostaria%20de%20falar%20sobre%20meu%20caso." target="_blank" rel="noopener noreferrer">Falar com a advogada agora</a>
+          <a class="btn btn-secondary" href="#processo">Entender como funciona</a>
+        </div>
+
+        <div class="hero-points">
+          <div class="point">
+            <strong>Clareza desde o início</strong>
+            <span>Você entende sua situação, seus direitos e os próximos passos sem complicação desnecessária.</span>
+          </div>
+
+          <div class="point">
+            <strong>Estratégia com critério</strong>
+            <span>Cada caso é analisado com técnica, visão prática e foco em uma condução segura.</span>
+          </div>
+
+          <div class="point">
+            <strong>Presença e firmeza</strong>
+            <span>Seu problema é tratado com seriedade, elegância e posicionamento profissional.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="hero-overlay">
+          <span class="tag">JurisIA por Noêmia Paixão Advocacia</span>
+          <h3>Atendimento jurídico estratégico com clareza, firmeza e direção.</h3>
+          <p>
+            Atendimento com clareza, sensibilidade e estratégia para orientar cada cliente com segurança e alto nível profissional.
+          </p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="areas">
+    <div class="container">
+      <div class="section-head">
+        <h2>Áreas de atuação</h2>
+        <p>
+          A página foi estruturada para falar diretamente com pessoas que estão vivendo problemas jurídicos reais e procuram segurança, orientação e firmeza.
+        </p>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <span class="tag">Previdenciário</span>
+          <h3>Aposentadorias e benefícios</h3>
+          <p>
+            Análise técnica e estratégica para proteger direitos previdenciários, orientar com clareza e buscar o que é efetivamente devido ao cliente.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="tag">Consumidor e bancário</span>
+          <h3>Fraudes, abusos, cobranças e descontos indevidos</h3>
+          <p>
+            Atuação firme em situações envolvendo bancos, negativação indevida, descontos irregulares, contratos abusivos e lesões ao consumidor.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="tag">Família e civil</span>
+          <h3>Conflitos delicados exigem inteligência e segurança</h3>
+          <p>
+            Atendimento em demandas familiares e cíveis com sensibilidade, técnica, estratégia e postura profissional em cada etapa.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="sobre">
+    <div class="container institutional">
+      <div class="panel">
+        <span class="tag">Apresentação</span>
+        <h3>Autoridade construída com elegância.</h3>
+        <p>
+          Atuação jurídica com foco em excelência técnica, comunicação clara e atendimento humanizado. O objetivo é oferecer ao cliente não apenas uma resposta jurídica, mas segurança, direcionamento e confiança em cada decisão.
+        </p>
+        <p>
+          Cada caso é tratado com atenção real, análise estratégica e compromisso com uma advocacia séria, refinada e eficiente.
+        </p>
+        <ul class="list-clean">
+          <li>Postura firme, linguagem clara e atendimento respeitoso.</li>
+          <li>Imagem premium que transmite confiança desde o primeiro contato.</li>
+          <li>Estratégia pensada para orientar, acolher e conduzir com segurança.</li>
+          <li>Foco em clientes reais, não em conteúdo técnico para advogados.</li>
+        </ul>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <span class="tag">Diferencial</span>
+          <h3>Confiança imediata</h3>
+          <p>
+            Um bom site jurídico não serve apenas para informar. Ele precisa reduzir a insegurança do cliente e aumentar a sensação de que ele está em boas mãos.
+          </p>
+        </article>
+
+        <article class="card">
+          <span class="tag">Posicionamento</span>
+          <h3>Premium sem exagero</h3>
+          <p>
+            Verde escuro, dourado e preto criam um universo visual de luxo, estabilidade e credibilidade — perfeito para uma advocacia forte, moderna e elegante.
+          </p>
+        </article>
+
+        <article class="card" style="grid-column: 1 / -1;">
+          <span class="tag">Texto institucional</span>
+          <h3>Modelo pronto para personalizar</h3>
+          <p>
+            “Nosso compromisso é oferecer atuação jurídica estratégica, técnica e humana, com foco em soluções seguras, comunicação transparente e defesa firme dos direitos de cada cliente.”
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="processo">
+    <div class="container">
+      <div class="section-head">
+        <h2>Como funciona o atendimento</h2>
+        <p>
+          Clareza vende muito. Quando a pessoa entende como será atendida, a chance de entrar em contato aumenta bastante.
+        </p>
+      </div>
+
+      <div class="steps">
+        <article class="card">
+          <div class="step-number">1</div>
+          <h3>Contato inicial</h3>
+          <p>Você envia sua dúvida ou situação pelo WhatsApp de forma simples e objetiva.</p>
+        </article>
+
+        <article class="card">
+          <div class="step-number">2</div>
+          <h3>Análise preliminar</h3>
+          <p>A equipe entende o caso, verifica as informações iniciais e identifica os caminhos possíveis.</p>
+        </article>
+
+        <article class="card">
+          <div class="step-number">3</div>
+          <h3>Orientação clara</h3>
+          <p>Você recebe explicação objetiva sobre direitos, riscos, possibilidades e próximos passos.</p>
+        </article>
+
+        <article class="card">
+          <div class="step-number">4</div>
+          <h3>Atuação estratégica</h3>
+          <p>Quando fizer sentido seguir, o caso é conduzido com técnica, organização e acompanhamento profissional.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="jurisia">
+    <div class="container tech-grid">
+      <div class="tech-main">
+        <span class="tag">JurisIA</span>
+        <h3>Tecnologia jurídica com atendimento humano.</h3>
+        <p>
+          A proposta da JurisIA é tornar o primeiro contato mais rápido, claro e acessível, sem perder a seriedade do atendimento jurídico. A marca já nasce com visão de futuro: unir captação premium, triagem inteligente e atendimento jurídico real.
+        </p>
+        <p>
+          Em breve, o visitante poderá fazer uma triagem inicial inteligente, entender melhor seu problema e ser direcionado com mais precisão para o atendimento jurídico adequado — sempre com acompanhamento humano e responsabilidade profissional.
+        </p>
+        <a class="btn btn-primary" href="https://wa.me/5584996248241?text=Olá,%20vim%20pelo%20site%20e%20gostaria%20de%20falar%20sobre%20meu%20caso." target="_blank" rel="noopener noreferrer">Falar com a advogada agora</a>
+      </div>
+
+      <div class="benefits">
+        <article class="benefit">
+          <h4>Triagem mais inteligente</h4>
+          <p>O cliente consegue organizar a própria situação com mais clareza antes mesmo do atendimento completo.</p>
+        </article>
+
+        <article class="benefit">
+          <h4>Experiência mais moderna</h4>
+          <p>A marca transmite inovação séria, sofisticação e visão estratégica sem perder credibilidade jurídica.</p>
+        </article>
+
+        <article class="benefit">
+          <h4>Mais precisão no direcionamento</h4>
+          <p>O futuro assistente ajuda a encaminhar melhor cada caso para o atendimento certo, de forma mais rápida e organizada.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="container">
+      <div class="section-head">
+        <h2>Perguntas frequentes</h2>
+        <p>
+          Respostas objetivas para reduzir insegurança, gerar confiança e facilitar a decisão de quem está considerando entrar em contato.
+        </p>
+      </div>
+
+      <div class="faq">
+        <article class="faq-item">
+          <h3>Preciso já ter todos os documentos para entrar em contato?</h3>
+          <p>Não. Você pode iniciar o atendimento mesmo sem estar com tudo organizado. A orientação inicial ajuda justamente a entender o que será necessário para analisar melhor o caso.</p>
+        </article>
+
+        <article class="faq-item">
+          <h3>O atendimento é apenas online?</h3>
+          <p>Você pode personalizar esta resposta conforme a realidade do escritório. O mais comum é oferecer atendimento online com praticidade, sem excluir a possibilidade de atendimento presencial quando fizer sentido.</p>
+        </article>
+
+        <article class="faq-item">
+          <h3>Como sei se meu caso realmente tem solução?</h3>
+          <p>É justamente por isso que a análise técnica é importante. Antes de qualquer encaminhamento, o caso é avaliado com critério para orientar sobre caminhos possíveis, riscos e estratégia.</p>
+        </article>
+
+        <article class="faq-item">
+          <h3>A JurisIA substitui a advogada?</h3>
+          <p>Não. A proposta da JurisIA é facilitar o primeiro contato e organizar melhor a experiência do cliente. A atuação jurídica continua sendo humana, responsável e estratégica.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="cta" id="contato">
+        <div>
+          <span class="tag">Atendimento inicial</span>
+          <h2>Fale agora com a equipe e receba orientação inicial.</h2>
+          <p>
+            Seu caso merece análise séria, clara e estratégica. Entre em contato e dê o primeiro passo com segurança, confiança e atendimento de alto nível.
+          </p>
+        </div>
+
+        <div class="cta-box">
+          <strong>Atendimento por WhatsApp</strong>
+          <span>
+            Um primeiro contato claro, humano e profissional pode encurtar o caminho até a melhor solução para o seu caso.
+          </span>
+          <a class="btn btn-primary" href="https://wa.me/5584996248241?text=Olá,%20vim%20pelo%20site%20e%20gostaria%20de%20falar%20sobre%20meu%20caso." target="_blank" rel="noopener noreferrer">Quero falar com a equipe</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer-bar">
+      <div>© 2026 • Noêmia Paixão Advocacia • Todos os direitos reservados.</div>
+      <div>Atendimento jurídico estratégico por Noêmia Paixão Advocacia</div>
+    </div>
+  </footer>
+
+  <a class="whatsapp-float" href="https://wa.me/5584996248241?text=Olá,%20gostaria%20de%20mais%20informações." target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
+    <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" alt="WhatsApp">
+  </a>
+</body>
+</html>
