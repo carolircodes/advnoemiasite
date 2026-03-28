@@ -1,4 +1,4 @@
-export async function handler(event) {
+exports.handler = async function (event) {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -43,14 +43,14 @@ Regras:
         input: [
           {
             role: "system",
-            content: systemPrompt
+            content: systemPrompt,
           },
           {
             role: "user",
-            content: message
-          }
-        ]
-      })
+            content: message,
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
@@ -62,20 +62,20 @@ Regras:
     return {
       statusCode: 200,
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ reply })
+      body: JSON.stringify({ reply }),
     };
   } catch (error) {
     return {
       statusCode: 500,
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         error: "Erro interno no servidor",
-        details: error.message
-      })
+        details: error.message,
+      }),
     };
   }
-}
+};
