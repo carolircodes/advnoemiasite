@@ -1,6 +1,8 @@
-exports.handler = async function(event) {
+exports.handler = async (event, context) => {
   return {
     statusCode: 200,
-    body: JSON.stringify({ reply: "Funcionando!" })
+    body: JSON.stringify({
+      message: "ok"
+    })
   };
 };
