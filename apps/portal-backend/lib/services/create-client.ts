@@ -136,7 +136,9 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
         public_summary:
           "Seu acesso ao portal esta sendo preparado pela equipe responsavel.",
         triggered_by: actorProfileId,
+        visible_to_client: true,
         should_notify_client: false,
+        occurred_at: invitedAt,
         payload: {
           caseArea: input.caseArea,
           clientStatus: input.status

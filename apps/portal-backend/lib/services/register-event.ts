@@ -4,18 +4,32 @@ import { recordPortalEventSchema } from "@/lib/domain/portal";
 import { queueCaseEventNotification } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
+function resolveOccurredAt(value: string) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  return new Date(value).toISOString();
+}
+
 export async function registerPortalEvent(rawInput: unknown, actorProfileId: string) {
   const input = recordPortalEventSchema.parse(rawInput);
   const supabase = createAdminSupabaseClient();
+  const occurredAt = resolveOccurredAt(input.occurredAt);
+  const visibleToClient = input.visibleToClient;
+  const shouldNotifyClient = visibleToClient && input.shouldNotifyClient;
+  const publicSummary = visibleToClient
+    ? input.publicSummary || input.description || "Nova atualizacao registrada no portal."
+    : null;
 
   const { data: caseRecord, error: caseError } = await supabase
     .from("cases")
-    .select("id,client_id")
+    .select("id,client_id,title")
     .eq("id", input.caseId)
     .single();
 
   if (caseError || !caseRecord) {
-    throw new Error(caseError?.message || "Caso não encontrado para registrar o evento.");
+    throw new Error(caseError?.message || "Caso nao encontrado para registrar a atualizacao.");
   }
 
   const { data: clientRecord, error: clientError } = await supabase
@@ -25,7 +39,7 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
     .single();
 
   if (clientError || !clientRecord) {
-    throw new Error(clientError?.message || "Cliente não encontrado para este caso.");
+    throw new Error(clientError?.message || "Cliente nao encontrado para este caso.");
   }
 
   const { data: profileRecord, error: profileError } = await supabase
@@ -35,7 +49,7 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
     .single();
 
   if (profileError || !profileRecord) {
-    throw new Error(profileError?.message || "Perfil do cliente não encontrado.");
+    throw new Error(profileError?.message || "Perfil do cliente nao encontrado.");
   }
 
   const { data: eventRecord, error: eventError } = await supabase
@@ -46,47 +60,97 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
       event_type: input.eventType,
       title: input.title,
       description: input.description || null,
-      public_summary: input.publicSummary || null,
+      public_summary: publicSummary,
       triggered_by: actorProfileId,
-      should_notify_client: input.shouldNotifyClient,
-      payload: input.payload || {}
+      visible_to_client: visibleToClient,
+      should_notify_client: shouldNotifyClient,
+      occurred_at: occurredAt,
+      payload: {
+        ...(input.payload || {}),
+        source: input.payload?.source || "painel-advogada"
+      }
     })
     .select("id")
     .single();
 
   if (eventError || !eventRecord) {
-    throw new Error(eventError?.message || "Não foi possível registrar o evento do caso.");
+    throw new Error(eventError?.message || "Nao foi possivel registrar a atualizacao do caso.");
   }
 
   let notificationId: string | null = null;
+  try {
+    if (shouldNotifyClient && profileRecord.email) {
+      const notificationSummary =
+        publicSummary || "Nova atualizacao registrada no portal.";
+      const notification = await queueCaseEventNotification({
+        clientProfileId: profileRecord.id,
+        clientEmail: profileRecord.email,
+        eventType: input.eventType,
+        title: input.title,
+        publicSummary: notificationSummary,
+        relatedId: eventRecord.id
+      });
 
-  if (input.shouldNotifyClient && profileRecord.email) {
-    const notification = await queueCaseEventNotification({
-      clientProfileId: profileRecord.id,
-      clientEmail: profileRecord.email,
-      eventType: input.eventType,
-      title: input.title,
-      publicSummary:
-        input.publicSummary || "Há uma atualização disponível na sua área do cliente.",
-      relatedId: eventRecord.id
+      notificationId = notification.id;
+    }
+
+    const { error: auditError } = await supabase.from("audit_logs").insert({
+      actor_profile_id: actorProfileId,
+      action: "cases.event.create",
+      entity_type: "case_events",
+      entity_id: eventRecord.id,
+      payload: {
+        caseId: caseRecord.id,
+        caseTitle: caseRecord.title,
+        visibleToClient,
+        shouldNotifyClient,
+        occurredAt,
+        notificationId
+      }
     });
 
-    notificationId = notification.id;
-  }
-
-  const { error: auditError } = await supabase.from("audit_logs").insert({
-    actor_profile_id: actorProfileId,
-    action: "cases.event.create",
-    entity_type: "case_events",
-    entity_id: eventRecord.id,
-    payload: {
-      caseId: caseRecord.id,
-      notificationId
+    if (auditError) {
+      throw new Error(
+        `Nao foi possivel registrar a auditoria da atualizacao: ${auditError.message}`
+      );
     }
-  });
+  } catch (error) {
+    console.error("[case-events.create] Rolling back case update after downstream failure", {
+      caseId: caseRecord.id,
+      eventId: eventRecord.id,
+      notificationId,
+      message: error instanceof Error ? error.message : String(error)
+    });
 
-  if (auditError) {
-    throw new Error(`Não foi possível registrar a auditoria do evento: ${auditError.message}`);
+    if (notificationId) {
+      const { error: deleteNotificationError } = await supabase
+        .from("notifications_outbox")
+        .delete()
+        .eq("id", notificationId);
+
+      if (deleteNotificationError) {
+        console.error("[case-events.create] Failed to rollback notification", {
+          eventId: eventRecord.id,
+          notificationId,
+          message: deleteNotificationError.message
+        });
+      }
+    }
+
+    const { error: deleteEventError } = await supabase
+      .from("case_events")
+      .delete()
+      .eq("id", eventRecord.id);
+
+    if (deleteEventError) {
+      console.error("[case-events.create] Failed to rollback case update", {
+        caseId: caseRecord.id,
+        eventId: eventRecord.id,
+        message: deleteEventError.message
+      });
+    }
+
+    throw error;
   }
 
   return {
@@ -99,14 +163,15 @@ export async function listLatestCaseEvents(limit = 8) {
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("case_events")
-    .select("id,event_type,title,occurred_at,should_notify_client")
+    .select(
+      "id,case_id,event_type,title,occurred_at,visible_to_client,should_notify_client"
+    )
     .order("occurred_at", { ascending: false })
     .limit(limit);
 
   if (error) {
-    throw new Error(`Não foi possível listar os eventos do portal: ${error.message}`);
+    throw new Error(`Nao foi possivel listar as atualizacoes do portal: ${error.message}`);
   }
 
   return data || [];
 }
-

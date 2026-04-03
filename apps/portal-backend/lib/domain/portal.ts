@@ -62,9 +62,9 @@ export function isPortalRole(value: unknown): value is PortalRole {
 }
 
 export const caseAreaLabels: Record<CaseArea, string> = {
-  previdenciario: "Direito Previdenciário",
-  consumidor_bancario: "Direito do Consumidor/Bancário",
-  familia: "Direito de Família",
+  previdenciario: "Direito Previdenciario",
+  consumidor_bancario: "Direito do Consumidor/Bancario",
+  familia: "Direito de Familia",
   civil: "Direito Civil"
 };
 
@@ -78,22 +78,44 @@ export const clientStatusLabels: Record<ClientStatus, string> = {
   encerrado: "Encerrado"
 };
 
+export const caseStatusLabels: Record<CaseStatus, string> = {
+  triagem: "Triagem",
+  documentos: "Documentos",
+  analise: "Analise",
+  "em-andamento": "Em andamento",
+  "aguardando-retorno": "Aguardando retorno",
+  concluido: "Concluido"
+};
+
 export const portalEventTypeLabels: Record<PortalEventType, string> = {
-  case_update: "Atualização do caso",
+  case_update: "Atualizacao do caso",
   new_document: "Novo documento",
   new_appointment: "Novo agendamento",
-  document_request: "Solicitação de documento",
-  status_change: "Mudança de status"
+  document_request: "Solicitacao de documento",
+  status_change: "Mudanca de status"
 };
+
+export function formatPortalDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
 
 export const createClientSchema = z.object({
   fullName: z.string().trim().min(3, "Informe o nome completo."),
-  email: z.string().trim().email("Informe um e-mail válido.").toLowerCase(),
+  email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
   cpf: z
     .string()
     .trim()
     .transform(onlyDigits)
-    .refine((value) => value.length === 11, "Informe um CPF com 11 dígitos."),
+    .refine((value) => value.length === 11, "Informe um CPF com 11 digitos."),
   phone: z
     .string()
     .trim()
@@ -103,7 +125,7 @@ export const createClientSchema = z.object({
       "Informe um telefone com DDD."
     ),
   caseArea: z.enum(caseAreas, {
-    errorMap: () => ({ message: "Selecione a área do caso." })
+    errorMap: () => ({ message: "Selecione a area do caso." })
   }),
   notes: z.string().trim().max(1200).optional().default(""),
   status: z.enum(clientStatuses, {
@@ -112,7 +134,7 @@ export const createClientSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().trim().email("Informe um e-mail válido.").toLowerCase(),
+  email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
   password: z.string().min(8, "Informe sua senha.")
 });
 
@@ -131,13 +153,22 @@ export const passwordSchema = z
   });
 
 export const recordPortalEventSchema = z.object({
-  caseId: z.string().uuid("Informe um identificador de caso válido."),
+  caseId: z.string().uuid("Informe um identificador de caso valido."),
   eventType: z.enum(portalEventTypes, {
-    errorMap: () => ({ message: "Selecione o tipo de evento." })
+    errorMap: () => ({ message: "Selecione o tipo de atualizacao." })
   }),
-  title: z.string().trim().min(3, "Informe um título para o evento."),
+  title: z.string().trim().min(3, "Informe um titulo para a atualizacao."),
   description: z.string().trim().max(2000).optional().default(""),
   publicSummary: z.string().trim().max(500).optional().default(""),
+  occurredAt: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine((value) => value === "" || !Number.isNaN(Date.parse(value)), {
+      message: "Informe uma data valida para a atualizacao."
+    }),
+  visibleToClient: z.coerce.boolean().default(true),
   shouldNotifyClient: z.coerce.boolean().default(true),
   payload: z.record(z.any()).optional().default({})
 });

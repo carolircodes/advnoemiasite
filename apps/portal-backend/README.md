@@ -12,6 +12,8 @@ O fluxo local validado para este projeto e:
 - envio de convite para Mailpit
 - primeiro acesso do cliente
 - login do cliente
+- registro de atualizacao real do caso
+- visualizacao do historico pelo cliente
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
 
@@ -21,6 +23,8 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/auth/`: guards e resolucao de perfil
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
+- `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
+- `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
 - `lib/supabase/`: clientes browser, server, admin e middleware
 - `scripts/bootstrap-admin.mjs`: bootstrap idempotente da advogada
 - `supabase/config.toml`: configuracao local do Supabase Auth e Mailpit
@@ -174,6 +178,22 @@ Configuracao local relevante em `supabase/config.toml`:
 2. Acesse `/auth/login`.
 3. Entre com o e-mail do cliente e a senha definida no primeiro acesso.
 4. Confirme que `/cliente` abre normalmente.
+
+### Acompanhamento real do caso
+
+1. Entre como advogada em `/internal/advogada`.
+2. No card `Registrar atualizacao do caso`, escolha o caso e preencha:
+   - tipo de atualizacao
+   - data da atualizacao
+   - titulo
+   - descricao
+   - visibilidade para o cliente
+3. Se quiser preparar a notificacao futura, mantenha marcada a opcao de fila de e-mail.
+4. Envie o formulario.
+5. Confirme que um novo registro foi criado em `case_events`.
+6. Se a atualizacao estiver visivel e com notificacao habilitada, confirme o novo item em `notifications_outbox`.
+7. Abra a area do cliente em `/cliente`.
+8. Confirme que a atualizacao aparece no historico em ordem da mais recente para a mais antiga.
 
 ## Diagnostico rapido de invite
 

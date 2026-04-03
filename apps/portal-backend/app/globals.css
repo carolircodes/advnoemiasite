@@ -347,6 +347,107 @@ textarea {
   font-size: 0.92rem;
 }
 
+.update-feed {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.update-feed.compact {
+  gap: 14px;
+}
+
+.update-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+  border: 1px solid rgba(14, 31, 27, 0.1);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 244, 238, 0.9)),
+    var(--surface);
+}
+
+.update-card.featured {
+  padding: 24px 26px;
+  border-color: rgba(142, 106, 59, 0.2);
+  box-shadow: 0 18px 36px rgba(16, 32, 29, 0.06);
+}
+
+.update-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.update-head strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.05rem;
+}
+
+.update-body {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.pill.success {
+  background: rgba(41, 93, 69, 0.12);
+  color: var(--success);
+}
+
+.pill.warning {
+  background: rgba(142, 106, 59, 0.14);
+  color: var(--accent-strong);
+}
+
+.pill.muted {
+  background: rgba(16, 32, 29, 0.08);
+  color: var(--text);
+}
+
+.support-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.support-row {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(14, 31, 27, 0.08);
+  border-radius: 18px;
+  background: rgba(248, 244, 238, 0.72);
+}
+
+.support-label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -412,6 +513,10 @@ textarea {
     flex-direction: column;
   }
 
+  .update-head {
+    flex-direction: column;
+  }
+
   .button {
     width: 100%;
   }
@@ -420,4 +525,3 @@ textarea {
     font-size: clamp(1.9rem, 9vw, 2.8rem);
   }
 }
-

@@ -62,6 +62,49 @@ function createSupabaseClient(url, key) {
   });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isSchemaCacheError(message) {
+  return (
+    typeof message === "string" &&
+    (message.includes("schema cache") || message.includes("Could not find the table"))
+  );
+}
+
+function formatSupabaseError(error) {
+  if (!error) {
+    return "";
+  }
+
+  const message =
+    typeof error.message === "string" ? error.message.trim() : "";
+
+  if (message && message !== "{}") {
+    return message;
+  }
+
+  const serialized = JSON.stringify(error);
+  return message === "{}" || serialized === "{}" ? "servico ainda indisponivel" : serialized;
+}
+
+function isTransientBootstrapError(message) {
+  return (
+    !message ||
+    message === "servico ainda indisponivel" ||
+    message.includes("schema cache") ||
+    message.includes("Could not find the table") ||
+    message.includes("fetch failed") ||
+    message.includes("Failed to fetch") ||
+    message.includes("ECONNREFUSED") ||
+    message.includes("Service Unavailable") ||
+    message.includes("502")
+  );
+}
+
 const env = {
   supabaseUrl: resolveEnvValue(
     "NEXT_PUBLIC_SUPABASE_URL",
@@ -95,24 +138,201 @@ const env = {
 const adminSupabase = createSupabaseClient(env.supabaseUrl, env.secretKey);
 const publicSupabase = createSupabaseClient(env.supabaseUrl, env.publishableKey);
 
+async function waitForTableInSchemaCache(tableName, attempts = 15, delayMs = 2000) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const { error } = await adminSupabase.from(tableName).select("*").limit(1);
+
+    if (!error) {
+      return;
+    }
+
+    if (!isSchemaCacheError(error.message)) {
+      throw new Error(
+        `Nao foi possivel validar a tabela public.${tableName}: ${error.message}`
+      );
+    }
+
+    if (attempt === attempts) {
+      throw new Error(
+        `PostgREST nao recarregou a tabela public.${tableName} depois do reset.`
+      );
+    }
+
+    console.log(
+      `[bootstrap] Aguardando schema cache do Supabase para public.${tableName} (${attempt}/${attempts}).`
+    );
+    await sleep(delayMs);
+  }
+}
+
+async function waitForAuthGatewayReady(attempts = 30, delayMs = 3000) {
+  const settingsUrl = `${env.supabaseUrl}/auth/v1/settings`;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(settingsUrl);
+
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // O gateway ainda pode estar reiniciando.
+    }
+
+    if (attempt === attempts) {
+      throw new Error("O gateway local de Auth do Supabase nao ficou disponivel a tempo.");
+    }
+
+    console.log(`[bootstrap] Aguardando gateway de Auth do Supabase (${attempt}/${attempts}).`);
+    await sleep(delayMs);
+  }
+}
+
+async function listAuthUsersWithRetry(attempts = 15, delayMs = 2000) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const { data, error } = await adminSupabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000
+    });
+
+    if (Array.isArray(data?.users)) {
+      if (error) {
+        console.log(
+          `[bootstrap] Auth respondeu com usuarios apesar de um erro transitorio (${formatSupabaseError(error)}).`
+        );
+      }
+
+      return data;
+    }
+
+    const message = formatSupabaseError(error);
+
+    if (attempt === attempts || !isTransientBootstrapError(message)) {
+      throw new Error(`Nao foi possivel listar usuarios no Auth: ${message}`);
+    }
+
+    console.log(
+      `[bootstrap] Aguardando API de Auth do Supabase (${attempt}/${attempts}).`
+    );
+    await sleep(delayMs);
+  }
+}
+
+async function findAuthUserByEmail(email) {
+  const listData = await listAuthUsersWithRetry();
+  return listData.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+}
+
+async function createAuthUserWithRetry(payload, attempts = 12, delayMs = 2500) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const { data, error } = await adminSupabase.auth.admin.createUser(payload);
+
+    if (data?.user) {
+      if (error) {
+        console.log(
+          `[bootstrap] createUser retornou um erro transitorio apos criar a conta: ${formatSupabaseError(error)}.`
+        );
+      }
+
+      return data.user;
+    }
+
+    const existingUser = await findAuthUserByEmail(payload.email);
+
+    if (existingUser) {
+      console.log(
+        "[bootstrap] A conta apareceu no Auth apos uma resposta ambigua do createUser. Seguindo com o usuario encontrado."
+      );
+      return existingUser;
+    }
+
+    const message = formatSupabaseError(error);
+
+    if (attempt === attempts || !isTransientBootstrapError(message)) {
+      throw new Error(`Nao foi possivel criar a usuaria interna: ${message}`);
+    }
+
+    console.log(`[bootstrap] Aguardando criacao da usuaria no Auth (${attempt}/${attempts}).`);
+    await sleep(delayMs);
+  }
+}
+
+async function updateAuthUserWithRetry(userId, payload, attempts = 12, delayMs = 2500) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const { data, error } = await adminSupabase.auth.admin.updateUserById(userId, payload);
+
+    if (data?.user) {
+      if (error) {
+        console.log(
+          `[bootstrap] updateUserById retornou um erro transitorio apos atualizar a conta: ${formatSupabaseError(error)}.`
+        );
+      }
+
+      return data.user;
+    }
+
+    const refreshedUser = await findAuthUserByEmail(payload.email || env.adminEmail);
+
+    if (refreshedUser?.id === userId) {
+      console.log(
+        "[bootstrap] A conta apareceu atualizada no Auth apos uma resposta ambigua do updateUserById."
+      );
+      return refreshedUser;
+    }
+
+    const message = formatSupabaseError(error);
+
+    if (attempt === attempts || !isTransientBootstrapError(message)) {
+      throw new Error(`Nao foi possivel atualizar a usuaria interna existente: ${message}`);
+    }
+
+    console.log(
+      `[bootstrap] Aguardando atualizacao da usuaria no Auth (${attempt}/${attempts}).`
+    );
+    await sleep(delayMs);
+  }
+}
+
+async function signInWithPasswordWithRetry(email, password, attempts = 12, delayMs = 2500) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = await publicSupabase.auth.signInWithPassword({ email, password });
+
+    if (result.data?.user && result.data?.session) {
+      if (result.error) {
+        console.log(
+          `[bootstrap] signInWithPassword retornou um erro transitorio apos autenticar: ${formatSupabaseError(result.error)}.`
+        );
+      }
+
+      return result;
+    }
+
+    const message = formatSupabaseError(result.error);
+
+    if (attempt === attempts || !isTransientBootstrapError(message)) {
+      throw new Error(
+        message ||
+          "A usuaria foi provisionada, mas o login publico falhou. Revise a chave publica local."
+      );
+    }
+
+    console.log(`[bootstrap] Aguardando login publico do Supabase (${attempt}/${attempts}).`);
+    await sleep(delayMs);
+  }
+}
+
 console.log(`[bootstrap] Arquivos de ambiente carregados: ${formatLoadedEnvFiles()}`);
 console.log(`[bootstrap] Provisionando a usuaria interna ${env.adminEmail}.`);
 
-const { data: listData, error: listError } = await adminSupabase.auth.admin.listUsers({
-  page: 1,
-  perPage: 1000
-});
+await waitForAuthGatewayReady();
 
-if (listError) {
-  throw new Error(`Nao foi possivel listar usuarios no Auth: ${listError.message}`);
-}
+const listData = await listAuthUsersWithRetry();
 
 let adminUser = listData.users.find((user) => user.email?.toLowerCase() === env.adminEmail);
 
 if (!adminUser) {
   console.log("[bootstrap] Usuaria nao encontrada no Auth. Criando conta local.");
-
-  const { data, error } = await adminSupabase.auth.admin.createUser({
+  adminUser = await createAuthUserWithRetry({
     email: env.adminEmail,
     password: env.adminPassword,
     email_confirm: true,
@@ -121,16 +341,9 @@ if (!adminUser) {
       full_name: env.adminFullName
     }
   });
-
-  if (error || !data.user) {
-    throw new Error(error?.message || "Nao foi possivel criar a usuaria interna.");
-  }
-
-  adminUser = data.user;
 } else {
   console.log("[bootstrap] Usuaria ja existe no Auth. Alinhando senha e metadata.");
-
-  const { data, error } = await adminSupabase.auth.admin.updateUserById(adminUser.id, {
+  adminUser = await updateAuthUserWithRetry(adminUser.id, {
     email: env.adminEmail,
     password: env.adminPassword,
     email_confirm: true,
@@ -140,17 +353,12 @@ if (!adminUser) {
       full_name: env.adminFullName
     }
   });
-
-  if (error || !data.user) {
-    throw new Error(
-      error?.message || "Nao foi possivel atualizar a usuaria interna existente."
-    );
-  }
-
-  adminUser = data.user;
 }
 
 const preparedAt = new Date().toISOString();
+
+await waitForTableInSchemaCache("profiles");
+await waitForTableInSchemaCache("staff_members");
 
 const { data: profileData, error: profileError } = await adminSupabase
   .from("profiles")
@@ -197,17 +405,10 @@ if (staffError || !staffData) {
   );
 }
 
-const { data: signInData, error: signInError } = await publicSupabase.auth.signInWithPassword({
-  email: env.adminEmail,
-  password: env.adminPassword
-});
-
-if (signInError || !signInData.user || !signInData.session) {
-  throw new Error(
-    signInError?.message ||
-      "A usuaria foi provisionada, mas o login publico falhou. Revise a chave publica local."
-  );
-}
+const { data: signInData } = await signInWithPasswordWithRetry(
+  env.adminEmail,
+  env.adminPassword
+);
 
 await publicSupabase.auth.signOut();
 

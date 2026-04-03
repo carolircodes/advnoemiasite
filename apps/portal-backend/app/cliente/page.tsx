@@ -4,7 +4,24 @@ import { redirect } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
+import {
+  caseAreaLabels,
+  clientStatusLabels,
+  formatPortalDateTime
+} from "@/lib/domain/portal";
 import { getClientWorkspace } from "@/lib/services/dashboard";
+
+function getStatusSummary(status: string) {
+  if (status === "aguardando-primeiro-acesso") {
+    return "Seu cadastro ja foi criado e aguarda a conclusao do primeiro acesso.";
+  }
+
+  if (status === "convite-enviado") {
+    return "Seu convite inicial ja foi emitido e o portal esta pronto para uso.";
+  }
+
+  return "Seu cadastro esta sincronizado com a base real do portal.";
+}
 
 export default async function ClientPage({
   searchParams
@@ -24,9 +41,9 @@ export default async function ClientPage({
 
   return (
     <AppFrame
-      eyebrow="Área do cliente"
+      eyebrow="Area do cliente"
       title={`Bem-vindo, ${profile.full_name}.`}
-      description="Este painel já consome a estrutura real de autenticação e dados do novo portal."
+      description="Este painel mostra o acompanhamento real do seu caso com base persistida, atualizacoes ordenadas e preparo para notificacoes por e-mail."
       actions={[
         { href: "/documentos", label: "Meus documentos", tone: "secondary" },
         { href: "/agenda", label: "Minha agenda", tone: "secondary" }
@@ -34,8 +51,7 @@ export default async function ClientPage({
     >
       {success ? (
         <div className="success-notice">
-          Acesso atualizado com sucesso. O portal já está pronto para próximos envios
-          automáticos por e-mail.
+          Acesso atualizado com sucesso. Seu portal ja esta pronto para receber novas atualizacoes de caso.
         </div>
       ) : null}
 
@@ -49,46 +65,72 @@ export default async function ClientPage({
           <strong>{workspace.documents.length}</strong>
         </div>
         <div className="metric-card">
-          <span>Atualizações</span>
+          <span>Atualizacoes visiveis</span>
           <strong>{workspace.events.length}</strong>
         </div>
         <div className="metric-card">
-          <span>Próximo compromisso</span>
-          <strong>{nextAppointment ? "Agendado" : "Sem agenda"}</strong>
+          <span>Proximo compromisso</span>
+          <strong>
+            {nextAppointment ? formatPortalDateTime(nextAppointment.starts_at) : "Sem agenda"}
+          </strong>
         </div>
       </div>
 
       <div className="grid two">
         <SectionCard
-          title="Andamento do caso"
-          description="As atualizações futuras registradas pela equipe podem gerar notificações automáticas por e-mail."
+          title="Seus casos"
+          description="A equipe registra atualizacoes reais no mesmo caso que aparece aqui no portal."
         >
           {workspace.cases.length ? (
-            <ul className="list">
+            <ul className="update-feed compact">
               {workspace.cases.map((caseItem) => (
-                <li key={caseItem.id}>
-                  <div className="item-head">
-                    <strong>{caseItem.title}</strong>
-                    <span className="tag soft">{caseItem.status}</span>
+                <li key={caseItem.id} className="update-card">
+                  <div className="update-head">
+                    <div>
+                      <strong>{caseItem.title}</strong>
+                      <span className="item-meta">
+                        {caseAreaLabels[caseItem.area as keyof typeof caseAreaLabels]}
+                      </span>
+                    </div>
+                    <span className="tag soft">{caseItem.statusLabel}</span>
                   </div>
-                  <span className="item-meta">{caseItem.area}</span>
+                  <span className="item-meta">
+                    Aberto em {formatPortalDateTime(caseItem.created_at)}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="empty-state">Seu caso será exibido aqui assim que a equipe concluir o cadastro interno.</p>
+            <p className="empty-state">
+              Seu caso aparecera aqui assim que a equipe concluir o cadastro interno.
+            </p>
           )}
         </SectionCard>
 
         <SectionCard
           title="Acesso e suporte"
-          description="O e-mail continua sendo o identificador principal do portal."
+          description="Seu e-mail continua sendo o identificador principal do portal."
         >
-          <ul className="timeline">
-            <li>E-mail de login: {profile.email}</li>
-            <li>Status do cadastro: {workspace.clientRecord.status}</li>
-            <li>Observações internas liberadas para acompanhamento futuro.</li>
-          </ul>
+          <div className="support-panel">
+            <div className="support-row">
+              <span className="support-label">E-mail de login</span>
+              <strong>{profile.email}</strong>
+            </div>
+            <div className="support-row">
+              <span className="support-label">Status do cadastro</span>
+              <strong>
+                {
+                  clientStatusLabels[
+                    workspace.clientRecord.status as keyof typeof clientStatusLabels
+                  ]
+                }
+              </strong>
+            </div>
+            <div className="support-row">
+              <span className="support-label">Situacao atual</span>
+              <strong>{getStatusSummary(workspace.clientRecord.status)}</strong>
+            </div>
+          </div>
           <div className="form-actions">
             <Link className="button" href="/auth/esqueci-senha">
               Recuperar senha
@@ -98,25 +140,34 @@ export default async function ClientPage({
       </div>
 
       <SectionCard
-        title="Últimas atualizações visíveis ao cliente"
-        description="Somente os eventos preparados para a área do cliente aparecem aqui."
+        title="Historico de atualizacoes"
+        description="Somente as atualizacoes liberadas pela equipe para acompanhamento do cliente aparecem aqui, da mais recente para a mais antiga."
       >
         {workspace.events.length ? (
-          <ul className="list">
+          <ul className="update-feed">
             {workspace.events.map((event) => (
-              <li key={event.id}>
-                <div className="item-head">
-                  <strong>{event.title}</strong>
+              <li key={event.id} className="update-card featured">
+                <div className="update-head">
+                  <div>
+                    <strong>{event.title}</strong>
+                    <span className="item-meta">{event.caseTitle}</span>
+                  </div>
                   <span className="tag soft">{event.eventLabel}</span>
                 </div>
-                <span className="item-meta">
-                  {event.public_summary || "Atualização registrada no portal."}
-                </span>
+                <p className="update-body">
+                  {event.public_summary || "Nova atualizacao registrada no seu portal."}
+                </p>
+                <div className="pill-row">
+                  <span className="pill success">Visivel no portal</span>
+                  <span className="pill muted">{formatPortalDateTime(event.occurred_at)}</span>
+                </div>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="empty-state">Assim que a equipe registrar novos eventos, eles ficarão visíveis neste painel.</p>
+          <p className="empty-state">
+            Assim que a equipe registrar novas atualizacoes visiveis, elas aparecerao aqui.
+          </p>
         )}
       </SectionCard>
     </AppFrame>
