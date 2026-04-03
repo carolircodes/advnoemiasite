@@ -435,75 +435,75 @@ body:not(.portal-app) .cta-copy p {
 }
 
 body:not(.portal-app) .pathway-section {
-  padding-top: 18px;
+  padding-top: 10px;
 }
 
 body:not(.portal-app) .pathway-shell {
-  position: relative;
-  overflow: hidden;
-  padding: clamp(28px, 4vw, 40px);
-  border: 1px solid rgba(234, 215, 175, 0.16);
-  border-radius: 34px;
-  background:
-    radial-gradient(circle at top left, rgba(234, 215, 175, 0.11), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(159, 206, 193, 0.09), transparent 28%),
-    linear-gradient(180deg, rgba(8, 18, 17, 0.94), rgba(6, 12, 12, 0.9));
-  box-shadow: 0 30px 64px rgba(0, 0, 0, 0.26);
-}
-
-body:not(.portal-app) .pathway-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 38%);
-  pointer-events: none;
+  padding: clamp(28px, 4vw, 42px);
+  border: 1px solid rgba(234, 215, 175, 0.14);
+  border-radius: 32px;
+  background: linear-gradient(180deg, rgba(9, 18, 17, 0.92), rgba(7, 13, 13, 0.96));
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.22);
 }
 
 body:not(.portal-app) .pathway-head {
-  position: relative;
-  z-index: 1;
-  max-width: 72ch;
-  margin-bottom: 0;
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto 30px;
+  text-align: center;
+}
+
+body:not(.portal-app) .pathway-head h2 {
+  margin: 0;
+  color: rgba(250, 246, 238, 0.97);
+  font-size: clamp(36px, 4.6vw, 54px);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+body:not(.portal-app) .pathway-head p {
+  margin: 0 auto;
+  max-width: 58ch;
+  color: rgba(248, 243, 234, 0.74);
+  font-size: clamp(16px, 1.4vw, 18px);
+  line-height: 1.72;
 }
 
 body:not(.portal-app) .pathway-grid {
-  position: relative;
-  z-index: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 18px;
 }
 
 body:not(.portal-app) .pathway-card {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  align-items: flex-start;
+  gap: 16px;
   min-height: 100%;
-  padding: 28px;
-  border: 1px solid rgba(234, 215, 175, 0.12);
+  padding: 30px;
+  border: 1px solid rgba(234, 215, 175, 0.1);
   border-radius: 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025));
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.022));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.16);
 }
 
 body:not(.portal-app) .pathway-card-primary {
-  background:
-    radial-gradient(circle at top right, rgba(234, 215, 175, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
-  border-color: rgba(234, 215, 175, 0.2);
+  border-color: rgba(234, 215, 175, 0.18);
+  background: linear-gradient(180deg, rgba(234, 215, 175, 0.08), rgba(255, 255, 255, 0.03));
 }
 
 body:not(.portal-app) .pathway-card-secondary {
-  background:
-    radial-gradient(circle at top left, rgba(159, 206, 193, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.022));
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(159, 206, 193, 0.06), rgba(255, 255, 255, 0.02));
 }
 
 body:not(.portal-app) .pathway-card h3 {
   margin: 0;
   color: rgba(250, 246, 238, 0.97);
-  font-size: clamp(30px, 3.5vw, 42px);
-  line-height: 0.98;
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1;
   letter-spacing: -0.04em;
 }
 
@@ -511,39 +511,17 @@ body:not(.portal-app) .pathway-card p {
   margin: 0;
   color: rgba(248, 243, 234, 0.76);
   font-size: 16px;
-  line-height: 1.78;
-}
-
-body:not(.portal-app) .pathway-note {
-  display: grid;
-  gap: 6px;
-  padding: 16px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-body:not(.portal-app) .pathway-note strong {
-  color: rgba(250, 246, 238, 0.95);
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-body:not(.portal-app) .pathway-note span {
-  color: rgba(248, 243, 234, 0.72);
-  line-height: 1.66;
+  line-height: 1.72;
 }
 
 body:not(.portal-app) .pathway-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  width: 100%;
   margin-top: auto;
 }
 
 body:not(.portal-app) .pathway-actions .btn {
-  min-width: 232px;
+  min-width: 0;
 }
 
 body:not(.portal-app) .filters {
@@ -624,11 +602,15 @@ body:not(.portal-app) .footer {
   body:not(.portal-app) .featured-main:hover,
   body:not(.portal-app) .mini-feature:hover,
   body:not(.portal-app) .article-card:hover,
-  body:not(.portal-app) .pathway-card:hover,
   body:not(.portal-app) .cta-box:hover {
     transform: translateY(-4px);
     border-color: rgba(234, 215, 175, 0.22);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.32);
+  }
+
+  body:not(.portal-app) .pathway-card:hover {
+    border-color: rgba(234, 215, 175, 0.2);
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.22);
   }
 }
 
@@ -671,6 +653,10 @@ body:not(.portal-app) .footer {
   body:not(.portal-app) .pathway-shell {
     padding: 24px;
     border-radius: 30px;
+  }
+
+  body:not(.portal-app) .pathway-head {
+    margin-bottom: 24px;
   }
 
   body:not(.portal-app) .pathway-grid {
@@ -772,13 +758,24 @@ body:not(.portal-app) .footer {
     padding: 20px;
   }
 
+  body:not(.portal-app) .pathway-head {
+    margin-bottom: 20px;
+    text-align: left;
+  }
+
+  body:not(.portal-app) .pathway-head p {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: none;
+  }
+
   body:not(.portal-app) .pathway-card {
     gap: 16px;
     padding: 20px;
   }
 
   body:not(.portal-app) .pathway-card h3 {
-    font-size: clamp(28px, 8vw, 36px);
+    font-size: clamp(26px, 8vw, 34px);
   }
 
   body:not(.portal-app) .pathway-actions .btn {
