@@ -35,6 +35,13 @@ export const portalEventTypes = [
   "document_request",
   "status_change"
 ] as const;
+export const documentStatuses = [
+  "recebido",
+  "pendente",
+  "solicitado",
+  "revisado"
+] as const;
+export const documentRequestStatuses = ["pending", "completed", "cancelled"] as const;
 export const notificationChannels = ["email"] as const;
 export const notificationStatuses = [
   "pending",
@@ -56,6 +63,8 @@ export type CaseArea = (typeof caseAreas)[number];
 export type ClientStatus = (typeof clientStatuses)[number];
 export type CaseStatus = (typeof caseStatuses)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
+export type DocumentStatus = (typeof documentStatuses)[number];
+export type DocumentRequestStatus = (typeof documentRequestStatuses)[number];
 
 export function isPortalRole(value: unknown): value is PortalRole {
   return typeof value === "string" && portalRoles.includes(value as PortalRole);
@@ -93,6 +102,19 @@ export const portalEventTypeLabels: Record<PortalEventType, string> = {
   new_appointment: "Novo agendamento",
   document_request: "Solicitacao de documento",
   status_change: "Mudanca de status"
+};
+
+export const documentStatusLabels: Record<DocumentStatus, string> = {
+  recebido: "Recebido",
+  pendente: "Pendente",
+  solicitado: "Solicitado",
+  revisado: "Revisado"
+};
+
+export const documentRequestStatusLabels: Record<DocumentRequestStatus, string> = {
+  pending: "Aberta",
+  completed: "Concluida",
+  cancelled: "Cancelada"
 };
 
 export function formatPortalDateTime(value: string) {
@@ -171,6 +193,42 @@ export const recordPortalEventSchema = z.object({
   visibleToClient: z.coerce.boolean().default(true),
   shouldNotifyClient: z.coerce.boolean().default(true),
   payload: z.record(z.any()).optional().default({})
+});
+
+export const registerCaseDocumentSchema = z.object({
+  caseId: z.string().uuid("Informe um identificador de caso valido."),
+  fileName: z.string().trim().min(3, "Informe o nome do documento."),
+  category: z.string().trim().min(2, "Informe o tipo do documento.").max(120),
+  description: z.string().trim().max(500).optional().default(""),
+  status: z.enum(documentStatuses, {
+    errorMap: () => ({ message: "Selecione o status do documento." })
+  }),
+  documentDate: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine((value) => value === "" || !Number.isNaN(Date.parse(value)), {
+      message: "Informe uma data valida para o documento."
+    }),
+  visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const requestCaseDocumentSchema = z.object({
+  caseId: z.string().uuid("Informe um identificador de caso valido."),
+  title: z.string().trim().min(3, "Informe o nome do documento solicitado."),
+  instructions: z.string().trim().max(1000).optional().default(""),
+  dueAt: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine((value) => value === "" || !Number.isNaN(Date.parse(value)), {
+      message: "Informe uma data limite valida."
+    }),
+  visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
 });
 
 export function mapClientStatusToCaseStatus(status: ClientStatus): CaseStatus {

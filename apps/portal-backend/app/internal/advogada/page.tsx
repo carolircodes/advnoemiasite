@@ -110,7 +110,8 @@ export default async function InternalLawyerPage({
       description="Cadastro de clientes, acompanhamento real do caso e fila transacional preparados em uma unica operacao."
       actions={[
         { href: "/api/internal/clients", label: "API de clientes", tone: "secondary" },
-        { href: "/api/internal/events", label: "API de atualizacoes", tone: "secondary" }
+        { href: "/api/internal/events", label: "API de atualizacoes", tone: "secondary" },
+        { href: "/documentos", label: "Central de documentos", tone: "secondary" }
       ]}
     >
       {error ? <div className="error-notice">{error}</div> : null}
@@ -387,6 +388,96 @@ export default async function InternalLawyerPage({
           ) : (
             <p className="empty-state">
               A fila sera alimentada pelos convites e pelas atualizacoes visiveis com notificacao habilitada.
+            </p>
+          )}
+        </SectionCard>
+      </div>
+
+      <div className="grid two">
+        <SectionCard
+          title="Documentos recentes"
+          description="A central de documentos parte da mesma base e ja acompanha status e visibilidade por caso."
+        >
+          {overview.latestDocuments.length ? (
+            <ul className="update-feed">
+              {overview.latestDocuments.map((document) => (
+                <li key={document.id} className="update-card">
+                  <div className="update-head">
+                    <div>
+                      <strong>{document.file_name}</strong>
+                      <span className="item-meta">{document.caseTitle}</span>
+                    </div>
+                    <span className="tag soft">{document.category}</span>
+                  </div>
+                  <div className="pill-row">
+                    <span
+                      className={`pill ${
+                        document.status === "recebido" || document.status === "revisado"
+                          ? "success"
+                          : "warning"
+                      }`}
+                    >
+                      {document.statusLabel}
+                    </span>
+                    <span
+                      className={`pill ${
+                        document.visibility === "client" ? "success" : "muted"
+                      }`}
+                    >
+                      {document.visibility === "client" ? "Visivel ao cliente" : "Uso interno"}
+                    </span>
+                  </div>
+                  <span className="item-meta">
+                    {formatPortalDateTime(document.document_date)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">
+              Os documentos registrados para os casos aparecerao aqui.
+            </p>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Pendencias documentais"
+          description="As solicitacoes abertas aparecem aqui e tambem ficam visiveis na central de documentos."
+        >
+          {overview.latestDocumentRequests.length ? (
+            <ul className="update-feed">
+              {overview.latestDocumentRequests.map((request) => (
+                <li key={request.id} className="update-card">
+                  <div className="update-head">
+                    <div>
+                      <strong>{request.title}</strong>
+                      <span className="item-meta">{request.caseTitle}</span>
+                    </div>
+                    <span className="tag soft">{request.statusLabel}</span>
+                  </div>
+                  <div className="pill-row">
+                    <span
+                      className={`pill ${
+                        request.visible_to_client ? "success" : "muted"
+                      }`}
+                    >
+                      {request.visible_to_client ? "Cliente acompanha" : "Somente equipe"}
+                    </span>
+                    <span className="pill muted">
+                      {request.due_at
+                        ? `Prazo ${formatPortalDateTime(request.due_at)}`
+                        : "Sem prazo definido"}
+                    </span>
+                  </div>
+                  <span className="item-meta">
+                    Aberta em {formatPortalDateTime(request.created_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">
+              As solicitacoes documentais abertas aparecerao aqui.
             </p>
           )}
         </SectionCard>

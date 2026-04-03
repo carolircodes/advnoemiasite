@@ -14,6 +14,8 @@ O fluxo local validado para este projeto e:
 - login do cliente
 - registro de atualizacao real do caso
 - visualizacao do historico pelo cliente
+- gestao real de documentos do caso
+- solicitacoes documentais visiveis no portal
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
 
@@ -23,6 +25,7 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/auth/`: guards e resolucao de perfil
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
+- `lib/services/manage-documents.ts`: registro e solicitacao de documentos do caso
 - `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
 - `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
 - `lib/supabase/`: clientes browser, server, admin e middleware
@@ -194,6 +197,29 @@ Configuracao local relevante em `supabase/config.toml`:
 6. Se a atualizacao estiver visivel e com notificacao habilitada, confirme o novo item em `notifications_outbox`.
 7. Abra a area do cliente em `/cliente`.
 8. Confirme que a atualizacao aparece no historico em ordem da mais recente para a mais antiga.
+
+### Gestao de documentos do caso
+
+1. Entre como advogada em `/documentos`.
+2. No card `Registrar documento do caso`, escolha o caso e preencha:
+   - nome do documento
+   - tipo
+   - descricao curta
+   - status
+   - data
+   - visibilidade para o cliente
+3. Se o documento for visivel e a notificacao estiver habilitada, confirme o novo item em `notifications_outbox`.
+4. No card `Solicitar documento ao cliente`, abra uma nova solicitacao com orientacoes e prazo.
+5. Confirme que:
+   - o documento foi criado em `documents`
+   - a solicitacao foi criada em `document_requests`
+   - eventos visiveis foram registrados em `case_events`
+   - a fila foi alimentada em `notifications_outbox` quando cabivel
+6. Entre como cliente e abra `/documentos`.
+7. Confirme as tres visoes:
+   - `Documentos disponiveis`
+   - `Documentos pendentes`
+   - `Solicitacoes abertas`
 
 ## Diagnostico rapido de invite
 

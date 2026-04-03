@@ -3,6 +3,8 @@ import "server-only";
 import {
   caseStatusLabels,
   clientStatusLabels,
+  documentRequestStatusLabels,
+  documentStatusLabels,
   portalEventTypeLabels
 } from "@/lib/domain/portal";
 import type { PortalProfile } from "@/lib/auth/guards";
@@ -10,7 +12,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export async function getStaffOverview() {
   const supabase = createAdminSupabaseClient();
-  const [clientsResult, casesResult, eventsResult, outboxResult] = await Promise.all([
+  const [clientsResult, casesResult, eventsResult, documentsResult, requestsResult, outboxResult] =
+    await Promise.all([
     supabase
       .from("clients")
       .select("id,profile_id,status,created_at")
@@ -29,11 +32,21 @@ export async function getStaffOverview() {
       .order("occurred_at", { ascending: false })
       .limit(8),
     supabase
+      .from("documents")
+      .select("id,case_id,file_name,category,status,visibility,document_date,created_at")
+      .order("document_date", { ascending: false })
+      .limit(8),
+    supabase
+      .from("document_requests")
+      .select("id,case_id,title,status,visible_to_client,due_at,created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase
       .from("notifications_outbox")
       .select("id,status,template_key,created_at")
       .order("created_at", { ascending: false })
       .limit(12)
-  ]);
+    ]);
 
   if (clientsResult.error) {
     throw new Error(`Nao foi possivel carregar os clientes: ${clientsResult.error.message}`);
@@ -47,6 +60,16 @@ export async function getStaffOverview() {
     throw new Error(`Nao foi possivel carregar as atualizacoes: ${eventsResult.error.message}`);
   }
 
+  if (documentsResult.error) {
+    throw new Error(`Nao foi possivel carregar os documentos: ${documentsResult.error.message}`);
+  }
+
+  if (requestsResult.error) {
+    throw new Error(
+      `Nao foi possivel carregar as solicitacoes de documentos: ${requestsResult.error.message}`
+    );
+  }
+
   if (outboxResult.error) {
     throw new Error(
       `Nao foi possivel carregar a fila de notificacoes: ${outboxResult.error.message}`
@@ -56,6 +79,8 @@ export async function getStaffOverview() {
   const cases = casesResult.data || [];
   const clients = clientsResult.data || [];
   const events = eventsResult.data || [];
+  const documents = documentsResult.data || [];
+  const requests = requestsResult.data || [];
   const caseClientIds = [...new Set(cases.map((item) => item.client_id))];
 
   const { data: relatedClients, error: relatedClientsError } = caseClientIds.length
@@ -85,6 +110,7 @@ export async function getStaffOverview() {
   const pendingNotifications = (outboxResult.data || []).filter(
     (item) => item.status === "pending"
   ).length;
+  const openDocumentRequests = requests.filter((item) => item.status === "pending");
 
   return {
     latestClients: clients.map((client) => ({
@@ -115,6 +141,20 @@ export async function getStaffOverview() {
       caseTitle: caseMap.get(event.case_id)?.title || "Caso",
       eventLabel: portalEventTypeLabels[event.event_type as keyof typeof portalEventTypeLabels]
     })),
+    latestDocuments: documents.map((document) => ({
+      ...document,
+      caseTitle: caseMap.get(document.case_id)?.title || "Caso",
+      statusLabel: documentStatusLabels[document.status as keyof typeof documentStatusLabels]
+    })),
+    latestDocumentRequests: requests.map((request) => ({
+      ...request,
+      caseTitle: caseMap.get(request.case_id)?.title || "Caso",
+      statusLabel:
+        documentRequestStatusLabels[
+          request.status as keyof typeof documentRequestStatusLabels
+        ] || request.status
+    })),
+    openDocumentRequestsCount: openDocumentRequests.length,
     pendingNotifications,
     outboxPreview: outboxResult.data || []
   };
@@ -148,12 +188,26 @@ export async function getClientWorkspace(profile: PortalProfile) {
   const caseIds = caseList.map((item) => item.id);
   const caseMap = new Map(caseList.map((item) => [item.id, item]));
 
-  const [documentsResult, appointmentsResult, eventsResult] = await Promise.all([
+  const [documentsResult, documentRequestsResult, appointmentsResult, eventsResult] =
+    await Promise.all([
     caseIds.length
       ? supabase
           .from("documents")
-          .select("id,file_name,category,visibility,created_at")
+          .select(
+            "id,case_id,file_name,category,description,status,visibility,document_date,created_at"
+          )
           .in("case_id", caseIds)
+          .eq("visibility", "client")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    caseIds.length
+      ? supabase
+          .from("document_requests")
+          .select(
+            "id,case_id,title,instructions,due_at,status,visible_to_client,created_at"
+          )
+          .in("case_id", caseIds)
+          .eq("visible_to_client", true)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     supabase
@@ -178,6 +232,12 @@ export async function getClientWorkspace(profile: PortalProfile) {
     throw new Error(`Nao foi possivel carregar a agenda: ${appointmentsResult.error.message}`);
   }
 
+  if (documentRequestsResult.error) {
+    throw new Error(
+      `Nao foi possivel carregar as solicitacoes de documentos: ${documentRequestsResult.error.message}`
+    );
+  }
+
   if (eventsResult.error) {
     throw new Error(`Nao foi possivel carregar as atualizacoes: ${eventsResult.error.message}`);
   }
@@ -188,7 +248,19 @@ export async function getClientWorkspace(profile: PortalProfile) {
       ...caseItem,
       statusLabel: caseStatusLabels[caseItem.status as keyof typeof caseStatusLabels]
     })),
-    documents: documentsResult.data || [],
+    documents: (documentsResult.data || []).map((document) => ({
+      ...document,
+      caseTitle: caseMap.get(document.case_id)?.title || "Caso",
+      statusLabel: documentStatusLabels[document.status as keyof typeof documentStatusLabels]
+    })),
+    documentRequests: (documentRequestsResult.data || []).map((request) => ({
+      ...request,
+      caseTitle: caseMap.get(request.case_id)?.title || "Caso",
+      statusLabel:
+        documentRequestStatusLabels[
+          request.status as keyof typeof documentRequestStatusLabels
+        ] || request.status
+    })),
     appointments: appointmentsResult.data || [],
     events: (eventsResult.data || []).map((event) => ({
       ...event,
