@@ -1,0 +1,10 @@
+<h2>Recuperacao de senha do portal</h2>
+<p>Recebemos uma solicitacao para redefinir a senha da sua area do cliente.</p>
+<p>
+  <a
+    href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery&next=/auth/atualizar-senha"
+  >
+    Redefinir senha
+  </a>
+</p>
+<p>Se voce nao solicitou esta alteracao, ignore esta mensagem.</p>

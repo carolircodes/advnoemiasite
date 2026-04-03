@@ -1,0 +1,12 @@
+<h2>Seu acesso ao portal juridico foi liberado</h2>
+<p>Olá, {{ .Data.full_name }}.</p>
+<p>A equipe cadastrou seu atendimento e liberou o primeiro acesso ao portal.</p>
+<p>
+  <a
+    href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite&next=/auth/primeiro-acesso"
+  >
+    Definir senha e entrar no portal
+  </a>
+</p>
+<p>Se você não esperava este convite, ignore esta mensagem.</p>
+

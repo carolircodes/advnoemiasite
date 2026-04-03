@@ -1,0 +1,6 @@
+apps/portal-backend/node_modules/
+apps/portal-backend/.next/
+apps/portal-backend/.env.local
+apps/portal-backend/.env
+npm-debug.log*
+
