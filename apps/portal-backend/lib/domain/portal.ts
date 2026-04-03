@@ -57,6 +57,13 @@ export const appointmentStatuses = [
   "completed",
   "cancelled"
 ] as const;
+export const appointmentTypes = [
+  "reuniao",
+  "retorno",
+  "prazo",
+  "audiencia",
+  "ligacao"
+] as const;
 
 export type PortalRole = (typeof portalRoles)[number];
 export type CaseArea = (typeof caseAreas)[number];
@@ -65,6 +72,7 @@ export type CaseStatus = (typeof caseStatuses)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
 export type DocumentStatus = (typeof documentStatuses)[number];
 export type DocumentRequestStatus = (typeof documentRequestStatuses)[number];
+export type AppointmentType = (typeof appointmentTypes)[number];
 
 export function isPortalRole(value: unknown): value is PortalRole {
   return typeof value === "string" && portalRoles.includes(value as PortalRole);
@@ -115,6 +123,21 @@ export const documentRequestStatusLabels: Record<DocumentRequestStatus, string> 
   pending: "Aberta",
   completed: "Concluida",
   cancelled: "Cancelada"
+};
+
+export const appointmentStatusLabels: Record<(typeof appointmentStatuses)[number], string> = {
+  scheduled: "Agendado",
+  confirmed: "Confirmado",
+  completed: "Concluido",
+  cancelled: "Cancelado"
+};
+
+export const appointmentTypeLabels: Record<AppointmentType, string> = {
+  reuniao: "Reuniao",
+  retorno: "Retorno",
+  prazo: "Prazo",
+  audiencia: "Audiencia",
+  ligacao: "Ligacao"
 };
 
 export function formatPortalDateTime(value: string) {
@@ -227,6 +250,26 @@ export const requestCaseDocumentSchema = z.object({
     .refine((value) => value === "" || !Number.isNaN(Date.parse(value)), {
       message: "Informe uma data limite valida."
     }),
+  visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const registerCaseAppointmentSchema = z.object({
+  caseId: z.string().uuid("Informe um identificador de caso valido."),
+  title: z.string().trim().min(3, "Informe o titulo do compromisso."),
+  appointmentType: z.enum(appointmentTypes, {
+    errorMap: () => ({ message: "Selecione o tipo de compromisso." })
+  }),
+  description: z.string().trim().max(1000).optional().default(""),
+  startsAt: z
+    .string()
+    .trim()
+    .refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: "Informe uma data e hora validas."
+    }),
+  status: z.enum(appointmentStatuses, {
+    errorMap: () => ({ message: "Selecione o status do compromisso." })
+  }),
   visibleToClient: z.coerce.boolean().default(true),
   shouldNotifyClient: z.coerce.boolean().default(true)
 });

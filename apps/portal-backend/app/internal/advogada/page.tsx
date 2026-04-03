@@ -111,7 +111,8 @@ export default async function InternalLawyerPage({
       actions={[
         { href: "/api/internal/clients", label: "API de clientes", tone: "secondary" },
         { href: "/api/internal/events", label: "API de atualizacoes", tone: "secondary" },
-        { href: "/documentos", label: "Central de documentos", tone: "secondary" }
+        { href: "/documentos", label: "Central de documentos", tone: "secondary" },
+        { href: "/agenda", label: "Central de agenda", tone: "secondary" }
       ]}
     >
       {error ? <div className="error-notice">{error}</div> : null}
@@ -478,6 +479,103 @@ export default async function InternalLawyerPage({
           ) : (
             <p className="empty-state">
               As solicitacoes documentais abertas aparecerao aqui.
+            </p>
+          )}
+        </SectionCard>
+      </div>
+
+      <div className="grid two">
+        <SectionCard
+          title="Proximos compromissos"
+          description="A agenda do caso tambem fica refletida aqui para a equipe acompanhar os proximos passos sem sair do painel."
+        >
+          {overview.latestAppointments.length ? (
+            <ul className="update-feed">
+              {overview.latestAppointments
+                .filter((appointment) => new Date(appointment.starts_at) >= new Date())
+                .slice(0, 6)
+                .map((appointment) => (
+                  <li key={appointment.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{appointment.title}</strong>
+                        <span className="item-meta">
+                          {appointment.caseTitle} - {appointment.clientName}
+                        </span>
+                      </div>
+                      <span className="tag soft">{appointment.typeLabel}</span>
+                    </div>
+                    <div className="pill-row">
+                      <span
+                        className={`pill ${
+                          appointment.status === "scheduled" ||
+                          appointment.status === "confirmed"
+                            ? "success"
+                            : "warning"
+                        }`}
+                      >
+                        {appointment.statusLabel}
+                      </span>
+                      <span
+                        className={`pill ${
+                          appointment.visible_to_client ? "success" : "muted"
+                        }`}
+                      >
+                        {appointment.visible_to_client ? "Cliente acompanha" : "Somente equipe"}
+                      </span>
+                    </div>
+                    <span className="item-meta">
+                      {formatPortalDateTime(appointment.starts_at)}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          ) : (
+            <p className="empty-state">
+              Os proximos compromissos cadastrados para os casos aparecerao aqui.
+            </p>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Historico recente da agenda"
+          description="Itens concluidos ou passados continuam visiveis para apoiar o acompanhamento interno."
+        >
+          {overview.latestAppointments.length ? (
+            <ul className="update-feed">
+              {overview.latestAppointments
+                .filter((appointment) => new Date(appointment.starts_at) < new Date())
+                .sort((left, right) => right.starts_at.localeCompare(left.starts_at))
+                .slice(0, 6)
+                .map((appointment) => (
+                  <li key={appointment.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{appointment.title}</strong>
+                        <span className="item-meta">
+                          {appointment.caseTitle} - {appointment.clientName}
+                        </span>
+                      </div>
+                      <span className="tag soft">{appointment.typeLabel}</span>
+                    </div>
+                    <div className="pill-row">
+                      <span
+                        className={`pill ${
+                          appointment.status === "completed" ? "success" : "warning"
+                        }`}
+                      >
+                        {appointment.statusLabel}
+                      </span>
+                      <span className="pill muted">
+                        {formatPortalDateTime(appointment.starts_at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          ) : (
+            <p className="empty-state">
+              O historico recente da agenda aparecera aqui depois dos primeiros registros.
             </p>
           )}
         </SectionCard>

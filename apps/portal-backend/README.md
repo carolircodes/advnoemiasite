@@ -16,6 +16,8 @@ O fluxo local validado para este projeto e:
 - visualizacao do historico pelo cliente
 - gestao real de documentos do caso
 - solicitacoes documentais visiveis no portal
+- agenda real de compromissos e proximos passos
+- compromissos visiveis ao cliente em `/agenda`
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
 
@@ -26,6 +28,7 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
 - `lib/services/manage-documents.ts`: registro e solicitacao de documentos do caso
+- `lib/services/manage-appointments.ts`: compromissos, prazos e proximos passos do caso
 - `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
 - `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
 - `lib/supabase/`: clientes browser, server, admin e middleware
@@ -220,6 +223,26 @@ Configuracao local relevante em `supabase/config.toml`:
    - `Documentos disponiveis`
    - `Documentos pendentes`
    - `Solicitacoes abertas`
+
+### Agenda do caso
+
+1. Entre como advogada em `/agenda`.
+2. No card `Registrar compromisso ou proximo passo`, escolha o caso e preencha:
+   - titulo
+   - tipo de compromisso
+   - descricao curta
+   - data e hora
+   - status
+   - visibilidade para o cliente
+3. Envie o formulario.
+4. Confirme que:
+   - o compromisso foi criado em `appointments`
+   - um evento visivel foi criado em `case_events` quando aplicavel
+   - a fila foi alimentada em `notifications_outbox` quando a notificacao estiver habilitada
+5. Entre como cliente e abra `/agenda`.
+6. Confirme as duas visoes:
+   - `Proximos compromissos`
+   - `Historico recente`
 
 ## Diagnostico rapido de invite
 

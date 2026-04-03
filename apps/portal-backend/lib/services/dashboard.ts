@@ -1,6 +1,8 @@
 import "server-only";
 
 import {
+  appointmentStatusLabels,
+  appointmentTypeLabels,
   caseStatusLabels,
   clientStatusLabels,
   documentRequestStatusLabels,
@@ -12,7 +14,15 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export async function getStaffOverview() {
   const supabase = createAdminSupabaseClient();
-  const [clientsResult, casesResult, eventsResult, documentsResult, requestsResult, outboxResult] =
+  const [
+    clientsResult,
+    casesResult,
+    eventsResult,
+    documentsResult,
+    requestsResult,
+    appointmentsResult,
+    outboxResult
+  ] =
     await Promise.all([
     supabase
       .from("clients")
@@ -42,6 +52,13 @@ export async function getStaffOverview() {
       .order("created_at", { ascending: false })
       .limit(8),
     supabase
+      .from("appointments")
+      .select(
+        "id,case_id,client_id,title,appointment_type,status,visible_to_client,starts_at,created_at"
+      )
+      .order("starts_at", { ascending: true })
+      .limit(12),
+    supabase
       .from("notifications_outbox")
       .select("id,status,template_key,created_at")
       .order("created_at", { ascending: false })
@@ -70,6 +87,10 @@ export async function getStaffOverview() {
     );
   }
 
+  if (appointmentsResult.error) {
+    throw new Error(`Nao foi possivel carregar a agenda: ${appointmentsResult.error.message}`);
+  }
+
   if (outboxResult.error) {
     throw new Error(
       `Nao foi possivel carregar a fila de notificacoes: ${outboxResult.error.message}`
@@ -81,6 +102,7 @@ export async function getStaffOverview() {
   const events = eventsResult.data || [];
   const documents = documentsResult.data || [];
   const requests = requestsResult.data || [];
+  const appointments = appointmentsResult.data || [];
   const caseClientIds = [...new Set(cases.map((item) => item.client_id))];
 
   const { data: relatedClients, error: relatedClientsError } = caseClientIds.length
@@ -111,6 +133,8 @@ export async function getStaffOverview() {
     (item) => item.status === "pending"
   ).length;
   const openDocumentRequests = requests.filter((item) => item.status === "pending");
+  const nowIso = new Date().toISOString();
+  const upcomingAppointments = appointments.filter((item) => item.starts_at >= nowIso);
 
   return {
     latestClients: clients.map((client) => ({
@@ -154,6 +178,22 @@ export async function getStaffOverview() {
           request.status as keyof typeof documentRequestStatusLabels
         ] || request.status
     })),
+    latestAppointments: appointments.map((appointment) => ({
+      ...appointment,
+      caseTitle: caseMap.get(appointment.case_id)?.title || "Caso",
+      clientName:
+        profileMap.get(clientMap.get(appointment.client_id)?.profile_id || "")?.full_name ||
+        "Cliente",
+      statusLabel:
+        appointmentStatusLabels[
+          appointment.status as keyof typeof appointmentStatusLabels
+        ] || appointment.status,
+      typeLabel:
+        appointmentTypeLabels[
+          appointment.appointment_type as keyof typeof appointmentTypeLabels
+        ] || appointment.appointment_type
+    })),
+    upcomingAppointmentsCount: upcomingAppointments.length,
     openDocumentRequestsCount: openDocumentRequests.length,
     pendingNotifications,
     outboxPreview: outboxResult.data || []
@@ -212,8 +252,11 @@ export async function getClientWorkspace(profile: PortalProfile) {
       : Promise.resolve({ data: [], error: null }),
     supabase
       .from("appointments")
-      .select("id,starts_at,ends_at,mode,status,notes")
+      .select(
+        "id,case_id,title,appointment_type,starts_at,ends_at,mode,status,notes,visible_to_client"
+      )
       .eq("client_id", clientRecord.id)
+      .eq("visible_to_client", true)
       .order("starts_at", { ascending: true }),
     supabase
       .from("case_events")
@@ -261,7 +304,19 @@ export async function getClientWorkspace(profile: PortalProfile) {
           request.status as keyof typeof documentRequestStatusLabels
         ] || request.status
     })),
-    appointments: appointmentsResult.data || [],
+    appointments: (appointmentsResult.data || []).map((appointment) => ({
+      ...appointment,
+      caseTitle: caseMap.get(appointment.case_id)?.title || "Caso",
+      description: appointment.notes || "",
+      statusLabel:
+        appointmentStatusLabels[
+          appointment.status as keyof typeof appointmentStatusLabels
+        ] || appointment.status,
+      typeLabel:
+        appointmentTypeLabels[
+          appointment.appointment_type as keyof typeof appointmentTypeLabels
+        ] || appointment.appointment_type
+    })),
     events: (eventsResult.data || []).map((event) => ({
       ...event,
       caseTitle: caseMap.get(event.case_id)?.title || "Caso",
