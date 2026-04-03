@@ -3,7 +3,7 @@
     office: {
       name: "Noêmia Paixão Advocacia",
       oab: "OAB/RN 3939",
-      tagline: "Portal Jurídico Premium",
+      tagline: "Portal jurídico organizado",
       supportPhone: "5584996248241"
     },
     api: {
@@ -12,15 +12,23 @@
       endpoints: {
         session: "/portal/session",
         login: "/portal/auth/login",
-        dashboardAdvogada: "/portal/advogada/dashboard",
-        dashboardCliente: "/portal/cliente/dashboard",
+        internalLogin: "/portal/auth/internal/login",
+        passwordSetup: "/portal/auth/password/setup",
+        passwordReset: "/portal/auth/password/reset",
+        clients: "/portal/clients",
+        clientInvite: "/portal/clients/invite",
+        cases: "/portal/cases",
+        caseUpdates: "/portal/cases/updates",
         documents: "/portal/documents",
-        schedule: "/portal/schedule"
+        documentRequests: "/portal/documents/requests",
+        schedule: "/portal/schedule",
+        notifications: "/portal/notifications"
       }
     },
     routes: {
       site: "../index.html",
       blog: "../blog.html",
+      triagem: "../triagem.html?area=geral&origem=portal-login&pagina=portal/login.html",
       login: "login.html",
       painelAdvogada: "painel-advogada.html",
       painelCliente: "painel-cliente.html",
@@ -32,45 +40,49 @@
       ready: { label: "Pronto", tone: "success" },
       completed: { label: "Concluído", tone: "success" },
       validated: { label: "Validado", tone: "success" },
+      active: { label: "Acesso ativo", tone: "success" },
+      planned: { label: "Preparado", tone: "success" },
+      scheduled: { label: "Agendado", tone: "success" },
+      updated: { label: "Atualizado", tone: "success" },
       inReview: { label: "Em revisão", tone: "" },
-      preparing: { label: "Em preparação", tone: "" },
+      preparing: { label: "Em andamento", tone: "" },
       reserve: { label: "Reserva", tone: "" },
-      base: { label: "Base pronta", tone: "success" },
-      model: { label: "Modelo base", tone: "" },
       pending: { label: "Pendente", tone: "warning" },
       pendingClient: { label: "Aguardando cliente", tone: "warning" },
-      missing: { label: "Falta revisar", tone: "danger" },
+      invited: { label: "Convite pendente", tone: "warning" },
+      requested: { label: "Solicitado", tone: "warning" },
       highPriority: { label: "Prioridade alta", tone: "warning" },
-      prerequisite: { label: "Pré-requisito aberto", tone: "warning" }
+      prerequisite: { label: "Pré-requisito", tone: "warning" },
+      missing: { label: "Documento pendente", tone: "danger" }
     },
     users: {
       advogada: {
         name: "Dra. Noêmia Paixão",
-        label: "Operação Premium",
-        summary: "Gestão jurídica com foco em atendimento, revisão documental e agenda estratégica."
+        label: "Painel interno",
+        summary: "Cadastro de clientes, atualização de casos, agenda e organização das comunicações do escritório."
       },
       cliente: {
         name: "Marina Costa",
-        label: "Área do Cliente",
-        summary: "Cliente com revisão de aposentadoria em andamento, acompanhamento digital e agenda ativa."
+        label: "Área do cliente",
+        summary: "Cliente com revisão previdenciária em andamento, documentos conferidos e agenda ativa."
       },
       documentos: {
         name: "Centro documental",
-        label: "Centro Documental",
-        summary: "Organização por caso, status, checklist, revisão e governança dos arquivos do atendimento."
+        label: "Documentos",
+        summary: "Fila de arquivos, solicitações ao cliente, conferência e histórico organizados por caso."
       },
       agenda: {
-        name: "Semana operacional",
-        label: "Agenda Premium",
-        summary: "Blocos visuais para consulta, retorno, preparo estratégico e gestão da carga."
+        name: "Agenda operacional",
+        label: "Agenda",
+        summary: "Compromissos, confirmações e lembretes conectados aos casos e às próximas ações do atendimento."
       }
     },
     summaries: {
       advogada: {
+        registrations: "06 cadastros",
         cases: "24 casos",
-        appointments: "08 compromissos",
-        documents: "12 documentos",
-        alerts: "03 alertas"
+        notifications: "05 eventos",
+        documents: "12 documentos"
       },
       cliente: {
         currentStage: "Etapa atual",
@@ -80,109 +92,227 @@
       },
       documentos: {
         files: "12 arquivos",
-        checklists: "04 checklists",
+        requests: "03 solicitações",
         pendingItems: "03 pendências",
-        traceability: "100% rastreável"
+        traceability: "Histórico ativo"
       },
       agenda: {
         appointments: "08 compromissos",
         confirmations: "03 confirmações",
         freeSlots: "02 janelas livres",
-        alerts: "01 alerta"
+        alerts: "02 avisos"
       }
     },
     integrationModules: [
       {
-        title: "Autenticação e sessão",
-        description: "Pronta para login real, sessão persistida, perfil ativo e permissões por papel."
+        title: "Cadastro e acesso do cliente",
+        description: "A equipe cadastra o cliente, vincula o caso e libera o portal com login por e-mail."
       },
       {
-        title: "Casos e clientes",
-        description: "Estrutura compatível com cadastro de clientes, casos, estágio, prioridade e histórico."
+        title: "Convite e primeiro acesso",
+        description: "O cliente recebe convite por e-mail para definir a própria senha com fluxo seguro."
       },
       {
-        title: "Documentos e agenda",
-        description: "Fluxo preparado para upload, checklist, confirmações, reagendamento e alertas."
+        title: "Recuperação de senha",
+        description: "A redefinição poderá ser enviada para o e-mail cadastrado, sem uso de CPF como senha."
       },
       {
-        title: "Auditoria e rastreio",
-        description: "Base pronta para registrar ação, data, responsável e origem de cada mudança."
+        title: "Eventos e notificações",
+        description: "Atualizações de caso, documentos, agenda e status poderão acionar e-mails automáticos."
       }
     ],
     loginHighlights: [
       {
-        title: "Experiência consistente",
-        description: "O acesso mantém a mesma linguagem visual do site e facilita a continuidade do atendimento."
+        title: "1. Cadastro pela equipe",
+        description: "A advogada cadastra nome, e-mail, CPF, telefone, área do caso e status inicial."
       },
       {
-        title: "Base pronta para evoluir",
-        description: "Campos, perfis e navegação já sustentam autenticação, sessão e governança futura."
+        title: "2. Convite por e-mail",
+        description: "Depois do cadastro, o cliente pode receber um convite para definir a própria senha."
       },
       {
-        title: "Separação por contexto",
-        description: "Cliente acompanha o atendimento. Equipe visualiza operação, agenda e documentos."
+        title: "3. Acompanhamento no portal",
+        description: "Com o acesso liberado, o cliente entra com o e-mail cadastrado e acompanha o caso."
       }
     ],
-    loginRoles: [
+    loginSupportCards: [
       {
-        id: "cliente",
-        title: "Cliente",
-        description: "Visualiza andamento, agenda, documentos, solicitações e próximos passos."
+        id: "primeiro-acesso",
+        title: "Primeiro acesso",
+        description: "O cliente recebe um convite no e-mail cadastrado para criar a senha e liberar a entrada no portal.",
+        tags: ["Convite por e-mail", "Senha definida pelo cliente"]
       },
       {
-        id: "advogada",
-        title: "Advogada",
-        description: "Visualiza operação, triagem, agenda, documentos e gestão do atendimento."
+        id: "recuperacao-senha",
+        title: "Esqueci minha senha",
+        description: "A recuperação será feita por link seguro enviado para o e-mail cadastrado no escritório.",
+        tags: ["Redefinição segura", "Login por e-mail"]
+      },
+      {
+        id: "acesso-interno",
+        title: "Painel interno da equipe",
+        description: "A advogada usa o painel interno para cadastrar clientes, atualizar casos e preparar comunicações futuras.",
+        tags: ["Cadastro interno", "Gestão de casos"],
+        action: {
+          label: "Abrir painel interno",
+          href: "painel-advogada.html",
+          variant: "secondary"
+        }
       }
     ],
-    leads: [
+    loginReadiness: [
       {
-        title: "Consumidor e bancário",
-        description: "2 novos leads com documentos iniciais enviados e pendência de confirmação de consulta."
+        key: "Login do cliente",
+        value: "Entrada pelo e-mail cadastrado, com sessão segura e permissão por perfil."
       },
       {
-        title: "Previdenciário",
-        description: "1 cliente aguardando checklist final para análise de revisão de benefício."
+        key: "Convite inicial",
+        value: "Disparo futuro de e-mail para criação da primeira senha do cliente."
+      },
+      {
+        key: "Esqueci minha senha",
+        value: "Envio futuro de link de redefinição para o e-mail cadastrado."
+      },
+      {
+        key: "Painel interno",
+        value: "Cadastro de clientes, atualização de casos e organização dos próximos envios."
+      }
+    ],
+    clientRegistrationFields: [
+      {
+        label: "Nome completo",
+        type: "text",
+        placeholder: "Nome completo do cliente"
+      },
+      {
+        label: "E-mail",
+        type: "email",
+        placeholder: "cliente@dominio.com"
+      },
+      {
+        label: "CPF",
+        type: "text",
+        placeholder: "000.000.000-00"
+      },
+      {
+        label: "Telefone",
+        type: "tel",
+        placeholder: "(84) 00000-0000"
+      },
+      {
+        label: "Área do caso",
+        type: "select",
+        placeholder: "Selecione a área do caso",
+        options: [
+          "Direito Previdenciário",
+          "Consumidor e Bancário",
+          "Direito de Família",
+          "Direito Civil"
+        ]
+      },
+      {
+        label: "Status",
+        type: "select",
+        placeholder: "Selecione o status inicial",
+        options: [
+          "Triagem recebida",
+          "Cadastro concluído",
+          "Convite pendente",
+          "Acesso ativo"
+        ]
+      },
+      {
+        label: "Observações",
+        type: "textarea",
+        placeholder: "Observações internas, urgência, documentos pendentes e próximos passos.",
+        fullWidth: true,
+        rows: 4
+      }
+    ],
+    clientRegistrationTags: ["Login por e-mail", "Convite por e-mail", "Senha criada pelo cliente"],
+    clientAccessFlow: [
+      {
+        title: "Triagem ou contato inicial",
+        description: "O novo atendimento chega ao escritório e é qualificado pela equipe."
+      },
+      {
+        title: "Cadastro interno do cliente",
+        description: "A advogada registra dados, área do caso, observações e status inicial."
+      },
+      {
+        title: "Convite para o portal",
+        description: "O sistema poderá enviar e-mail com convite para o cliente definir a própria senha."
+      },
+      {
+        title: "Acompanhamento do caso",
+        description: "Depois do primeiro acesso, o cliente acompanha documentos, agenda e atualizações."
       }
     ],
     advogadaRadar: [
       {
         title: "09:30 • Consulta inicial",
-        description: "Marina Costa • revisão de aposentadoria",
+        description: "Marina Costa • revisão previdenciária",
         status: "confirmed"
       },
       {
-        title: "11:00 • Revisão documental",
-        description: "Procuração e contrato de honorários • caso bancário",
+        title: "11:00 • Conferência de cadastro",
+        description: "Novo cliente bancário • convite pendente de envio",
         status: "highPriority"
       },
       {
         title: "15:30 • Retorno ao cliente",
-        description: "Acompanhamento de negativa do INSS",
+        description: "Atualização de status após análise do caso",
         status: "preparing"
       }
     ],
-    advogadaDocuments: [
+    advogadaCaseUpdates: [
       {
-        title: "Contrato de honorários",
-        description: "Cliente: Marina Costa • assinatura pendente",
+        title: "Atualização do caso • Marina Costa",
+        description: "Resumo do andamento pronto para publicação no portal e envio futuro por e-mail.",
+        status: "updated"
+      },
+      {
+        title: "Mudança de status • caso bancário",
+        description: "Status alterado para aguardando documentos complementares do cliente.",
         status: "pendingClient"
       },
       {
-        title: "Extratos bancários",
-        description: "Caso bancário • revisão de provas",
-        status: "missing"
+        title: "Novo cliente • direito de família",
+        description: "Cadastro recebido e aguardando conferência final antes do convite para o portal.",
+        status: "invited"
+      }
+    ],
+    notificationEvents: [
+      {
+        title: "Atualização do caso",
+        description: "Quando a equipe registrar novo andamento, o cliente poderá receber resumo por e-mail com link para o portal.",
+        status: "planned"
       },
       {
-        title: "CNIS atualizado",
-        description: "Revisão previdenciária • recebido hoje",
-        status: "ready"
+        title: "Novo documento",
+        description: "Ao disponibilizar documento no portal, o sistema poderá avisar o cliente por e-mail.",
+        status: "planned"
+      },
+      {
+        title: "Novo agendamento",
+        description: "Criação de consulta ou retorno poderá gerar confirmação por e-mail para o cliente.",
+        status: "scheduled"
+      },
+      {
+        title: "Solicitação de documento",
+        description: "Pedidos de novos arquivos poderão ser enviados com checklist e link direto para o portal.",
+        status: "requested"
+      },
+      {
+        title: "Mudança de status",
+        description: "Mudanças como em análise, aguardando cliente ou concluído poderão acionar comunicação automática.",
+        status: "planned"
       }
     ],
     clientTimeline: [
       {
         title: "1. Cadastro e triagem concluídos",
-        description: "Seus dados principais já foram recebidos e o tipo de atendimento foi definido pela equipe."
+        description: "Seus dados principais já foram registrados e o atendimento foi vinculado à área correta."
       },
       {
         title: "2. Documentação em conferência",
@@ -190,7 +320,7 @@
       },
       {
         title: "3. Reunião estratégica agendada",
-        description: "Na próxima consulta serão explicados cenário, riscos, próximos passos e estratégia sugerida."
+        description: "Na próxima consulta serão explicados cenário, riscos e próximos passos do caso."
       }
     ],
     clientDocuments: [
@@ -224,19 +354,23 @@
     ],
     clientSupportNotes: [
       {
-        title: "Dúvidas rápidas",
-        description: "O WhatsApp continua como canal de apoio para questões práticas e encaminhamentos imediatos."
+        title: "Login por e-mail",
+        description: "O acesso do cliente usa o e-mail cadastrado pela equipe no escritório."
       },
       {
-        title: "Próximos passos claros",
-        description: "O cliente enxerga o que falta, o que já foi feito e quando haverá novo contato."
+        title: "Convite e redefinição",
+        description: "O primeiro acesso e a recuperação de senha poderão ser enviados para o mesmo e-mail."
+      },
+      {
+        title: "Canal de apoio",
+        description: "O WhatsApp continua disponível para dúvidas práticas e encaminhamentos imediatos."
       }
     ],
     documentQueue: [
       {
         title: "Contrato de honorários",
-        description: "Cliente: Marina Costa • módulo comercial",
-        status: "pending"
+        description: "Cliente: Marina Costa • aguardando assinatura",
+        status: "pendingClient"
       },
       {
         title: "Procuração",
@@ -245,20 +379,20 @@
       },
       {
         title: "Extratos bancários",
-        description: "Caso bancário • anexos probatórios",
-        status: "missing"
+        description: "Caso bancário • documentos complementares solicitados",
+        status: "requested"
       },
       {
         title: "CNIS atualizado",
-        description: "Caso previdenciário • documento técnico",
+        description: "Caso previdenciário • documento validado pela equipe",
         status: "validated"
       }
     ],
     documentChecklist: [
       {
         title: "Onboarding inicial",
-        description: "Documento pessoal, comprovante, contrato e procuração.",
-        status: "base"
+        description: "Documento pessoal, comprovante de endereço, contrato e procuração.",
+        status: "active"
       },
       {
         title: "Provas do caso",
@@ -266,27 +400,39 @@
         status: "pending"
       },
       {
-        title: "Documentação processual",
-        description: "Petições, anexos técnicos e peças organizadas por etapa.",
-        status: "model"
+        title: "Peças e histórico",
+        description: "Petição, anexos técnicos, versões e validações organizadas por etapa.",
+        status: "planned"
       }
     ],
     documentFlow: [
       {
         title: "1. Solicitar",
-        description: "Cliente recebe checklist objetivo no portal."
+        description: "A equipe abre a solicitação com checklist objetivo e prazo."
       },
       {
         title: "2. Receber",
-        description: "Arquivo entra com tipo, origem, caso e status inicial."
+        description: "O arquivo entra no caso com tipo documental, origem e status inicial."
       },
       {
         title: "3. Conferir",
-        description: "Equipe marca se está válido, incompleto ou pendente."
+        description: "A equipe valida se o documento está completo, pendente ou pronto para uso."
       },
       {
-        title: "4. Consolidar",
-        description: "Documentos aprovados alimentam análise, agenda e próximos passos."
+        title: "4. Publicar no portal",
+        description: "Quando necessário, o cliente é avisado no portal e poderá receber comunicação por e-mail."
+      }
+    ],
+    documentNotificationEvents: [
+      {
+        title: "Novo documento disponibilizado",
+        description: "Quando um arquivo for publicado no portal, o cliente poderá receber aviso por e-mail.",
+        status: "planned"
+      },
+      {
+        title: "Solicitação de documento",
+        description: "Pedidos de anexos poderão ser enviados com checklist e link direto para o portal.",
+        status: "requested"
       }
     ],
     weekSchedule: [
@@ -318,28 +464,40 @@
         status: "confirmed"
       },
       {
-        title: "11:00 • Revisão documental",
-        description: "Pasta bancária com pendência de extratos",
-        status: "prerequisite"
+        title: "11:00 • Novo agendamento",
+        description: "Retorno bancário criado e aguardando confirmação do cliente",
+        status: "scheduled"
       },
       {
-        title: "15:30 • Retorno ao cliente",
-        description: "Envio de próximos passos após análise preliminar",
+        title: "15:30 • Lembrete ao cliente",
+        description: "Compromisso de amanhã com envio futuro de aviso por e-mail",
         status: "preparing"
       }
     ],
     agendaGuides: [
       {
-        title: "Confirmação",
-        description: "Registrar status do compromisso e orientar o cliente com antecedência."
+        title: "Confirmação do compromisso",
+        description: "Registrar status do atendimento e orientar o cliente com antecedência."
       },
       {
-        title: "Pré-leitura",
+        title: "Pré-leitura documental",
         description: "Verificar se documentos essenciais foram enviados antes da reunião."
       },
       {
-        title: "Blocos internos",
-        description: "Separar tempo de revisão estratégica e fechamento operacional."
+        title: "Rotina interna",
+        description: "Separar tempo para revisão estratégica, retorno ao cliente e fechamento operacional."
+      }
+    ],
+    agendaNotificationEvents: [
+      {
+        title: "Novo agendamento",
+        description: "Ao criar consulta ou retorno, o cliente poderá receber confirmação por e-mail.",
+        status: "scheduled"
+      },
+      {
+        title: "Lembrete de compromisso",
+        description: "Antes do horário agendado, o sistema poderá enviar aviso com data, hora e link do portal.",
+        status: "planned"
       }
     ]
   };

@@ -585,6 +585,17 @@ body:not(.portal-app) .pathway-actions .btn {
   min-width: 0;
 }
 
+body:not(.portal-app) .pathway-footnote {
+  margin: 18px auto 0;
+  max-width: 66ch;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(248, 243, 234, 0.68);
+  font-size: 14px;
+  line-height: 1.74;
+  text-align: center;
+}
+
 body:not(.portal-app) .filters {
   margin-bottom: 26px;
   overflow-x: auto;
@@ -846,6 +857,10 @@ body:not(.portal-app) .footer {
     margin-left: 0;
     margin-right: 0;
     max-width: none;
+  }
+
+  body:not(.portal-app) .pathway-footnote {
+    text-align: left;
   }
 
   body:not(.portal-app) .pathway-card {

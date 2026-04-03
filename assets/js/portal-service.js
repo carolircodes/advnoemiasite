@@ -49,9 +49,9 @@
     return [
       { label: "Site", href: data.routes.site, active: activeKey === "site" },
       { label: "Blog", href: data.routes.blog, active: activeKey === "blog" },
-      { label: "Acesso", href: data.routes.login, active: activeKey === "login" },
-      { label: "Cliente", href: data.routes.painelCliente, active: activeKey === "cliente" },
-      { label: "Advogada", href: data.routes.painelAdvogada, active: activeKey === "advogada" }
+      { label: "Iniciar atendimento", href: data.routes.triagem, active: activeKey === "triagem" },
+      { label: "Área do cliente", href: data.routes.login, active: activeKey === "login" },
+      { label: "Painel interno", href: data.routes.painelAdvogada, active: activeKey === "advogada" }
     ];
   }
 
@@ -60,8 +60,14 @@
       {
         label: "Visão geral",
         href: data.routes.painelAdvogada,
-        badge: "01",
+        badge: "Painel",
         active: activePage === "painel-advogada"
+      },
+      {
+        label: "Cadastrar cliente",
+        href: data.routes.painelAdvogada + "#cadastro-cliente",
+        badge: "Novo",
+        active: false
       },
       {
         label: "Documentos",
@@ -82,7 +88,7 @@
         active: activePage === "painel-cliente"
       },
       {
-        label: "Trocar acesso",
+        label: "Login do cliente",
         href: data.routes.login,
         badge: "↗",
         active: activePage === "login"
@@ -101,7 +107,7 @@
       {
         label: "Meu painel",
         href: data.routes.painelCliente,
-        badge: "01",
+        badge: "Painel",
         active: activePage === "painel-cliente"
       },
       {
@@ -115,12 +121,6 @@
         href: data.routes.agenda,
         badge: "02",
         active: activePage === "agenda"
-      },
-      {
-        label: "Painel interno",
-        href: data.routes.painelAdvogada,
-        badge: "Equipe",
-        active: activePage === "painel-advogada"
       },
       {
         label: "Trocar acesso",
@@ -140,15 +140,15 @@
   function buildSharedSidebarNav(activePage) {
     return [
       {
-        label: "Painel da advogada",
+        label: "Painel interno",
         href: data.routes.painelAdvogada,
-        badge: "↗",
+        badge: "Equipe",
         active: activePage === "painel-advogada"
       },
       {
-        label: "Painel do cliente",
+        label: "Área do cliente",
         href: data.routes.painelCliente,
-        badge: "↗",
+        badge: "Cliente",
         active: activePage === "painel-cliente"
       },
       {
@@ -164,7 +164,7 @@
         active: activePage === "agenda"
       },
       {
-        label: "Trocar acesso",
+        label: "Login do cliente",
         href: data.routes.login,
         badge: "↗",
         active: activePage === "login"
@@ -182,50 +182,51 @@
   }
 
   function buildLoginModel() {
-    var selectedRole = getStoredRole();
-
     return {
       type: "login",
       topbar: {
-        message: "Área reservada organizada para autenticação, sessão, perfis e módulos do escritório.",
-        pills: ["Login", "Sessão", "Permissões"]
+        message: "Acesso reservado para clientes já cadastrados. Novos atendimentos começam pela triagem.",
+        pills: ["Login por e-mail", "Convite de acesso", "Recuperação de senha"]
       },
       header: {
         brandHref: data.routes.site,
-        brandSmall: "Área Reservada",
+        brandSmall: "Área do cliente",
         nav: buildHeaderNav("login"),
         actions: [
-          { label: "Área do cliente", href: data.routes.painelCliente, variant: "secondary" },
-          { label: "Área interna", href: data.routes.painelAdvogada, variant: "primary" }
+          { label: "Iniciar atendimento", href: data.routes.triagem, variant: "secondary" },
+          { label: "Painel interno", href: data.routes.painelAdvogada, variant: "primary" }
         ]
       },
       intro: {
-        eyebrow: "Acesso organizado por perfil",
-        title: "Uma entrada reservada clara para clientes, equipe e autenticação real.",
+        eyebrow: "Acesso para clientes cadastrados",
+        title: "Entre com o e-mail liberado pela equipe.",
         description:
-          "A interface separa cliente e operação do escritório, enquanto a camada técnica já organiza sessão, permissões e a conexão posterior com a API.",
+          "O portal é liberado após o cadastro interno do cliente. No primeiro acesso, a senha é definida pelo próprio cliente a partir do convite enviado por e-mail.",
         timeline: clone(data.loginHighlights),
         quickAccess: [
-          { label: "Entrar como equipe", href: data.routes.painelAdvogada, variant: "secondary" },
-          { label: "Entrar como cliente", href: data.routes.painelCliente, variant: "secondary" },
-          { label: "Abrir documentos", href: data.routes.documentos, variant: "secondary" },
-          { label: "Abrir agenda", href: data.routes.agenda, variant: "secondary" }
+          { label: "Iniciar atendimento", href: data.routes.triagem, variant: "secondary" },
+          { label: "Voltar ao site", href: data.routes.site, variant: "secondary" },
+          { label: "Painel interno", href: data.routes.painelAdvogada, variant: "secondary" }
         ]
       },
       form: {
-        eyebrow: "Acesso reservado",
-        title: "Entrar na área reservada",
+        eyebrow: "Clientes já cadastrados",
+        title: "Acessar área do cliente",
         description:
-          "A estrutura já está separada para validar credenciais, montar sessão segura e redirecionar o perfil correto quando o backend for integrado.",
-        roles: clone(data.loginRoles),
-        selectedRole: selectedRole,
-        submitLabel: "Acessar área reservada",
-        note: "Fluxo preparado para autenticação segura, permissões por perfil e continuidade do atendimento digital.",
+          "Use o e-mail cadastrado pela equipe e a senha definida no convite inicial. O CPF permanece apenas como dado cadastral, sem uso como senha.",
+        selectedRole: "cliente",
+        submitLabel: "Entrar na área do cliente",
+        note: "Somente clientes cadastrados pela equipe conseguem acessar este ambiente.",
+        inlineLinks: [
+          { label: "Primeiro acesso", href: "#primeiro-acesso" },
+          { label: "Esqueci minha senha", href: "#recuperacao-senha" }
+        ],
+        supportCards: clone(data.loginSupportCards),
         readiness: {
-          title: "Estrutura de integração",
+          title: "Estrutura pronta para integração",
           description:
-            "Interface, dados de exibição e serviço de acesso já estão isolados. Quando a API entrar, a camada de demonstração pode ser substituída pelas rotas reais sem reescrever a interface.",
-          items: buildIntegrationRows()
+            "A interface já foi organizada para backend, sessão segura, convites por e-mail, redefinição de senha e permissões por perfil.",
+          items: clone(data.loginReadiness)
         }
       }
     };
@@ -236,8 +237,8 @@
       type: "app",
       pageId: "painel-advogada",
       topbar: {
-        message: "Ambiente interno organizado para gestão de clientes, documentos, agenda e acompanhamento do escritório.",
-        pills: ["Visão executiva", "Agenda", "Documentos"]
+        message: "Painel interno para cadastrar clientes, atualizar casos e organizar eventos futuros de comunicação.",
+        pills: ["Cadastro de clientes", "Atualização de casos", "Notificações futuras"]
       },
       sidebar: {
         brandHref: data.routes.site,
@@ -246,52 +247,77 @@
         userSummary: data.users.advogada.summary,
         nav: buildAdvogadaSidebarNav("painel-advogada"),
         footerAction: {
-          label: "Abrir agenda da semana",
+          label: "Abrir agenda da equipe",
           href: data.routes.agenda,
           variant: "primary"
         },
-        caption: "Estrutura compartilhada para casos, agenda, documentos, sessão e ações da equipe."
+        caption: "Camada interna preparada para cadastro manual, gestão de casos, convites por e-mail e histórico operacional."
       },
       header: {
-        eyebrow: "Painel da advogada",
-        title: "Visão executiva da operação jurídica.",
+        eyebrow: "Painel interno da advogada",
+        title: "Cadastro, casos e comunicação futura em um único fluxo.",
         description:
-          "O portal concentra rotina, documentos, agenda e entrada de casos em uma camada única, com dados e renderização já separados para integração posterior com backend.",
+          "A equipe cadastra o cliente, vincula o caso, organiza documentos e agenda, e prepara os eventos que poderão gerar e-mails automáticos quando o backend estiver conectado.",
         subnav: [
-          { label: "Geral", href: data.routes.painelAdvogada, active: true },
-          { label: "Documentos", href: data.routes.documentos, active: false },
-          { label: "Agenda", href: data.routes.agenda, active: false },
-          { label: "Cliente", href: data.routes.painelCliente, active: false }
+          { label: "Visão geral", href: data.routes.painelAdvogada, active: true },
+          { label: "Cadastrar cliente", href: "#cadastro-cliente", active: false },
+          { label: "Notificações", href: "#notificacoes", active: false },
+          { label: "Documentos", href: data.routes.documentos, active: false }
         ],
         actions: [
-          { label: "Voltar ao site", href: data.routes.site, variant: "secondary" },
-          { label: "Revisar pendências", href: data.routes.documentos, variant: "primary" }
+          { label: "Abrir agenda", href: data.routes.agenda, variant: "secondary" },
+          { label: "Ver documentos", href: data.routes.documentos, variant: "primary" }
         ]
       },
       metrics: [
         {
-          title: data.summaries.advogada.cases,
-          description: "Carteira ativa com leitura rápida por prioridade, estágio e necessidade operacional."
+          title: data.summaries.advogada.registrations,
+          description: "Cadastros prontos para conferência, liberação de acesso ou envio de convite."
         },
         {
-          title: data.summaries.advogada.appointments,
-          description: "Agenda do ciclo com consultas, retornos, diligências e janelas de preparação."
+          title: data.summaries.advogada.cases,
+          description: "Casos em andamento com atualização interna, status e próximos passos definidos."
+        },
+        {
+          title: data.summaries.advogada.notifications,
+          description: "Eventos já mapeados para gerar e-mail automático quando a integração for ativada."
         },
         {
           title: data.summaries.advogada.documents,
-          description: "Arquivos aguardando conferência, assinatura, upload ou envio complementar."
-        },
-        {
-          title: data.summaries.advogada.alerts,
-          description: "Prazos e atenção crítica visíveis no primeiro olhar do painel."
+          description: "Documentos ligados a triagem, onboarding, prova e andamento do atendimento."
         }
       ],
       columns: {
         primary: [
           {
+            anchorId: "cadastro-cliente",
+            variant: "app-card",
+            eyebrow: "Cadastrar cliente",
+            title: "Cadastro inicial e liberação futura do portal",
+            body: {
+              kind: "form-preview",
+              fields: clone(data.clientRegistrationFields),
+              tags: clone(data.clientRegistrationTags),
+              noteTitle: "Convite por e-mail",
+              noteText:
+                "Depois de salvar o cadastro e vincular o caso, o sistema poderá enviar convite para que o cliente defina a própria senha no primeiro acesso."
+            }
+          },
+          {
+            variant: "app-card",
+            eyebrow: "Atualizações do caso",
+            title: "Fila de andamento e próximos envios",
+            body: {
+              kind: "rows",
+              listClass: "timeline-list",
+              rowClass: "timeline-row",
+              items: withStatus(data.advogadaCaseUpdates)
+            }
+          },
+          {
             variant: "app-card",
             eyebrow: "Radar do dia",
-            title: "Atendimentos e foco operacional",
+            title: "Agenda e prioridades da operação",
             action: { label: "Abrir agenda", href: data.routes.agenda, variant: "secondary" },
             body: {
               kind: "rows",
@@ -299,38 +325,28 @@
               rowClass: "timeline-row",
               items: withStatus(data.advogadaRadar)
             }
-          },
-          {
-            variant: "app-card",
-            eyebrow: "Triagem e onboarding",
-            title: "Entrada de casos e próximas ações",
-            body: {
-              kind: "stack-grid",
-              gridClass: "mini-grid",
-              items: clone(data.leads)
-            }
           }
         ],
         secondary: [
           {
-            variant: "app-card",
-            eyebrow: "Documentos críticos",
-            title: "Fila de conferência",
-            action: { label: "Centro documental", href: data.routes.documentos, variant: "secondary" },
+            variant: "status-card",
+            eyebrow: "Fluxo do cliente",
+            title: "Da triagem ao primeiro login",
             body: {
-              kind: "rows",
-              listClass: "document-list",
-              rowClass: "document-row",
-              items: withStatus(data.advogadaDocuments)
+              kind: "timeline",
+              items: clone(data.clientAccessFlow)
             }
           },
           {
+            anchorId: "notificacoes",
             variant: "status-card",
-            eyebrow: "Expansão técnica",
-            title: "Camadas separadas para integração",
+            eyebrow: "Notificações futuras",
+            title: "Eventos preparados para e-mail automático",
             body: {
-              kind: "key-list",
-              items: buildIntegrationRows()
+              kind: "rows",
+              listClass: "timeline-list",
+              rowClass: "timeline-row",
+              items: withStatus(data.notificationEvents)
             }
           }
         ]
@@ -343,7 +359,7 @@
       type: "app",
       pageId: "painel-cliente",
       topbar: {
-        message: "Portal do cliente com leitura clara, menos ansiedade e acompanhamento mais elegante.",
+        message: "Portal do cliente com acompanhamento claro, documentos organizados e próximos passos visíveis.",
         pills: ["Status do caso", "Documentos", "Agenda"]
       },
       sidebar: {
@@ -357,28 +373,28 @@
           href: buildSupportHref("Olá, estou na área do cliente e preciso de orientação."),
           variant: "primary"
         },
-        caption: "Camada desenhada para sessão do cliente, caso ativo, timeline, documentos e agenda."
+        caption: "Área preparada para sessão do cliente, histórico do caso, documentos, agenda e comunicações futuras."
       },
       header: {
         eyebrow: "Painel do cliente",
         title: "Clareza sobre o caso e próximos passos.",
         description:
-          "A interface do cliente foi organizada para reduzir ruído, com dados e componentes já separados para conectar caso, cronologia, documentos e agenda reais depois.",
+          "O cliente acessa o portal com o e-mail cadastrado e acompanha documentos, agenda e atualizações do atendimento em uma leitura simples.",
         subnav: [
           { label: "Visão geral", href: data.routes.painelCliente, active: true },
           { label: "Documentos", href: data.routes.documentos, active: false },
           { label: "Agenda", href: data.routes.agenda, active: false },
-          { label: "Login", href: data.routes.login, active: false }
+          { label: "Acesso", href: data.routes.login, active: false }
         ],
         actions: [
-          { label: "Ler conteúdos", href: data.routes.blog, variant: "secondary" },
-          { label: "Enviar documentos", href: data.routes.documentos, variant: "primary" }
+          { label: "Ver documentos", href: data.routes.documentos, variant: "secondary" },
+          { label: "Ver agenda", href: data.routes.agenda, variant: "primary" }
         ]
       },
       metrics: [
         {
           title: data.summaries.cliente.currentStage,
-          description: "Análise técnica do benefício com documentação essencial recebida."
+          description: "Análise técnica do caso com documentação essencial recebida."
         },
         {
           title: data.summaries.cliente.nextMeeting,
@@ -386,7 +402,7 @@
         },
         {
           title: data.summaries.cliente.pendingDocs,
-          description: "Pendência restante para fechar o dossiê documental do caso."
+          description: "Pendência restante para fechar o dossiê documental."
         },
         {
           title: data.summaries.cliente.lastUpdate,
@@ -432,14 +448,13 @@
           },
           {
             variant: "status-card",
-            eyebrow: "Apoio",
-            title: "Canal de orientação",
+            eyebrow: "Acesso e avisos",
+            title: "Login por e-mail e comunicações do portal",
             body: {
               kind: "timeline",
               items: clone(data.clientSupportNotes)
             },
             footerActions: [
-              { label: "Abrir documentos", href: data.routes.documentos, variant: "secondary" },
               { label: "Falar com a equipe", href: buildSupportHref("Olá, estou na área do cliente e preciso de orientação."), variant: "primary" }
             ]
           }
@@ -453,8 +468,8 @@
       type: "app",
       pageId: "documentos",
       topbar: {
-        message: "Módulo documental pensado para checklist, rastreio, revisão e fluxo organizado de conferência.",
-        pills: ["Checklist", "Metadados", "Pendências"]
+        message: "Módulo documental preparado para checklist, conferência, solicitações ao cliente e avisos futuros.",
+        pills: ["Checklist", "Solicitações", "Histórico"]
       },
       sidebar: {
         brandHref: data.routes.site,
@@ -463,44 +478,44 @@
         userSummary: data.users.documentos.summary,
         nav: buildSharedSidebarNav("documentos"),
         footerAction: {
-          label: "Ver visão do cliente",
-          href: data.routes.painelCliente,
+          label: "Voltar ao painel interno",
+          href: data.routes.painelAdvogada,
           variant: "primary"
         },
-        caption: "Fluxo desenhado para upload, histórico de versão, status, responsável e trilha de conferência."
+        caption: "Estrutura preparada para upload, solicitação de documento, histórico por caso e eventos de notificação."
       },
       header: {
         eyebrow: "Estrutura de documentos",
-        title: "Centro documental com estrutura organizada.",
+        title: "Documentos, solicitações e conferência em um só módulo.",
         description:
-          "A camada visual já está separada da lógica de dados, e o módulo está organizado para receber backend de arquivos, status, trilha de revisão e permissões por perfil.",
+          "A camada visual já separa fila documental, checklist, solicitações ao cliente e eventos que poderão gerar aviso por e-mail quando a integração estiver ativa.",
         subnav: [
           { label: "Central", href: data.routes.documentos, active: true },
-          { label: "Advogada", href: data.routes.painelAdvogada, active: false },
+          { label: "Painel interno", href: data.routes.painelAdvogada, active: false },
           { label: "Cliente", href: data.routes.painelCliente, active: false },
           { label: "Agenda", href: data.routes.agenda, active: false }
         ],
         actions: [
-          { label: "Conectar com agenda", href: data.routes.agenda, variant: "secondary" },
-          { label: "Voltar ao painel", href: data.routes.painelAdvogada, variant: "primary" }
+          { label: "Ver agenda", href: data.routes.agenda, variant: "secondary" },
+          { label: "Abrir painel interno", href: data.routes.painelAdvogada, variant: "primary" }
         ]
       },
       metrics: [
         {
           title: data.summaries.documentos.files,
-          description: "Volume atual em análise com separação por tipo documental e status."
+          description: "Arquivos organizados por caso, etapa e necessidade operacional."
         },
         {
-          title: data.summaries.documentos.checklists,
-          description: "Trilhas para onboarding, contratos, provas e andamento processual."
+          title: data.summaries.documentos.requests,
+          description: "Solicitações abertas ao cliente com checklist e vínculo ao caso."
         },
         {
           title: data.summaries.documentos.pendingItems,
-          description: "Itens aguardando cliente, conferência técnica ou assinatura."
+          description: "Itens aguardando cliente, conferência técnica ou publicação no portal."
         },
         {
           title: data.summaries.documentos.traceability,
-          description: "Arquitetura visual preparada para histórico de versão, upload e validação consistente."
+          description: "Estrutura pronta para registrar origem, versão, responsável e status."
         }
       ],
       columns: {
@@ -528,8 +543,8 @@
         secondary: [
           {
             variant: "status-card",
-            eyebrow: "Fluxo recomendado",
-            title: "Como o módulo evolui para operação real",
+            eyebrow: "Fluxo documental",
+            title: "Solicitação, conferência e publicação",
             body: {
               kind: "rows",
               listClass: "timeline-list",
@@ -539,11 +554,13 @@
           },
           {
             variant: "status-card",
-            eyebrow: "Expansão técnica",
-            title: "Recursos previstos para integração",
+            eyebrow: "Avisos por e-mail",
+            title: "Eventos documentais preparados",
             body: {
-              kind: "key-list",
-              items: buildIntegrationRows()
+              kind: "rows",
+              listClass: "timeline-list",
+              rowClass: "timeline-row",
+              items: withStatus(data.documentNotificationEvents)
             }
           }
         ]
@@ -556,8 +573,8 @@
       type: "app",
       pageId: "agenda",
       topbar: {
-        message: "Módulo de agenda pensado para confirmações, janelas livres, capacidade e leitura operacional.",
-        pills: ["Compromissos", "Capacidade", "Confirmações"]
+        message: "Módulo de agenda preparado para compromissos, confirmações e notificações futuras ao cliente.",
+        pills: ["Compromissos", "Confirmações", "Lembretes"]
       },
       sidebar: {
         brandHref: data.routes.site,
@@ -566,26 +583,26 @@
         userSummary: data.users.agenda.summary,
         nav: buildSharedSidebarNav("agenda"),
         footerAction: {
-          label: "Voltar ao painel",
+          label: "Voltar ao painel interno",
           href: data.routes.painelAdvogada,
           variant: "primary"
         },
-        caption: "Camada desenhada para calendário real, disponibilidade, confirmações automáticas e histórico de mudanças."
+        caption: "Agenda pronta para integrar disponibilidade, criação de compromissos, confirmações e avisos automáticos."
       },
       header: {
         eyebrow: "Estrutura de agenda",
-        title: "Agenda clara para operação e atendimento.",
+        title: "Agenda clara para equipe e cliente.",
         description:
-          "A agenda já foi desenhada como módulo independente, o que facilita conectar disponibilidade, compromissos, lembretes e vínculo com documentos e casos reais.",
+          "O módulo já separa compromissos, confirmações e eventos que poderão gerar lembretes e avisos automáticos por e-mail.",
         subnav: [
           { label: "Semana", href: data.routes.agenda, active: true },
-          { label: "Advogada", href: data.routes.painelAdvogada, active: false },
+          { label: "Painel interno", href: data.routes.painelAdvogada, active: false },
           { label: "Cliente", href: data.routes.painelCliente, active: false },
           { label: "Documentos", href: data.routes.documentos, active: false }
         ],
         actions: [
           { label: "Ver documentos", href: data.routes.documentos, variant: "secondary" },
-          { label: "Ver visão do cliente", href: data.routes.painelCliente, variant: "primary" }
+          { label: "Ver área do cliente", href: data.routes.painelCliente, variant: "primary" }
         ]
       },
       metrics: [
@@ -603,7 +620,7 @@
         },
         {
           title: data.summaries.agenda.alerts,
-          description: "Compromisso que depende de documentação complementar antes da reunião."
+          description: "Compromissos conectados a lembrete, confirmação ou documentação pendente."
         }
       ],
       columns: {
@@ -643,11 +660,13 @@
           },
           {
             variant: "status-card",
-            eyebrow: "Expansão técnica",
-            title: "Conexões previstas para integração",
+            eyebrow: "Avisos por e-mail",
+            title: "Eventos de agenda preparados",
             body: {
-              kind: "key-list",
-              items: buildIntegrationRows()
+              kind: "rows",
+              listClass: "timeline-list",
+              rowClass: "timeline-row",
+              items: withStatus(data.agendaNotificationEvents)
             }
           }
         ]

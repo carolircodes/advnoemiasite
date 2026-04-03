@@ -31,6 +31,7 @@
     var roleButtons = Array.prototype.slice.call(form.querySelectorAll("[data-portal-role-option]"));
     var submit = form.querySelector("[data-portal-submit]");
     var status = document.querySelector("[data-portal-form-status]");
+    var defaultSubmitLabel = submit ? submit.getAttribute("data-default-label") || submit.textContent : "";
 
     roleButtons.forEach(function (button) {
       button.addEventListener("click", function () {
@@ -49,7 +50,10 @@
       }
 
       if (status) {
-        status.textContent = "Simulando autenticação e montagem de sessão...";
+        status.textContent =
+          roleInput && roleInput.value === "advogada"
+            ? "Simulando autenticação do painel interno..."
+            : "Simulando autenticação do cliente com login por e-mail...";
       }
 
       service
@@ -60,7 +64,10 @@
         })
         .then(function (response) {
           if (status) {
-            status.textContent = "Sessão preparada. Redirecionando para o painel do perfil selecionado...";
+            status.textContent =
+              response.redirectTo === service.routes.painelAdvogada
+                ? "Acesso interno validado. Redirecionando para o painel da advogada..."
+                : "Acesso validado. Redirecionando para a área do cliente...";
           }
 
           window.location.href = response.redirectTo;
@@ -72,7 +79,7 @@
 
           if (submit) {
             submit.disabled = false;
-            submit.textContent = "Acessar área reservada";
+            submit.textContent = defaultSubmitLabel || "Entrar na área do cliente";
           }
         });
     });

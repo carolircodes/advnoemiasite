@@ -121,7 +121,7 @@
       escapeHtml(sidebar.userName) +
       "</strong><span>" +
       escapeHtml(sidebar.userSummary) +
-      '</span><div class="portal-sidebar-caption"><span class="portal-inline-status">Pronto para integração com sessão, dados e permissões.</span></div></div></div>' +
+      '</span><div class="portal-sidebar-caption"><span class="portal-inline-status">Estrutura pronta para autenticação, casos e notificações.</span></div></div></div>' +
       '<nav class="sidebar-nav">' +
       sidebar.nav
         .map(function (item) {
@@ -353,6 +353,70 @@
     );
   }
 
+  function renderFormField(field) {
+    var className = "field-group portal-preview-field" + (field.fullWidth ? " portal-preview-field-full" : "");
+    var control = "";
+
+    if (field.type === "select") {
+      control =
+        '<select>' +
+        '<option selected>' +
+        escapeHtml(field.placeholder || "Selecione") +
+        "</option>" +
+        (field.options || [])
+          .map(function (option) {
+            return "<option>" + escapeHtml(option) + "</option>";
+          })
+          .join("") +
+        "</select>";
+    } else if (field.type === "textarea") {
+      control =
+        '<textarea rows="' +
+        escapeHtml(field.rows || 4) +
+        '" placeholder="' +
+        escapeHtml(field.placeholder || "") +
+        '"></textarea>';
+    } else {
+      control =
+        '<input type="' +
+        escapeHtml(field.type || "text") +
+        '" placeholder="' +
+        escapeHtml(field.placeholder || "") +
+        '" />';
+    }
+
+    return '<div class="' + className + '"><label>' + escapeHtml(field.label) + "</label>" + control + "</div>";
+  }
+
+  function renderFormPreview(body) {
+    if (!body.fields || !body.fields.length) {
+      return '<div class="portal-empty-note">Nenhum campo preparado neste momento.</div>';
+    }
+
+    return (
+      '<div class="portal-preview-form"><div class="portal-form-preview-grid">' +
+      body.fields.map(renderFormField).join("") +
+      "</div>" +
+      (body.tags && body.tags.length
+        ? '<div class="portal-tag-list">' +
+          body.tags
+            .map(function (tag) {
+              return '<span class="portal-tag">' + escapeHtml(tag) + "</span>";
+            })
+            .join("") +
+          "</div>"
+        : "") +
+      (body.noteTitle || body.noteText
+        ? '<div class="portal-form-note"><strong>' +
+          escapeHtml(body.noteTitle || "") +
+          "</strong><p>" +
+          escapeHtml(body.noteText || "") +
+          "</p></div>"
+        : "") +
+      "</div>"
+    );
+  }
+
   function renderBody(body) {
     if (!body) {
       return "";
@@ -382,6 +446,10 @@
       return renderKeyList(body);
     }
 
+    if (body.kind === "form-preview") {
+      return renderFormPreview(body);
+    }
+
     return '<div class="portal-empty-note">Componente ainda não mapeado.</div>';
   }
 
@@ -398,9 +466,12 @@
         escapeHtml(card.action.label) +
         "</a>"
       : "";
+    var articleId = card.anchorId ? ' id="' + escapeHtml(card.anchorId) + '"' : "";
 
     return (
-      '<article class="' +
+      "<article" +
+      articleId +
+      ' class="' +
       escapeHtml(card.variant || "app-card") +
       '">' +
       (eyebrow || title || action
@@ -412,7 +483,93 @@
     );
   }
 
+  function renderLoginSupportCards(cards) {
+    if (!cards || !cards.length) {
+      return "";
+    }
+
+    return (
+      '<div class="portal-support-grid">' +
+      cards
+        .map(function (card) {
+          return (
+            '<article class="portal-support-card"' +
+            (card.id ? ' id="' + escapeHtml(card.id) + '"' : "") +
+            ">" +
+            "<h3>" +
+            escapeHtml(card.title) +
+            "</h3><p>" +
+            escapeHtml(card.description) +
+            "</p>" +
+            (card.tags && card.tags.length
+              ? '<div class="portal-tag-list">' +
+                card.tags
+                  .map(function (tag) {
+                    return '<span class="portal-tag">' + escapeHtml(tag) + "</span>";
+                  })
+                  .join("") +
+                "</div>"
+              : "") +
+            (card.action
+              ? '<a class="btn ' +
+                (card.action.variant === "primary" ? "btn-primary" : "btn-secondary") +
+                '" href="' +
+                escapeHtml(card.action.href) +
+                '">' +
+                escapeHtml(card.action.label) +
+                "</a>"
+              : "") +
+            "</article>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
+  function renderInlineLinks(links) {
+    if (!links || !links.length) {
+      return "";
+    }
+
+    return (
+      '<div class="portal-link-row">' +
+      links
+        .map(function (link) {
+          return '<a class="portal-text-link" href="' + escapeHtml(link.href) + '">' + escapeHtml(link.label) + "</a>";
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
   function renderLogin(page) {
+    var roleMarkup = "";
+
+    if (page.form.roles && page.form.roles.length) {
+      roleMarkup =
+        '<div class="field-group"><label>Escolha o perfil</label><div class="role-switch">' +
+        page.form.roles
+          .map(function (role) {
+            var isSelected = role.id === page.form.selectedRole;
+            return (
+              '<button class="role-card' +
+              (isSelected ? " is-selected" : "") +
+              '" type="button" data-portal-role-option="' +
+              escapeHtml(role.id) +
+              '" aria-pressed="' +
+              (isSelected ? "true" : "false") +
+              '"><strong>' +
+              escapeHtml(role.title) +
+              "</strong><p>" +
+              escapeHtml(role.description) +
+              "</p></button>"
+            );
+          })
+          .join("") +
+        "</div></div>";
+    }
+
     return (
       renderTopbar(page.topbar) +
       renderPortalHeader(page.header) +
@@ -446,30 +603,18 @@
       '<input type="hidden" name="role" value="' +
       escapeHtml(page.form.selectedRole) +
       '" data-portal-role-input />' +
-      '<div class="field-group"><label>Escolha o perfil</label><div class="role-switch">' +
-      page.form.roles
-        .map(function (role) {
-          var isSelected = role.id === page.form.selectedRole;
-          return (
-            '<button class="role-card' +
-            (isSelected ? " is-selected" : "") +
-            '" type="button" data-portal-role-option="' +
-            escapeHtml(role.id) +
-            '" aria-pressed="' +
-            (isSelected ? "true" : "false") +
-            '"><strong>' +
-            escapeHtml(role.title) +
-            "</strong><p>" +
-            escapeHtml(role.description) +
-            "</p></button>"
-          );
-        })
-        .join("") +
-      '</div></div><button class="btn btn-primary btn-full" type="submit" data-portal-submit>' +
+      roleMarkup +
+      '<button class="btn btn-primary btn-full" type="submit" data-portal-submit data-default-label="' +
       escapeHtml(page.form.submitLabel) +
-      '</button></form><p class="mini-note" data-portal-form-status>' +
+      '">' +
+      escapeHtml(page.form.submitLabel) +
+      "</button>" +
+      renderInlineLinks(page.form.inlineLinks) +
+      "</form><p class=\"mini-note\" data-portal-form-status>" +
       escapeHtml(page.form.note) +
-      '</p><div class="portal-form-note"><strong>' +
+      "</p>" +
+      renderLoginSupportCards(page.form.supportCards) +
+      '<div class="portal-form-note"><strong>' +
       escapeHtml(page.form.readiness.title) +
       "</strong><p>" +
       escapeHtml(page.form.readiness.description) +
