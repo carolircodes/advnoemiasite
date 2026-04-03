@@ -2,10 +2,39 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
-import { getDefaultDestinationForRole, requireProfile } from "@/lib/auth/guards";
+import {
+  getDefaultDestinationForProfile,
+  requireProfile
+} from "@/lib/auth/guards";
 import { passwordSchema } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+async function markClientFirstAccessCompleted(profileId: string, completedAt: string) {
+  const admin = createAdminSupabaseClient();
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ first_login_completed_at: completedAt })
+    .eq("id", profileId);
+
+  if (profileError) {
+    throw new Error(
+      `Nao foi possivel sincronizar o perfil apos a troca de senha: ${profileError.message}`
+    );
+  }
+
+  const { error: clientError } = await admin
+    .from("clients")
+    .update({ status: "ativo" })
+    .eq("profile_id", profileId)
+    .in("status", ["convite-enviado", "aguardando-primeiro-acesso"]);
+
+  if (clientError) {
+    throw new Error(
+      `Nao foi possivel atualizar o status do cliente: ${clientError.message}`
+    );
+  }
+}
 
 async function updatePasswordAction(formData: FormData) {
   "use server";
@@ -31,15 +60,20 @@ async function updatePasswordAction(formData: FormData) {
 
   const admin = createAdminSupabaseClient();
   const updatedAt = new Date().toISOString();
+  const destinationProfile =
+    profile.role === "cliente" && !profile.first_login_completed_at
+      ? { ...profile, first_login_completed_at: updatedAt }
+      : profile;
 
   if (profile.role === "cliente" && !profile.first_login_completed_at) {
-    await admin
-      .from("profiles")
-      .update({ first_login_completed_at: updatedAt })
-      .eq("id", profile.id);
+    try {
+      await markClientFirstAccessCompleted(profile.id, updatedAt);
+    } catch (_error) {
+      redirect("/auth/atualizar-senha?error=nao-foi-possivel-finalizar");
+    }
   }
 
-  await admin.from("audit_logs").insert({
+  const { error: auditError } = await admin.from("audit_logs").insert({
     actor_profile_id: profile.id,
     action: "auth.password.updated",
     entity_type: "profiles",
@@ -49,7 +83,11 @@ async function updatePasswordAction(formData: FormData) {
     }
   });
 
-  redirect(`${getDefaultDestinationForRole(profile)}?success=senha-atualizada`);
+  if (auditError) {
+    redirect("/auth/atualizar-senha?error=nao-foi-possivel-registrar-auditoria");
+  }
+
+  redirect(`${getDefaultDestinationForProfile(destinationProfile)}?success=senha-atualizada`);
 }
 
 export default async function UpdatePasswordPage({
@@ -97,4 +135,3 @@ export default async function UpdatePasswordPage({
     </AppFrame>
   );
 }
-

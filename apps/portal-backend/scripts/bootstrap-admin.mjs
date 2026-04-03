@@ -1,132 +1,222 @@
-import dotenv from 'dotenv';
-
-dotenv.config({ path: '.env.local' });
-
-import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 
-function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return;
+const { loadEnvConfig } = nextEnv;
+
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const projectDir = path.resolve(scriptDir, "..");
+
+const silentEnvLog = {
+  info: () => {},
+  error: (...args) => {
+    console.error(...args);
+  }
+};
+
+const { loadedEnvFiles } = loadEnvConfig(projectDir, false, silentEnvLog, true);
+
+function formatLoadedEnvFiles() {
+  if (!loadedEnvFiles.length) {
+    return "nenhum arquivo .env encontrado";
   }
 
-  const content = fs.readFileSync(filePath, "utf8");
-
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-
-    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
-      continue;
-    }
-
-    const separatorIndex = trimmed.indexOf("=");
-    const key = trimmed.slice(0, separatorIndex).trim();
-    const rawValue = trimmed.slice(separatorIndex + 1).trim();
-    const value = rawValue.replace(/^['"]|['"]$/g, "");
-
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
-  }
+  return loadedEnvFiles
+    .map((file) => path.basename(file.path))
+    .filter(Boolean)
+    .join(", ");
 }
 
-const cwd = process.cwd();
-loadEnvFile(path.join(cwd, ".env.local"));
-loadEnvFile(path.join(cwd, ".env"));
-
-const required = [
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "PORTAL_ADMIN_EMAIL",
-  "PORTAL_ADMIN_TEMP_PASSWORD"
-];
-
-for (const key of required) {
-  if (!process.env[key]) {
-    throw new Error(`Defina a variável ${key} antes de executar o bootstrap.`);
-  }
+function readEnv(name) {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
+function resolveEnvValue(preferredName, legacyName, label) {
+  const preferredValue = readEnv(preferredName);
+  const legacyValue = legacyName ? readEnv(legacyName) : undefined;
+
+  if (preferredValue && legacyValue && preferredValue !== legacyValue) {
+    throw new Error(
+      `${preferredName} e ${legacyName} estao diferentes. Padronize o ambiente antes de executar o bootstrap.`
+    );
+  }
+
+  const resolvedValue = preferredValue || legacyValue;
+
+  if (!resolvedValue) {
+    throw new Error(`Defina ${preferredName} em .env.local para ${label}.`);
+  }
+
+  return resolvedValue;
+}
+
+function createSupabaseClient(url, key) {
+  return createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     }
-  }
-);
+  });
+}
 
-const adminEmail = process.env.PORTAL_ADMIN_EMAIL.toLowerCase();
-const adminFullName = process.env.PORTAL_ADMIN_FULL_NAME || "Noemia Paixao";
-const adminPassword = process.env.PORTAL_ADMIN_TEMP_PASSWORD;
+const env = {
+  supabaseUrl: resolveEnvValue(
+    "NEXT_PUBLIC_SUPABASE_URL",
+    null,
+    "a URL local do Supabase"
+  ),
+  publishableKey: resolveEnvValue(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "a chave publica local do Supabase"
+  ),
+  secretKey: resolveEnvValue(
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "a chave secreta local do Supabase"
+  ),
+  adminEmail: resolveEnvValue(
+    "PORTAL_ADMIN_EMAIL",
+    null,
+    "o email da advogada bootstrap"
+  ).toLowerCase(),
+  adminFullName:
+    readEnv("PORTAL_ADMIN_FULL_NAME") || "Noemia Paixao",
+  adminPassword: resolveEnvValue(
+    "PORTAL_ADMIN_TEMP_PASSWORD",
+    null,
+    "a senha inicial da advogada bootstrap"
+  )
+};
 
-const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+const adminSupabase = createSupabaseClient(env.supabaseUrl, env.secretKey);
+const publicSupabase = createSupabaseClient(env.supabaseUrl, env.publishableKey);
+
+console.log(`[bootstrap] Arquivos de ambiente carregados: ${formatLoadedEnvFiles()}`);
+console.log(`[bootstrap] Provisionando a usuaria interna ${env.adminEmail}.`);
+
+const { data: listData, error: listError } = await adminSupabase.auth.admin.listUsers({
   page: 1,
-  perPage: 200
+  perPage: 1000
 });
 
 if (listError) {
-  throw new Error(`Não foi possível listar usuários: ${listError.message}`);
+  throw new Error(`Nao foi possivel listar usuarios no Auth: ${listError.message}`);
 }
 
-let adminUser = listData.users.find((user) => user.email?.toLowerCase() === adminEmail);
+let adminUser = listData.users.find((user) => user.email?.toLowerCase() === env.adminEmail);
 
 if (!adminUser) {
-  const { data, error } = await supabase.auth.admin.createUser({
-    email: adminEmail,
-    password: adminPassword,
+  console.log("[bootstrap] Usuaria nao encontrada no Auth. Criando conta local.");
+
+  const { data, error } = await adminSupabase.auth.admin.createUser({
+    email: env.adminEmail,
+    password: env.adminPassword,
     email_confirm: true,
     user_metadata: {
       role: "advogada",
-      full_name: adminFullName
+      full_name: env.adminFullName
     }
   });
 
   if (error || !data.user) {
-    throw new Error(error?.message || "Não foi possível criar a usuária administradora.");
+    throw new Error(error?.message || "Nao foi possivel criar a usuaria interna.");
+  }
+
+  adminUser = data.user;
+} else {
+  console.log("[bootstrap] Usuaria ja existe no Auth. Alinhando senha e metadata.");
+
+  const { data, error } = await adminSupabase.auth.admin.updateUserById(adminUser.id, {
+    email: env.adminEmail,
+    password: env.adminPassword,
+    email_confirm: true,
+    user_metadata: {
+      ...(adminUser.user_metadata || {}),
+      role: "advogada",
+      full_name: env.adminFullName
+    }
+  });
+
+  if (error || !data.user) {
+    throw new Error(
+      error?.message || "Nao foi possivel atualizar a usuaria interna existente."
+    );
   }
 
   adminUser = data.user;
 }
 
-const { error: profileError } = await supabase.from("profiles").upsert(
-  {
-    id: adminUser.id,
-    email: adminEmail,
-    full_name: adminFullName,
-    role: "advogada",
-    is_active: true,
-    first_login_completed_at: new Date().toISOString()
-  },
-  {
-    onConflict: "id"
-  }
-);
+const preparedAt = new Date().toISOString();
 
-if (profileError) {
-  throw new Error(`Não foi possível salvar o perfil da advogada: ${profileError.message}`);
+const { data: profileData, error: profileError } = await adminSupabase
+  .from("profiles")
+  .upsert(
+    {
+      id: adminUser.id,
+      email: env.adminEmail,
+      full_name: env.adminFullName,
+      role: "advogada",
+      is_active: true,
+      first_login_completed_at: preparedAt
+    },
+    {
+      onConflict: "id"
+    }
+  )
+  .select("id,email,role,is_active,first_login_completed_at")
+  .single();
+
+if (profileError || !profileData) {
+  throw new Error(
+    profileError?.message || "Nao foi possivel salvar o perfil interno da advogada."
+  );
 }
 
-const { error: staffError } = await supabase.from("staff_members").upsert(
-  {
-    profile_id: adminUser.id,
-    title: "Advogada responsável",
-    receives_notification_emails: true
-  },
-  {
-    onConflict: "profile_id"
-  }
-);
+const { data: staffData, error: staffError } = await adminSupabase
+  .from("staff_members")
+  .upsert(
+    {
+      profile_id: adminUser.id,
+      title: "Advogada responsavel",
+      receives_notification_emails: true
+    },
+    {
+      onConflict: "profile_id"
+    }
+  )
+  .select("profile_id,title,receives_notification_emails")
+  .single();
 
-if (staffError) {
-  throw new Error(`Não foi possível salvar o vínculo interno: ${staffError.message}`);
+if (staffError || !staffData) {
+  throw new Error(
+    staffError?.message || "Nao foi possivel salvar o vinculo interno da advogada."
+  );
 }
 
-console.log("Bootstrap concluído.");
-console.log(`Usuária interna preparada: ${adminEmail}`);
-console.log("Acesse /auth/login ou /internal/advogada depois de iniciar a aplicação.");
+const { data: signInData, error: signInError } = await publicSupabase.auth.signInWithPassword({
+  email: env.adminEmail,
+  password: env.adminPassword
+});
 
+if (signInError || !signInData.user || !signInData.session) {
+  throw new Error(
+    signInError?.message ||
+      "A usuaria foi provisionada, mas o login publico falhou. Revise a chave publica local."
+  );
+}
+
+await publicSupabase.auth.signOut();
+
+console.log("[bootstrap] Auth validado com sucesso.");
+console.log(
+  `[bootstrap] Perfil sincronizado: role=${profileData.role}, active=${profileData.is_active}.`
+);
+console.log(
+  `[bootstrap] Staff sincronizado: title=${staffData.title}, notifications=${staffData.receives_notification_emails}.`
+);
+console.log(`[bootstrap] Login confirmado para ${env.adminEmail}.`);
+console.log("[bootstrap] Bootstrap concluido sem necessidade de ajuste manual no Studio.");

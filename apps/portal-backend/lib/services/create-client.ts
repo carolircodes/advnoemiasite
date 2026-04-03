@@ -9,6 +9,34 @@ import {
 import { queueClientInviteTracking } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
+function buildInviteErrorMessage(
+  inviteError: {
+    message?: string;
+    status?: number;
+    code?: string;
+  } | null,
+  email: string,
+  redirectTo: string
+) {
+  console.error("[clients.create] Invite failure", {
+    email,
+    redirectTo,
+    status: inviteError?.status ?? null,
+    code: inviteError?.code ?? null,
+    message: inviteError?.message ?? null
+  });
+
+  if (inviteError?.message === "Error sending invite email") {
+    return "Nao foi possivel enviar o convite de acesso. Verifique o Mailpit e a configuracao SMTP do Supabase local.";
+  }
+
+  if (inviteError?.message) {
+    return `Nao foi possivel enviar o convite de acesso: ${inviteError.message}`;
+  }
+
+  return "Nao foi possivel criar o convite inicial para este cliente.";
+}
+
 export async function createClientWithInvite(rawInput: unknown, actorProfileId: string) {
   const input = createClientSchema.parse(rawInput);
   const env = getServerEnv();
@@ -27,10 +55,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
   );
 
   if (inviteError || !inviteData.user) {
-    throw new Error(
-      inviteError?.message ||
-        "NÃ£o foi possÃ­vel criar o convite inicial para este cliente."
-    );
+    throw new Error(buildInviteErrorMessage(inviteError, input.email, env.inviteRedirectUrl));
   }
 
   const userId = inviteData.user.id;
@@ -53,7 +78,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
     );
 
     if (profileError) {
-      throw new Error(`NÃ£o foi possÃ­vel salvar o perfil do cliente: ${profileError.message}`);
+      throw new Error(`Nao foi possivel salvar o perfil do cliente: ${profileError.message}`);
     }
 
     const { data: client, error: clientError } = await supabase
@@ -76,7 +101,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
 
     if (clientError || !client) {
       throw new Error(
-        clientError?.message || "NÃ£o foi possÃ­vel criar o cadastro interno do cliente."
+        clientError?.message || "Nao foi possivel criar o cadastro interno do cliente."
       );
     }
 
@@ -96,7 +121,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
       .single();
 
     if (caseError || !caseRecord) {
-      throw new Error(caseError?.message || "NÃ£o foi possÃ­vel abrir o caso inicial.");
+      throw new Error(caseError?.message || "Nao foi possivel abrir o caso inicial.");
     }
 
     const { data: eventRecord, error: eventError } = await supabase
@@ -105,11 +130,11 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
         case_id: caseRecord.id,
         client_id: client.id,
         event_type: "status_change",
-        title: "Cadastro interno concluÃ­do",
+        title: "Cadastro interno concluido",
         description:
           "Cliente criado pela equipe com convite de primeiro acesso preparado para envio por e-mail.",
         public_summary:
-          "Seu acesso ao portal estÃ¡ sendo preparado pela equipe responsÃ¡vel.",
+          "Seu acesso ao portal esta sendo preparado pela equipe responsavel.",
         triggered_by: actorProfileId,
         should_notify_client: false,
         payload: {
@@ -121,7 +146,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
       .single();
 
     if (eventError || !eventRecord) {
-      throw new Error(eventError?.message || "NÃ£o foi possÃ­vel registrar o evento inicial.");
+      throw new Error(eventError?.message || "Nao foi possivel registrar o evento inicial.");
     }
 
     const inviteNotification = await queueClientInviteTracking({
@@ -146,7 +171,9 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
     });
 
     if (auditError) {
-      throw new Error(`NÃ£o foi possÃ­vel registrar a auditoria do cadastro: ${auditError.message}`);
+      throw new Error(
+        `Nao foi possivel registrar a auditoria do cadastro: ${auditError.message}`
+      );
     }
 
     return {
@@ -158,7 +185,22 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
       invitedAt
     };
   } catch (error) {
-    await supabase.auth.admin.deleteUser(userId).catch(() => null);
+    console.error("[clients.create] Rolling back invited user after downstream failure", {
+      userId,
+      email: input.email,
+      message: error instanceof Error ? error.message : String(error)
+    });
+
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+
+    if (deleteError) {
+      console.error("[clients.create] Failed to rollback invited user", {
+        userId,
+        email: input.email,
+        message: deleteError.message
+      });
+    }
+
     throw error;
   }
 }
@@ -172,7 +214,7 @@ export async function listLatestClients(limit = 8) {
     .limit(limit);
 
   if (error) {
-    throw new Error(`NÃ£o foi possÃ­vel listar os clientes: ${error.message}`);
+    throw new Error(`Nao foi possivel listar os clientes: ${error.message}`);
   }
 
   const profileIds = (clients || []).map((item) => item.profile_id);

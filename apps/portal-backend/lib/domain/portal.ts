@@ -57,6 +57,10 @@ export type ClientStatus = (typeof clientStatuses)[number];
 export type CaseStatus = (typeof caseStatuses)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
 
+export function isPortalRole(value: unknown): value is PortalRole {
+  return typeof value === "string" && portalRoles.includes(value as PortalRole);
+}
+
 export const caseAreaLabels: Record<CaseArea, string> = {
   previdenciario: "Direito Previdenciário",
   consumidor_bancario: "Direito do Consumidor/Bancário",
@@ -155,4 +159,3 @@ export function mapClientStatusToCaseStatus(status: ClientStatus): CaseStatus {
       return "analise";
   }
 }
-

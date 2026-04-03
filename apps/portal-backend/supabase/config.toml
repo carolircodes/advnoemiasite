@@ -10,12 +10,12 @@ additional_redirect_urls = [
 ]
 
 [auth.email]
-enable_signup = false
+enable_signup = true
 enable_confirmations = false
 
 [auth.email.smtp]
 enabled = true
-host = "maildev"
+host = "inbucket"
 port = 1025
 user = "local"
 pass = "local"
@@ -29,4 +29,3 @@ content_path = "./supabase/templates/invite.html"
 [auth.email.template.recovery]
 subject = "Redefina sua senha do portal"
 content_path = "./supabase/templates/recovery.html"
-

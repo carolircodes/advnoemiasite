@@ -1,215 +1,195 @@
 # Portal Backend
 
-Base real do portal juridico, separada do site estatico atual para manter o fluxo publicado enquanto a autenticacao e o backend passam a funcionar de verdade.
+Base real do portal juridico com Supabase Auth, cadastro interno, convite por e-mail e area autenticada para equipe e cliente.
 
-## O que ja esta implementado
+O fluxo local validado para este projeto e:
 
-- autenticacao real com Supabase Auth
-- login com e-mail + senha
-- convite de primeiro acesso criado pela advogada
-- definicao de senha no primeiro acesso
-- recuperacao de senha por e-mail
-- perfis separados para `advogada/admin` e `cliente`
-- persistencia real de clientes, casos, eventos, fila de notificacoes e auditoria
-- painel interno funcional para cadastrar cliente e registrar evento
-- area do cliente conectada a dados reais
+- subir o Supabase local
+- aplicar a migration inicial
+- bootstrap da advogada
+- login interno
+- cadastro de cliente
+- envio de convite para Mailpit
+- primeiro acesso do cliente
+- login do cliente
 
-## Estrutura
+Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
 
-- `app/`: rotas e telas do portal real
-- `lib/auth/`: guards de acesso e resolucao de perfil
-- `lib/supabase/`: clientes SSR, browser, admin e middleware
-- `lib/services/`: regras de negocio de cadastro, eventos e dashboards
-- `lib/notifications/`: fila `notifications_outbox`
-- `scripts/bootstrap-admin.mjs`: cria a advogada inicial
-- `supabase/config.toml`: configuracao local do Supabase
-- `supabase/templates/`: templates locais de convite e recuperacao
+## Estrutura principal
+
+- `app/`: rotas e telas do portal
+- `lib/auth/`: guards e resolucao de perfil
+- `lib/config/env.ts`: padronizacao das variaveis de ambiente
+- `lib/services/create-client.ts`: cadastro interno do cliente e convite
+- `lib/supabase/`: clientes browser, server, admin e middleware
+- `scripts/bootstrap-admin.mjs`: bootstrap idempotente da advogada
+- `supabase/config.toml`: configuracao local do Supabase Auth e Mailpit
 - `supabase/migrations/20260403_initial_portal.sql`: schema inicial
+- `supabase/templates/`: templates locais de invite e recovery
 
-## Pre-requisitos locais
+## Pre-requisitos
 
 - Node.js 20+
 - npm
 - Docker Desktop em execucao
 
-## 1. Instalar dependencias
+Se o PowerShell bloquear `npm.ps1`, use `npm.cmd` nos mesmos comandos.
 
-No terminal, dentro de [apps/portal-backend](C:\Users\Carolina Rosa\Documents\GitHub\advnoemiasite\apps\portal-backend):
+## Padrao final de ambiente
 
-```powershell
-npm install
-```
-
-## 2. Subir o Supabase local
-
-Ainda em [apps/portal-backend](C:\Users\Carolina Rosa\Documents\GitHub\advnoemiasite\apps\portal-backend):
-
-```powershell
-npm run supabase:start
-```
-
-Depois confira o status:
-
-```powershell
-npm run supabase:status
-```
-
-O Supabase local vai expor:
-
-- API URL local
-- `anon key`
-- `service_role key`
-- painel Studio
-- caixa de e-mail local do Auth
-
-## 3. Criar `.env.local`
-
-Copie [.env.example](C:\Users\Carolina Rosa\Documents\GitHub\advnoemiasite\apps\portal-backend\.env.example) para `.env.local`.
-
-Exemplo:
+Use estas variaveis em `.env.local`:
 
 ```env
 NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=COLE_A_CHAVE_ANON_LOCAL_DO_SUPABASE
-SUPABASE_SERVICE_ROLE_KEY=COLE_A_CHAVE_SERVICE_ROLE_LOCAL_DO_SUPABASE
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=COLE_A_CHAVE_PUBLICA_LOCAL_DO_SUPABASE
+SUPABASE_SECRET_KEY=COLE_A_CHAVE_SECRETA_LOCAL_DO_SUPABASE
 INVITE_REDIRECT_URL=http://127.0.0.1:3000/auth/callback
 PASSWORD_RESET_REDIRECT_URL=http://127.0.0.1:3000/auth/callback
 RESEND_API_KEY=
-EMAIL_FROM=Noemia Paixao Advocacia <portal@advnoemia.local>
+EMAIL_FROM=Noemia Paixao Advocacia <no-reply@advnoemia.local>
 PORTAL_ADMIN_EMAIL=advogada@advnoemia.local
 PORTAL_ADMIN_FULL_NAME=Noemia Paixao
 PORTAL_ADMIN_TEMP_PASSWORD=TroqueEstaSenha123
 ```
 
-Use as chaves que o `supabase start` e o `supabase status` exibirem no seu terminal.
+Use o valor `Publishable` mostrado pelo `supabase start` em `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
-## 4. Aplicar a migration
+Use o valor `Secret` mostrado pelo `supabase start` em `SUPABASE_SECRET_KEY`.
 
-Com o Supabase local rodando, aplique as migrations do projeto:
+O projeto ainda aceita os aliases antigos `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`, mas o padrao documentado e o definitivo.
+
+## Setup local
+
+### 1. Instalar dependencias
+
+```powershell
+npm install
+```
+
+### 2. Criar `.env.local`
+
+Copie `.env.example` para `.env.local` e preencha as chaves locais do Supabase.
+
+### 3. Subir o Supabase local
+
+```powershell
+npm run supabase:start
+```
+
+Servicos locais relevantes:
+
+- API: `http://127.0.0.1:54321`
+- Studio: `http://127.0.0.1:54323`
+- Mailpit: `http://127.0.0.1:54324`
+
+### 4. Resetar o banco local
 
 ```powershell
 npm run supabase:db:reset
 ```
 
-Esse comando recria o banco local e aplica automaticamente [20260403_initial_portal.sql](C:\Users\Carolina Rosa\Documents\GitHub\advnoemiasite\apps\portal-backend\supabase\migrations\20260403_initial_portal.sql).
+Esse comando reaplica `20260403_initial_portal.sql`.
 
-## 5. Criar a advogada interna
+### 5. Executar o bootstrap da advogada
 
 ```powershell
 npm run bootstrap:admin
 ```
 
-Esse passo cria:
+O bootstrap:
 
-- usuaria da advogada no Auth
-- perfil interno em `profiles`
-- vinculo interno em `staff_members`
+- cria ou atualiza a usuaria da advogada no Auth
+- alinha senha e metadata
+- sincroniza `profiles`
+- sincroniza `staff_members`
+- valida o login com a chave publica local
 
-## 6. Rodar a aplicacao
+### 6. Rodar o app
 
 ```powershell
 npm run dev
 ```
 
-Abra:
+Abra sempre usando o mesmo host configurado em `NEXT_PUBLIC_APP_URL`.
 
-- [http://127.0.0.1:3000/auth/login](http://127.0.0.1:3000/auth/login)
-- [http://127.0.0.1:3000/internal/advogada](http://127.0.0.1:3000/internal/advogada)
+Padrao recomendado:
 
-## 7. Teste exato do fluxo completo
+- `http://127.0.0.1:3000/auth/login`
+- `http://127.0.0.1:3000/internal/advogada`
 
-### Fluxo da advogada
+## Convite local e Mailpit
 
-1. Entre em `/auth/login`.
-2. Faça login com:
-   - e-mail: o valor de `PORTAL_ADMIN_EMAIL`
-   - senha: o valor de `PORTAL_ADMIN_TEMP_PASSWORD`
-3. Voce sera redirecionada para `/internal/advogada`.
-4. Cadastre um cliente com:
-   - nome completo
-   - e-mail
-   - CPF
-   - telefone
-   - area do caso
-   - observacoes
-   - status
-5. Ao enviar, confirme no banco:
-   - nova linha em `profiles`
-   - nova linha em `clients`
-   - novo caso em `cases`
-   - novo evento em `case_events`
-   - item em `notifications_outbox`
+O convite do cliente usa `supabase.auth.admin.inviteUserByEmail`.
 
-### Fluxo de convite do cliente
+No ambiente local atual:
 
-1. Abra a caixa de e-mail local do Supabase mostrada pelo `supabase start`.
-2. Localize o e-mail de convite.
-3. Clique no link.
-4. O link entra por `/auth/callback`.
-5. O callback valida o `token_hash` e redireciona para `/auth/primeiro-acesso`.
-6. Defina a senha do cliente.
-7. O cliente e redirecionado para `/cliente`.
+- o envio vai para a inbox local do Mailpit
+- o Mailpit fica em `http://127.0.0.1:54324`
+- o SMTP interno do Supabase local precisa apontar para `inbucket:1025`
+- o callback de invite e recovery precisa apontar para `/auth/callback`
 
-### Fluxo de login do cliente
+Configuracao local relevante em `supabase/config.toml`:
 
-1. Em uma janela anonima ou outro perfil do navegador, abra `/auth/login`.
-2. Entre com:
-   - e-mail do cliente cadastrado
-   - senha definida no primeiro acesso
-3. O cliente entra em `/cliente`.
+- `enable_signup = true`
+- `enable_confirmations = false`
+- `[auth.email.smtp].host = "inbucket"`
+- `[auth.email.smtp].port = 1025`
+- redirects incluindo `http://127.0.0.1:3000/auth/callback` e `http://localhost:3000/auth/callback`
 
-### Fluxo de recuperacao de senha
+## Fluxo local validado
 
-1. Abra `/auth/esqueci-senha`.
-2. Informe o e-mail do cliente.
-3. Localize o e-mail de recuperacao na caixa de e-mail local do Supabase.
-4. Clique no link.
-5. O callback valida o `token_hash` e envia para `/auth/atualizar-senha`.
-6. Defina a nova senha.
-7. Faça login novamente com a senha atualizada.
+### Advogada
 
-### Fluxo de historico do portal
+1. Rode `npm run bootstrap:admin`.
+2. Acesse `/auth/login`.
+3. Entre com `PORTAL_ADMIN_EMAIL` e `PORTAL_ADMIN_TEMP_PASSWORD`.
+4. Confirme que o redirecionamento vai para `/internal/advogada`.
 
-1. Volte para `/internal/advogada`.
-2. Em `Registrar evento do portal`, escolha um caso criado.
-3. Registre um evento.
-4. Confira:
-   - novo registro em `case_events`
-   - novo item em `notifications_outbox` quando `shouldNotifyClient` estiver ativo
-   - evento aparecendo no painel interno
-   - evento aparecendo em `/cliente`
+### Cadastro interno e convite
 
-## Como parar ou resetar o ambiente local
+1. No painel da advogada, preencha o formulario `Cadastrar cliente`.
+2. Envie o formulario.
+3. Confirme que o cliente foi criado em:
+   - `profiles`
+   - `clients`
+   - `cases`
+   - `case_events`
+   - `notifications_outbox`
+4. Abra o Mailpit em `http://127.0.0.1:54324`.
+5. Confirme que o convite chegou na inbox local.
 
-Parar os containers locais:
+### Primeiro acesso do cliente
+
+1. Abra o e-mail de convite no Mailpit.
+2. Clique no link do convite.
+3. O callback entra por `/auth/callback`.
+4. O cliente e redirecionado para `/auth/primeiro-acesso`.
+5. Defina a senha inicial.
+6. O cliente e redirecionado para `/cliente`.
+
+### Login do cliente
+
+1. Abra uma aba anonima.
+2. Acesse `/auth/login`.
+3. Entre com o e-mail do cliente e a senha definida no primeiro acesso.
+4. Confirme que `/cliente` abre normalmente.
+
+## Diagnostico rapido de invite
+
+Se o painel mostrar erro no convite:
+
+1. Confirme que `npm run supabase:start` esta com Mailpit local ativo.
+2. Confirme em `supabase/config.toml`:
+   - `host = "inbucket"`
+   - `port = 1025`
+3. Confirme que `INVITE_REDIRECT_URL` aponta para `/auth/callback`.
+4. Confirme que o app e o callback usam o mesmo host base configurado no `.env.local`.
+5. Veja o Mailpit em `http://127.0.0.1:54324`.
+6. Se necessario, consulte os logs do container `supabase_auth_portal-backend`.
+
+## Parar o ambiente
 
 ```powershell
 npm run supabase:stop
 ```
-
-Resetar o banco local:
-
-```powershell
-npm run supabase:db:reset
-```
-
-Depois do reset, rode novamente o bootstrap da advogada.
-
-## E-mail local e producao
-
-### Local
-
-No ambiente local, o proprio Supabase entrega os e-mails de Auth na caixa de e-mail local exibida pelo `supabase start`. Isso cobre:
-
-- convite de primeiro acesso
-- recuperacao de senha
-
-### Producao
-
-Para producao, o envio continua passando pelo Supabase Auth, mas voce precisa configurar um provedor SMTP no projeto remoto do Supabase. Exemplo:
-
-- Resend via SMTP
-- SMTP proprio do seu dominio
-
-Essa configuracao e externa ao codigo da aplicacao.

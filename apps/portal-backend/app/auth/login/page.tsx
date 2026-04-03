@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
 import {
+  ensureProfileForUser,
   getCurrentProfile,
-  getDefaultDestinationForRole,
-  getProfileById
+  getDefaultDestinationForProfile
 } from "@/lib/auth/guards";
 import { loginSchema } from "@/lib/domain/portal";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -30,17 +30,8 @@ async function loginAction(formData: FormData) {
     redirect("/auth/login?error=credenciais-invalidas");
   }
 
-  const profile = await getProfileById(data.user.id);
-
-  if (!profile) {
-    redirect("/auth/login?error=perfil-nao-localizado");
-  }
-
-  if (profile.role === "cliente" && !profile.first_login_completed_at) {
-    redirect("/auth/primeiro-acesso");
-  }
-
-  redirect(getDefaultDestinationForRole(profile));
+  const profile = await ensureProfileForUser(data.user);
+  redirect(getDefaultDestinationForProfile(profile));
 }
 
 export default async function LoginPage({
@@ -51,7 +42,7 @@ export default async function LoginPage({
   const currentProfile = await getCurrentProfile();
 
   if (currentProfile) {
-    redirect(getDefaultDestinationForRole(currentProfile));
+    redirect(getDefaultDestinationForProfile(currentProfile));
   }
 
   const params = await searchParams;

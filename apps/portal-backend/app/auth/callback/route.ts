@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
-import { getProfileById } from "@/lib/auth/guards";
+import {
+  ensureProfileForUser,
+  getDefaultDestinationForProfile
+} from "@/lib/auth/guards";
+import { getServerEnv } from "@/lib/config/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function normalizeNextPath(next: string | null) {
@@ -29,13 +33,15 @@ function normalizeOtpType(type: string | null): EmailOtpType | null {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const env = getServerEnv();
+  const appOrigin = env.NEXT_PUBLIC_APP_URL;
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const otpType = normalizeOtpType(url.searchParams.get("type"));
   const next = normalizeNextPath(url.searchParams.get("next"));
 
   if (!code && !(tokenHash && otpType)) {
-    return NextResponse.redirect(new URL("/auth/login?error=link-invalido", url.origin));
+    return NextResponse.redirect(new URL("/auth/login?error=link-invalido", appOrigin));
   }
 
   const supabase = await createServerSupabaseClient();
@@ -48,7 +54,7 @@ export async function GET(request: Request) {
       : await supabase.auth.exchangeCodeForSession(code as string);
 
   if (error) {
-    return NextResponse.redirect(new URL("/auth/login?error=link-expirado", url.origin));
+    return NextResponse.redirect(new URL("/auth/login?error=link-expirado", appOrigin));
   }
 
   const {
@@ -56,28 +62,26 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.redirect(new URL("/auth/login?error=sessao-nao-disponivel", url.origin));
-  }
-
-  const profile = await getProfileById(user.id);
-
-  if (!profile) {
     return NextResponse.redirect(
-      new URL("/auth/login?error=perfil-nao-localizado", url.origin)
+      new URL("/auth/login?error=sessao-nao-disponivel", appOrigin)
     );
   }
+
+  const profile = await ensureProfileForUser(user);
 
   let destination =
     next ||
     (otpType === "recovery"
       ? "/auth/atualizar-senha"
-      : profile.role === "cliente"
-        ? "/cliente"
-        : "/internal/advogada");
+      : getDefaultDestinationForProfile(profile));
 
-  if (profile.role === "cliente" && !profile.first_login_completed_at && next !== "/auth/atualizar-senha") {
+  if (
+    profile.role === "cliente" &&
+    !profile.first_login_completed_at &&
+    next !== "/auth/atualizar-senha"
+  ) {
     destination = "/auth/primeiro-acesso";
   }
 
-  return NextResponse.redirect(new URL(destination, url.origin));
+  return NextResponse.redirect(new URL(destination, appOrigin));
 }

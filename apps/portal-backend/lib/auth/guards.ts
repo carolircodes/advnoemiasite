@@ -1,8 +1,9 @@
 import "server-only";
 
+import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
-import type { PortalRole } from "@/lib/domain/portal";
+import { isPortalRole, type PortalRole } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -21,7 +22,13 @@ export function isStaffRole(role: PortalRole) {
   return role === "admin" || role === "advogada";
 }
 
-export function getDefaultDestinationForRole(profile: Pick<PortalProfile, "role">) {
+export function getDefaultDestinationForProfile(
+  profile: Pick<PortalProfile, "role" | "first_login_completed_at">
+) {
+  if (profile.role === "cliente" && !profile.first_login_completed_at) {
+    return "/auth/primeiro-acesso";
+  }
+
   return isStaffRole(profile.role) ? "/internal/advogada" : "/cliente";
 }
 
@@ -42,6 +49,57 @@ export async function getProfileById(profileId: string) {
   return data as PortalProfile | null;
 }
 
+function inferRoleFromAuthUser(user: User): PortalRole {
+  const metadataRole = user.user_metadata?.role;
+  return isPortalRole(metadataRole) ? metadataRole : "cliente";
+}
+
+function inferFullNameFromAuthUser(user: User) {
+  const metadataFullName = user.user_metadata?.full_name;
+
+  if (typeof metadataFullName === "string" && metadataFullName.trim().length >= 3) {
+    return metadataFullName.trim();
+  }
+
+  return user.email?.split("@")[0] || "Usuario do portal";
+}
+
+export async function ensureProfileForUser(user: User) {
+  const existingProfile = await getProfileById(user.id);
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email || "",
+        full_name: inferFullNameFromAuthUser(user),
+        role: inferRoleFromAuthUser(user),
+        is_active: true
+      },
+      {
+        onConflict: "id"
+      }
+    )
+    .select(
+      "id,email,full_name,phone,role,is_active,invited_at,first_login_completed_at"
+    )
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      error?.message || "Nao foi possivel sincronizar o perfil autenticado."
+    );
+  }
+
+  return data as PortalProfile;
+}
+
 export async function getCurrentProfile() {
   const supabase = await createServerSupabaseClient();
   const {
@@ -52,7 +110,7 @@ export async function getCurrentProfile() {
     return null;
   }
 
-  return getProfileById(user.id);
+  return ensureProfileForUser(user);
 }
 
 export async function requireProfile(allowedRoles?: PortalRole[]) {
@@ -63,7 +121,7 @@ export async function requireProfile(allowedRoles?: PortalRole[]) {
   }
 
   if (allowedRoles && !allowedRoles.includes(profile.role)) {
-    redirect(getDefaultDestinationForRole(profile));
+    redirect(getDefaultDestinationForProfile(profile));
   }
 
   return profile;

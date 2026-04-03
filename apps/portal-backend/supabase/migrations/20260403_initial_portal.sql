@@ -234,10 +234,13 @@ set search_path = public
 as $$
 declare
   inferred_role public.app_role;
+  has_explicit_role boolean;
 begin
+  has_explicit_role := new.raw_user_meta_data ->> 'role' in ('admin', 'advogada', 'cliente');
+
   inferred_role :=
     case
-      when new.raw_user_meta_data ->> 'role' in ('admin', 'advogada', 'cliente')
+      when has_explicit_role
         then (new.raw_user_meta_data ->> 'role')::public.app_role
       else 'cliente'::public.app_role
     end;
@@ -258,6 +261,12 @@ begin
   )
   on conflict (id) do update
     set email = excluded.email,
+        full_name = excluded.full_name,
+        role =
+          case
+            when has_explicit_role then excluded.role
+            else public.profiles.role
+          end,
         updated_at = timezone('utc', now());
 
   return new;

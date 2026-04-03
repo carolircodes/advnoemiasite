@@ -7,6 +7,48 @@ import { passwordSchema } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+async function markClientFirstAccessCompleted(profileId: string, completedAt: string) {
+  const admin = createAdminSupabaseClient();
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ first_login_completed_at: completedAt })
+    .eq("id", profileId);
+
+  if (profileError) {
+    throw new Error(
+      `Nao foi possivel concluir o primeiro acesso no perfil: ${profileError.message}`
+    );
+  }
+
+  const { error: clientError } = await admin
+    .from("clients")
+    .update({ status: "ativo" })
+    .eq("profile_id", profileId)
+    .in("status", ["convite-enviado", "aguardando-primeiro-acesso"]);
+
+  if (clientError) {
+    throw new Error(
+      `Nao foi possivel atualizar o status do cliente: ${clientError.message}`
+    );
+  }
+
+  const { error: auditError } = await admin.from("audit_logs").insert({
+    actor_profile_id: profileId,
+    action: "auth.first_access.completed",
+    entity_type: "profiles",
+    entity_id: profileId,
+    payload: {
+      completedAt
+    }
+  });
+
+  if (auditError) {
+    throw new Error(
+      `Nao foi possivel registrar a auditoria do primeiro acesso: ${auditError.message}`
+    );
+  }
+}
+
 async function firstAccessAction(formData: FormData) {
   "use server";
 
@@ -29,23 +71,12 @@ async function firstAccessAction(formData: FormData) {
     redirect("/auth/primeiro-acesso?error=nao-foi-possivel-definir-senha");
   }
 
-  const admin = createAdminSupabaseClient();
   const completedAt = new Date().toISOString();
-
-  await admin
-    .from("profiles")
-    .update({ first_login_completed_at: completedAt })
-    .eq("id", profile.id);
-
-  await admin.from("audit_logs").insert({
-    actor_profile_id: profile.id,
-    action: "auth.first_access.completed",
-    entity_type: "profiles",
-    entity_id: profile.id,
-    payload: {
-      completedAt
-    }
-  });
+  try {
+    await markClientFirstAccessCompleted(profile.id, completedAt);
+  } catch (_error) {
+    redirect("/auth/primeiro-acesso?error=nao-foi-possivel-finalizar");
+  }
 
   redirect("/cliente?success=primeiro-acesso-concluido");
 }
@@ -106,4 +137,3 @@ export default async function FirstAccessPage({
     </AppFrame>
   );
 }
-
