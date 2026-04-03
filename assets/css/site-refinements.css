@@ -1,0 +1,808 @@
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body:not(.portal-app) {
+  --public-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.024));
+  --public-surface-strong: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03));
+  --public-line: rgba(234, 215, 175, 0.15);
+  --public-line-strong: rgba(234, 215, 175, 0.28);
+  --public-shadow: 0 28px 58px rgba(0, 0, 0, 0.28);
+  --public-shadow-soft: 0 18px 38px rgba(0, 0, 0, 0.2);
+}
+
+section[id],
+.section[id],
+#contato,
+#areas,
+#como-funciona,
+#conteudo,
+#artigos {
+  scroll-margin-top: 110px;
+}
+
+.feature-grid > *,
+.metric-grid > *,
+.status-grid > *,
+.showcase-grid > *,
+.cta-grid > *,
+.documents-layout > *,
+.agenda-layout > *,
+.app-grid > *,
+.login-layout > * {
+  min-width: 0;
+}
+
+.btn,
+.contact-mobile-link {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.btn-primary {
+  box-shadow: 0 16px 30px rgba(200, 169, 107, 0.18);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.metric-card,
+.feature-card,
+.stack-card,
+.list-card,
+.app-card,
+.status-card,
+.document-card,
+.calendar-card,
+.timeline-item,
+.article-card,
+.featured-main,
+.mini-feature,
+.footer-card,
+.cta-box,
+.highlight-box {
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
+}
+
+.metric-card,
+.feature-card,
+.stack-card,
+.list-card,
+.footer-card,
+.article-card,
+.featured-main,
+.mini-feature,
+.cta-box,
+.highlight-box {
+  height: 100%;
+}
+
+.hero-copy h1,
+.showcase-copy h2,
+.cta-copy h2,
+.section-head h2,
+.app-page-title h1,
+.feature-card h3,
+.article-card h1,
+.article-card h2,
+.article-card h3,
+.featured-main h2 {
+  text-wrap: balance;
+}
+
+.hero-actions,
+.dashboard-actions,
+.bottom-links,
+.quick-access {
+  align-items: stretch;
+}
+
+.article-card,
+.featured-main,
+.mini-feature,
+.cta-box,
+.highlight-box {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+}
+
+.article-content p,
+.article-content li {
+  line-height: 1.84;
+}
+
+.whatsapp-float,
+.floating-contact,
+.contact-floating-widget {
+  transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+}
+
+.whatsapp-float:hover,
+.floating-contact:hover,
+.contact-floating-widget:hover {
+  transform: translateY(-2px);
+  filter: saturate(1.03);
+}
+
+.topbar-inner,
+.footer-bar {
+  gap: 14px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(234, 215, 175, 0.78),
+    0 0 0 4px rgba(234, 215, 175, 0.18);
+}
+
+.blog-grid,
+.timeline,
+.timeline-list,
+.document-list,
+.check-list,
+.hero-points,
+.feature-grid,
+.metric-grid {
+  gap: 16px;
+}
+
+/* Public premium polish */
+body:not(.portal-app) .container {
+  width: min(calc(100% - 40px), 1240px);
+}
+
+body:not(.portal-app) .header,
+body:not(.portal-app) .nav {
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
+}
+
+body:not(.portal-app) .topbar {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+body:not(.portal-app) .topbar-inner {
+  min-height: 46px;
+}
+
+body:not(.portal-app) .pill-row span,
+body:not(.portal-app) .hero-mini span,
+body:not(.portal-app) .filter-chip,
+body:not(.portal-app) .meta-pill {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body:not(.portal-app) .hero,
+body:not(.portal-app) .login-main {
+  position: relative;
+  padding-top: clamp(74px, 8vw, 108px);
+  padding-bottom: clamp(40px, 6vw, 64px);
+}
+
+body:not(.portal-app) .hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(234, 215, 175, 0.11), transparent 28%),
+    radial-gradient(circle at 86% 10%, rgba(159, 206, 193, 0.1), transparent 22%);
+  pointer-events: none;
+}
+
+body:not(.portal-app) .hero-grid,
+body:not(.portal-app) .showcase-grid,
+body:not(.portal-app) .cta-grid,
+body:not(.portal-app) .featured {
+  gap: clamp(24px, 3vw, 38px);
+}
+
+body:not(.portal-app) .hero-copy h1,
+body:not(.portal-app) .hero h1 {
+  font-size: clamp(44px, 6.3vw, 84px);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+}
+
+body:not(.portal-app) .hero-copy p,
+body:not(.portal-app) .hero p.lead,
+body:not(.portal-app) .section-head p,
+body:not(.portal-app) .showcase p,
+body:not(.portal-app) .cta p,
+body:not(.portal-app) .feature-card p,
+body:not(.portal-app) .metric-card p,
+body:not(.portal-app) .stack-card p,
+body:not(.portal-app) .list-card p {
+  color: rgba(248, 243, 234, 0.76);
+}
+
+body:not(.portal-app) .hero-copy p,
+body:not(.portal-app) .hero p.lead,
+body:not(.portal-app) .section-head p {
+  max-width: 64ch;
+  font-size: clamp(16px, 1.45vw, 18.5px);
+}
+
+body:not(.portal-app) .hero-actions,
+body:not(.portal-app) .dashboard-actions,
+body:not(.portal-app) .bottom-links {
+  gap: 14px;
+}
+
+body:not(.portal-app) .section,
+body:not(.portal-app) main > section {
+  padding-top: clamp(42px, 5.2vw, 64px);
+  padding-bottom: clamp(42px, 5.2vw, 64px);
+}
+
+body:not(.portal-app) .section-head {
+  gap: 28px;
+  margin-bottom: 34px;
+}
+
+body:not(.portal-app) .section-head h2 {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+body:not(.portal-app) .section-head h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 92px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(234, 215, 175, 0.96), rgba(159, 206, 193, 0.26));
+}
+
+body:not(.portal-app) .btn,
+body:not(.portal-app) .contact-mobile-link {
+  min-height: 54px;
+  padding: 0 24px;
+  border-color: rgba(234, 215, 175, 0.14);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+body:not(.portal-app) .btn-primary {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(135deg, #b78d4e 0%, #ddc18a 54%, #f1dfbd 100%);
+  box-shadow:
+    0 20px 38px rgba(186, 151, 92, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+body:not(.portal-app) .btn-secondary {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.026));
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+body:not(.portal-app) .glass-card,
+body:not(.portal-app) .feature-card,
+body:not(.portal-app) .metric-card,
+body:not(.portal-app) .stack-card,
+body:not(.portal-app) .list-card,
+body:not(.portal-app) .timeline-item,
+body:not(.portal-app) .article-card,
+body:not(.portal-app) .featured-main,
+body:not(.portal-app) .mini-feature,
+body:not(.portal-app) .cta-box,
+body:not(.portal-app) .highlight-box,
+body:not(.portal-app) .showcase,
+body:not(.portal-app) .cta-wrap,
+body:not(.portal-app) .cta {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--public-line);
+  background: var(--public-surface);
+  box-shadow: var(--public-shadow-soft);
+  backdrop-filter: blur(10px);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+body:not(.portal-app) .feature-card,
+body:not(.portal-app) .metric-card,
+body:not(.portal-app) .stack-card,
+body:not(.portal-app) .list-card,
+body:not(.portal-app) .timeline-item,
+body:not(.portal-app) .article-card,
+body:not(.portal-app) .featured-main,
+body:not(.portal-app) .mini-feature {
+  display: flex;
+  flex-direction: column;
+}
+
+body:not(.portal-app) .feature-card::before,
+body:not(.portal-app) .metric-card::before,
+body:not(.portal-app) .stack-card::before,
+body:not(.portal-app) .list-card::before,
+body:not(.portal-app) .timeline-item::before,
+body:not(.portal-app) .article-card::before,
+body:not(.portal-app) .featured-main::before,
+body:not(.portal-app) .mini-feature::before,
+body:not(.portal-app) .showcase::before,
+body:not(.portal-app) .cta-wrap::before,
+body:not(.portal-app) .cta::before,
+body:not(.portal-app) .cta-box::before,
+body:not(.portal-app) .highlight-box::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(234, 215, 175, 0.74), rgba(255, 255, 255, 0));
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+body:not(.portal-app) .showcase,
+body:not(.portal-app) .cta-wrap,
+body:not(.portal-app) .cta {
+  border-radius: 32px;
+  border-color: var(--public-line-strong);
+  background:
+    radial-gradient(circle at top right, rgba(234, 215, 175, 0.08), transparent 24%),
+    radial-gradient(circle at left 16%, rgba(159, 206, 193, 0.06), transparent 20%),
+    var(--public-surface-strong);
+  box-shadow: var(--public-shadow);
+}
+
+body:not(.portal-app) .showcase > *,
+body:not(.portal-app) .cta-wrap > *,
+body:not(.portal-app) .cta > * {
+  position: relative;
+  z-index: 1;
+}
+
+body:not(.portal-app) .hero-panel {
+  box-shadow: var(--public-shadow);
+}
+
+body:not(.portal-app) .hero-panel .panel-visual {
+  min-height: 560px;
+  padding: 28px;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+body:not(.portal-app) .floating-metric,
+body:not(.portal-app) .preview-row,
+body:not(.portal-app) .document-row,
+body:not(.portal-app) .timeline-row,
+body:not(.portal-app) .agenda-row,
+body:not(.portal-app) .mini-stat-row,
+body:not(.portal-app) .list-row {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(6, 11, 10, 0.7), rgba(6, 11, 10, 0.46));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body:not(.portal-app) .floating-metric strong,
+body:not(.portal-app) .metric-card strong,
+body:not(.portal-app) .stack-card strong,
+body:not(.portal-app) .feature-card h3,
+body:not(.portal-app) .timeline-item strong,
+body:not(.portal-app) .featured-main h3,
+body:not(.portal-app) .mini-feature h3,
+body:not(.portal-app) .article-card h3,
+body:not(.portal-app) .cta-box strong {
+  font-family: var(--font-display, Georgia, "Times New Roman", serif);
+  letter-spacing: -0.025em;
+}
+
+body:not(.portal-app) .metric-card strong,
+body:not(.portal-app) .stack-card strong {
+  font-size: clamp(24px, 2.5vw, 30px);
+  line-height: 0.98;
+}
+
+body:not(.portal-app) .feature-card h3,
+body:not(.portal-app) .article-card h3,
+body:not(.portal-app) .mini-feature h3 {
+  margin-bottom: 14px;
+  line-height: 1.02;
+}
+
+body:not(.portal-app) .dashboard-actions,
+body:not(.portal-app) .bottom-links,
+body:not(.portal-app) .article-card .read-more,
+body:not(.portal-app) .feature-card .btn,
+body:not(.portal-app) .stack-card .btn {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+body:not(.portal-app) .showcase-copy h2,
+body:not(.portal-app) .cta-copy h2 {
+  margin-bottom: 18px;
+}
+
+body:not(.portal-app) .showcase-copy p,
+body:not(.portal-app) .cta-copy p {
+  max-width: 60ch;
+}
+
+body:not(.portal-app) .pathway-section {
+  padding-top: 18px;
+}
+
+body:not(.portal-app) .pathway-shell {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(28px, 4vw, 40px);
+  border: 1px solid rgba(234, 215, 175, 0.16);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at top left, rgba(234, 215, 175, 0.11), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(159, 206, 193, 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(8, 18, 17, 0.94), rgba(6, 12, 12, 0.9));
+  box-shadow: 0 30px 64px rgba(0, 0, 0, 0.26);
+}
+
+body:not(.portal-app) .pathway-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 38%);
+  pointer-events: none;
+}
+
+body:not(.portal-app) .pathway-head {
+  position: relative;
+  z-index: 1;
+  max-width: 72ch;
+  margin-bottom: 0;
+}
+
+body:not(.portal-app) .pathway-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+body:not(.portal-app) .pathway-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+  padding: 28px;
+  border: 1px solid rgba(234, 215, 175, 0.12);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025));
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.18);
+}
+
+body:not(.portal-app) .pathway-card-primary {
+  background:
+    radial-gradient(circle at top right, rgba(234, 215, 175, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+  border-color: rgba(234, 215, 175, 0.2);
+}
+
+body:not(.portal-app) .pathway-card-secondary {
+  background:
+    radial-gradient(circle at top left, rgba(159, 206, 193, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.022));
+}
+
+body:not(.portal-app) .pathway-card h3 {
+  margin: 0;
+  color: rgba(250, 246, 238, 0.97);
+  font-size: clamp(30px, 3.5vw, 42px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+body:not(.portal-app) .pathway-card p {
+  margin: 0;
+  color: rgba(248, 243, 234, 0.76);
+  font-size: 16px;
+  line-height: 1.78;
+}
+
+body:not(.portal-app) .pathway-note {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body:not(.portal-app) .pathway-note strong {
+  color: rgba(250, 246, 238, 0.95);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body:not(.portal-app) .pathway-note span {
+  color: rgba(248, 243, 234, 0.72);
+  line-height: 1.66;
+}
+
+body:not(.portal-app) .pathway-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: auto;
+}
+
+body:not(.portal-app) .pathway-actions .btn {
+  min-width: 232px;
+}
+
+body:not(.portal-app) .filters {
+  margin-bottom: 26px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+body:not(.portal-app) .filters::-webkit-scrollbar {
+  display: none;
+}
+
+body:not(.portal-app) .filter-chip {
+  white-space: nowrap;
+  border-color: rgba(234, 215, 175, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+}
+
+body:not(.portal-app) .featured-main,
+body:not(.portal-app) .mini-feature,
+body:not(.portal-app) .article-card {
+  box-shadow: var(--public-shadow-soft);
+}
+
+body:not(.portal-app) .featured-main p,
+body:not(.portal-app) .mini-feature p,
+body:not(.portal-app) .article-card p {
+  color: rgba(248, 243, 234, 0.74);
+}
+
+body:not(.portal-app) .read-more {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+body:not(.portal-app) .article-shell {
+  padding-top: 34px;
+  padding-bottom: 56px;
+}
+
+body:not(.portal-app) .article-card {
+  border-radius: 32px;
+}
+
+body:not(.portal-app) .article-meta {
+  gap: 12px;
+  padding-top: 28px;
+}
+
+body:not(.portal-app) .article-content {
+  padding-top: 18px;
+  padding-bottom: 40px;
+}
+
+body:not(.portal-app) .article-content h2 {
+  margin-top: 38px;
+  margin-bottom: 16px;
+  color: rgba(248, 243, 234, 0.96);
+  font-size: clamp(30px, 4.4vw, 44px);
+}
+
+body:not(.portal-app) .article-content p,
+body:not(.portal-app) .article-content li {
+  color: rgba(248, 243, 234, 0.78);
+}
+
+body:not(.portal-app) .footer {
+  padding-top: 32px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body:not(.portal-app) .btn:hover,
+  body:not(.portal-app) .metric-card:hover,
+  body:not(.portal-app) .feature-card:hover,
+  body:not(.portal-app) .stack-card:hover,
+  body:not(.portal-app) .list-card:hover,
+  body:not(.portal-app) .timeline-item:hover,
+  body:not(.portal-app) .featured-main:hover,
+  body:not(.portal-app) .mini-feature:hover,
+  body:not(.portal-app) .article-card:hover,
+  body:not(.portal-app) .pathway-card:hover,
+  body:not(.portal-app) .cta-box:hover {
+    transform: translateY(-4px);
+    border-color: rgba(234, 215, 175, 0.22);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.32);
+  }
+}
+
+@media (max-width: 820px) {
+  body:not(.portal-app) .container {
+    width: min(calc(100% - 24px), 1240px);
+  }
+
+  body:not(.portal-app) .hero,
+  body:not(.portal-app) .login-main {
+    padding-top: 56px;
+    padding-bottom: 34px;
+  }
+
+  body:not(.portal-app) .section,
+  body:not(.portal-app) main > section {
+    padding-top: 34px;
+    padding-bottom: 34px;
+  }
+
+  body:not(.portal-app) .section-head {
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+
+  body:not(.portal-app) .hero h1,
+  body:not(.portal-app) .hero-copy h1 {
+    font-size: clamp(36px, 9vw, 56px);
+  }
+
+  body:not(.portal-app) .hero-panel .panel-visual {
+    min-height: 430px;
+    padding: 20px;
+  }
+
+  body:not(.portal-app) .floating-metric strong {
+    font-size: 22px;
+  }
+
+  body:not(.portal-app) .pathway-shell {
+    padding: 24px;
+    border-radius: 30px;
+  }
+
+  body:not(.portal-app) .pathway-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body:not(.portal-app) .pathway-card {
+    padding: 24px;
+  }
+
+  .hero-actions .btn,
+  .dashboard-actions .btn,
+  .bottom-links .btn,
+  .quick-access .btn {
+    width: 100%;
+  }
+
+  .topbar-inner,
+  .footer-bar {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 680px) {
+  body:not(.portal-app) .hero,
+  body:not(.portal-app) .login-main {
+    padding-top: 48px;
+    padding-bottom: 28px;
+  }
+
+  body:not(.portal-app) .hero h1,
+  body:not(.portal-app) .hero-copy h1 {
+    font-size: clamp(32px, 11vw, 46px);
+    line-height: 0.96;
+  }
+
+  body:not(.portal-app) .section-head h2,
+  body:not(.portal-app) .showcase-copy h2,
+  body:not(.portal-app) .cta-copy h2 {
+    font-size: clamp(29px, 9vw, 39px);
+  }
+
+  body:not(.portal-app) .btn,
+  body:not(.portal-app) .contact-mobile-link {
+    min-height: 52px;
+    padding: 0 18px;
+    font-size: 12px;
+  }
+
+  .article-card,
+  .featured-main,
+  .mini-feature,
+  .cta-box,
+  .highlight-box,
+  .metric-card,
+  .feature-card,
+  .stack-card,
+  .showcase,
+  .cta-wrap,
+  .app-card,
+  .status-card,
+  .document-card {
+    padding: 20px;
+  }
+
+  body:not(.portal-app) .hero-copy p,
+  body:not(.portal-app) .hero p.lead,
+  body:not(.portal-app) .section-head p,
+  body:not(.portal-app) .showcase p,
+  body:not(.portal-app) .cta p {
+    font-size: 16px;
+    line-height: 1.76;
+  }
+
+  body:not(.portal-app) .hero-points,
+  body:not(.portal-app) .feature-grid,
+  body:not(.portal-app) .metric-grid,
+  body:not(.portal-app) .timeline,
+  body:not(.portal-app) .blog-grid,
+  body:not(.portal-app) .featured-side {
+    gap: 14px;
+  }
+
+  body:not(.portal-app) .showcase,
+  body:not(.portal-app) .cta-wrap,
+  body:not(.portal-app) .cta,
+  body:not(.portal-app) .hero-panel,
+  body:not(.portal-app) .pathway-shell,
+  body:not(.portal-app) .pathway-card,
+  body:not(.portal-app) .article-card,
+  body:not(.portal-app) .featured-main,
+  body:not(.portal-app) .mini-feature,
+  body:not(.portal-app) .cta-box,
+  body:not(.portal-app) .highlight-box {
+    border-radius: 24px;
+  }
+
+  body:not(.portal-app) .pathway-shell {
+    padding: 20px;
+  }
+
+  body:not(.portal-app) .pathway-card {
+    gap: 16px;
+    padding: 20px;
+  }
+
+  body:not(.portal-app) .pathway-card h3 {
+    font-size: clamp(28px, 8vw, 36px);
+  }
+
+  body:not(.portal-app) .pathway-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body:not(.portal-app) .article-meta,
+  body:not(.portal-app) .article-content {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .article-content p,
+  .article-content li,
+  .hero p.lead {
+    font-size: 16px;
+  }
+
+  .footer-bar {
+    font-size: 13px;
+  }
+
+  body.has-mobile-contact .footer {
+    padding-bottom: 124px;
+  }
+}

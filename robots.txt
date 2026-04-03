@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /portal/
+Disallow: /triagem.html
+
+Sitemap: https://advnoemia.com.br/sitemap.xml
