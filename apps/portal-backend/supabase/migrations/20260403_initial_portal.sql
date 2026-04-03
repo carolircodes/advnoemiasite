@@ -67,64 +67,6 @@ begin
 end;
 $$;
 
-create or replace function public.current_app_role()
-returns public.app_role
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select role from public.profiles where id = auth.uid();
-$$;
-
-create or replace function public.is_staff()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select coalesce(public.current_app_role() in ('admin', 'advogada'), false);
-$$;
-
-create or replace function public.sync_profile_from_auth()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  inferred_role public.app_role;
-begin
-  inferred_role :=
-    case
-      when new.raw_user_meta_data ->> 'role' in ('admin', 'advogada', 'cliente')
-        then (new.raw_user_meta_data ->> 'role')::public.app_role
-      else 'cliente'::public.app_role
-    end;
-
-  insert into public.profiles (
-    id,
-    email,
-    full_name,
-    role,
-    is_active
-  )
-  values (
-    new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
-    inferred_role,
-    true
-  )
-  on conflict (id) do update
-    set email = excluded.email,
-        updated_at = timezone('utc', now());
-
-  return new;
-end;
-$$;
-
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null unique,
@@ -256,6 +198,71 @@ create table if not exists public.audit_logs (
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+create or replace function public.current_app_role()
+returns public.app_role
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (
+      select profiles.role
+      from public.profiles as profiles
+      where profiles.id = auth.uid()
+    ),
+    'cliente'::public.app_role
+  );
+$$;
+
+create or replace function public.is_staff()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(public.current_app_role() in ('admin', 'advogada'), false);
+$$;
+
+create or replace function public.sync_profile_from_auth()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  inferred_role public.app_role;
+begin
+  inferred_role :=
+    case
+      when new.raw_user_meta_data ->> 'role' in ('admin', 'advogada', 'cliente')
+        then (new.raw_user_meta_data ->> 'role')::public.app_role
+      else 'cliente'::public.app_role
+    end;
+
+  insert into public.profiles (
+    id,
+    email,
+    full_name,
+    role,
+    is_active
+  )
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
+    inferred_role,
+    true
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        updated_at = timezone('utc', now());
+
+  return new;
+end;
+$$;
 
 create index if not exists clients_profile_id_idx on public.clients(profile_id);
 create index if not exists cases_client_id_idx on public.cases(client_id);
@@ -466,4 +473,3 @@ on public.audit_logs
 for all
 using (public.is_staff())
 with check (public.is_staff());
-

@@ -14,8 +14,13 @@ enable_signup = false
 enable_confirmations = false
 
 [auth.email.smtp]
-admin_email = "portal@advnoemia.local"
-sender_name = "Noemia Paixao Advocacia"
+enabled = true
+host = "maildev"
+port = 1025
+user = "local"
+pass = "local"
+admin_email = "no-reply@advnoemia.local"
+sender_name = "Noêmia Paixão Advocacia"
 
 [auth.email.template.invite]
 subject = "Seu acesso ao portal juridico"
