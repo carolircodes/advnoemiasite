@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
@@ -203,6 +204,15 @@ export default async function DocumentsPage({
         eyebrow="Documentos"
         title="Central de documentos clara para registro, solicitacao e acompanhamento."
         description="Aqui a equipe organiza uploads reais, pendencias documentais e pedidos ao cliente em um fluxo direto e facil de operar."
+        utilityContent={
+          <PortalSessionBanner
+            role={profile.role}
+            fullName={profile.full_name}
+            email={profile.email}
+            workspaceLabel="Documentos internos protegidos"
+            workspaceHint="Sessao interna ativa para uploads, solicitacoes e leitura documental."
+          />
+        }
         navigation={[
           { href: "/internal/advogada", label: "Painel" },
           { href: "/documentos", label: "Documentos", active: true },
@@ -680,6 +690,15 @@ export default async function DocumentsPage({
         eyebrow="Documentos"
         title="Documentos e pendencias organizados em um so lugar."
         description="Voce acompanha aqui os arquivos liberados pela equipe, o que ainda esta pendente e as solicitacoes abertas do seu caso."
+        utilityContent={
+          <PortalSessionBanner
+            role={profile.role}
+            fullName={profile.full_name}
+            email={profile.email}
+            workspaceLabel="Portal autenticado"
+            workspaceHint="Sessao ativa para acompanhar documentos e pendencias do proprio caso."
+          />
+        }
         navigation={[
           { href: "/cliente", label: "Meu painel" },
           { href: "/documentos", label: "Documentos", active: true },

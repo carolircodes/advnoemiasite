@@ -771,9 +771,13 @@ body:not(.portal-app) .footer {
 }
 
 @media (max-width: 680px) {
+  body:not(.portal-app) .topbar {
+    display: none;
+  }
+
   body:not(.portal-app) .hero,
   body:not(.portal-app) .login-main {
-    padding-top: 48px;
+    padding-top: 32px;
     padding-bottom: 28px;
   }
 
@@ -887,6 +891,12 @@ body:not(.portal-app) .footer {
 
   body:not(.portal-app) .pathway-card p {
     max-width: none;
+  }
+
+  body.has-mobile-contact .whatsapp-float,
+  body.has-mobile-contact .floating-contact,
+  body.has-mobile-contact .contact-floating-widget {
+    bottom: 92px;
   }
 
   body:not(.portal-app) .section-actions .btn {

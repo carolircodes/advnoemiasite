@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AppFrame } from "@/components/app-frame";
 import { NoemiaAssistant } from "@/components/noemia-assistant";
+import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getCurrentProfile } from "@/lib/auth/guards";
@@ -62,6 +63,20 @@ export default async function NoemiaPage() {
         "Quando eu recebo acesso ao portal do cliente?",
         "O que eu consigo acompanhar dentro do portal?"
       ];
+  const utilityContent =
+    profile && profile.is_active ? (
+      <PortalSessionBanner
+        role={profile.role}
+        fullName={profile.full_name}
+        email={profile.email}
+        workspaceLabel={isStaffMode ? "Noemia interna" : "Portal autenticado"}
+        workspaceHint={
+          isStaffMode
+            ? "Sessao interna ativa para usar a assistente com contexto operacional."
+            : "Sessao ativa para usar a assistente com contexto do proprio portal."
+        }
+      />
+    ) : null;
 
   return (
     <>
@@ -82,6 +97,7 @@ export default async function NoemiaPage() {
             ? "Noemia usa apenas o contexto do seu proprio portal para explicar status, agenda, documentos e proximos passos com mais clareza."
             : "Noemia ajuda visitantes a entender triagem, atendimento, convite e funcionamento do portal sem substituir o retorno tecnico da equipe."
         }
+        utilityContent={utilityContent}
         navigation={navigation}
         highlights={[
           {

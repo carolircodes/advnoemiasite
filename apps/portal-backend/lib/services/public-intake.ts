@@ -8,6 +8,7 @@ import {
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels,
   recordProductEventSchema,
+  submitLegacySiteTriageSchema,
   submitPublicTriageSchema,
   updateIntakeRequestStatusSchema
 } from "@/lib/domain/portal";
@@ -30,6 +31,167 @@ type PublicTriageContext = {
   userAgent?: string | null;
   ipAddress?: string | null;
 };
+
+type NormalizedPublicTriageInput = {
+  fullName: string;
+  email: string;
+  phone: string;
+  city: string;
+  caseArea: "previdenciario" | "consumidor_bancario" | "familia" | "civil";
+  currentStage:
+    | "ainda-nao-iniciei"
+    | "ja-estou-em-atendimento"
+    | "tenho-prazo-proximo"
+    | "recebi-negativa-ou-cobranca";
+  urgencyLevel: "baixa" | "moderada" | "alta" | "urgente";
+  preferredContactPeriod: "manha" | "tarde" | "noite" | "horario-comercial";
+  caseSummary: string;
+  consentAccepted: boolean;
+  sourcePath: string;
+  website: string;
+  captureMetadata: {
+    captureMode: "portal_guided_triage" | "static_site_triage";
+    source: string;
+    page: string;
+    theme: string;
+    areaRaw: string;
+    problemType: string;
+    urgencyRaw: string;
+  };
+};
+
+function normalizeCaptureValue(value: string | null | undefined) {
+  return (value || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/_/g, "-");
+}
+
+function inferCaseArea(
+  areaRaw: string,
+  problemTypeRaw: string,
+  themeRaw: string
+): NormalizedPublicTriageInput["caseArea"] {
+  const candidates = [areaRaw, problemTypeRaw, themeRaw].map(normalizeCaptureValue);
+
+  if (candidates.some((value) => value.includes("previd") || value.includes("aposentadoria"))) {
+    return "previdenciario";
+  }
+
+  if (candidates.some((value) => value.includes("familia"))) {
+    return "familia";
+  }
+
+  if (
+    candidates.some(
+      (value) =>
+        value.includes("consumidor") ||
+        value.includes("banc") ||
+        value.includes("banco") ||
+        value.includes("emprestimo") ||
+        value.includes("negativ")
+    )
+  ) {
+    return "consumidor_bancario";
+  }
+
+  if (candidates.some((value) => value.includes("civil"))) {
+    return "civil";
+  }
+
+  return "civil";
+}
+
+function inferUrgencyLevel(rawValue: string): NormalizedPublicTriageInput["urgencyLevel"] {
+  const value = normalizeCaptureValue(rawValue);
+
+  if (value.includes("urgente")) {
+    return "urgente";
+  }
+
+  if (value.includes("alta")) {
+    return "alta";
+  }
+
+  if (value.includes("media") || value.includes("moderada")) {
+    return "moderada";
+  }
+
+  if (value.includes("baixa")) {
+    return "baixa";
+  }
+
+  return "moderada";
+}
+
+function normalizePublicTriageInput(
+  rawInput: unknown,
+  context: PublicTriageContext = {}
+): NormalizedPublicTriageInput {
+  const canonicalResult = submitPublicTriageSchema.safeParse(rawInput);
+
+  if (canonicalResult.success) {
+    const input = canonicalResult.data;
+
+    return {
+      fullName: input.fullName,
+      email: input.email,
+      phone: input.phone,
+      city: input.city,
+      caseArea: input.caseArea,
+      currentStage: input.currentStage,
+      urgencyLevel: input.urgencyLevel,
+      preferredContactPeriod: input.preferredContactPeriod,
+      caseSummary: input.caseSummary,
+      consentAccepted: input.consentAccepted,
+      sourcePath: input.sourcePath || context.pagePath || "/triagem",
+      website: input.website,
+      captureMetadata: {
+        captureMode: "portal_guided_triage",
+        source: "portal-triagem",
+        page: input.sourcePath || context.pagePath || "/triagem",
+        theme: "",
+        areaRaw: input.caseArea,
+        problemType: input.caseArea,
+        urgencyRaw: input.urgencyLevel
+      }
+    };
+  }
+
+  const legacyInput = submitLegacySiteTriageSchema.parse(rawInput);
+  const caseArea = inferCaseArea(
+    legacyInput.area,
+    legacyInput.problem_type,
+    legacyInput.theme
+  );
+
+  return {
+    fullName: legacyInput.name,
+    email: "",
+    phone: legacyInput.phone,
+    city: legacyInput.city,
+    caseArea,
+    currentStage: "ainda-nao-iniciei",
+    urgencyLevel: inferUrgencyLevel(legacyInput.urgency),
+    preferredContactPeriod: "horario-comercial",
+    caseSummary: legacyInput.description,
+    consentAccepted: true,
+    sourcePath: legacyInput.sourcePath || context.pagePath || "/triagem.html",
+    website: legacyInput.website,
+    captureMetadata: {
+      captureMode: "static_site_triage",
+      source: legacyInput.source,
+      page: legacyInput.page,
+      theme: legacyInput.theme,
+      areaRaw: legacyInput.area,
+      problemType: legacyInput.problem_type,
+      urgencyRaw: legacyInput.urgency
+    }
+  };
+}
 
 export async function recordProductEvent(rawInput: ProductEventInput) {
   const input = recordProductEventSchema.parse(rawInput);
@@ -61,7 +223,7 @@ export async function submitPublicTriage(
   rawInput: unknown,
   context: PublicTriageContext = {}
 ) {
-  const input = submitPublicTriageSchema.parse(rawInput);
+  const input = normalizePublicTriageInput(rawInput, context);
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("intake_requests")
@@ -79,6 +241,18 @@ export async function submitPublicTriage(
       source_path: input.sourcePath || context.pagePath || "/triagem",
       status: "new",
       metadata: {
+        captureMode: input.captureMetadata.captureMode,
+        source: input.captureMetadata.source || null,
+        origem: input.captureMetadata.source || null,
+        page: input.captureMetadata.page || null,
+        theme: input.captureMetadata.theme || null,
+        tema: input.captureMetadata.theme || null,
+        areaRaw: input.captureMetadata.areaRaw || null,
+        area: input.captureMetadata.areaRaw || null,
+        problemType: input.captureMetadata.problemType || null,
+        problem_type: input.captureMetadata.problemType || null,
+        urgencyRaw: input.captureMetadata.urgencyRaw || null,
+        urgencia: input.captureMetadata.urgencyRaw || null,
         userAgent: context.userAgent || null,
         ipAddress: context.ipAddress || null
       }
@@ -106,7 +280,19 @@ export async function submitPublicTriage(
         currentStageLabel: publicIntakeStageLabels[input.currentStage],
         preferredContactPeriod: input.preferredContactPeriod,
         preferredContactPeriodLabel:
-          publicContactPeriodLabels[input.preferredContactPeriod]
+          publicContactPeriodLabels[input.preferredContactPeriod],
+        source: input.captureMetadata.source || null,
+        origem: input.captureMetadata.source || null,
+        page: input.captureMetadata.page || null,
+        theme: input.captureMetadata.theme || null,
+        tema: input.captureMetadata.theme || null,
+        areaRaw: input.captureMetadata.areaRaw || null,
+        area: input.captureMetadata.areaRaw || null,
+        problemType: input.captureMetadata.problemType || null,
+        problem_type: input.captureMetadata.problemType || null,
+        urgencyRaw: input.captureMetadata.urgencyRaw || null,
+        urgencia: input.captureMetadata.urgencyRaw || null,
+        captureMode: input.captureMetadata.captureMode
       }
     });
   } catch (trackingError) {

@@ -1,31 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Interno da Advogada | Noêmia Paixão Advocacia</title>
-  <meta
-    name="description"
-    content="Painel interno da advogada com cadastro de clientes, atualização de casos, agenda, documentos e estrutura pronta para convites e notificações por e-mail."
-  />
-  <meta name="robots" content="noindex,nofollow" />
-  <meta name="theme-color" content="#07110f" />
-  <link rel="icon" href="../logo.png" type="image/png" />
-  <link rel="stylesheet" href="../assets/css/premium-system.css" />
-  <link rel="stylesheet" href="../assets/css/portal-system.css" />
-  <link rel="stylesheet" href="../assets/css/contact-capture.css" />
-  <link rel="stylesheet" href="../assets/css/site-refinements.css" />
+  <title>Redirecionando para o painel interno</title>
+  <meta http-equiv="refresh" content="0; url=/internal/advogada" />
+  <script>
+    (function () {
+      window.location.replace("/internal/advogada" + window.location.search + window.location.hash);
+    })();
+  </script>
 </head>
-<body class="portal-app" data-portal-page="painel-advogada">
-  <div class="page-shell">
-    <div data-portal-root></div>
-  </div>
-
-  <script src="../assets/js/portal-data.js"></script>
-  <script src="../assets/js/portal-service.js"></script>
-  <script src="../assets/js/portal-renderer.js"></script>
-  <script src="../assets/js/portal-app.js"></script>
-  <script src="../assets/js/premium-system.js"></script>
-  <script src="../assets/js/contact-capture.js"></script>
+<body>
+  <p>Redirecionando para o painel interno. Se nada acontecer, <a href="/internal/advogada">clique aqui</a>.</p>
 </body>
 </html>

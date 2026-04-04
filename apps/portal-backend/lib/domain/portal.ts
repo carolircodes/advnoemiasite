@@ -319,6 +319,30 @@ export const createClientSchema = z.object({
   })
 });
 
+export const updateClientSchema = z.object({
+  clientId: z.string().uuid("Informe um identificador de cliente valido."),
+  fullName: z.string().trim().min(3, "Informe o nome completo."),
+  email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
+  cpf: z
+    .string()
+    .trim()
+    .transform(onlyDigits)
+    .refine((value) => value.length === 11, "Informe um CPF com 11 digitos."),
+  phone: z
+    .string()
+    .trim()
+    .transform(onlyDigits)
+    .refine(
+      (value) => value.length >= 10 && value.length <= 11,
+      "Informe um telefone com DDD."
+    ),
+  status: z.enum(clientStatuses, {
+    errorMap: () => ({ message: "Selecione um status valido para o cliente." })
+  }),
+  notes: z.string().trim().max(1200).optional().default(""),
+  isActive: z.coerce.boolean().default(true)
+});
+
 export const submitPublicTriageSchema = z.object({
   fullName: z.string().trim().min(3, "Informe seu nome completo."),
   email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
@@ -352,6 +376,36 @@ export const submitPublicTriageSchema = z.object({
     errorMap: () => ({ message: "Confirme a autorizacao para envio da triagem." })
   }),
   sourcePath: z.string().trim().max(300).optional().default("/triagem"),
+  website: z.string().trim().max(0).optional().default("")
+});
+
+export const submitLegacySiteTriageSchema = z.object({
+  name: z.string().trim().min(3, "Informe seu nome completo."),
+  phone: z
+    .string()
+    .trim()
+    .transform(onlyDigits)
+    .refine(
+      (value) => value.length >= 10 && value.length <= 11,
+      "Informe um telefone com DDD."
+    ),
+  city: z.string().trim().min(2, "Informe sua cidade.").max(120),
+  problem_type: z
+    .string()
+    .trim()
+    .min(2, "Selecione o tipo de problema.")
+    .max(120),
+  description: z
+    .string()
+    .trim()
+    .min(20, "Descreva em poucas linhas o que aconteceu e o que voce precisa.")
+    .max(2000, "Resuma o contexto em ate 2000 caracteres."),
+  urgency: z.string().trim().min(3, "Selecione a urgencia.").max(80),
+  area: z.string().trim().max(120).optional().default("geral"),
+  source: z.string().trim().max(120).optional().default("site"),
+  page: z.string().trim().max(300).optional().default("triagem.html"),
+  theme: z.string().trim().max(120).optional().default(""),
+  sourcePath: z.string().trim().max(300).optional().default("/triagem.html"),
   website: z.string().trim().max(0).optional().default("")
 });
 

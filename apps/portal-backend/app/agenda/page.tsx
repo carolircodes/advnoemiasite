@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
@@ -246,6 +248,8 @@ export default async function AgendaPage({
     const decodedError = rawError ? decodeURIComponent(rawError) : "";
     const query = getStringParam(params.q);
     const selectedStatus = getStringParam(params.status);
+    const selectedClientId = getStringParam(params.clientId);
+    const selectedCaseId = getStringParam(params.caseId);
     const dateFrom = getStringParam(params.dateFrom);
     const dateTo = getStringParam(params.dateTo);
     const scope = getStringParam(params.scope, "all");
@@ -253,6 +257,8 @@ export default async function AgendaPage({
     const hasFilters = !!(
       query ||
       selectedStatus ||
+      selectedClientId ||
+      selectedCaseId ||
       dateFrom ||
       dateTo ||
       scope !== "all" ||
@@ -261,7 +267,20 @@ export default async function AgendaPage({
     const error = getAccessMessage(decodedError) || decodedError;
     const success =
       typeof params.success === "string" ? getSuccessMessage(params.success) : "";
-    const hasCases = overview.caseOptions.length > 0;
+    const selectedClient =
+      overview.clientOptions.find((client) => client.id === selectedClientId) || null;
+    const caseOptionsForAgenda = overview.caseOptions.filter(
+      (caseItem) => !selectedClientId || caseItem.clientId === selectedClientId
+    );
+    const selectedCase =
+      overview.caseOptions.find((caseItem) => caseItem.id === selectedCaseId) ||
+      (selectedClientId
+        ? caseOptionsForAgenda.find((caseItem) => caseItem.status !== "concluido") ||
+          caseOptionsForAgenda[0] ||
+          null
+        : null);
+    const defaultCaseId = selectedCase?.id || caseOptionsForAgenda[0]?.id || undefined;
+    const hasCases = caseOptionsForAgenda.length > 0;
     const now = new Date();
     const filteredAppointments = [...overview.latestAppointments]
       .filter(
@@ -274,6 +293,8 @@ export default async function AgendaPage({
             appointment.statusLabel
           ]) &&
           (!selectedStatus || appointment.status === selectedStatus) &&
+          (!selectedClientId || appointment.client_id === selectedClientId) &&
+          (!selectedCaseId || appointment.case_id === selectedCaseId) &&
           isWithinDateRange(appointment.starts_at, dateFrom, dateTo) &&
           (scope === "all" ||
             (scope === "upcoming" && isUpcomingAppointment(appointment, now)) ||
@@ -300,37 +321,64 @@ export default async function AgendaPage({
             item.clientName,
             item.changeLabel,
             item.typeLabel
-          ]) && isWithinDateRange(item.created_at, dateFrom, dateTo)
+          ]) &&
+          (!selectedClientId || item.client_id === selectedClientId) &&
+          (!selectedCaseId || item.case_id === selectedCaseId) &&
+          isWithinDateRange(item.created_at, dateFrom, dateTo)
       )
       .slice(0, 10);
+    const sameDayAppointments = upcomingAppointments.filter((appointment) => {
+      const appointmentDate = new Date(appointment.starts_at);
+
+      return (
+        appointmentDate.getFullYear() === now.getFullYear() &&
+        appointmentDate.getMonth() === now.getMonth() &&
+        appointmentDate.getDate() === now.getDate()
+      );
+    });
+    const next48HoursCount = upcomingAppointments.filter((appointment) => {
+      const startsAt = new Date(appointment.starts_at).getTime();
+      const distance = startsAt - now.getTime();
+
+      return distance >= 0 && distance <= 48 * 60 * 60 * 1000;
+    }).length;
+    const visibleToClientCount = upcomingAppointments.filter(
+      (appointment) => appointment.visible_to_client
+    ).length;
 
     return (
       <AppFrame
         eyebrow="Agenda"
         title="Central de agenda para compromissos, prazos e proximos passos."
         description="A equipe acompanha aqui o ciclo completo da agenda do caso, com criacao, reagendamento, cancelamento e historico bem organizados."
+        utilityContent={
+          <PortalSessionBanner
+            role={profile.role}
+            fullName={profile.full_name}
+            email={profile.email}
+            workspaceLabel="Agenda interna protegida"
+            workspaceHint="Sessao interna ativa para operar compromissos, prazos e retornos."
+          />
+        }
         navigation={[
           { href: "/internal/advogada", label: "Painel" },
           { href: "/documentos", label: "Documentos" },
           { href: "/agenda", label: "Agenda", active: true }
         ]}
         highlights={[
-          { label: "Proximos compromissos", value: String(overview.upcomingAppointmentsCount) },
-          { label: "Casos disponiveis", value: String(overview.caseOptions.length) },
+          { label: "Hoje", value: String(sameDayAppointments.length) },
+          { label: "Proximas 48h", value: String(next48HoursCount) },
+          { label: "Casos filtrados", value: String(caseOptionsForAgenda.length) },
           {
-            label: "Alteracoes recentes",
-            value: String(overview.latestAppointmentHistory.length)
+            label: "Visiveis ao cliente",
+            value: String(visibleToClientCount)
           },
           { label: "Notificacoes pendentes", value: String(overview.pendingNotifications) }
         ]}
         actions={[
           { href: "#registrar-compromisso", label: "Criar compromisso" },
           { href: "#editar-compromisso", label: "Editar agenda", tone: "secondary" },
-          {
-            href: "/internal/advogada#status-caso",
-            label: "Alterar status do caso",
-            tone: "secondary"
-          }
+          { href: selectedClient ? `/internal/advogada?clientId=${selectedClient.id}#clientes` : "/internal/advogada#clientes", label: "Abrir ficha", tone: "secondary" }
         ]}
       >
         {error ? <div className="error-notice">{error}</div> : null}
@@ -364,6 +412,28 @@ export default async function AgendaPage({
                 </select>
               </div>
               <div className="field">
+                <label htmlFor="agenda-client">Cliente</label>
+                <select id="agenda-client" name="clientId" defaultValue={selectedClientId}>
+                  <option value="">Todos os clientes</option>
+                  {overview.clientOptions.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="agenda-case">Caso</label>
+                <select id="agenda-case" name="caseId" defaultValue={selectedCaseId}>
+                  <option value="">Todos os casos</option>
+                  {caseOptionsForAgenda.map((caseItem) => (
+                    <option key={caseItem.id} value={caseItem.id}>
+                      {caseItem.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
                 <label htmlFor="agenda-scope">Escopo</label>
                 <select id="agenda-scope" name="scope" defaultValue={scope}>
                   <option value="all">Tudo</option>
@@ -387,6 +457,14 @@ export default async function AgendaPage({
                 <input id="agenda-date-to" name="dateTo" type="date" defaultValue={dateTo} />
               </div>
             </div>
+            {selectedClient || selectedCase ? (
+              <div className="notice">
+                {selectedClient
+                  ? `${selectedClient.fullName} esta no foco desta agenda.`
+                  : "Filtro de caso ativo."}{" "}
+                {selectedCase ? `Caso selecionado: ${selectedCase.title}.` : ""}
+              </div>
+            ) : null}
             <div className="form-actions">
               <button className="button secondary" type="submit">
                 Aplicar filtros
@@ -398,6 +476,25 @@ export default async function AgendaPage({
           </form>
         </SectionCard>
 
+        <div className="metric-grid">
+          <div className="metric-card">
+            <span>Hoje</span>
+            <strong>{sameDayAppointments.length}</strong>
+          </div>
+          <div className="metric-card">
+            <span>Proximas 48h</span>
+            <strong>{next48HoursCount}</strong>
+          </div>
+          <div className="metric-card">
+            <span>Visiveis ao cliente</span>
+            <strong>{visibleToClientCount}</strong>
+          </div>
+          <div className="metric-card">
+            <span>Historico filtrado</span>
+            <strong>{filteredAppointmentHistory.length}</strong>
+          </div>
+        </div>
+
         <div className="grid two">
           <SectionCard
             id="registrar-compromisso"
@@ -408,9 +505,15 @@ export default async function AgendaPage({
               <div className="fields">
                 <div className="field-full">
                   <label htmlFor="caseId">Caso</label>
-                  <select id="caseId" name="caseId" required disabled={!hasCases}>
+                  <select
+                    id="caseId"
+                    name="caseId"
+                    required
+                    disabled={!hasCases}
+                    defaultValue={defaultCaseId}
+                  >
                     {hasCases ? (
-                      overview.caseOptions.map((caseItem) => (
+                      caseOptionsForAgenda.map((caseItem) => (
                         <option key={caseItem.id} value={caseItem.id}>
                           {caseItem.title} - {caseItem.clientName} - {caseItem.statusLabel}
                         </option>
@@ -531,6 +634,20 @@ export default async function AgendaPage({
                     <span className="item-meta">
                       {formatPortalDateTime(appointment.starts_at)}
                     </span>
+                    <div className="form-actions">
+                      <Link
+                        className="button secondary"
+                        href={`/internal/advogada?clientId=${appointment.client_id}#clientes`}
+                      >
+                        Abrir ficha
+                      </Link>
+                      <Link
+                        className="button secondary"
+                        href={`/agenda?clientId=${appointment.client_id}&caseId=${appointment.case_id}#editar-compromisso`}
+                      >
+                        Editar este caso
+                      </Link>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -549,9 +666,9 @@ export default async function AgendaPage({
           title="Editar, reagendar ou cancelar"
           description="Cada formulario abaixo atualiza o compromisso atual, grava a alteracao no historico da agenda e prepara notificacao futura quando a mudanca for relevante para o cliente."
         >
-          {overview.latestAppointments.length ? (
+          {filteredAppointments.length ? (
             <div className="grid two">
-              {overview.latestAppointments.slice(0, 8).map((appointment) => (
+              {filteredAppointments.slice(0, 8).map((appointment) => (
                 <SectionCard
                   key={appointment.id}
                   title={appointment.title}
@@ -572,6 +689,14 @@ export default async function AgendaPage({
                     <span className="pill muted">
                       {formatPortalDateTime(appointment.starts_at)}
                     </span>
+                  </div>
+                  <div className="form-actions">
+                    <Link
+                      className="button secondary"
+                      href={`/internal/advogada?clientId=${appointment.client_id}#clientes`}
+                    >
+                      Ficha do cliente
+                    </Link>
                   </div>
                   <form action={updateAppointmentAction} className="stack">
                     <input type="hidden" name="appointmentId" value={appointment.id} />
@@ -859,6 +984,15 @@ export default async function AgendaPage({
         eyebrow="Agenda"
         title="Sua agenda do caso, organizada para consulta rapida."
         description="Aqui voce ve os proximos compromissos, os itens recentes e qualquer mudanca importante liberada pela equipe para o seu atendimento."
+        utilityContent={
+          <PortalSessionBanner
+            role={profile.role}
+            fullName={profile.full_name}
+            email={profile.email}
+            workspaceLabel="Portal autenticado"
+            workspaceHint="Sessao ativa para acompanhar compromissos e datas do proprio caso."
+          />
+        }
         navigation={[
           { href: "/cliente", label: "Meu painel" },
           { href: "/documentos", label: "Documentos" },

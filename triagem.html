@@ -188,6 +188,7 @@
             <input type="hidden" name="page" value="triagem.html" data-triage-page-input />
 
             <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar triagem para o WhatsApp</button>
+            <div class="form-status" data-triage-status role="status" aria-live="polite"></div>
           </form>
 
           <p class="mini-note" id="miniNote">
@@ -205,8 +206,9 @@
     (function () {
       const params = new URLSearchParams(window.location.search);
 
-      const tema = (params.get("tema") || "").toLowerCase().trim();
+      const tema = (params.get("tema") || params.get("area") || "").toLowerCase().trim();
       const origem = (params.get("origem") || params.get("source") || "site").toLowerCase().trim();
+      const pageParam = (params.get("page") || params.get("pagina") || "").trim();
 
       const areaInput = document.querySelector("[data-triage-area-input]");
       const sourceInput = document.querySelector("[data-triage-source-input]");
@@ -378,8 +380,7 @@
       }
 
       if (pageInput) {
-        const suffix = window.location.search || "";
-        pageInput.value = "triagem.html" + suffix;
+        pageInput.value = pageParam || "triagem.html";
       }
 
       const timelineStep1 = document.getElementById("timelineStep1");
@@ -394,5 +395,60 @@
       }
     })();
   </script>
+  <script>
+  (function () {
+    // O envio principal da triagem e tratado por assets/js/contact-capture.js.
+    // Este bloco legado permanece apenas para preservar compatibilidade do template.
+    return;
+
+    const whatsappNumber = "5584996248241"; // TROQUE pelo número real com DDI e DDD
+
+    function normalize(text) {
+      return (text || "").toString().trim();
+    }
+
+    function optionText(select) {
+      if (!select) return "";
+      const option = select.options[select.selectedIndex];
+      return option ? option.textContent.trim() : "";
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const name = normalize(form.elements["name"]?.value);
+      const phone = normalize(form.elements["phone"]?.value);
+      const city = normalize(form.elements["city"]?.value);
+      const problemType = optionText(form.elements["problem_type"]);
+      const description = normalize(form.elements["description"]?.value);
+      const urgency = optionText(form.elements["urgency"]);
+      const area = normalize(form.elements["area"]?.value || "geral");
+      const source = normalize(form.elements["source"]?.value || "site");
+      const page = normalize(form.elements["page"]?.value || "triagem.html");
+
+      const message =
+`Olá, Dra. Noêmia! Vim pela triagem do site e gostaria de atendimento.
+
+*Dados iniciais*
+• Nome: ${name}
+• Telefone: ${phone}
+• Cidade: ${city}
+
+*Contexto do caso*
+• Área sugerida: ${problemType || area}
+• Urgência: ${urgency}
+• Origem: ${source}
+• Página: ${page}
+
+*Resumo do problema*
+${description}
+
+Fico no aguardo das orientações sobre os próximos passos.`;
+
+      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+      window.location.href = url;
+    });
+  })();
+</script>
 </body>
 </html>

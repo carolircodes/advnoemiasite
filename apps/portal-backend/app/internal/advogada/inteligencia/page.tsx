@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
@@ -25,7 +26,7 @@ export default async function IntelligencePage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireProfile(["advogada", "admin"]);
+  const profile = await requireProfile(["advogada", "admin"]);
   const params = searchParams ? await searchParams : {};
   const selectedDays = Number.parseInt(getStringParam(params.days, "30"), 10);
   const intelligence = await getBusinessIntelligenceOverview(selectedDays);
@@ -35,6 +36,15 @@ export default async function IntelligencePage({
       eyebrow="Inteligencia do produto"
       title="Leitura simples do funil, das automacoes e do uso real do portal."
       description="Esta visao junta conversao, operacao e uso do portal para mostrar onde o fluxo avanca, onde trava e o que ja esta sendo tratado automaticamente."
+      utilityContent={
+        <PortalSessionBanner
+          role={profile.role}
+          fullName={profile.full_name}
+          email={profile.email}
+          workspaceLabel="Inteligencia interna protegida"
+          workspaceHint="Sessao interna ativa para leitura de BI, funil e automacoes."
+        />
+      }
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
         { href: "/internal/advogada/inteligencia", label: "Inteligencia", active: true },

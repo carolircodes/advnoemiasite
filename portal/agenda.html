@@ -1,31 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agenda | Portal Jurídico Premium</title>
-  <meta
-    name="description"
-    content="Módulo de agenda com compromissos, disponibilidade, confirmações e estrutura organizada para integração com backend."
-  />
-  <meta name="robots" content="noindex,nofollow" />
-  <meta name="theme-color" content="#07110f" />
-  <link rel="icon" href="../logo.png" type="image/png" />
-  <link rel="stylesheet" href="../assets/css/premium-system.css" />
-  <link rel="stylesheet" href="../assets/css/portal-system.css" />
-  <link rel="stylesheet" href="../assets/css/contact-capture.css" />
-  <link rel="stylesheet" href="../assets/css/site-refinements.css" />
+  <title>Redirecionando para agenda</title>
+  <meta http-equiv="refresh" content="0; url=/agenda" />
+  <script>
+    (function () {
+      window.location.replace("/agenda" + window.location.search + window.location.hash);
+    })();
+  </script>
 </head>
-<body class="portal-app" data-portal-page="agenda">
-  <div class="page-shell">
-    <div data-portal-root></div>
-  </div>
-
-  <script src="../assets/js/portal-data.js"></script>
-  <script src="../assets/js/portal-service.js"></script>
-  <script src="../assets/js/portal-renderer.js"></script>
-  <script src="../assets/js/portal-app.js"></script>
-  <script src="../assets/js/premium-system.js"></script>
-  <script src="../assets/js/contact-capture.js"></script>
+<body>
+  <p>Redirecionando para agenda. Se nada acontecer, <a href="/agenda">clique aqui</a>.</p>
 </body>
 </html>

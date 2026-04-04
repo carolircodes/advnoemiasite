@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Atendimento Jurídico Inteligente</title>
+  <title>Atendimento Juridico Inteligente</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -54,38 +54,174 @@
 <body>
   <div class="container">
     <h1 id="titulo">Analisando seu caso...</h1>
-    <p id="descricao">Estamos preparando as informações para você.</p>
+    <p id="descricao">Estamos preparando as informacoes para voce.</p>
 
-    <a id="cta" class="btn" href="#">Continuar</a>
+    <a id="cta" class="btn" href="/triagem.html">Continuar</a>
 
-    <div class="badge">Atendimento jurídico inteligente</div>
+    <div class="badge">Atendimento juridico inteligente</div>
   </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const tema = params.get("tema");
+    (function () {
+      const EVENTS_API_PATH = "/api/public/events";
+      const SESSION_STORAGE_KEY = "site_product_session_id";
+      const SESSION_FLAG_PREFIX = "site_product_flag:";
+      const params = new URLSearchParams(window.location.search);
+      const tema = (params.get("tema") || "").trim().toLowerCase();
+      const origem = (params.get("origem") || "entrada").trim().toLowerCase();
 
-    const titulo = document.getElementById("titulo");
-    const descricao = document.getElementById("descricao");
-    const cta = document.getElementById("cta");
+      const titulo = document.getElementById("titulo");
+      const descricao = document.getElementById("descricao");
+      const cta = document.getElementById("cta");
 
-    if (tema === "aposentadoria") {
-      titulo.innerText = "Você pode ter direito a valores não recebidos";
-      descricao.innerText = "Vou analisar sua situação e te mostrar exatamente o que pode ser feito.";
-      cta.href = "/triagem.html?tema=aposentadoria";
-    }
+      const themeToArea = {
+        aposentadoria: "previdenciario",
+        previdenciario: "previdenciario",
+        banco: "bancario",
+        bancario: "bancario",
+        familia: "familia",
+        civil: "civil",
+        consumidor: "consumidor",
+        "consumidor-bancario": "consumidor-bancario"
+      };
 
-    if (tema === "banco") {
-      titulo.innerText = "O banco pode estar te cobrando indevidamente";
-      descricao.innerText = "Vamos verificar isso agora e entender o seu caso.";
-      cta.href = "/triagem.html?tema=banco";
-    }
+      function createSessionId() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+          return crypto.randomUUID();
+        }
 
-    if (tema === "familia") {
-      titulo.innerText = "Seu caso precisa ser tratado com estratégia";
-      descricao.innerText = "Vou te orientar da melhor forma possível.";
-      cta.href = "/triagem.html?tema=familia";
-    }
+        return "session-" + Date.now();
+      }
+
+      function getProductSessionId() {
+        try {
+          const stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
+
+          if (stored) {
+            return stored;
+          }
+
+          const nextId = createSessionId();
+          window.localStorage.setItem(SESSION_STORAGE_KEY, nextId);
+          return nextId;
+        } catch (error) {
+          return createSessionId();
+        }
+      }
+
+      function trackEvent(input) {
+        const body = JSON.stringify({
+          eventKey: input.eventKey,
+          eventGroup: input.eventGroup || "conversion",
+          pagePath: input.pagePath || "/entrada",
+          sessionId: getProductSessionId(),
+          payload: input.payload || {}
+        });
+
+        if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+          navigator.sendBeacon(
+            new URL(EVENTS_API_PATH, window.location.origin).toString(),
+            new Blob([body], { type: "application/json" })
+          );
+          return;
+        }
+
+        void fetch(new URL(EVENTS_API_PATH, window.location.origin).toString(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body
+        }).catch(function () {
+          return undefined;
+        });
+      }
+
+      function trackEventOncePerSession(input) {
+        const flagKey = SESSION_FLAG_PREFIX + input.eventKey;
+
+        try {
+          if (window.sessionStorage.getItem(flagKey)) {
+            return;
+          }
+
+          window.sessionStorage.setItem(flagKey, "1");
+        } catch (error) {
+          // Continua mesmo sem sessionStorage.
+        }
+
+        trackEvent(input);
+      }
+
+      function buildNextHref() {
+        const nextParams = new URLSearchParams();
+        const mappedArea = themeToArea[tema] || "";
+
+        if (tema) {
+          nextParams.set("tema", tema);
+        }
+
+        nextParams.set("origem", origem || "entrada");
+        nextParams.set("page", "entrada/index.html");
+
+        if (mappedArea) {
+          nextParams.set("area", mappedArea);
+        }
+
+        return "/triagem.html?" + nextParams.toString();
+      }
+
+      trackEventOncePerSession({
+        eventKey: "entry_page_viewed",
+        eventGroup: "traffic",
+        pagePath: "/entrada",
+        payload: {
+          tema: tema || "",
+          origem: origem || "entrada"
+        }
+      });
+
+      if (tema === "aposentadoria") {
+        titulo.innerText = "Voce pode ter direito a valores nao recebidos";
+        descricao.innerText =
+          "Vou analisar sua situacao e te mostrar exatamente o que pode ser feito.";
+      }
+
+      if (tema === "banco") {
+        titulo.innerText = "O banco pode estar te cobrando indevidamente";
+        descricao.innerText = "Vamos verificar isso agora e entender o seu caso.";
+      }
+
+      if (tema === "familia") {
+        titulo.innerText = "Seu caso precisa ser tratado com estrategia";
+        descricao.innerText = "Vou te orientar da melhor forma possivel.";
+      }
+
+      const nextHref = buildNextHref();
+      cta.href = nextHref;
+
+      cta.addEventListener("click", function (event) {
+        event.preventDefault();
+        cta.textContent = "Continuando...";
+        cta.setAttribute("aria-disabled", "true");
+        cta.style.pointerEvents = "none";
+
+        trackEvent({
+          eventKey: "entry_continue_clicked",
+          eventGroup: "conversion",
+          pagePath: "/entrada",
+          payload: {
+            tema: tema || "",
+            origem: origem || "entrada",
+            destination: nextHref
+          }
+        });
+
+        window.setTimeout(function () {
+          window.location.assign(nextHref);
+        }, 80);
+      });
+    })();
   </script>
 </body>
 </html>

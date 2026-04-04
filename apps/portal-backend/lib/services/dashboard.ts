@@ -228,7 +228,7 @@ export async function getStaffOverview() {
     await Promise.all([
     supabase
       .from("clients")
-      .select("id,profile_id,status,created_at,source_intake_request_id")
+      .select("id,profile_id,status,created_at,source_intake_request_id,cpf,phone,notes")
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
@@ -362,7 +362,7 @@ export async function getStaffOverview() {
   const { data: profiles } = profileIds.length
     ? await supabase
         .from("profiles")
-        .select("id,full_name,email,is_active,invited_at,first_login_completed_at")
+        .select("id,full_name,email,phone,is_active,invited_at,first_login_completed_at")
         .in("id", profileIds)
     : { data: [] };
 
@@ -391,16 +391,22 @@ export async function getStaffOverview() {
     statusLabel: clientStatusLabels[client.status as keyof typeof clientStatusLabels],
     createdAt: client.created_at
   }));
-  const clientOptions = clients.map((client) => ({
+  const clientOptionsBase = clients.map((client) => ({
     id: client.id,
+    profileId: client.profile_id,
     fullName: profileMap.get(client.profile_id)?.full_name || "Cliente",
     email: profileMap.get(client.profile_id)?.email || "",
+    phone: client.phone || profileMap.get(client.profile_id)?.phone || "",
+    cpf: client.cpf || "",
+    notes: client.notes || "",
     status: client.status,
     statusLabel: clientStatusLabels[client.status as keyof typeof clientStatusLabels],
+    isActive: profileMap.get(client.profile_id)?.is_active ?? true,
     invitedAt: profileMap.get(client.profile_id)?.invited_at || null,
     firstLoginCompletedAt:
       profileMap.get(client.profile_id)?.first_login_completed_at || null,
-    createdAt: client.created_at
+    createdAt: client.created_at,
+    sourceIntakeRequestId: client.source_intake_request_id || null
   }));
   const latestIntakeRequests = intakeRequests.map((item) => ({
     ...item,
@@ -424,6 +430,7 @@ export async function getStaffOverview() {
   }));
   const caseOptions = cases.map((caseItem) => ({
     id: caseItem.id,
+    clientId: caseItem.client_id,
     title: caseItem.title,
     area: caseItem.area,
     summary: caseItem.summary || "",
@@ -499,6 +506,109 @@ export async function getStaffOverview() {
         item.appointment_type as keyof typeof appointmentTypeLabels
       ] || item.appointment_type
   }));
+  const casesByClientId = new Map<string, typeof caseOptions>();
+  const appointmentsByClientId = new Map<string, typeof latestAppointments>();
+  const eventsByClientId = new Map<string, typeof latestEvents>();
+  const documentRequestsByClientId = new Map<string, typeof latestDocumentRequests>();
+
+  for (const caseItem of caseOptions) {
+    const current = casesByClientId.get(caseItem.clientId) || [];
+    current.push(caseItem);
+    casesByClientId.set(caseItem.clientId, current);
+  }
+
+  for (const appointment of latestAppointments) {
+    const current = appointmentsByClientId.get(appointment.client_id) || [];
+    current.push(appointment);
+    appointmentsByClientId.set(appointment.client_id, current);
+  }
+
+  for (const event of latestEvents) {
+    const clientId = caseMap.get(event.case_id)?.client_id;
+
+    if (!clientId) {
+      continue;
+    }
+
+    const current = eventsByClientId.get(clientId) || [];
+    current.push(event);
+    eventsByClientId.set(clientId, current);
+  }
+
+  for (const request of latestDocumentRequests) {
+    const clientId = caseMap.get(request.case_id)?.client_id;
+
+    if (!clientId) {
+      continue;
+    }
+
+    const current = documentRequestsByClientId.get(clientId) || [];
+    current.push(request);
+    documentRequestsByClientId.set(clientId, current);
+  }
+
+  const clientOptions = clientOptionsBase.map((client) => {
+    const latestCasesForClient = [...(casesByClientId.get(client.id) || [])].sort((left, right) =>
+      right.created_at.localeCompare(left.created_at)
+    );
+    const appointmentsForClient = [...(appointmentsByClientId.get(client.id) || [])].sort(
+      (left, right) => left.starts_at.localeCompare(right.starts_at)
+    );
+    const upcomingAppointmentsForClient = appointmentsForClient
+      .filter(
+        (appointment) =>
+          appointment.starts_at >= nowIso &&
+          appointment.status !== "cancelled" &&
+          appointment.status !== "completed"
+      )
+      .slice(0, 3);
+    const recentEventsForClient = [...(eventsByClientId.get(client.id) || [])]
+      .sort((left, right) => right.occurred_at.localeCompare(left.occurred_at))
+      .slice(0, 3);
+    const openDocumentRequestsForClient = [...(documentRequestsByClientId.get(client.id) || [])]
+      .filter((request) => request.status === "pending")
+      .sort((left, right) =>
+        (right.due_at || right.created_at).localeCompare(left.due_at || left.created_at)
+      )
+      .slice(0, 3);
+    const primaryCase =
+      latestCasesForClient.find((caseItem) => caseItem.status !== "concluido") ||
+      latestCasesForClient[0] ||
+      null;
+    const lastActivityTimestamp = getMostRecentTimestamp([
+      client.createdAt,
+      ...latestCasesForClient.flatMap((caseItem) => [
+        caseItem.updated_at,
+        caseItem.last_public_update_at,
+        caseItem.last_status_changed_at,
+        caseItem.created_at
+      ]),
+      ...appointmentsForClient.flatMap((appointment) => [appointment.updated_at, appointment.starts_at]),
+      ...recentEventsForClient.map((event) => event.occurred_at)
+    ]);
+
+    return {
+      ...client,
+      caseCount: latestCasesForClient.length,
+      activeCaseCount: latestCasesForClient.filter((caseItem) => caseItem.status !== "concluido")
+        .length,
+      upcomingAppointmentsCount: upcomingAppointmentsForClient.length,
+      pendingDocumentRequestsCount: openDocumentRequestsForClient.length,
+      lastActivityAt:
+        lastActivityTimestamp === null
+          ? client.createdAt
+          : new Date(lastActivityTimestamp).toISOString(),
+      primaryCaseId: primaryCase?.id || null,
+      primaryCaseTitle: primaryCase?.title || null,
+      primaryCaseArea: primaryCase?.area || null,
+      primaryCaseStatus: primaryCase?.status || null,
+      primaryCaseStatusLabel: primaryCase?.statusLabel || null,
+      latestCases: latestCasesForClient.slice(0, 3),
+      upcomingAppointments: upcomingAppointmentsForClient,
+      openDocumentRequests: openDocumentRequestsForClient,
+      recentEvents: recentEventsForClient
+    };
+  });
 
   const latestEventByCase = new Map<string, (typeof latestEvents)[number]>();
 

@@ -29,6 +29,7 @@ type AppFrameProps = {
   actions?: Action[];
   navigation?: NavigationItem[];
   highlights?: Highlight[];
+  utilityContent?: ReactNode;
   children: ReactNode;
 };
 
@@ -39,12 +40,14 @@ export function AppFrame({
   actions = [],
   navigation = [],
   highlights = [],
+  utilityContent,
   children
 }: AppFrameProps) {
   return (
     <div className="portal-root">
       <header className="hero-shell">
         <div className="hero-main">
+          {utilityContent ? <div className="frame-utility">{utilityContent}</div> : null}
           {navigation.length ? (
             <nav className="workspace-nav" aria-label="Navegacao do portal">
               {navigation.map((item) => (

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
@@ -165,6 +166,15 @@ export default async function ClientPage({
         eyebrow="Area do cliente"
         title={`Seu caso em um painel claro, organizado e facil de acompanhar, ${profile.full_name}.`}
         description="Aqui voce encontra o status atual do caso, as proximas datas, os documentos liberados e os avisos que realmente importam no acompanhamento do dia a dia."
+        utilityContent={
+          <PortalSessionBanner
+            role={profile.role}
+            fullName={profile.full_name}
+            email={profile.email}
+            workspaceLabel="Portal autenticado"
+            workspaceHint="Sessao ativa para acompanhar o proprio atendimento com seguranca."
+          />
+        }
         navigation={[
           { href: "/cliente", label: "Meu painel", active: true },
           { href: "/documentos", label: "Documentos" },

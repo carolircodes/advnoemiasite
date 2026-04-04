@@ -48,6 +48,15 @@ function getLoginErrorMessage(error: string) {
   }
 }
 
+function getLoginSuccessMessage(success: string) {
+  switch (success) {
+    case "sessao-encerrada":
+      return "Sessao encerrada com sucesso. Entre novamente quando precisar acessar a area protegida.";
+    default:
+      return "";
+  }
+}
+
 async function loginAction(formData: FormData) {
   "use server";
 
@@ -105,6 +114,8 @@ export default async function LoginPage({
 
   const error = typeof params.error === "string" ? params.error : "";
   const errorMessage = getLoginErrorMessage(error);
+  const success = typeof params.success === "string" ? params.success : "";
+  const successMessage = getLoginSuccessMessage(success);
 
   return (
     <AppFrame
@@ -127,6 +138,7 @@ export default async function LoginPage({
         { href: "/triagem", label: "Ainda nao sou cliente", tone: "secondary" }
       ]}
     >
+      {successMessage ? <div className="success-notice">{successMessage}</div> : null}
       {errorMessage ? <div className="error-notice">{errorMessage}</div> : null}
 
       <div className="split">
@@ -171,12 +183,12 @@ export default async function LoginPage({
           </SectionCard>
 
           <SectionCard
-            title="Se ainda esta no primeiro contato"
-            description="A triagem e o melhor caminho para iniciar o atendimento com contexto e organizacao."
+            title="Area interna e primeiro contato"
+            description="Clientes entram por convite seguro. A area interna continua restrita a perfis provisionados no ambiente e autenticados por sessao."
           >
             <div className="cta-strip">
-              <strong>Comece pela triagem organizada.</strong>
-              <p>Ela ajuda a equipe a entender seu momento atual e encaminhar o retorno com mais clareza.</p>
+              <strong>Credenciais internas nao ficam no frontend.</strong>
+              <p>O acesso da equipe depende do bootstrap configurado por variaveis de ambiente, enquanto novos atendimentos seguem pela triagem organizada.</p>
               <div className="form-actions">
                 <Link className="button" href="/triagem">
                   Iniciar triagem
