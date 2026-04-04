@@ -61,14 +61,29 @@
     <div class="badge">Atendimento juridico inteligente</div>
   </div>
 
+  <script src="../assets/js/entry-context.js"></script>
   <script>
     (function () {
       const EVENTS_API_PATH = "/api/public/events";
       const SESSION_STORAGE_KEY = "site_product_session_id";
       const SESSION_FLAG_PREFIX = "site_product_flag:";
       const params = new URLSearchParams(window.location.search);
-      const tema = (params.get("tema") || "").trim().toLowerCase();
-      const origem = (params.get("origem") || "entrada").trim().toLowerCase();
+      const entryContext = window.EntryContext
+        ? window.EntryContext.readFromSearch(window.location.search, {
+            defaults: {
+              origem: "entrada"
+            }
+          })
+        : {
+            tema: (params.get("tema") || "").trim().toLowerCase(),
+            origem: (params.get("origem") || "entrada").trim().toLowerCase(),
+            campanha: (params.get("campanha") || params.get("campaign") || "").trim().toLowerCase(),
+            video: (params.get("video") || "").trim().toLowerCase()
+          };
+      const tema = entryContext.tema || "";
+      const origem = entryContext.origem || "entrada";
+      const campanha = entryContext.campanha || "";
+      const video = entryContext.video || "";
 
       const titulo = document.getElementById("titulo");
       const descricao = document.getElementById("descricao");
@@ -168,7 +183,9 @@
           nextParams.set("area", mappedArea);
         }
 
-        return "/triagem.html?" + nextParams.toString();
+        return window.EntryContext
+          ? window.EntryContext.appendToHref("/triagem.html?" + nextParams.toString(), entryContext)
+          : "/triagem.html?" + nextParams.toString();
       }
 
       trackEventOncePerSession({
@@ -177,7 +194,9 @@
         pagePath: "/entrada",
         payload: {
           tema: tema || "",
-          origem: origem || "entrada"
+          origem: origem || "entrada",
+          campanha: campanha || "",
+          video: video || ""
         }
       });
 
@@ -209,13 +228,15 @@
         trackEvent({
           eventKey: "entry_continue_clicked",
           eventGroup: "conversion",
-          pagePath: "/entrada",
-          payload: {
-            tema: tema || "",
-            origem: origem || "entrada",
-            destination: nextHref
-          }
-        });
+        pagePath: "/entrada",
+        payload: {
+          tema: tema || "",
+          origem: origem || "entrada",
+          campanha: campanha || "",
+          video: video || "",
+          destination: nextHref
+        }
+      });
 
         window.setTimeout(function () {
           window.location.assign(nextHref);

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
 import {
   caseAreaLabels,
   formatPortalDateTime,
@@ -376,7 +377,7 @@ async function queueInviteAccessReminders() {
         invitedAtLabel: formatPortalDateTime(profile.invited_at),
         reminderStage,
         clientStatus: linkedClient?.status || "",
-        destinationPath: "/auth/login"
+        destinationPath: CLIENT_LOGIN_PATH
       },
       relatedTable: "profiles",
       relatedId: profile.id,

@@ -168,7 +168,7 @@ Abra sempre usando o mesmo host configurado em `NEXT_PUBLIC_APP_URL`.
 
 Padrao recomendado:
 
-- `http://127.0.0.1:3000/auth/login`
+- `http://127.0.0.1:3000/portal/login`
 - `http://127.0.0.1:3000/internal/advogada`
 
 ## Convite local e Mailpit
@@ -306,7 +306,7 @@ Os eventos abaixo passam a alimentar a leitura inteligente do produto:
 ### Advogada
 
 1. Rode `npm run bootstrap:admin`.
-2. Acesse `/auth/login`.
+2. Acesse `/portal/login`.
 3. Entre com `PORTAL_ADMIN_EMAIL` e `PORTAL_ADMIN_TEMP_PASSWORD`.
 4. Confirme que o redirecionamento vai para `/internal/advogada`.
 
@@ -335,7 +335,7 @@ Os eventos abaixo passam a alimentar a leitura inteligente do produto:
 ### Login do cliente
 
 1. Abra uma aba anonima.
-2. Acesse `/auth/login`.
+2. Acesse `/portal/login`.
 3. Entre com o e-mail do cliente e a senha definida no primeiro acesso.
 4. Confirme que `/cliente` abre normalmente.
 
@@ -416,7 +416,7 @@ Os eventos abaixo passam a alimentar a leitura inteligente do produto:
 ### Checklist de seguranca local
 
 1. Acesse `/internal/advogada`, `/cliente`, `/documentos` e `/agenda` sem login.
-2. Confirme que todas as rotas redirecionam para `/auth/login`.
+2. Confirme que todas as rotas redirecionam para `/portal/login`.
 3. Acesse `/api/internal/clients` sem login.
 4. Confirme retorno `401`.
 5. Entre como advogada.

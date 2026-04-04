@@ -12,10 +12,17 @@ import {
   publicIntakeUrgencies,
   publicIntakeUrgencyLabels
 } from "@/lib/domain/portal";
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
 import {
   getProductSessionId,
   trackProductEventOncePerSession
 } from "@/lib/analytics/browser";
+import {
+  appendEntryContextToPath,
+  getEntryContextPayload,
+  resolveEntryCaseArea,
+  type EntryContext
+} from "@/lib/entry-context";
 
 type TriageFormState = {
   fullName: string;
@@ -88,8 +95,21 @@ function validateStep(state: TriageFormState, stepIndex: number) {
   return "";
 }
 
-export function TriageForm() {
-  const [state, setState] = useState<TriageFormState>(initialState);
+type TriageFormProps = {
+  entryContext?: EntryContext;
+};
+
+export function TriageForm({ entryContext }: TriageFormProps) {
+  const initialCaseArea = resolveEntryCaseArea(entryContext) || initialState.caseArea;
+  const baseState = {
+    ...initialState,
+    caseArea: initialCaseArea
+  };
+  const entryPath = appendEntryContextToPath("/triagem", entryContext);
+  const entryContextPayload = getEntryContextPayload(entryContext);
+  const homeHref = appendEntryContextToPath("/", entryContext);
+  const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
+  const [state, setState] = useState<TriageFormState>(() => baseState);
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<null | { intakeRequestId: string }>(null);
@@ -131,9 +151,10 @@ export function TriageForm() {
       trackProductEventOncePerSession({
         eventKey: "triage_started",
         eventGroup: "conversion",
-        pagePath: "/triagem",
+        pagePath: entryPath,
         payload: {
-          step: "contact-finished"
+          step: "contact-finished",
+          ...entryContextPayload
         }
       });
       setHasTrackedStart(true);
@@ -164,7 +185,14 @@ export function TriageForm() {
         },
         body: JSON.stringify({
           ...state,
-          sourcePath: "/triagem"
+          sourcePath: entryPath,
+          captureMetadata: {
+            source: entryContext?.origem || "portal-triagem",
+            page: entryPath,
+            theme: entryContext?.tema || "",
+            campaign: entryContext?.campanha || "",
+            video: entryContext?.video || ""
+          }
         })
       });
       const result = await response.json().catch(() => ({}));
@@ -181,7 +209,7 @@ export function TriageForm() {
       setSuccess({
         intakeRequestId: result.intakeRequestId
       });
-      setState(initialState);
+      setState(baseState);
       setStepIndex(0);
     });
   }
@@ -206,10 +234,10 @@ export function TriageForm() {
             Referencia interna desta triagem: <span className="code">{success.intakeRequestId}</span>
           </div>
           <div className="form-actions">
-            <a className="button" href="/">
+            <a className="button" href={homeHref}>
               Voltar ao inicio
             </a>
-            <a className="button secondary" href="/auth/login">
+            <a className="button secondary" href={clientLoginHref}>
               Ja recebeu convite? Entrar no portal
             </a>
           </div>

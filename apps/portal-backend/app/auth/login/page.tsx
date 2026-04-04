@@ -6,10 +6,17 @@ import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import {
+  CLIENT_LOGIN_PATH,
   getAccessMessage,
   getPostAuthDestination,
   normalizeNextPath
 } from "@/lib/auth/access-control";
+import {
+  appendEntryContextToPath,
+  getEntryContextPayload,
+  readEntryContext,
+  type EntryContext
+} from "@/lib/entry-context";
 import { ensureProfileForUser, getCurrentProfile } from "@/lib/auth/guards";
 import { loginSchema } from "@/lib/domain/portal";
 import { recordProductEvent } from "@/lib/services/public-intake";
@@ -19,6 +26,9 @@ export const metadata: Metadata = {
   title: "Entrar na area do cliente",
   description:
     "Acesso seguro ao portal do cliente e ao painel interno, com login por e-mail e senha.",
+  alternates: {
+    canonical: CLIENT_LOGIN_PATH
+  },
   robots: {
     index: false,
     follow: false
@@ -57,26 +67,56 @@ function getLoginSuccessMessage(success: string) {
   }
 }
 
+function readEntryContextFromFormData(formData: FormData): EntryContext {
+  return readEntryContext({
+    origem: typeof formData.get("origem") === "string" ? String(formData.get("origem")) : "",
+    tema: typeof formData.get("tema") === "string" ? String(formData.get("tema")) : "",
+    campanha: typeof formData.get("campanha") === "string" ? String(formData.get("campanha")) : "",
+    video: typeof formData.get("video") === "string" ? String(formData.get("video")) : ""
+  });
+}
+
+function buildLoginPath(
+  entryContext: Partial<EntryContext>,
+  options: {
+    error?: string;
+    next?: string | null;
+  } = {}
+) {
+  const url = new URL(appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext), "https://app.local");
+
+  if (options.error) {
+    url.searchParams.set("error", options.error);
+  }
+
+  if (options.next) {
+    url.searchParams.set("next", options.next);
+  }
+
+  return `${url.pathname}${url.search}`;
+}
+
 async function loginAction(formData: FormData) {
   "use server";
 
+  const entryContext = readEntryContextFromFormData(formData);
+  const requestedPath = normalizeNextPath(String(formData.get("next") || ""));
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password")
   });
 
   if (!parsed.success) {
-    redirect("/auth/login?error=dados-invalidos");
+    redirect(buildLoginPath(entryContext, { error: "dados-invalidos", next: requestedPath }));
   }
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error || !data.user) {
-    redirect("/auth/login?error=credenciais-invalidas");
+    redirect(buildLoginPath(entryContext, { error: "credenciais-invalidas", next: requestedPath }));
   }
 
-  const requestedPath = normalizeNextPath(String(formData.get("next") || ""));
   const profile = await ensureProfileForUser(data.user);
 
   try {
@@ -86,7 +126,8 @@ async function loginAction(formData: FormData) {
       profileId: profile.id,
       payload: {
         role: profile.role,
-        source: "password-login"
+        source: "password-login",
+        ...getEntryContextPayload(entryContext)
       }
     });
   } catch (trackingError) {
@@ -106,6 +147,12 @@ export default async function LoginPage({
 }) {
   const currentProfile = await getCurrentProfile();
   const params = await searchParams;
+  const entryContext = readEntryContext(params);
+  const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
+  const entryContextPayload = getEntryContextPayload(entryContext);
+  const homeHref = appendEntryContextToPath("/", entryContext);
+  const triageHref = appendEntryContextToPath("/triagem", entryContext);
+  const recoverAccessHref = appendEntryContextToPath("/auth/esqueci-senha", entryContext);
   const nextPath = typeof params.next === "string" ? normalizeNextPath(params.next) : null;
 
   if (currentProfile?.is_active) {
@@ -123,9 +170,9 @@ export default async function LoginPage({
       title="Entrar no portal com clareza, sem etapas confusas."
       description="Clientes acessam o portal com o convite enviado pela equipe e, depois do primeiro acesso, entram com e-mail e senha. A area interna continua protegida para perfis autorizados."
       navigation={[
-        { href: "/", label: "Inicio" },
-        { href: "/triagem", label: "Triagem" },
-        { href: "/auth/login", label: "Area do cliente", active: true }
+        { href: homeHref, label: "Inicio" },
+        { href: triageHref, label: "Triagem" },
+        { href: clientLoginHref, label: "Area do cliente", active: true }
       ]}
       highlights={[
         { label: "Acesso", value: "E-mail e senha" },
@@ -134,8 +181,8 @@ export default async function LoginPage({
         { label: "Ambiente", value: "Clientes e equipe" }
       ]}
       actions={[
-        { href: "/auth/esqueci-senha", label: "Recuperar acesso", tone: "secondary" },
-        { href: "/triagem", label: "Ainda nao sou cliente", tone: "secondary" }
+        { href: recoverAccessHref, label: "Recuperar acesso", tone: "secondary" },
+        { href: triageHref, label: "Ainda nao sou cliente", tone: "secondary" }
       ]}
     >
       {successMessage ? <div className="success-notice">{successMessage}</div> : null}
@@ -148,6 +195,10 @@ export default async function LoginPage({
         >
           <form action={loginAction} className="stack">
             <input type="hidden" name="next" value={nextPath || ""} />
+            <input type="hidden" name="origem" value={entryContextPayload.origem || ""} />
+            <input type="hidden" name="tema" value={entryContextPayload.tema || ""} />
+            <input type="hidden" name="campanha" value={entryContextPayload.campanha || ""} />
+            <input type="hidden" name="video" value={entryContextPayload.video || ""} />
             <div className="fields">
               <div className="field-full">
                 <label htmlFor="email">E-mail</label>
@@ -162,7 +213,7 @@ export default async function LoginPage({
               <FormSubmitButton pendingLabel="Entrando no portal...">
                 Entrar no portal
               </FormSubmitButton>
-              <Link className="button secondary" href="/auth/esqueci-senha">
+              <Link className="button secondary" href={recoverAccessHref}>
                 Esqueci minha senha
               </Link>
             </div>
@@ -190,10 +241,10 @@ export default async function LoginPage({
               <strong>Credenciais internas nao ficam no frontend.</strong>
               <p>O acesso da equipe depende do bootstrap configurado por variaveis de ambiente, enquanto novos atendimentos seguem pela triagem organizada.</p>
               <div className="form-actions">
-                <Link className="button" href="/triagem">
+                <Link className="button" href={triageHref}>
                   Iniciar triagem
                 </Link>
-                <Link className="button secondary" href="/">
+                <Link className="button secondary" href={homeHref}>
                   Voltar ao inicio
                 </Link>
               </div>

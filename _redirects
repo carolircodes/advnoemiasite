@@ -1,0 +1,10 @@
+/auth/login /portal/login 301
+/portal/login.html /portal/login 301
+/portal/painel-cliente /cliente 301
+/portal/painel-cliente.html /cliente 301
+/portal/documentos /documentos 301
+/portal/documentos.html /documentos 301
+/portal/agenda /agenda 301
+/portal/agenda.html /agenda 301
+/portal/painel-advogada /internal/advogada 301
+/portal/painel-advogada.html /internal/advogada 301

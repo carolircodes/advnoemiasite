@@ -376,7 +376,16 @@ export const submitPublicTriageSchema = z.object({
     errorMap: () => ({ message: "Confirme a autorizacao para envio da triagem." })
   }),
   sourcePath: z.string().trim().max(300).optional().default("/triagem"),
-  website: z.string().trim().max(0).optional().default("")
+  website: z.string().trim().max(0).optional().default(""),
+  captureMetadata: z
+    .object({
+      source: z.string().trim().max(120).optional().default(""),
+      page: z.string().trim().max(300).optional().default(""),
+      theme: z.string().trim().max(120).optional().default(""),
+      campaign: z.string().trim().max(120).optional().default(""),
+      video: z.string().trim().max(120).optional().default("")
+    })
+    .optional()
 });
 
 export const submitLegacySiteTriageSchema = z.object({
@@ -405,6 +414,8 @@ export const submitLegacySiteTriageSchema = z.object({
   source: z.string().trim().max(120).optional().default("site"),
   page: z.string().trim().max(300).optional().default("triagem.html"),
   theme: z.string().trim().max(120).optional().default(""),
+  campaign: z.string().trim().max(120).optional().default(""),
+  video: z.string().trim().max(120).optional().default(""),
   sourcePath: z.string().trim().max(300).optional().default("/triagem.html"),
   website: z.string().trim().max(0).optional().default("")
 });

@@ -28,12 +28,12 @@
     routes: {
       site: "../index.html",
       blog: "../blog.html",
-      triagem: "../triagem.html?area=geral&origem=portal-login&pagina=portal/login.html",
-      login: "login.html",
-      painelAdvogada: "painel-advogada.html",
-      painelCliente: "painel-cliente.html",
-      documentos: "documentos.html",
-      agenda: "agenda.html"
+      triagem: "../triagem.html?area=geral&origem=portal-login&pagina=portal/login",
+      login: "/portal/login",
+      painelAdvogada: "/internal/advogada",
+      painelCliente: "/cliente",
+      documentos: "/documentos",
+      agenda: "/agenda"
     },
     statusMap: {
       confirmed: { label: "Confirmado", tone: "success" },

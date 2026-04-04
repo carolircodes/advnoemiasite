@@ -5,6 +5,25 @@
   var EVENTS_API_PATH = "/api/public/events";
   var SESSION_STORAGE_KEY = "site_product_session_id";
   var SESSION_FLAG_PREFIX = "site_product_flag:";
+  var entryContext = window.EntryContext || {
+    readFromSearch: function () {
+      return {
+        origem: "",
+        tema: "",
+        campanha: "",
+        video: ""
+      };
+    },
+    appendToHref: function (href) {
+      return href;
+    },
+    toPayload: function () {
+      return {};
+    },
+    hasAny: function () {
+      return false;
+    }
+  };
 
   var AREAS = {
     geral: {
@@ -150,7 +169,17 @@
       source: "portal-login",
       message: "Ola, estou na area reservada e preciso de apoio no acesso."
     },
+    "portal/login/index.html": {
+      mode: "support",
+      source: "portal-login",
+      message: "Ola, estou na area reservada e preciso de apoio no acesso."
+    },
     "portal/painel-advogada.html": {
+      mode: "support",
+      source: "portal-advogada",
+      message: "Ola, estou na area interna e preciso de apoio da equipe."
+    },
+    "portal/painel-advogada/index.html": {
       mode: "support",
       source: "portal-advogada",
       message: "Ola, estou na area interna e preciso de apoio da equipe."
@@ -160,12 +189,27 @@
       source: "portal-cliente",
       message: "Ola, estou na area do cliente e preciso de orientacao."
     },
+    "portal/painel-cliente/index.html": {
+      mode: "support",
+      source: "portal-cliente",
+      message: "Ola, estou na area do cliente e preciso de orientacao."
+    },
     "portal/documentos.html": {
       mode: "support",
       source: "portal-documentos",
       message: "Ola, estou na area de documentos e preciso de orientacao."
     },
+    "portal/documentos/index.html": {
+      mode: "support",
+      source: "portal-documentos",
+      message: "Ola, estou na area de documentos e preciso de orientacao."
+    },
     "portal/agenda.html": {
+      mode: "support",
+      source: "portal-agenda",
+      message: "Ola, estou na area de agenda e preciso de orientacao."
+    },
+    "portal/agenda/index.html": {
       mode: "support",
       source: "portal-agenda",
       message: "Ola, estou na area de agenda e preciso de orientacao."
@@ -319,19 +363,38 @@
     return THEME_TO_AREA[(theme || "").toLowerCase().trim()] || "";
   }
 
+  function getCurrentEntryContext(defaults, aliases) {
+    return entryContext.readFromSearch(window.location.search, {
+      defaults: defaults || {},
+      aliases: aliases || {}
+    });
+  }
+
   function buildTriageHref(config) {
     var params = new URLSearchParams();
     var theme = config.theme || "";
+    var context = getCurrentEntryContext(
+      {
+        origem: config.source || "site",
+        tema: theme
+      },
+      {
+        tema: ["tema", "theme", "area"]
+      }
+    );
+    var themeArea = getThemeArea(context.tema || theme);
 
-    params.set("area", config.area || getThemeArea(theme) || "geral");
-    params.set("origem", config.source || "site");
+    params.set("area", themeArea || config.area || getThemeArea(theme) || "geral");
+    params.set("origem", context.origem || config.source || "site");
     params.set("page", getPageKey());
 
-    if (theme) {
-      params.set("tema", theme);
+    if (context.tema || theme) {
+      params.set("tema", context.tema || theme);
     }
 
-    return getPrefix() + "triagem.html?" + params.toString();
+    return entryContext.appendToHref(getPrefix() + "triagem.html?" + params.toString(), context, {
+      overwrite: true
+    });
   }
 
   function buildSupportHref(config) {
@@ -375,6 +438,54 @@
         link.textContent = getUpdatedLabel(link.textContent.trim());
       }
     });
+  }
+
+  function decorateEntryLinks(config) {
+    var context = getCurrentEntryContext(
+      {
+        origem: config.source || "site",
+        tema: config.theme || ""
+      },
+      {
+        tema: ["tema", "theme", "area"]
+      }
+    );
+
+    if (!entryContext.hasAny(context)) {
+      return;
+    }
+
+    document
+      .querySelectorAll(
+        'a[href*="triagem.html"], a[href^="/triagem"], a[href*="entrada/index.html"], a[href*="portal/login"], a[href*="portal/painel-cliente"], a[href*="portal/documentos"], a[href*="portal/agenda"], a[href^="/cliente"], a[href^="/documentos"], a[href^="/agenda"]'
+      )
+      .forEach(function (link) {
+        var href = link.getAttribute("href");
+        var themedArea = getThemeArea(context.tema);
+
+        if (!href || href.indexOf("mailto:") === 0 || href.indexOf("tel:") === 0) {
+          return;
+        }
+
+        var nextHref = entryContext.appendToHref(href, context, {
+          overwrite: true
+        });
+
+        if (themedArea) {
+          try {
+            var url = new URL(nextHref, window.location.origin);
+
+            if (url.pathname.indexOf("triagem") !== -1) {
+              url.searchParams.set("area", themedArea);
+              nextHref = url.pathname + url.search + url.hash;
+            }
+          } catch (error) {
+            // Se a URL nao puder ser reinterpretada, mantemos o href ja montado.
+          }
+        }
+
+        link.setAttribute("href", nextHref);
+      });
   }
 
   function ensureWidgets(config) {
@@ -435,13 +546,18 @@
 
   function getTriageContext(config) {
     var params = new URLSearchParams(window.location.search);
-    var theme = (params.get("tema") || params.get("theme") || "").toLowerCase().trim();
+    var queryContext = getCurrentEntryContext(
+      {
+        origem: config.source || "site"
+      },
+      {
+        tema: ["tema", "theme", "area"]
+      }
+    );
+    var theme = queryContext.tema || "";
     var area =
       (params.get("area") || getThemeArea(theme) || config.area || "geral").toLowerCase().trim();
-    var source =
-      (params.get("origem") || params.get("source") || config.source || "site")
-        .toLowerCase()
-        .trim();
+    var source = queryContext.origem || (config.source || "site").toLowerCase().trim();
     var page = (params.get("page") || params.get("pagina") || "").trim();
     var referrerPage = normalizeExternalReferrer(document.referrer || "");
 
@@ -454,7 +570,9 @@
       source: source || "site",
       page: page || "triagem.html",
       theme: theme,
-      sourcePath: window.location.pathname || "/triagem.html"
+      campaign: queryContext.campanha || "",
+      video: queryContext.video || "",
+      sourcePath: (window.location.pathname || "/triagem.html") + (window.location.search || "")
     };
   }
 
@@ -490,7 +608,9 @@
       urgencyLabel: urgencyOption ? urgencyOption.textContent.trim() : "",
       area: (form.elements["area"] && form.elements["area"].value || "geral").trim(),
       source: (form.elements["source"] && form.elements["source"].value || "site").trim(),
-      page: (form.elements["page"] && form.elements["page"].value || "triagem.html").trim()
+      page: (form.elements["page"] && form.elements["page"].value || "triagem.html").trim(),
+      campaign: (form.elements["campaign"] && form.elements["campaign"].value || "").trim(),
+      video: (form.elements["video"] && form.elements["video"].value || "").trim()
     };
   }
 
@@ -536,6 +656,14 @@
       contextLines.splice(3, 0, "- Tema: " + context.theme);
     }
 
+    if (context.campaign) {
+      contextLines.push("- Campanha: " + context.campaign);
+    }
+
+    if (context.video) {
+      contextLines.push("- Video: " + context.video);
+    }
+
     return [
       areaConfig.intro,
       "",
@@ -567,6 +695,8 @@
     var areaInput = document.querySelector("[data-triage-area-input]");
     var sourceInput = document.querySelector("[data-triage-source-input]");
     var pageInput = document.querySelector("[data-triage-page-input]");
+    var campaignInput = document.querySelector("[data-triage-campaign-input]");
+    var videoInput = document.querySelector("[data-triage-video-input]");
     var problemTypeSelect = document.getElementById("leadProblemType");
     var defaultButtonLabel = submitButton ? submitButton.textContent : "Enviar triagem para o WhatsApp";
     var hasTrackedStart = false;
@@ -581,6 +711,14 @@
 
     if (pageInput) {
       pageInput.value = context.page;
+    }
+
+    if (campaignInput) {
+      campaignInput.value = context.campaign;
+    }
+
+    if (videoInput) {
+      videoInput.value = context.video;
     }
 
     if (
@@ -605,6 +743,8 @@
           source: context.source,
           page: context.page,
           theme: context.theme || "",
+          campaign: context.campaign || "",
+          video: context.video || "",
           mode: "static_site_triage"
         }
       });
@@ -641,7 +781,9 @@
           payload: {
             reason: "validation",
             source: context.source,
-            page: context.page
+            page: context.page,
+            campaign: context.campaign || "",
+            video: context.video || ""
           }
         });
         return;
@@ -676,6 +818,8 @@
           source: values.source,
           page: values.page,
           theme: context.theme,
+          campaign: values.campaign || context.campaign,
+          video: values.video || context.video,
           sourcePath: context.sourcePath
         })
       })
@@ -715,7 +859,9 @@
                 reason: errorMessage,
                 source: context.source,
                 page: context.page,
-                theme: context.theme || ""
+                theme: context.theme || "",
+                campaign: context.campaign || "",
+                video: context.video || ""
               }
             });
 
@@ -743,6 +889,8 @@
               source: context.source,
               page: context.page,
               theme: context.theme || "",
+              campaign: context.campaign || "",
+              video: context.video || "",
               problemType: values.problemTypeValue,
               urgency: values.urgencyValue
             }
@@ -773,7 +921,9 @@
               reason: "network",
               source: context.source,
               page: context.page,
-              theme: context.theme || ""
+              theme: context.theme || "",
+              campaign: context.campaign || "",
+              video: context.video || ""
             }
           });
         });
@@ -783,6 +933,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     var config = getConfig();
 
+    decorateEntryLinks(config);
     updatePublicWhatsAppLinks(config);
     ensureWidgets(config);
     setupTriageForm();

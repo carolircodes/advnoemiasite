@@ -1,4 +1,5 @@
 import { PortalLoadingPage } from "@/components/portal-loading";
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
 
 export default function Loading() {
   return (
@@ -10,7 +11,7 @@ export default function Loading() {
         { href: "/", label: "Inicio" },
         { href: "/triagem", label: "Triagem" },
         { href: "/noemia", label: "Noemia", active: true },
-        { href: "/auth/login", label: "Area do cliente" }
+        { href: CLIENT_LOGIN_PATH, label: "Area do cliente" }
       ]}
     />
   );

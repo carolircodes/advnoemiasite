@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import {
+  buildLoginRedirectPath,
   getPostAuthDestination,
   normalizeNextPath
 } from "@/lib/auth/access-control";
@@ -36,7 +37,9 @@ export async function GET(request: Request) {
   const next = normalizeNextPath(url.searchParams.get("next"));
 
   if (!code && !(tokenHash && otpType)) {
-    return NextResponse.redirect(new URL("/auth/login?error=link-invalido", appOrigin));
+    return NextResponse.redirect(
+      new URL(buildLoginRedirectPath(null, "link-invalido"), appOrigin)
+    );
   }
 
   const supabase = await createServerSupabaseClient();
@@ -49,7 +52,9 @@ export async function GET(request: Request) {
       : await supabase.auth.exchangeCodeForSession(code as string);
 
   if (error) {
-    return NextResponse.redirect(new URL("/auth/login?error=link-expirado", appOrigin));
+    return NextResponse.redirect(
+      new URL(buildLoginRedirectPath(null, "link-expirado"), appOrigin)
+    );
   }
 
   const {
@@ -58,14 +63,14 @@ export async function GET(request: Request) {
 
   if (!user) {
     return NextResponse.redirect(
-      new URL("/auth/login?error=sessao-nao-disponivel", appOrigin)
+      new URL(buildLoginRedirectPath(null, "sessao-nao-disponivel"), appOrigin)
     );
   }
 
   const profile = await ensureProfileForUser(user);
   if (!profile.is_active) {
     return NextResponse.redirect(
-      new URL("/auth/login?error=perfil-inativo", appOrigin)
+      new URL(buildLoginRedirectPath(null, "perfil-inativo"), appOrigin)
     );
   }
 

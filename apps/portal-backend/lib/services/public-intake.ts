@@ -54,6 +54,8 @@ type NormalizedPublicTriageInput = {
     source: string;
     page: string;
     theme: string;
+    campaign: string;
+    video: string;
     areaRaw: string;
     problemType: string;
     urgencyRaw: string;
@@ -151,9 +153,12 @@ function normalizePublicTriageInput(
       website: input.website,
       captureMetadata: {
         captureMode: "portal_guided_triage",
-        source: "portal-triagem",
-        page: input.sourcePath || context.pagePath || "/triagem",
-        theme: "",
+        source: input.captureMetadata?.source || "portal-triagem",
+        page:
+          input.captureMetadata?.page || input.sourcePath || context.pagePath || "/triagem",
+        theme: input.captureMetadata?.theme || "",
+        campaign: input.captureMetadata?.campaign || "",
+        video: input.captureMetadata?.video || "",
         areaRaw: input.caseArea,
         problemType: input.caseArea,
         urgencyRaw: input.urgencyLevel
@@ -186,6 +191,8 @@ function normalizePublicTriageInput(
       source: legacyInput.source,
       page: legacyInput.page,
       theme: legacyInput.theme,
+      campaign: legacyInput.campaign,
+      video: legacyInput.video,
       areaRaw: legacyInput.area,
       problemType: legacyInput.problem_type,
       urgencyRaw: legacyInput.urgency
@@ -247,6 +254,9 @@ export async function submitPublicTriage(
         page: input.captureMetadata.page || null,
         theme: input.captureMetadata.theme || null,
         tema: input.captureMetadata.theme || null,
+        campaign: input.captureMetadata.campaign || null,
+        campanha: input.captureMetadata.campaign || null,
+        video: input.captureMetadata.video || null,
         areaRaw: input.captureMetadata.areaRaw || null,
         area: input.captureMetadata.areaRaw || null,
         problemType: input.captureMetadata.problemType || null,
@@ -286,6 +296,9 @@ export async function submitPublicTriage(
         page: input.captureMetadata.page || null,
         theme: input.captureMetadata.theme || null,
         tema: input.captureMetadata.theme || null,
+        campaign: input.captureMetadata.campaign || null,
+        campanha: input.captureMetadata.campaign || null,
+        video: input.captureMetadata.video || null,
         areaRaw: input.captureMetadata.areaRaw || null,
         area: input.captureMetadata.areaRaw || null,
         problemType: input.captureMetadata.problemType || null,

@@ -6,6 +6,12 @@ import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getCurrentProfile } from "@/lib/auth/guards";
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import {
+  appendEntryContextToPath,
+  getEntryContextPayload,
+  readEntryContext
+} from "@/lib/entry-context";
 
 export const metadata: Metadata = {
   title: "Noemia",
@@ -20,7 +26,17 @@ export const metadata: Metadata = {
   }
 };
 
-export default async function NoemiaPage() {
+export default async function NoemiaPage({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const entryContext = readEntryContext(await searchParams);
+  const entryContextPayload = getEntryContextPayload(entryContext);
+  const homeHref = appendEntryContextToPath("/", entryContext);
+  const triageHref = appendEntryContextToPath("/triagem", entryContext);
+  const noemiaHref = appendEntryContextToPath("/noemia", entryContext);
+  const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
   const profile = await getCurrentProfile();
   const isStaffMode =
     !!profile && profile.is_active && (profile.role === "advogada" || profile.role === "admin");
@@ -41,10 +57,10 @@ export default async function NoemiaPage() {
         { href: "/noemia", label: "Noemia", active: true }
       ]
     : [
-        { href: "/", label: "Inicio" },
-        { href: "/triagem", label: "Triagem" },
-        { href: "/noemia", label: "Noemia", active: true },
-        { href: "/auth/login", label: "Area do cliente" }
+        { href: homeHref, label: "Inicio" },
+        { href: triageHref, label: "Triagem" },
+        { href: noemiaHref, label: "Noemia", active: true },
+        { href: clientLoginHref, label: "Area do cliente" }
       ];
   const suggestedPrompts = isStaffMode
     ? [
@@ -80,7 +96,11 @@ export default async function NoemiaPage() {
 
   return (
     <>
-      <ProductEventBeacon eventKey="noemia_opened" eventGroup="ai" payload={{ audience }} />
+      <ProductEventBeacon
+        eventKey="noemia_opened"
+        eventGroup="ai"
+        payload={{ audience, ...entryContextPayload }}
+      />
       <AppFrame
         eyebrow="Noemia"
         title={
@@ -134,7 +154,7 @@ export default async function NoemiaPage() {
               }
             : isClientMode
             ? { href: "/cliente", label: "Voltar ao meu painel", tone: "secondary" as const }
-            : { href: "/triagem", label: "Iniciar triagem", tone: "secondary" as const }
+            : { href: triageHref, label: "Iniciar triagem", tone: "secondary" as const }
         ]}
       >
         <div className="grid two">
@@ -158,7 +178,7 @@ export default async function NoemiaPage() {
               audience={audience}
               displayName={profile?.full_name || "Voce"}
               suggestedPrompts={suggestedPrompts}
-              currentPath="/noemia"
+              currentPath={noemiaHref}
             />
           </SectionCard>
 

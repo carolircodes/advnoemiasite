@@ -4,6 +4,12 @@ import { AppFrame } from "@/components/app-frame";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import {
+  appendEntryContextToPath,
+  getEntryContextPayload,
+  readEntryContext
+} from "@/lib/entry-context";
 
 export const metadata: Metadata = {
   title: "Atendimento juridico claro e portal do cliente",
@@ -43,13 +49,24 @@ const legalServiceSchema = {
   ]
 };
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const entryContext = readEntryContext(await searchParams);
+  const entryContextPayload = getEntryContextPayload(entryContext);
+  const homeHref = appendEntryContextToPath("/", entryContext);
+  const triageHref = appendEntryContextToPath("/triagem", entryContext);
+  const noemiaHref = appendEntryContextToPath("/noemia", entryContext);
+  const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
+
   return (
     <>
       <ProductEventBeacon
         eventKey="site_visit_started"
         eventGroup="traffic"
-        payload={{ entryPoint: "home" }}
+        payload={{ entryPoint: "home", ...entryContextPayload }}
         oncePerSession
       />
       <script
@@ -61,10 +78,10 @@ export default function HomePage() {
         title="Um fluxo juridico claro do primeiro contato ao acompanhamento continuo do caso."
         description="A triagem inicial organiza o seu atendimento com seriedade. Depois, o portal do cliente concentra documentos, agenda, atualizacoes e proximos passos em uma experiencia unica."
         navigation={[
-          { href: "/", label: "Inicio", active: true },
-          { href: "/triagem", label: "Triagem" },
-          { href: "/noemia", label: "Noemia" },
-          { href: "/auth/login", label: "Area do cliente" }
+          { href: homeHref, label: "Inicio", active: true },
+          { href: triageHref, label: "Triagem" },
+          { href: noemiaHref, label: "Noemia" },
+          { href: clientLoginHref, label: "Area do cliente" }
         ]}
         highlights={[
           { label: "Triagem orientada", value: "Em poucos minutos" },
@@ -74,17 +91,17 @@ export default function HomePage() {
         ]}
         actions={[
           {
-            href: "/triagem",
+            href: triageHref,
             label: "Iniciar atendimento",
             trackingEventKey: "cta_start_triage_clicked",
-            trackingPayload: { location: "home_hero" }
+            trackingPayload: { location: "home_hero", ...entryContextPayload }
           },
           {
-            href: "/auth/login",
+            href: clientLoginHref,
             label: "Entrar na area do cliente",
             tone: "secondary",
             trackingEventKey: "cta_client_portal_clicked",
-            trackingPayload: { location: "home_hero" }
+            trackingPayload: { location: "home_hero", ...entryContextPayload }
           }
         ]}
       >
@@ -202,27 +219,27 @@ export default function HomePage() {
               <p>Ela ajuda a equipe a entender o contexto do caso com mais rapidez e encaminhar o atendimento com mais seguranca.</p>
               <div className="form-actions">
                 <TrackedLink
-                  href="/triagem"
+                  href={triageHref}
                   className="button"
                   eventKey="cta_start_triage_clicked"
-                  trackingPayload={{ location: "home_footer" }}
+                  trackingPayload={{ location: "home_footer", ...entryContextPayload }}
                 >
                   Iniciar triagem
                 </TrackedLink>
                 <TrackedLink
-                  href="/auth/login"
+                  href={clientLoginHref}
                   className="button secondary"
                   eventKey="cta_client_portal_clicked"
-                  trackingPayload={{ location: "home_footer" }}
+                  trackingPayload={{ location: "home_footer", ...entryContextPayload }}
                 >
                   Ja sou cliente
                 </TrackedLink>
                 <TrackedLink
-                  href="/noemia"
+                  href={noemiaHref}
                   className="button secondary"
                   eventKey="cta_noemia_clicked"
                   eventGroup="ai"
-                  trackingPayload={{ location: "home_footer" }}
+                  trackingPayload={{ location: "home_footer", ...entryContextPayload }}
                 >
                   Tirar duvidas com Noemia
                 </TrackedLink>

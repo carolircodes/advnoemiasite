@@ -1,5 +1,6 @@
 import "server-only";
 
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
 import { getServerEnv } from "@/lib/config/env";
 
 type NotificationTemplateRecord = {
@@ -100,7 +101,7 @@ function renderInviteTrackingEmail(record: NotificationTemplateRecord) {
     intro: `O convite principal do portal foi emitido pela equipe para ${fullName}.`,
     body: `Assim que voce concluir o primeiro acesso, o acompanhamento do ${caseAreaLabel} aparecera em um painel claro, com documentos, agenda e atualizacoes.`,
     ctaLabel: "Abrir portal",
-    ctaHref: buildPortalUrl("/auth/login"),
+    ctaHref: buildPortalUrl(CLIENT_LOGIN_PATH),
     footer:
       "Este registro existe para acompanhar o onboarding no portal. O link oficial de primeiro acesso continua sendo o convite emitido pelo Supabase Auth."
   });
@@ -180,7 +181,7 @@ function renderInternalTriageEmail(record: NotificationTemplateRecord) {
 function renderReminderEmail(record: NotificationTemplateRecord) {
   const payload = record.payload || {};
   const fullName = asString(payload.fullName, "Cliente");
-  const destinationPath = asString(payload.destinationPath, "/auth/login");
+  const destinationPath = asString(payload.destinationPath, CLIENT_LOGIN_PATH);
 
   if (record.template_key === "invite-reminder") {
     const invitedAtLabel = asString(payload.invitedAtLabel, "recentemente");

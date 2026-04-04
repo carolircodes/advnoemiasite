@@ -6,6 +6,9 @@ export type AccessProfile = {
   first_login_completed_at?: string | null;
 };
 
+export const CLIENT_LOGIN_PATH = "/portal/login";
+export const LEGACY_CLIENT_LOGIN_PATH = "/auth/login";
+
 function matchesPrefix(pathname: string, basePath: string) {
   return pathname === basePath || pathname.startsWith(`${basePath}/`);
 }
@@ -106,7 +109,7 @@ export function buildLoginRedirectPath(nextPath?: string | null, error = "login-
     params.set("next", normalizedNext);
   }
 
-  return `/auth/login?${params.toString()}`;
+  return `${CLIENT_LOGIN_PATH}?${params.toString()}`;
 }
 
 export function buildAccessDeniedPath(

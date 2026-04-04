@@ -4,6 +4,12 @@ import { AppFrame } from "@/components/app-frame";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TriageForm } from "@/components/triage-form";
+import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import {
+  appendEntryContextToPath,
+  getEntryContextPayload,
+  readEntryContext
+} from "@/lib/entry-context";
 
 export const metadata: Metadata = {
   title: "Triagem inicial do atendimento",
@@ -28,13 +34,24 @@ export const metadata: Metadata = {
   }
 };
 
-export default function TriagePage() {
+export default async function TriagePage({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const entryContext = readEntryContext(await searchParams);
+  const entryContextPayload = getEntryContextPayload(entryContext);
+  const homeHref = appendEntryContextToPath("/", entryContext);
+  const triageHref = appendEntryContextToPath("/triagem", entryContext);
+  const noemiaHref = appendEntryContextToPath("/noemia", entryContext);
+  const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
+
   return (
     <>
       <ProductEventBeacon
         eventKey="site_visit_started"
         eventGroup="traffic"
-        payload={{ entryPoint: "triagem" }}
+        payload={{ entryPoint: "triagem", ...entryContextPayload }}
         oncePerSession
       />
       <AppFrame
@@ -42,10 +59,10 @@ export default function TriagePage() {
         title="Uma triagem guiada para iniciar o atendimento com mais clareza e menos atrito."
         description="Voce responde em etapas curtas, a equipe recebe o contexto organizado e o proximo passo fica mais claro desde o inicio."
         navigation={[
-          { href: "/", label: "Inicio" },
-          { href: "/triagem", label: "Triagem", active: true },
-          { href: "/noemia", label: "Noemia" },
-          { href: "/auth/login", label: "Area do cliente" }
+          { href: homeHref, label: "Inicio" },
+          { href: triageHref, label: "Triagem", active: true },
+          { href: noemiaHref, label: "Noemia" },
+          { href: clientLoginHref, label: "Area do cliente" }
         ]}
         highlights={[
           { label: "Tempo medio", value: "Poucos minutos" },
@@ -55,14 +72,14 @@ export default function TriagePage() {
         ]}
         actions={[
           {
-            href: "/noemia",
+            href: noemiaHref,
             label: "Tirar uma duvida antes de enviar",
             tone: "secondary",
             trackingEventKey: "cta_noemia_clicked",
             trackingEventGroup: "ai",
-            trackingPayload: { location: "triagem_header" }
+            trackingPayload: { location: "triagem_header", ...entryContextPayload }
           },
-          { href: "/auth/login", label: "Ja recebi convite", tone: "secondary" }
+          { href: clientLoginHref, label: "Ja recebi convite", tone: "secondary" }
         ]}
       >
         <div className="split">
@@ -70,7 +87,7 @@ export default function TriagePage() {
           title="Preencha sua triagem"
           description="Cada etapa existe para ajudar a equipe a entender seu momento com mais rapidez e conduzir o atendimento com mais criterio."
         >
-          <TriageForm />
+          <TriageForm entryContext={entryContext} />
         </SectionCard>
 
         <div className="stack">
