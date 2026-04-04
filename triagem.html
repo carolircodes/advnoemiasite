@@ -36,7 +36,7 @@
   <div class="page-shell">
     <div class="topbar">
       <div class="container topbar-inner">
-        <span>Triagem inicial para organizar o atendimento antes do contato com a equipe jurídica.</span>
+        <span id="topbarCopy">Triagem inicial para organizar o atendimento antes do contato com a equipe jurídica.</span>
         <div class="pill-row">
           <span>Pré-atendimento</span>
           <span>WhatsApp estruturado</span>
@@ -85,9 +85,9 @@
     <main class="login-main">
       <div class="container triage-layout">
         <section class="triage-copy glass-card">
-          <span class="eyebrow">Pré-atendimento jurídico</span>
-          <h1>Conte o essencial do seu caso antes de falar com a equipe.</h1>
-          <p class="body-copy">
+          <span class="eyebrow" id="triageEyebrow">Pré-atendimento jurídico</span>
+          <h1 id="triageTitle">Conte o essencial do seu caso antes de falar com a equipe.</h1>
+          <p class="body-copy" id="triageIntro">
             Este formulário ajuda a organizar as informações iniciais, filtrar melhor a demanda e tornar o primeiro
             contato pelo WhatsApp mais produtivo para você e para a advogada.
           </p>
@@ -95,23 +95,23 @@
           <div class="timeline">
             <article class="timeline-item">
               <strong>1. Você preenche a triagem</strong>
-              <p>São solicitados apenas os dados necessários para entender melhor o contexto inicial do problema.</p>
+              <p id="timelineStep1">São solicitados apenas os dados necessários para entender melhor o contexto inicial do problema.</p>
             </article>
 
             <article class="timeline-item">
               <strong>2. O WhatsApp é aberto com mensagem pronta</strong>
-              <p>A triagem é convertida em uma mensagem organizada, com área jurídica, urgência e resumo do caso.</p>
+              <p id="timelineStep2">A triagem é convertida em uma mensagem organizada, com área jurídica, urgência e resumo do caso.</p>
             </article>
 
             <article class="timeline-item">
               <strong>3. O atendimento começa com mais critério</strong>
-              <p>A equipe recebe contexto melhor, consegue filtrar prioridades e orientar os próximos passos com mais clareza.</p>
+              <p id="timelineStep3">A equipe recebe contexto melhor, consegue filtrar prioridades e orientar os próximos passos com mais clareza.</p>
             </article>
           </div>
 
           <div class="stack-card">
             <strong>Indicação automática da área</strong>
-            <p class="body-copy">
+            <p class="body-copy" id="stackCardCopy">
               Se você chegou a partir de uma área ou artigo específico, o tipo de problema já pode vir sugerido para agilizar a triagem.
             </p>
             <div class="pill-row">
@@ -123,8 +123,8 @@
 
         <section class="triage-form-card glass-card">
           <span class="eyebrow">Formulário de triagem</span>
-          <h2>Iniciar contato pelo WhatsApp</h2>
-          <p class="body-copy">
+          <h2 id="formTitle">Iniciar contato pelo WhatsApp</h2>
+          <p class="body-copy" id="formIntro">
             Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada.
           </p>
 
@@ -163,7 +163,7 @@
             </div>
 
             <div class="field-group">
-              <label for="leadDescription">Breve descrição</label>
+              <label for="leadDescription" id="descriptionLabel">Breve descrição</label>
               <textarea
                 id="leadDescription"
                 name="description"
@@ -187,10 +187,10 @@
             <input type="hidden" name="source" value="site" data-triage-source-input />
             <input type="hidden" name="page" value="triagem.html" data-triage-page-input />
 
-            <button class="btn btn-primary btn-full" type="submit">Enviar triagem para o WhatsApp</button>
+            <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar triagem para o WhatsApp</button>
           </form>
 
-          <p class="mini-note">
+          <p class="mini-note" id="miniNote">
             A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba seu caso com mais contexto.
           </p>
         </section>
@@ -200,5 +200,199 @@
 
   <script src="assets/js/premium-system.js"></script>
   <script src="assets/js/contact-capture.js"></script>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+
+      const tema = (params.get("tema") || "").toLowerCase().trim();
+      const origem = (params.get("origem") || params.get("source") || "site").toLowerCase().trim();
+
+      const areaInput = document.querySelector("[data-triage-area-input]");
+      const sourceInput = document.querySelector("[data-triage-source-input]");
+      const pageInput = document.querySelector("[data-triage-page-input]");
+      const problemTypeSelect = document.getElementById("leadProblemType");
+
+      const areaBadge = document.getElementById("triageAreaBadge");
+      const originBadge = document.getElementById("triageOriginBadge");
+
+      const topbarCopy = document.getElementById("topbarCopy");
+      const triageEyebrow = document.getElementById("triageEyebrow");
+      const triageTitle = document.getElementById("triageTitle");
+      const triageIntro = document.getElementById("triageIntro");
+      const stackCardCopy = document.getElementById("stackCardCopy");
+      const formTitle = document.getElementById("formTitle");
+      const formIntro = document.getElementById("formIntro");
+      const descriptionLabel = document.getElementById("descriptionLabel");
+      const descriptionField = document.getElementById("leadDescription");
+      const submitButton = document.getElementById("submitButton");
+      const miniNote = document.getElementById("miniNote");
+
+      const originMap = {
+        instagram: "Instagram",
+        direct: "Direct",
+        reels: "Instagram Reels",
+        comentario: "Comentário do Instagram",
+        video: "Vídeo",
+        blog: "Blog",
+        artigo: "Artigo",
+        site: "Site",
+        whatsapp: "WhatsApp"
+      };
+
+      const themeMap = {
+        aposentadoria: {
+          label: "Direito Previdenciário",
+          badge: "Aposentadoria",
+          value: "previdenciario",
+          eyebrow: "Pré-atendimento previdenciário",
+          title: "Conte o essencial do seu caso sobre aposentadoria antes de falar com a equipe.",
+          intro: "Se você veio de um conteúdo sobre aposentadoria, esta triagem ajuda a organizar sua situação inicial para que o atendimento comece com mais contexto, clareza e direcionamento.",
+          formTitleText: "Iniciar análise inicial sobre aposentadoria",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento previdenciário.",
+          descriptionLabelText: "Explique sua situação previdenciária",
+          descriptionPlaceholder: "Exemplo: já dei entrada, tive negativa, estou aguardando análise, recebo benefício com valor errado ou quero entender se já posso pedir aposentadoria.",
+          buttonText: "Enviar triagem previdenciária para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento previdenciário antes do contato com a equipe jurídica."
+        },
+        previdenciario: {
+          label: "Direito Previdenciário",
+          badge: "Direito Previdenciário",
+          value: "previdenciario",
+          eyebrow: "Pré-atendimento previdenciário",
+          title: "Conte o essencial do seu caso previdenciário antes de falar com a equipe.",
+          intro: "Esta triagem ajuda a organizar as informações iniciais do seu caso previdenciário para que o primeiro contato pelo WhatsApp seja mais produtivo.",
+          formTitleText: "Iniciar atendimento previdenciário",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada.",
+          descriptionLabelText: "Explique sua situação previdenciária",
+          descriptionPlaceholder: "Explique de forma resumida o benefício, pedido, negativa, revisão, atraso ou dúvida principal.",
+          buttonText: "Enviar triagem para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento previdenciário antes do contato com a equipe jurídica."
+        },
+        banco: {
+          label: "Direito Bancário",
+          badge: "Direito Bancário",
+          value: "bancario",
+          eyebrow: "Pré-atendimento bancário",
+          title: "Conte o essencial do seu problema bancário antes de falar com a equipe.",
+          intro: "Se você chegou por um conteúdo sobre descontos, cobranças ou problemas com banco, esta triagem ajuda a organizar seu caso desde o início.",
+          formTitleText: "Iniciar análise inicial do problema bancário",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento bancário.",
+          descriptionLabelText: "Explique o problema com o banco",
+          descriptionPlaceholder: "Exemplo: desconto indevido, empréstimo não reconhecido, cobrança abusiva, cartão, tarifa, bloqueio ou outro problema bancário.",
+          buttonText: "Enviar triagem bancária para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento bancário antes do contato com a equipe jurídica."
+        },
+        consumidor: {
+          label: "Direito do Consumidor",
+          badge: "Direito do Consumidor",
+          value: "consumidor",
+          eyebrow: "Pré-atendimento do consumidor",
+          title: "Conte o essencial do seu problema de consumo antes de falar com a equipe.",
+          intro: "Esta triagem ajuda a entender com mais clareza o problema enfrentado com empresa, produto, serviço, cobrança ou atendimento.",
+          formTitleText: "Iniciar análise inicial do problema de consumo",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento ao consumidor.",
+          descriptionLabelText: "Explique o problema de consumo",
+          descriptionPlaceholder: "Exemplo: cobrança indevida, produto com defeito, serviço não prestado, negativação indevida, dificuldade de cancelamento ou outro problema de consumo.",
+          buttonText: "Enviar triagem do consumidor para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento em direito do consumidor antes do contato com a equipe jurídica."
+        },
+        "consumidor-bancario": {
+          label: "Direito do Consumidor e Bancário",
+          badge: "Consumidor e Bancário",
+          value: "consumidor-bancario",
+          eyebrow: "Pré-atendimento consumidor e bancário",
+          title: "Conte o essencial do seu problema antes de falar com a equipe.",
+          intro: "Se o seu caso envolve cobrança, contrato, empréstimo, desconto, banco ou relação de consumo, esta triagem ajuda a organizar o contexto inicial.",
+          formTitleText: "Iniciar análise inicial do caso",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada.",
+          descriptionLabelText: "Explique o problema",
+          descriptionPlaceholder: "Explique de forma resumida o que aconteceu, quando começou e o que mais preocupa você neste momento.",
+          buttonText: "Enviar triagem para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento antes do contato com a equipe jurídica."
+        },
+        familia: {
+          label: "Direito de Família",
+          badge: "Direito de Família",
+          value: "familia",
+          eyebrow: "Pré-atendimento em direito de família",
+          title: "Conte o essencial do seu caso de família antes de falar com a equipe.",
+          intro: "Se você chegou a partir de um conteúdo sobre separação, guarda, pensão ou outra questão familiar, esta triagem ajuda a organizar os pontos iniciais com mais critério.",
+          formTitleText: "Iniciar análise inicial do caso de família",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento em direito de família.",
+          descriptionLabelText: "Explique sua situação familiar",
+          descriptionPlaceholder: "Exemplo: separação, pensão alimentícia, guarda, convivência, união estável, divórcio ou outro ponto de família.",
+          buttonText: "Enviar triagem de família para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento em direito de família antes do contato com a equipe jurídica."
+        },
+        civil: {
+          label: "Direito Civil",
+          badge: "Direito Civil",
+          value: "civil",
+          eyebrow: "Pré-atendimento em direito civil",
+          title: "Conte o essencial do seu caso civil antes de falar com a equipe.",
+          intro: "Esta triagem ajuda a reunir o contexto inicial do seu problema para que o atendimento comece com mais clareza e direcionamento.",
+          formTitleText: "Iniciar análise inicial do caso civil",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento em direito civil.",
+          descriptionLabelText: "Explique seu caso civil",
+          descriptionPlaceholder: "Explique de forma resumida o que aconteceu, há quanto tempo e qual orientação você busca neste momento.",
+          buttonText: "Enviar triagem civil para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento em direito civil antes do contato com a equipe jurídica."
+        }
+      };
+
+      const selectedTheme = themeMap[tema] || null;
+      const originLabel = originMap[origem] || (origem ? origem.charAt(0).toUpperCase() + origem.slice(1) : "Site");
+
+      if (selectedTheme) {
+        triageEyebrow.textContent = selectedTheme.eyebrow;
+        triageTitle.textContent = selectedTheme.title;
+        triageIntro.textContent = selectedTheme.intro;
+        formTitle.textContent = selectedTheme.formTitleText;
+        formIntro.textContent = selectedTheme.formIntroText;
+        descriptionLabel.textContent = selectedTheme.descriptionLabelText;
+        descriptionField.placeholder = selectedTheme.descriptionPlaceholder;
+        submitButton.textContent = selectedTheme.buttonText;
+        topbarCopy.textContent = selectedTheme.topbar;
+        areaBadge.textContent = selectedTheme.badge;
+        stackCardCopy.textContent = "Identificamos automaticamente uma área provável com base no conteúdo de origem para agilizar sua triagem e direcionar melhor o atendimento inicial.";
+
+        if (problemTypeSelect) {
+          problemTypeSelect.value = selectedTheme.value;
+        }
+
+        if (areaInput) {
+          areaInput.value = selectedTheme.value;
+        }
+      } else {
+        areaBadge.textContent = "Atendimento geral";
+        if (areaInput) {
+          areaInput.value = "geral";
+        }
+      }
+
+      originBadge.textContent = "Origem: " + originLabel;
+
+      if (sourceInput) {
+        sourceInput.value = origem || "site";
+      }
+
+      if (pageInput) {
+        const suffix = window.location.search || "";
+        pageInput.value = "triagem.html" + suffix;
+      }
+
+      const timelineStep1 = document.getElementById("timelineStep1");
+      const timelineStep2 = document.getElementById("timelineStep2");
+      const timelineStep3 = document.getElementById("timelineStep3");
+
+      if (selectedTheme && tema === "aposentadoria") {
+        timelineStep1.textContent = "Você informa o estágio atual do benefício, pedido, negativa, revisão ou dúvida principal.";
+        timelineStep2.textContent = "A triagem é convertida em uma mensagem organizada no WhatsApp, com foco previdenciário e mais contexto para análise inicial.";
+        timelineStep3.textContent = "A equipe recebe sua situação de forma mais clara e consegue orientar os próximos passos com mais precisão.";
+        miniNote.textContent = "A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba sua situação previdenciária com mais contexto.";
+      }
+    })();
+  </script>
 </body>
 </html>
