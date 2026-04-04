@@ -99,6 +99,10 @@
       backdrop-filter:none;
     }
 
+    #formulario-triagem{
+      scroll-margin-top:100px;
+    }
+
     .login-main{
       padding:clamp(2rem, 5vw, 4rem) 0 5rem;
       background:transparent;
@@ -209,12 +213,47 @@
       color:#7a623f;
     }
 
+    .triage-trust-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 16px;
+      margin-top:1.35rem;
+      padding:0;
+      list-style:none;
+    }
+
+    .triage-trust-row li{
+      font-size:0.88rem;
+      color:var(--muted);
+      padding:0.45rem 0.75rem;
+      border-radius:999px;
+      border:1px solid rgba(171,132,63,.22);
+      background:rgba(255,252,246,.9);
+    }
+
+    .triage-trust-row strong{
+      color:var(--ink);
+      font-weight:700;
+    }
+
     @media (max-width: 980px){
       .triage-layout{
         grid-template-columns:1fr;
       }
       .header{
         position:relative;
+      }
+
+      .header-inner .nav-actions{
+        flex-wrap:wrap;
+        justify-content:flex-end;
+        gap:8px;
+      }
+
+      .header-inner .nav-actions .btn{
+        min-height:48px;
+        font-size:0.8rem;
+        padding:0 12px;
       }
     }
   </style>
@@ -264,8 +303,8 @@
         </nav>
 
         <div class="nav-actions">
-          <a class="btn btn-secondary" href="blog.html">Ler conteúdos</a>
-          <a class="btn btn-primary" href="index.html#contato">Voltar para a home</a>
+          <a class="btn btn-secondary" href="index.html">Página inicial</a>
+          <a class="btn btn-primary" href="#formulario-triagem">Falar com a especialista</a>
         </div>
       </div>
     </header>
@@ -277,8 +316,14 @@
           <h1 id="triageTitle">Conte o essencial do seu caso antes de falar com a equipe.</h1>
           <p class="body-copy" id="triageIntro">
             Este formulário ajuda a organizar as informações iniciais, filtrar melhor a demanda e tornar o primeiro
-            contato pelo WhatsApp mais produtivo para você e para a advogada.
+            contato pelo WhatsApp mais produtivo para você e para a Dra. Noêmia.
           </p>
+
+          <ul class="triage-trust-row" aria-label="Compromissos do escritório">
+            <li><strong>OAB/RN 3939</strong> — atendimento profissional</li>
+            <li><strong>Triagem gratuita</strong> — sem custo para organizar o primeiro contato</li>
+            <li><strong>Resposta humana</strong> — equipe lê o contexto antes de responder</li>
+          </ul>
 
           <div class="timeline">
             <article class="timeline-item">
@@ -309,11 +354,12 @@
           </div>
         </section>
 
-        <section class="triage-form-card glass-card">
+        <section class="triage-form-card glass-card" id="formulario-triagem">
           <span class="eyebrow">Formulário de triagem</span>
-          <h2 id="formTitle">Iniciar contato pelo WhatsApp</h2>
+          <h2 id="formTitle">Falar com a especialista pelo WhatsApp</h2>
           <p class="body-copy" id="formIntro">
-            Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada.
+            Preencha os campos com calma. Ao enviar, abrimos o WhatsApp com uma mensagem já redigida — você só confirma o envio.
+            Isso agiliza a análise inicial e evita que informações importantes se percam no chat.
           </p>
 
           <form class="triage-form" data-triage-form>
@@ -377,7 +423,7 @@
             <input type="hidden" name="campaign" value="" data-triage-campaign-input />
             <input type="hidden" name="video" value="" data-triage-video-input />
 
-            <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar triagem para o WhatsApp</button>
+            <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar e abrir WhatsApp com a mensagem pronta</button>
             <div class="form-status" data-triage-status role="status" aria-live="polite"></div>
           </form>
 

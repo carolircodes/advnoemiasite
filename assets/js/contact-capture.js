@@ -497,6 +497,8 @@
     var floatingLabel = "WhatsApp";
     var mobileLabel =
       config.mode === "triage" ? "Iniciar triagem no WhatsApp" : "Falar com a equipe no WhatsApp";
+    var floatingContactAria =
+      "Falar com a especialista — abrir triagem para contato pelo WhatsApp";
 
     var existingFloat = document.querySelector(
       ".whatsapp-float, .floating-contact, .contact-floating-widget"
@@ -504,12 +506,13 @@
 
     if (existingFloat) {
       existingFloat.href = href;
-      existingFloat.setAttribute("aria-label", mobileLabel);
       existingFloat.removeAttribute("target");
       existingFloat.removeAttribute("rel");
 
       if (existingFloat.classList.contains("floating-contact")) {
-        existingFloat.innerHTML = "<span>" + floatingLabel + "</span>";
+        existingFloat.setAttribute("aria-label", floatingContactAria);
+      } else {
+        existingFloat.setAttribute("aria-label", mobileLabel);
       }
 
       if (existingFloat.classList.contains("contact-floating-widget")) {

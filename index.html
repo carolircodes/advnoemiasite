@@ -515,7 +515,38 @@
 
     .hero-actions{
       gap:.85rem;
-      margin-bottom:1.35rem;
+      margin-bottom:1rem;
+    }
+
+    .hero-trust-note{
+      margin:0 0 12px;
+      font-size:0.95rem;
+      color:var(--ink-soft) !important;
+      max-width:52ch;
+      line-height:1.55;
+    }
+
+    .dashboard-actions--split{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      width:100%;
+    }
+
+    .dashboard-actions--split .btn{
+      flex:1 1 min(100%, 200px);
+      justify-content:center;
+    }
+
+    .section-actions--center{
+      justify-content:center;
+    }
+
+    .section-actions--blog{
+      justify-content:center;
+      max-width:520px;
+      margin-left:auto;
+      margin-right:auto;
     }
 
     .glass-card,
@@ -747,12 +778,32 @@
       color:#1d150b !important;
       box-shadow:0 18px 40px rgba(64,45,18,.18) !important;
       border:1px solid rgba(143,107,48,.24);
+      width:auto !important;
+      min-width:min(168px, calc(100vw - 36px));
+      min-height:52px !important;
+      height:auto !important;
+      padding:10px 16px !important;
+      flex-direction:column;
+      gap:2px;
+      text-align:center;
+      line-height:1.12;
+      bottom:max(18px, env(safe-area-inset-bottom, 0px)) !important;
+      right:max(14px, env(safe-area-inset-right, 0px)) !important;
     }
 
-    .floating-contact span{
+    .floating-contact .floating-contact__line{
+      display:block;
       color:#1b150c !important;
       font-weight:800;
+      letter-spacing:.02em;
+      font-size:10px;
+      text-transform:none;
+    }
+
+    .floating-contact .floating-contact__line--accent{
+      font-size:11px;
       letter-spacing:.04em;
+      text-transform:uppercase;
     }
 
     .home-process,
@@ -926,13 +977,13 @@
           <a href="#conteudo">Conteúdo</a>
           <a href="#contato">Contato</a>
           <a class="menu-only" href="/portal/login">Área do cliente</a>
-          <a class="menu-only" href="triagem.html?area=geral&amp;origem=home&amp;pagina=index.html">Iniciar atendimento</a>
+          <a class="menu-only" href="triagem.html?area=geral&amp;origem=home&amp;pagina=index.html">Falar com a especialista</a>
         </nav>
 
         <div class="nav-actions">
           <a class="btn btn-secondary" href="/portal/login">Área do cliente</a>
           <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=home&amp;pagina=index.html">
-            Iniciar atendimento
+            Falar com a especialista
           </a>
         </div>
       </div>
@@ -942,21 +993,24 @@
       <section class="hero">
         <div class="container hero-grid">
           <div class="hero-copy">
-            <span class="eyebrow">Atendimento jurídico com clareza, técnica e direção</span>
+            <span class="eyebrow">Advocacia estratégica para quem precisa de clareza</span>
             <h1>
-              Seu caso precisa de <span class="highlight">análise séria, direção segura e condução responsável</span>.
+              Seu problema jurídico merece <span class="highlight">análise séria, explicação em linguagem humana e um plano de ação</span>.
             </h1>
             <p>
-              Atuação em Direito Previdenciário, Consumidor e Bancário, Família e Civil, com comunicação clara,
-              leitura técnica do caso e organização desde o primeiro contato.
+              Atuação em Direito Previdenciário, Consumidor e Bancário, Família e Civil. Você entende o que está em jogo,
+              quais documentos importam e quais são os próximos passos — desde o primeiro contato.
             </p>
 
             <div class="hero-actions">
               <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=home&amp;pagina=index.html">
-                Iniciar atendimento
+                Falar com a especialista
               </a>
-              <a class="btn btn-secondary" href="/portal/login">Área do cliente</a>
+              <a class="btn btn-secondary" href="/portal/login">Já sou cliente</a>
             </div>
+            <p class="hero-trust-note">
+              Triagem rápida e gratuita: em poucos minutos você organiza seu relato e segue para o WhatsApp com a mensagem pronta para a equipe.
+            </p>
 
             <div class="hero-points">
               <div class="glass-card hero-point">
@@ -973,9 +1027,24 @@
 
           <div class="hero-panel glass-card">
             <div class="panel-visual">
-              <div class="hero-preview">
-
-               
+              <div class="hero-preview" role="region" aria-label="Por que confiar neste atendimento">
+                <div class="preview-row">
+                  <div>
+                    <strong>Primeiro contato organizado</strong>
+                    <span>Área jurídica, urgência e resumo do caso chegam estruturados para a Dra. Noêmia e a equipe.</span>
+                  </div>
+                </div>
+                <div class="preview-row">
+                  <div>
+                    <strong>Sem promessas vazias</strong>
+                    <span>Análise técnica do que é possível, com transparência sobre riscos e prazos.</span>
+                  </div>
+                </div>
+                <div class="preview-row">
+                  <div>
+                    <strong>OAB/RN 3939</strong>
+                    <span>Atendimento em nome da advogada inscrita e habilitada, com postura ética e profissional.</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -993,11 +1062,11 @@
 
             <div class="pathway-grid">
               <article class="pathway-card pathway-card-primary">
-                <h3>Iniciar atendimento</h3>
-                <p>Para quem vai apresentar o caso pela primeira vez e precisa de um primeiro direcionamento.</p>
+                <h3>Falar com a especialista</h3>
+                <p>Para quem ainda não é cliente e quer apresentar o caso com clareza, sem perder tempo no “oi, tudo bem?”.</p>
                 <div class="pathway-actions">
                   <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=home-direcionamento&amp;pagina=index.html">
-                    Iniciar atendimento
+                    Iniciar triagem no site
                   </a>
                 </div>
               </article>
@@ -1064,32 +1133,36 @@
             <article class="metric-card">
               <strong>Direito Previdenciário</strong>
               <p>Aposentadorias, benefícios do INSS, revisões, CNIS, negativas administrativas e leitura técnica do histórico previdenciário.</p>
-              <div class="dashboard-actions">
-                <a class="btn btn-secondary" href="direito-previdenciario.html">Conhecer área</a>
+              <div class="dashboard-actions dashboard-actions--split">
+                <a class="btn btn-primary" href="triagem.html?area=previdenciario&amp;origem=home-areas&amp;pagina=index.html">Falar com a especialista</a>
+                <a class="btn btn-secondary" href="direito-previdenciario.html">Conhecer a área</a>
               </div>
             </article>
 
             <article class="metric-card">
               <strong>Consumidor e Bancário</strong>
               <p>Fraudes, empréstimos não reconhecidos, descontos indevidos, negativação irregular, cobranças abusivas e conflitos contratuais.</p>
-              <div class="dashboard-actions">
-                <a class="btn btn-secondary" href="direito-consumidor-bancario.html">Conhecer área</a>
+              <div class="dashboard-actions dashboard-actions--split">
+                <a class="btn btn-primary" href="triagem.html?area=consumidor-bancario&amp;origem=home-areas&amp;pagina=index.html">Falar com a especialista</a>
+                <a class="btn btn-secondary" href="direito-consumidor-bancario.html">Conhecer a área</a>
               </div>
             </article>
 
             <article class="metric-card">
               <strong>Direito de Família</strong>
               <p>Divórcio, guarda, convivência, pensão alimentícia e orientação para decisões familiares que exigem cuidado e firmeza.</p>
-              <div class="dashboard-actions">
-                <a class="btn btn-secondary" href="direito-familia.html">Conhecer área</a>
+              <div class="dashboard-actions dashboard-actions--split">
+                <a class="btn btn-primary" href="triagem.html?area=familia&amp;origem=home-areas&amp;pagina=index.html">Falar com a especialista</a>
+                <a class="btn btn-secondary" href="direito-familia.html">Conhecer a área</a>
               </div>
             </article>
 
             <article class="metric-card">
               <strong>Direito Civil</strong>
               <p>Contrato descumprido, indenização, obrigações não cumpridas, conflitos patrimoniais e organização da prova desde o início.</p>
-              <div class="dashboard-actions">
-                <a class="btn btn-secondary" href="direito-civil.html">Conhecer área</a>
+              <div class="dashboard-actions dashboard-actions--split">
+                <a class="btn btn-primary" href="triagem.html?area=civil&amp;origem=home-areas&amp;pagina=index.html">Falar com a especialista</a>
+                <a class="btn btn-secondary" href="direito-civil.html">Conhecer a área</a>
               </div>
             </article>
           </div>
@@ -1130,6 +1203,10 @@
               <h3>Acompanhamento</h3>
               <p>Quando o atendimento avança, agenda, documentos e atualizações seguem de forma organizada.</p>
             </article>
+          </div>
+
+          <div class="dashboard-actions section-actions section-actions--center">
+            <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=home-processo&amp;pagina=index.html">Falar com a especialista</a>
           </div>
         </div>
       </section>
@@ -1214,8 +1291,9 @@
             </article>
           </div>
 
-          <div class="dashboard-actions section-actions">
-            <a class="btn btn-secondary" href="blog.html">Acessar blog jurídico</a>
+          <div class="dashboard-actions section-actions dashboard-actions--split section-actions--blog">
+            <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=home-conteudo&amp;pagina=index.html">Falar com a especialista</a>
+            <a class="btn btn-secondary" href="blog.html">Ler artigos no blog</a>
           </div>
         </div>
       </section>
@@ -1226,20 +1304,20 @@
             <div class="cta-grid">
               <div class="cta-copy">
                 <span class="eyebrow">Contato</span>
-                <h2>Quando o caso pede direção segura, o primeiro passo é iniciar a triagem.</h2>
+                <h2>Pronto para falar com a especialista? A triagem deixa tudo organizado antes do WhatsApp.</h2>
                 <p>
-                  A triagem ajuda a organizar as informações centrais do caso e torna o primeiro contato mais claro para
-                  você e para o escritório.
+                  Você preenche um formulário curto com nome, telefone, cidade, tipo de problema e urgência. Ao enviar,
+                  abrimos o WhatsApp com a mensagem já montada — sem enrolação e com respeito ao seu tempo.
                 </p>
               </div>
 
               <div class="showcase-side">
                 <div class="stack-card">
-                  <strong>Iniciar atendimento</strong>
+                  <strong>Falar com a especialista</strong>
                   <p>Envie o contexto do problema, a cidade e a urgência para receber um encaminhamento inicial mais objetivo.</p>
                   <div class="dashboard-actions">
                     <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=home&amp;pagina=index.html">
-                      Preencher triagem
+                      Abrir triagem e WhatsApp
                     </a>
                   </div>
                 </div>
@@ -1276,11 +1354,10 @@
   <a
     class="floating-contact"
     href="triagem.html?area=geral&amp;origem=home&amp;pagina=index.html"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="WhatsApp"
+    aria-label="Falar com a especialista — abrir triagem para contato pelo WhatsApp"
   >
-    <span>Fale</span>
+    <span class="floating-contact__line">Falar com a</span>
+    <span class="floating-contact__line floating-contact__line--accent">especialista</span>
   </a>
 
   <script src="assets/js/premium-system.js"></script>
