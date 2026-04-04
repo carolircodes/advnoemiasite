@@ -4,3 +4,10 @@ apps/portal-backend/.env.local
 apps/portal-backend/.env
 npm-debug.log*
 
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
