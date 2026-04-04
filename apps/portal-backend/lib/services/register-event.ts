@@ -1,8 +1,10 @@
 import "server-only";
 
+import { assertStaffActor } from "@/lib/auth/guards";
 import { recordPortalEventSchema } from "@/lib/domain/portal";
 import { queueCaseEventNotification } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function resolveOccurredAt(value: string) {
   if (!value) {
@@ -13,6 +15,7 @@ function resolveOccurredAt(value: string) {
 }
 
 export async function registerPortalEvent(rawInput: unknown, actorProfileId: string) {
+  await assertStaffActor(actorProfileId);
   const input = recordPortalEventSchema.parse(rawInput);
   const supabase = createAdminSupabaseClient();
   const occurredAt = resolveOccurredAt(input.occurredAt);
@@ -160,7 +163,7 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
 }
 
 export async function listLatestCaseEvents(limit = 8) {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("case_events")
     .select(

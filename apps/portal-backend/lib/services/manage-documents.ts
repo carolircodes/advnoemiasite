@@ -1,5 +1,6 @@
 import "server-only";
 
+import { assertStaffActor } from "@/lib/auth/guards";
 import {
   documentStatusLabels,
   formatPortalDateTime,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/domain/portal";
 import { queueCaseEventNotification } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function resolveDateTime(value: string) {
   if (!value) {
@@ -163,6 +165,7 @@ async function rollbackNotificationAndEvent(eventId: string | null, notification
 }
 
 export async function registerCaseDocument(rawInput: unknown, actorProfileId: string) {
+  await assertStaffActor(actorProfileId);
   const input = registerCaseDocumentSchema.parse(rawInput);
   const documentDate = resolveDateTime(input.documentDate);
   const visibleToClient = input.visibleToClient;
@@ -286,6 +289,7 @@ export async function registerCaseDocument(rawInput: unknown, actorProfileId: st
 }
 
 export async function requestCaseDocument(rawInput: unknown, actorProfileId: string) {
+  await assertStaffActor(actorProfileId);
   const input = requestCaseDocumentSchema.parse(rawInput);
   const dueAt = input.dueAt ? resolveDateTime(input.dueAt) : null;
   const visibleToClient = input.visibleToClient;
@@ -398,7 +402,7 @@ export async function requestCaseDocument(rawInput: unknown, actorProfileId: str
 }
 
 export async function listLatestDocuments(limit = 20) {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("documents")
     .select("id,case_id,file_name,category,status,visibility,document_date,created_at")
@@ -416,7 +420,7 @@ export async function listLatestDocuments(limit = 20) {
 }
 
 export async function listLatestDocumentRequests(limit = 20) {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("document_requests")
     .select("id,case_id,title,status,visible_to_client,due_at,created_at")

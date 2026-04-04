@@ -10,10 +10,10 @@ import {
   portalEventTypeLabels
 } from "@/lib/domain/portal";
 import type { PortalProfile } from "@/lib/auth/guards";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function getStaffOverview() {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const [
     clientsResult,
     casesResult,
@@ -201,7 +201,7 @@ export async function getStaffOverview() {
 }
 
 export async function getClientWorkspace(profile: PortalProfile) {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: clientRecord, error: clientError } = await supabase
     .from("clients")
     .select("id,status,notes,created_at")

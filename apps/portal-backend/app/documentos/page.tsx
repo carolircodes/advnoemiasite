@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
+import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
 import {
   documentRequestStatusLabels,
@@ -96,7 +97,9 @@ export default async function DocumentsPage({
   if (isStaffRole(profile.role)) {
     const overview = await getStaffOverview();
     const params = searchParams ? await searchParams : {};
-    const error = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+    const rawError =
+      typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+    const error = getAccessMessage(rawError) || rawError;
     const success =
       typeof params.success === "string" ? getSuccessMessage(params.success) : "";
     const hasCases = overview.caseOptions.length > 0;
@@ -377,6 +380,9 @@ export default async function DocumentsPage({
   }
 
   const workspace = await getClientWorkspace(profile);
+  const params = searchParams ? await searchParams : {};
+  const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+  const error = getAccessMessage(rawError) || rawError;
   const availableDocuments = workspace.documents.filter(
     (document) => document.status === "recebido" || document.status === "revisado"
   );
@@ -391,6 +397,7 @@ export default async function DocumentsPage({
       title="Documentos e pendencias do seu caso."
       description="Aqui voce acompanha os documentos liberados pela equipe, as pendencias documentais e as solicitacoes abertas do seu atendimento."
     >
+      {error ? <div className="error-notice">{error}</div> : null}
       <div className="metric-grid">
         <div className="metric-card">
           <span>Disponiveis</span>

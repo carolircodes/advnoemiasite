@@ -1,5 +1,6 @@
 import "server-only";
 
+import { assertStaffActor } from "@/lib/auth/guards";
 import { getServerEnv } from "@/lib/config/env";
 import {
   caseAreaLabels,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/domain/portal";
 import { queueClientInviteTracking } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function buildInviteErrorMessage(
   inviteError: {
@@ -38,6 +40,7 @@ function buildInviteErrorMessage(
 }
 
 export async function createClientWithInvite(rawInput: unknown, actorProfileId: string) {
+  await assertStaffActor(actorProfileId);
   const input = createClientSchema.parse(rawInput);
   const env = getServerEnv();
   const supabase = createAdminSupabaseClient();
@@ -208,7 +211,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
 }
 
 export async function listLatestClients(limit = 8) {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: clients, error } = await supabase
     .from("clients")
     .select("id,profile_id,status,created_at")

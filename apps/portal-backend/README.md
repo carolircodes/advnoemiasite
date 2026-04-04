@@ -18,6 +18,7 @@ O fluxo local validado para este projeto e:
 - solicitacoes documentais visiveis no portal
 - agenda real de compromissos e proximos passos
 - compromissos visiveis ao cliente em `/agenda`
+- rotas internas e areas autenticadas protegidas por sessao, role e RLS
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
 
@@ -25,6 +26,7 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 
 - `app/`: rotas e telas do portal
 - `lib/auth/`: guards e resolucao de perfil
+- `lib/auth/access-control.ts`: matriz central de acesso, `next` seguro e redirects
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
 - `lib/services/manage-documents.ts`: registro e solicitacao de documentos do caso
@@ -147,6 +149,16 @@ Configuracao local relevante em `supabase/config.toml`:
 - `[auth.email.smtp].port = 1025`
 - redirects incluindo `http://127.0.0.1:3000/auth/callback` e `http://localhost:3000/auth/callback`
 
+## Controle de acesso validado
+
+- `/internal/advogada` e `/api/internal/*` exigem sessao autenticada com role `advogada` ou `admin`
+- `/cliente` exige sessao autenticada com role `cliente`
+- `/documentos` e `/agenda` exigem sessao autenticada e respeitam o role do usuario
+- clientes sem `first_login_completed_at` sao redirecionados para `/auth/primeiro-acesso`
+- leituras autenticadas do app passam por RLS real, sem `service_role` nas telas do portal
+- mutacoes sensiveis ficam concentradas no backend com checagem adicional de actor autorizado
+- sessoes autenticadas comuns nao recebem permissao SQL direta de escrita nas tabelas do schema `public`
+
 ## Fluxo local validado
 
 ### Advogada
@@ -243,6 +255,20 @@ Configuracao local relevante em `supabase/config.toml`:
 6. Confirme as duas visoes:
    - `Proximos compromissos`
    - `Historico recente`
+
+### Checklist de seguranca local
+
+1. Acesse `/internal/advogada`, `/cliente`, `/documentos` e `/agenda` sem login.
+2. Confirme que todas as rotas redirecionam para `/auth/login`.
+3. Acesse `/api/internal/clients` sem login.
+4. Confirme retorno `401`.
+5. Entre como advogada.
+6. Confirme acesso a `/internal/advogada`.
+7. Confirme que a advogada nao abre `/cliente` e e redirecionada para a area interna.
+8. Entre como cliente.
+9. Confirme acesso apenas a `/cliente`, `/documentos` e `/agenda`.
+10. Confirme que o cliente nao abre `/internal/advogada` e recebe bloqueio em `/api/internal/*`.
+11. Cadastre dois clientes diferentes e confirme que um nao visualiza dados do outro nas telas nem nas consultas autenticadas do Supabase.
 
 ## Diagnostico rapido de invite
 

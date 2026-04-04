@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
+import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
 import {
   caseAreaLabels,
@@ -99,7 +100,8 @@ export default async function InternalLawyerPage({
   const profile = await requireProfile(["advogada", "admin"]);
   const overview = await getStaffOverview();
   const params = await searchParams;
-  const error = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+  const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+  const error = getAccessMessage(rawError) || rawError;
   const success = typeof params.success === "string" ? getSuccessMessage(params.success) : "";
   const hasCases = overview.caseOptions.length > 0;
 

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
+import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
 import {
   appointmentStatuses,
@@ -67,7 +68,9 @@ export default async function AgendaPage({
   if (isStaffRole(profile.role)) {
     const overview = await getStaffOverview();
     const params = searchParams ? await searchParams : {};
-    const error = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+    const rawError =
+      typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+    const error = getAccessMessage(rawError) || rawError;
     const success =
       typeof params.success === "string" ? getSuccessMessage(params.success) : "";
     const hasCases = overview.caseOptions.length > 0;
@@ -298,6 +301,9 @@ export default async function AgendaPage({
   }
 
   const workspace = await getClientWorkspace(profile);
+  const params = searchParams ? await searchParams : {};
+  const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+  const error = getAccessMessage(rawError) || rawError;
   const now = new Date();
   const upcomingAppointments = workspace.appointments.filter(
     (appointment) => new Date(appointment.starts_at) >= now
@@ -313,6 +319,7 @@ export default async function AgendaPage({
       title="Compromissos e proximos passos do seu caso."
       description="Aqui voce acompanha compromissos futuros, prazos e o historico recente liberado pela equipe para o seu atendimento."
     >
+      {error ? <div className="error-notice">{error}</div> : null}
       <div className="metric-grid">
         <div className="metric-card">
           <span>Proximos compromissos</span>

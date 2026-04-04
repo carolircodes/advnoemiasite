@@ -1,5 +1,6 @@
 import "server-only";
 
+import { assertStaffActor } from "@/lib/auth/guards";
 import {
   appointmentStatusLabels,
   appointmentTypeLabels,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/domain/portal";
 import { queueCaseEventNotification } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 async function resolveCaseContext(caseId: string) {
   const supabase = createAdminSupabaseClient();
@@ -166,6 +168,7 @@ async function rollbackAppointmentArtifacts(appointmentId: string, eventId: stri
 }
 
 export async function registerCaseAppointment(rawInput: unknown, actorProfileId: string) {
+  await assertStaffActor(actorProfileId);
   const input = registerCaseAppointmentSchema.parse(rawInput);
   const visibleToClient = input.visibleToClient;
   const shouldNotifyClient = visibleToClient && input.shouldNotifyClient;
@@ -273,7 +276,7 @@ export async function registerCaseAppointment(rawInput: unknown, actorProfileId:
 }
 
 export async function listLatestAppointments(limit = 20) {
-  const supabase = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("appointments")
     .select(

@@ -3,9 +3,17 @@ import "server-only";
 import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
+import {
+  buildAccessDeniedPath,
+  buildLoginRedirectPath,
+  getDefaultDestinationForProfile,
+  isStaffRole
+} from "@/lib/auth/access-control";
 import { isPortalRole, type PortalRole } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export { getDefaultDestinationForProfile, isStaffRole } from "@/lib/auth/access-control";
 
 export type PortalProfile = {
   id: string;
@@ -17,20 +25,6 @@ export type PortalProfile = {
   invited_at: string | null;
   first_login_completed_at: string | null;
 };
-
-export function isStaffRole(role: PortalRole) {
-  return role === "admin" || role === "advogada";
-}
-
-export function getDefaultDestinationForProfile(
-  profile: Pick<PortalProfile, "role" | "first_login_completed_at">
-) {
-  if (profile.role === "cliente" && !profile.first_login_completed_at) {
-    return "/auth/primeiro-acesso";
-  }
-
-  return isStaffRole(profile.role) ? "/internal/advogada" : "/cliente";
-}
 
 export async function getProfileById(profileId: string) {
   const supabase = createAdminSupabaseClient();
@@ -110,18 +104,79 @@ export async function getCurrentProfile() {
     return null;
   }
 
-  return ensureProfileForUser(user);
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id,email,full_name,phone,role,is_active,invited_at,first_login_completed_at"
+    )
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Nao foi possivel carregar o perfil autenticado: ${error.message}`);
+  }
+
+  return (data as PortalProfile | null) || null;
 }
 
 export async function requireProfile(allowedRoles?: PortalRole[]) {
   const profile = await getCurrentProfile();
 
-  if (!profile || !profile.is_active) {
-    redirect("/auth/login?error=acesso-restrito");
+  if (!profile) {
+    redirect(buildLoginRedirectPath(null, "login-obrigatorio"));
+  }
+
+  if (!profile.is_active) {
+    redirect(buildLoginRedirectPath(null, "perfil-inativo"));
   }
 
   if (allowedRoles && !allowedRoles.includes(profile.role)) {
-    redirect(getDefaultDestinationForProfile(profile));
+    redirect(buildAccessDeniedPath(profile));
+  }
+
+  return profile;
+}
+
+export async function requireInternalApiProfile() {
+  const profile = await getCurrentProfile();
+
+  if (!profile) {
+    return {
+      ok: false as const,
+      status: 401,
+      error: "Faca login para acessar a API interna."
+    };
+  }
+
+  if (!profile.is_active) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Seu perfil do portal esta inativo."
+    };
+  }
+
+  if (!isStaffRole(profile.role)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Apenas perfis internos autorizados podem acessar esta API."
+    };
+  }
+
+  return {
+    ok: true as const,
+    profile
+  };
+}
+
+export async function assertStaffActor(actorProfileId: string) {
+  const profile = await getProfileById(actorProfileId);
+
+  if (!profile || !profile.is_active || !isStaffRole(profile.role)) {
+    throw new Error(
+      "Apenas perfis internos ativos e autorizados podem executar esta operacao."
+    );
   }
 
   return profile;

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
+import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
 import {
   caseAreaLabels,
@@ -37,6 +38,8 @@ export default async function ClientPage({
   const workspace = await getClientWorkspace(profile);
   const params = await searchParams;
   const success = typeof params.success === "string" ? params.success : "";
+  const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
+  const error = getAccessMessage(rawError) || rawError;
   const nextAppointment = workspace.appointments[0];
 
   return (
@@ -49,6 +52,7 @@ export default async function ClientPage({
         { href: "/agenda", label: "Minha agenda", tone: "secondary" }
       ]}
     >
+      {error ? <div className="error-notice">{error}</div> : null}
       {success ? (
         <div className="success-notice">
           Acesso atualizado com sucesso. Seu portal ja esta pronto para receber novas atualizacoes de caso.

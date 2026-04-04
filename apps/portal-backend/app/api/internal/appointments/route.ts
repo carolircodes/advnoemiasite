@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentProfile, isStaffRole } from "@/lib/auth/guards";
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import {
   listLatestAppointments,
   registerCaseAppointment
 } from "@/lib/services/manage-appointments";
 
 export async function GET() {
-  const profile = await getCurrentProfile();
+  const access = await requireInternalApiProfile();
 
-  if (!profile || !isStaffRole(profile.role)) {
-    return NextResponse.json({ error: "Acesso interno obrigatorio." }, { status: 401 });
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const items = await listLatestAppointments(20);
@@ -18,15 +18,15 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const profile = await getCurrentProfile();
+  const access = await requireInternalApiProfile();
 
-  if (!profile || !isStaffRole(profile.role)) {
-    return NextResponse.json({ error: "Acesso interno obrigatorio." }, { status: 401 });
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   try {
     const payload = await request.json();
-    const result = await registerCaseAppointment(payload, profile.id);
+    const result = await registerCaseAppointment(payload, access.profile.id);
     return NextResponse.json({ ok: true, result }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

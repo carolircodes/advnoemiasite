@@ -2,19 +2,14 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import {
-  ensureProfileForUser,
-  getDefaultDestinationForProfile
+  getPostAuthDestination,
+  normalizeNextPath
+} from "@/lib/auth/access-control";
+import {
+  ensureProfileForUser
 } from "@/lib/auth/guards";
 import { getServerEnv } from "@/lib/config/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-
-function normalizeNextPath(next: string | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return null;
-  }
-
-  return next;
-}
 
 function normalizeOtpType(type: string | null): EmailOtpType | null {
   if (!type) {
@@ -68,20 +63,16 @@ export async function GET(request: Request) {
   }
 
   const profile = await ensureProfileForUser(user);
-
-  let destination =
-    next ||
-    (otpType === "recovery"
-      ? "/auth/atualizar-senha"
-      : getDefaultDestinationForProfile(profile));
-
-  if (
-    profile.role === "cliente" &&
-    !profile.first_login_completed_at &&
-    next !== "/auth/atualizar-senha"
-  ) {
-    destination = "/auth/primeiro-acesso";
+  if (!profile.is_active) {
+    return NextResponse.redirect(
+      new URL("/auth/login?error=perfil-inativo", appOrigin)
+    );
   }
+
+  const destination =
+    otpType === "recovery"
+      ? "/auth/atualizar-senha"
+      : getPostAuthDestination(profile, next);
 
   return NextResponse.redirect(new URL(destination, appOrigin));
 }
