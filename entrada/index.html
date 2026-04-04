@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Atendimento Jurídico Inteligente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0b1a13;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      max-width: 500px;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      opacity: 0.8;
+      margin-bottom: 25px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #c6a75e, #e6c97a);
+      color: #000;
+      padding: 15px;
+      border-radius: 10px;
+      font-weight: bold;
+      text-decoration: none;
+      display: block;
+    }
+
+    .badge {
+      font-size: 12px;
+      opacity: 0.6;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1 id="titulo">Analisando seu caso...</h1>
+    <p id="descricao">Estamos preparando as informações para você.</p>
+
+    <a id="cta" class="btn" href="#">Continuar</a>
+
+    <div class="badge">Atendimento jurídico inteligente</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const tema = params.get("tema");
+
+    const titulo = document.getElementById("titulo");
+    const descricao = document.getElementById("descricao");
+    const cta = document.getElementById("cta");
+
+    if (tema === "aposentadoria") {
+      titulo.innerText = "Você pode ter direito a valores não recebidos";
+      descricao.innerText = "Vou analisar sua situação e te mostrar exatamente o que pode ser feito.";
+      cta.href = "/triagem.html?tema=aposentadoria";
+    }
+
+    if (tema === "banco") {
+      titulo.innerText = "O banco pode estar te cobrando indevidamente";
+      descricao.innerText = "Vamos verificar isso agora e entender o seu caso.";
+      cta.href = "/triagem.html?tema=banco";
+    }
+
+    if (tema === "familia") {
+      titulo.innerText = "Seu caso precisa ser tratado com estratégia";
+      descricao.innerText = "Vou te orientar da melhor forma possível.";
+      cta.href = "/triagem.html?tema=familia";
+    }
+  </script>
+</body>
+</html>
