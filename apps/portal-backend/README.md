@@ -18,6 +18,7 @@ O fluxo local validado para este projeto e:
 - solicitacoes documentais visiveis no portal
 - agenda real de compromissos e proximos passos
 - compromissos visiveis ao cliente em `/agenda`
+- edicao, reagendamento e cancelamento com historico persistido da agenda
 - rotas internas e areas autenticadas protegidas por sessao, role e RLS
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
@@ -31,6 +32,7 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
 - `lib/services/manage-documents.ts`: registro e solicitacao de documentos do caso
 - `lib/services/manage-appointments.ts`: compromissos, prazos e proximos passos do caso
+- `supabase/migrations/20260408_appointment_lifecycle.sql`: historico persistido da agenda
 - `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
 - `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
 - `lib/supabase/`: clientes browser, server, admin e middleware
@@ -249,10 +251,19 @@ Configuracao local relevante em `supabase/config.toml`:
 3. Envie o formulario.
 4. Confirme que:
    - o compromisso foi criado em `appointments`
+   - uma trilha foi criada em `appointment_history`
    - um evento visivel foi criado em `case_events` quando aplicavel
    - a fila foi alimentada em `notifications_outbox` quando a notificacao estiver habilitada
-5. Entre como cliente e abra `/agenda`.
-6. Confirme as duas visoes:
+5. No bloco `Editar, reagendar ou cancelar`, altere o mesmo compromisso:
+   - mude titulo, tipo, descricao, data/hora, status ou visibilidade
+   - use `Salvar alteracoes` para edicao ou reagendamento
+   - use `Cancelar compromisso` para cancelamento
+6. Confirme que:
+   - novas linhas foram criadas em `appointment_history`
+   - mudancas visiveis geraram novos eventos em `case_events`
+   - reagendamento e cancelamento podem gerar novos itens em `notifications_outbox`
+7. Entre como cliente e abra `/agenda`.
+8. Confirme as duas visoes:
    - `Proximos compromissos`
    - `Historico recente`
 

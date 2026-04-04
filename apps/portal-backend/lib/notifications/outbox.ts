@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { PortalEventType } from "@/lib/domain/portal";
-import { portalEventTypeLabels } from "@/lib/domain/portal";
+import type { AnyCaseEventType } from "@/lib/domain/portal";
+import { caseEventTypeLabels } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type QueueEmailInput = {
@@ -15,10 +15,13 @@ type QueueEmailInput = {
   relatedId?: string | null;
 };
 
-const templateKeyByEvent: Record<PortalEventType, string> = {
+const templateKeyByEvent: Record<AnyCaseEventType, string> = {
   case_update: "case-update",
   new_document: "new-document",
   new_appointment: "new-appointment",
+  appointment_updated: "appointment-updated",
+  appointment_rescheduled: "appointment-rescheduled",
+  appointment_cancelled: "appointment-cancelled",
   document_request: "document-request",
   status_change: "status-change"
 };
@@ -74,7 +77,7 @@ export async function queueClientInviteTracking(input: {
 export async function queueCaseEventNotification(input: {
   clientProfileId: string;
   clientEmail: string;
-  eventType: PortalEventType;
+  eventType: AnyCaseEventType;
   title: string;
   publicSummary: string;
   relatedId: string;
@@ -83,12 +86,12 @@ export async function queueCaseEventNotification(input: {
     eventType: input.eventType,
     recipientProfileId: input.clientProfileId,
     recipientEmail: input.clientEmail,
-    subject: `${portalEventTypeLabels[input.eventType]}: ${input.title}`,
+    subject: `${caseEventTypeLabels[input.eventType]}: ${input.title}`,
     templateKey: templateKeyByEvent[input.eventType],
     payload: {
       title: input.title,
       publicSummary: input.publicSummary,
-      eventLabel: portalEventTypeLabels[input.eventType]
+      eventLabel: caseEventTypeLabels[input.eventType]
     },
     relatedTable: "case_events",
     relatedId: input.relatedId

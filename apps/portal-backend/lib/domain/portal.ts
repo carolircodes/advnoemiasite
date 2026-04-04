@@ -35,6 +35,11 @@ export const portalEventTypes = [
   "document_request",
   "status_change"
 ] as const;
+export const appointmentLifecycleEventTypes = [
+  "appointment_updated",
+  "appointment_rescheduled",
+  "appointment_cancelled"
+] as const;
 export const documentStatuses = [
   "recebido",
   "pendente",
@@ -64,15 +69,24 @@ export const appointmentTypes = [
   "audiencia",
   "ligacao"
 ] as const;
+export const appointmentChangeTypes = [
+  "created",
+  "updated",
+  "rescheduled",
+  "cancelled"
+] as const;
 
 export type PortalRole = (typeof portalRoles)[number];
 export type CaseArea = (typeof caseAreas)[number];
 export type ClientStatus = (typeof clientStatuses)[number];
 export type CaseStatus = (typeof caseStatuses)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
+export type AppointmentLifecycleEventType = (typeof appointmentLifecycleEventTypes)[number];
+export type AnyCaseEventType = PortalEventType | AppointmentLifecycleEventType;
 export type DocumentStatus = (typeof documentStatuses)[number];
 export type DocumentRequestStatus = (typeof documentRequestStatuses)[number];
 export type AppointmentType = (typeof appointmentTypes)[number];
+export type AppointmentChangeType = (typeof appointmentChangeTypes)[number];
 
 export function isPortalRole(value: unknown): value is PortalRole {
   return typeof value === "string" && portalRoles.includes(value as PortalRole);
@@ -107,9 +121,18 @@ export const caseStatusLabels: Record<CaseStatus, string> = {
 export const portalEventTypeLabels: Record<PortalEventType, string> = {
   case_update: "Atualizacao do caso",
   new_document: "Novo documento",
-  new_appointment: "Novo agendamento",
+  new_appointment: "Compromisso criado",
   document_request: "Solicitacao de documento",
   status_change: "Mudanca de status"
+};
+export const appointmentLifecycleEventLabels: Record<AppointmentLifecycleEventType, string> = {
+  appointment_updated: "Compromisso atualizado",
+  appointment_rescheduled: "Compromisso reagendado",
+  appointment_cancelled: "Compromisso cancelado"
+};
+export const caseEventTypeLabels: Record<AnyCaseEventType, string> = {
+  ...portalEventTypeLabels,
+  ...appointmentLifecycleEventLabels
 };
 
 export const documentStatusLabels: Record<DocumentStatus, string> = {
@@ -138,6 +161,12 @@ export const appointmentTypeLabels: Record<AppointmentType, string> = {
   prazo: "Prazo",
   audiencia: "Audiencia",
   ligacao: "Ligacao"
+};
+export const appointmentChangeLabels: Record<AppointmentChangeType, string> = {
+  created: "Criado",
+  updated: "Editado",
+  rescheduled: "Reagendado",
+  cancelled: "Cancelado"
 };
 
 export function formatPortalDateTime(value: string) {
@@ -271,6 +300,31 @@ export const registerCaseAppointmentSchema = z.object({
     errorMap: () => ({ message: "Selecione o status do compromisso." })
   }),
   visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const updateCaseAppointmentSchema = z.object({
+  appointmentId: z.string().uuid("Informe um identificador de compromisso valido."),
+  title: z.string().trim().min(3, "Informe o titulo do compromisso."),
+  appointmentType: z.enum(appointmentTypes, {
+    errorMap: () => ({ message: "Selecione o tipo de compromisso." })
+  }),
+  description: z.string().trim().max(1000).optional().default(""),
+  startsAt: z
+    .string()
+    .trim()
+    .refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: "Informe uma data e hora validas."
+    }),
+  status: z.enum(appointmentStatuses, {
+    errorMap: () => ({ message: "Selecione o status do compromisso." })
+  }),
+  visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const cancelCaseAppointmentSchema = z.object({
+  appointmentId: z.string().uuid("Informe um identificador de compromisso valido."),
   shouldNotifyClient: z.coerce.boolean().default(true)
 });
 
