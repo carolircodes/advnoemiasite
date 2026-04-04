@@ -19,6 +19,7 @@ import {
 } from "@/lib/entry-context";
 import { ensureProfileForUser, getCurrentProfile } from "@/lib/auth/guards";
 import { loginSchema } from "@/lib/domain/portal";
+import { getPublicMarketingSiteOrigin } from "@/lib/portal/app-urls";
 import { recordProductEvent } from "@/lib/services/public-intake";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -164,6 +165,24 @@ export default async function LoginPage({
   const success = typeof params.success === "string" ? params.success : "";
   const successMessage = getLoginSuccessMessage(success);
 
+  const publicSiteOrigin = getPublicMarketingSiteOrigin();
+  const frameActions: Array<{
+    href: string;
+    label: string;
+    tone?: "primary" | "secondary";
+  }> = [
+    { href: recoverAccessHref, label: "Recuperar acesso", tone: "secondary" },
+    { href: triageHref, label: "Ainda nao sou cliente", tone: "secondary" }
+  ];
+
+  if (publicSiteOrigin) {
+    frameActions.push({
+      href: `${publicSiteOrigin}/`,
+      label: "Site institucional",
+      tone: "secondary"
+    });
+  }
+
   return (
     <AppFrame
       eyebrow="Acesso seguro"
@@ -180,10 +199,7 @@ export default async function LoginPage({
         { label: "Recuperacao", value: "Link por e-mail" },
         { label: "Ambiente", value: "Clientes e equipe" }
       ]}
-      actions={[
-        { href: recoverAccessHref, label: "Recuperar acesso", tone: "secondary" },
-        { href: triageHref, label: "Ainda nao sou cliente", tone: "secondary" }
-      ]}
+      actions={frameActions}
     >
       {successMessage ? <div className="success-notice">{successMessage}</div> : null}
       {errorMessage ? <div className="error-notice">{errorMessage}</div> : null}

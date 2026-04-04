@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { corsPreflightResponse, withPublicApiCors } from "@/lib/http/cors-public";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { recordProductEvent } from "@/lib/services/public-intake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflightResponse(request);
+}
 
 export async function POST(request: Request) {
   try {
@@ -32,15 +37,16 @@ export async function POST(request: Request) {
       profileId
     });
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         ok: true,
         eventId: result.id
       },
       { status: 201 }
     );
+    return withPublicApiCors(request, res);
   } catch (error) {
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         ok: false,
         error:
@@ -50,5 +56,6 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+    return withPublicApiCors(request, res);
   }
 }

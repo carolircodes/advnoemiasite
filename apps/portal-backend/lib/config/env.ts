@@ -3,6 +3,8 @@ import { z } from "zod";
 const envSchema = z
   .object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
+  /** Site institucional (marketing). Opcional: usado para links "voltar ao site" quando o portal está em subdomínio. */
+  NEXT_PUBLIC_PUBLIC_SITE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
@@ -73,6 +75,7 @@ const envSchema = z
 
 type ServerEnv = {
   NEXT_PUBLIC_APP_URL: string;
+  NEXT_PUBLIC_PUBLIC_SITE_URL?: string;
   NEXT_PUBLIC_SUPABASE_URL: string;
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: string;
   SUPABASE_SECRET_KEY: string;
@@ -152,6 +155,7 @@ export function getServerEnv(): ServerEnv {
 
   cachedServerEnv = {
     NEXT_PUBLIC_APP_URL: parsed.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_PUBLIC_SITE_URL: parsed.NEXT_PUBLIC_PUBLIC_SITE_URL,
     NEXT_PUBLIC_SUPABASE_URL: parsed.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableKey,
     SUPABASE_SECRET_KEY: secretKey,

@@ -3,6 +3,21 @@
   var PROJECT_MARKER = "/advnoemiasite/";
   var TRIAGE_API_PATH = "/api/public/triage";
   var EVENTS_API_PATH = "/api/public/events";
+  /** Produção: triagem/eventos no portal; local: mesma origem quando host é localhost. */
+  var PORTAL_API_ORIGIN_DEFAULT = "https://portal.advnoemia.com.br";
+
+  function getPortalApiOrigin() {
+    if (typeof window !== "undefined" && window.__ADV_PORTAL_ORIGIN__) {
+      return String(window.__ADV_PORTAL_ORIGIN__).replace(/\/$/, "");
+    }
+    if (typeof window !== "undefined") {
+      var host = window.location.hostname || "";
+      if (host === "localhost" || host === "127.0.0.1") {
+        return window.location.origin.replace(/\/$/, "");
+      }
+    }
+    return PORTAL_API_ORIGIN_DEFAULT;
+  }
   var SESSION_STORAGE_KEY = "site_product_session_id";
   var SESSION_FLAG_PREFIX = "site_product_flag:";
   var entryContext = window.EntryContext || {
@@ -164,56 +179,6 @@
       source: "artigo-revisao-pensao",
       theme: "familia"
     },
-    "portal/login.html": {
-      mode: "support",
-      source: "portal-login",
-      message: "Ola, estou na area reservada e preciso de apoio no acesso."
-    },
-    "portal/login/index.html": {
-      mode: "support",
-      source: "portal-login",
-      message: "Ola, estou na area reservada e preciso de apoio no acesso."
-    },
-    "portal/painel-advogada.html": {
-      mode: "support",
-      source: "portal-advogada",
-      message: "Ola, estou na area interna e preciso de apoio da equipe."
-    },
-    "portal/painel-advogada/index.html": {
-      mode: "support",
-      source: "portal-advogada",
-      message: "Ola, estou na area interna e preciso de apoio da equipe."
-    },
-    "portal/painel-cliente.html": {
-      mode: "support",
-      source: "portal-cliente",
-      message: "Ola, estou na area do cliente e preciso de orientacao."
-    },
-    "portal/painel-cliente/index.html": {
-      mode: "support",
-      source: "portal-cliente",
-      message: "Ola, estou na area do cliente e preciso de orientacao."
-    },
-    "portal/documentos.html": {
-      mode: "support",
-      source: "portal-documentos",
-      message: "Ola, estou na area de documentos e preciso de orientacao."
-    },
-    "portal/documentos/index.html": {
-      mode: "support",
-      source: "portal-documentos",
-      message: "Ola, estou na area de documentos e preciso de orientacao."
-    },
-    "portal/agenda.html": {
-      mode: "support",
-      source: "portal-agenda",
-      message: "Ola, estou na area de agenda e preciso de orientacao."
-    },
-    "portal/agenda/index.html": {
-      mode: "support",
-      source: "portal-agenda",
-      message: "Ola, estou na area de agenda e preciso de orientacao."
-    }
   };
 
   function createSessionId() {
@@ -241,7 +206,7 @@
   }
 
   function buildApiUrl(path) {
-    return new URL(path, window.location.origin).toString();
+    return new URL(path, getPortalApiOrigin()).toString();
   }
 
   function trackEvent(input) {

@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { corsPreflightResponse, withPublicApiCors } from "@/lib/http/cors-public";
 import { submitPublicTriage } from "@/lib/services/public-intake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflightResponse(request);
+}
 
 function getClientIp(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -32,15 +37,16 @@ export async function POST(request: Request) {
       ipAddress: getClientIp(request)
     });
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         ok: true,
         intakeRequestId: result.id
       },
       { status: 201 }
     );
+    return withPublicApiCors(request, res);
   } catch (error) {
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         ok: false,
         error:
@@ -50,5 +56,6 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+    return withPublicApiCors(request, res);
   }
 }

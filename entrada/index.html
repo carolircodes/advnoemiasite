@@ -61,10 +61,12 @@
     <div class="badge">Atendimento juridico inteligente</div>
   </div>
 
+  <script src="../assets/js/portal-origin.js"></script>
   <script src="../assets/js/entry-context.js"></script>
   <script>
     (function () {
       const EVENTS_API_PATH = "/api/public/events";
+      const eventsApiBase = (window.__ADV_PORTAL_ORIGIN__ || window.location.origin).replace(/\/$/, "");
       const SESSION_STORAGE_KEY = "site_product_session_id";
       const SESSION_FLAG_PREFIX = "site_product_flag:";
       const params = new URLSearchParams(window.location.search);
@@ -135,13 +137,13 @@
 
         if (typeof navigator !== "undefined" && navigator.sendBeacon) {
           navigator.sendBeacon(
-            new URL(EVENTS_API_PATH, window.location.origin).toString(),
+            new URL(EVENTS_API_PATH, eventsApiBase).toString(),
             new Blob([body], { type: "application/json" })
           );
           return;
         }
 
-        void fetch(new URL(EVENTS_API_PATH, window.location.origin).toString(), {
+        void fetch(new URL(EVENTS_API_PATH, eventsApiBase).toString(), {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

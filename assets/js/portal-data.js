@@ -26,14 +26,14 @@
       }
     },
     routes: {
-      site: "../index.html",
-      blog: "../blog.html",
-      triagem: "../triagem.html?area=geral&origem=portal-login&pagina=portal/login",
-      login: "/portal/login",
-      painelAdvogada: "/internal/advogada",
-      painelCliente: "/cliente",
-      documentos: "/documentos",
-      agenda: "/agenda"
+      site: "https://advnoemia.com.br/",
+      blog: "https://advnoemia.com.br/blog.html",
+      triagem: "https://advnoemia.com.br/triagem.html?area=geral&origem=portal-login&pagina=portal/login",
+      login: "https://portal.advnoemia.com.br/portal/login",
+      painelAdvogada: "https://portal.advnoemia.com.br/internal/advogada",
+      painelCliente: "https://portal.advnoemia.com.br/cliente",
+      documentos: "https://portal.advnoemia.com.br/documentos",
+      agenda: "https://portal.advnoemia.com.br/agenda"
     },
     statusMap: {
       confirmed: { label: "Confirmado", tone: "success" },
@@ -155,7 +155,7 @@
         tags: ["Cadastro interno", "Gestão de casos"],
         action: {
           label: "Abrir painel interno",
-          href: "painel-advogada.html",
+          href: "https://portal.advnoemia.com.br/internal/advogada",
           variant: "secondary"
         }
       }

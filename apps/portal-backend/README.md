@@ -2,6 +2,10 @@
 
 Base real do portal juridico com Supabase Auth, cadastro interno, convite por e-mail e area autenticada para equipe e cliente.
 
+Arquitetura do produto, inventário (o que existe / o que falta) e plano por etapas: [`docs/PORTAL_PRODUCT.md`](docs/PORTAL_PRODUCT.md).
+
+Checklist de deploy (apex + `portal.advnoemia.com.br`): [`docs/DEPLOY_PRODUCTION_CHECKLIST.md`](docs/DEPLOY_PRODUCTION_CHECKLIST.md).
+
 O fluxo local validado para este projeto e:
 
 - home publica com CTA para triagem e acesso do cliente
@@ -38,6 +42,8 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/auth/`: guards e resolucao de perfil
 - `lib/auth/access-control.ts`: matriz central de acesso, `next` seguro e redirects
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
+- `lib/portal/`: URLs canónicas (portal vs site público), mapa de rotas e referência de tabelas
+- `app/api/health/route.ts`: health check leve (fora do middleware Supabase)
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
 - `lib/services/manage-documents.ts`: registro e solicitacao de documentos do caso
 - `app/api/documents/[documentId]/route.ts`: acesso autenticado e seguro aos arquivos do storage

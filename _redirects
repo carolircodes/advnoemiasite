@@ -1,10 +1,17 @@
-/auth/login /portal/login 301
-/portal/login.html /portal/login 301
-/portal/painel-cliente /cliente 301
-/portal/painel-cliente.html /cliente 301
-/portal/documentos /documentos 301
-/portal/documentos.html /documentos 301
-/portal/agenda /agenda 301
-/portal/agenda.html /agenda 301
-/portal/painel-advogada /internal/advogada 301
-/portal/painel-advogada.html /internal/advogada 301
+# advnoemia.com.br (site estático) → portal em https://portal.advnoemia.com.br
+# Ajuste o host para staging, se necessário.
+
+/portal/login https://portal.advnoemia.com.br/portal/login 302
+/portal/login.html https://portal.advnoemia.com.br/portal/login 302
+/auth/login https://portal.advnoemia.com.br/portal/login 302
+/cliente https://portal.advnoemia.com.br/cliente 302
+/documentos https://portal.advnoemia.com.br/documentos 302
+/agenda https://portal.advnoemia.com.br/agenda 302
+/portal/painel-cliente https://portal.advnoemia.com.br/cliente 302
+/portal/painel-cliente.html https://portal.advnoemia.com.br/cliente 302
+/portal/documentos https://portal.advnoemia.com.br/documentos 302
+/portal/documentos.html https://portal.advnoemia.com.br/documentos 302
+/portal/agenda https://portal.advnoemia.com.br/agenda 302
+/portal/agenda.html https://portal.advnoemia.com.br/agenda 302
+/portal/painel-advogada https://portal.advnoemia.com.br/internal/advogada 302
+/portal/painel-advogada.html https://portal.advnoemia.com.br/internal/advogada 302
