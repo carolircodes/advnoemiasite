@@ -19,6 +19,7 @@ import {
 } from "@/lib/domain/portal";
 import {
   buildInternalAgendaHref,
+  buildInternalCaseHref,
   buildInternalClientHref,
   buildInternalDocumentsHref
 } from "@/lib/navigation";
@@ -42,6 +43,8 @@ export type StaffOperationalStateTone = "critical" | "warning" | "neutral" | "su
 export type StaffOperationalItem = {
   id: string;
   queue: StaffOperationalQueueKey;
+  clientId?: string | null;
+  caseId?: string | null;
   kindLabel: string;
   title: string;
   description: string;
@@ -745,6 +748,7 @@ export async function getStaffOverview() {
     operationalQueues[queue].push({
       id: `invite-${client.id}`,
       queue,
+      clientId: client.id,
       kindLabel: "Onboarding",
       title: `${client.fullName} ainda nao concluiu o primeiro acesso`,
       description: `O convite continua aberto em ${client.email} e o portal ainda nao foi ativado.`,
@@ -770,6 +774,8 @@ export async function getStaffOverview() {
         operationalQueues.recentlyCompleted.push({
           id: `request-completed-${request.id}`,
           queue: "recentlyCompleted",
+          clientId: request.clientId,
+          caseId: request.case_id,
           kindLabel: "Documento",
           title: `${request.title} - ${request.statusLabel}`,
           description: `${request.caseTitle} saiu da fila documental recente.`,
@@ -804,6 +810,8 @@ export async function getStaffOverview() {
     operationalQueues[queue].push({
       id: `request-${request.id}`,
       queue,
+      clientId: request.clientId,
+      caseId: request.case_id,
       kindLabel: "Documento",
       title: request.title,
       description: compactText(
@@ -834,6 +842,8 @@ export async function getStaffOverview() {
         operationalQueues.recentlyCompleted.push({
           id: `appointment-completed-${appointment.id}`,
           queue: "recentlyCompleted",
+          clientId: appointment.client_id,
+          caseId: appointment.case_id,
           kindLabel: "Agenda",
           title: `${appointment.title} - ${appointment.statusLabel}`,
           description: `${appointment.caseTitle} com ${appointment.clientName}.`,
@@ -868,6 +878,8 @@ export async function getStaffOverview() {
     operationalQueues[queue].push({
       id: `appointment-${appointment.id}`,
       queue,
+      clientId: appointment.client_id,
+      caseId: appointment.case_id,
       kindLabel: "Agenda",
       title: appointment.title,
       description: compactText(
@@ -907,10 +919,12 @@ export async function getStaffOverview() {
         operationalQueues.recentlyCompleted.push({
           id: `case-completed-${caseItem.id}`,
           queue: "recentlyCompleted",
+          clientId: caseItem.clientId,
+          caseId: caseItem.id,
           kindLabel: "Caso",
           title: `${caseItem.title} - ${caseItem.statusLabel}`,
           description: `${caseItem.clientName} concluiu o ciclo principal do acompanhamento.`,
-          href: buildInternalClientHref(caseItem.clientId, "casos"),
+          href: buildInternalCaseHref(caseItem.id),
           actionLabel: "Revisar caso",
           meta: [caseItem.clientName, caseItem.priorityLabel],
           timingLabel: `Atualizado ${formatElapsedLabel(lastActionDate, nowTimestamp)}`,
@@ -940,6 +954,8 @@ export async function getStaffOverview() {
       operationalQueues[queue].push({
         id: `case-waiting-client-${caseItem.id}`,
         queue,
+        clientId: caseItem.clientId,
+        caseId: caseItem.id,
         kindLabel: "Caso",
         title: caseItem.title,
         description: compactText(
@@ -948,7 +964,7 @@ export async function getStaffOverview() {
             "O caso esta parado aguardando retorno do cliente para seguir.",
           150
         ),
-        href: buildInternalClientHref(caseItem.clientId, "pendencias"),
+        href: buildInternalCaseHref(caseItem.id, "status"),
         actionLabel: "Cobrar retorno",
         meta: [caseItem.clientName, caseItem.statusLabel, caseItem.priorityLabel],
         timingLabel: `Sem retorno ${formatElapsedLabel(lastActionDate, nowTimestamp)}`,
@@ -981,6 +997,8 @@ export async function getStaffOverview() {
     operationalQueues[queue].push({
       id: `case-stale-${caseItem.id}`,
       queue,
+      clientId: caseItem.clientId,
+      caseId: caseItem.id,
       kindLabel: "Caso",
       title: caseItem.title,
       description: compactText(
@@ -990,7 +1008,7 @@ export async function getStaffOverview() {
           "O caso esta sem atualizacao recente e precisa de novo movimento interno.",
         150
       ),
-      href: buildInternalClientHref(caseItem.clientId, "casos"),
+      href: buildInternalCaseHref(caseItem.id, "andamento"),
       actionLabel: "Atualizar caso",
       meta: [caseItem.clientName, caseItem.statusLabel, caseItem.priorityLabel],
       timingLabel: `Sem atualizacao ${formatElapsedLabel(lastActionDate, nowTimestamp)}`,

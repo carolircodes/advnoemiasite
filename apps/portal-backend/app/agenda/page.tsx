@@ -16,7 +16,11 @@ import {
   appointmentTypeLabels,
   formatPortalDateTime
 } from "@/lib/domain/portal";
-import { buildInternalClientHref, buildInternalDocumentsHref } from "@/lib/navigation";
+import {
+  buildInternalCaseHref,
+  buildInternalClientHref,
+  buildInternalDocumentsHref
+} from "@/lib/navigation";
 import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
 import {
   cancelCaseAppointment,
@@ -366,6 +370,7 @@ export default async function AgendaPage({
             href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada",
             label: selectedClient ? "Cliente" : "Painel"
           },
+          ...(selectedCase ? [{ href: buildInternalCaseHref(selectedCase.id), label: "Caso" }] : []),
           {
             href: selectedClient
               ? buildInternalDocumentsHref(selectedClient.id, selectedCase?.id || null)
@@ -387,6 +392,9 @@ export default async function AgendaPage({
         actions={[
           { href: "#registrar-compromisso", label: "Criar compromisso" },
           { href: "#editar-compromisso", label: "Editar agenda", tone: "secondary" },
+          ...(selectedCase
+            ? [{ href: buildInternalCaseHref(selectedCase.id), label: "Abrir caso", tone: "secondary" as const }]
+            : []),
           {
             href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada#clientes-operacao",
             label: "Abrir ficha",

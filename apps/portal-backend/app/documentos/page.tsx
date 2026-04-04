@@ -16,7 +16,11 @@ import {
   formatFileSize,
   formatPortalDateTime
 } from "@/lib/domain/portal";
-import { buildInternalAgendaHref, buildInternalClientHref } from "@/lib/navigation";
+import {
+  buildInternalAgendaHref,
+  buildInternalCaseHref,
+  buildInternalClientHref
+} from "@/lib/navigation";
 import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
 import {
   registerCaseDocument,
@@ -241,6 +245,7 @@ export default async function DocumentsPage({
             href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada",
             label: selectedClient ? "Cliente" : "Painel"
           },
+          ...(selectedCase ? [{ href: buildInternalCaseHref(selectedCase.id), label: "Caso" }] : []),
           { href: "/documentos", label: "Documentos", active: true },
           {
             href: selectedClient
@@ -266,6 +271,9 @@ export default async function DocumentsPage({
         actions={[
           { href: "#registrar-documento", label: "Registrar documento" },
           { href: "#solicitar-documento", label: "Solicitar documento", tone: "secondary" },
+          ...(selectedCase
+            ? [{ href: buildInternalCaseHref(selectedCase.id), label: "Abrir caso", tone: "secondary" as const }]
+            : []),
           selectedClient
             ? {
                 href: buildInternalClientHref(selectedClient.id),

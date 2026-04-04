@@ -3,6 +3,33 @@ export function buildInternalClientHref(clientId: string, hash?: string) {
   return `/internal/advogada/clientes/${clientId}${safeHash}`;
 }
 
+export function buildInternalCasesHref(clientId?: string | null) {
+  const searchParams = new URLSearchParams();
+
+  if (clientId) {
+    searchParams.set("clientId", clientId);
+  }
+
+  const query = searchParams.toString();
+  return query ? `/internal/advogada/casos?${query}` : "/internal/advogada/casos";
+}
+
+export function buildInternalNewCaseHref(clientId?: string | null) {
+  const searchParams = new URLSearchParams();
+
+  if (clientId) {
+    searchParams.set("clientId", clientId);
+  }
+
+  const query = searchParams.toString();
+  return query ? `/internal/advogada/casos/novo?${query}` : "/internal/advogada/casos/novo";
+}
+
+export function buildInternalCaseHref(caseId: string, hash?: string) {
+  const safeHash = hash ? `#${hash}` : "";
+  return `/internal/advogada/casos/${caseId}${safeHash}`;
+}
+
 export function buildInternalAgendaHref(clientId?: string | null, caseId?: string | null) {
   const searchParams = new URLSearchParams();
 

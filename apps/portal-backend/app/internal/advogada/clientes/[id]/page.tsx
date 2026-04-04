@@ -15,8 +15,11 @@ import {
 } from "@/lib/domain/portal";
 import {
   buildInternalAgendaHref,
+  buildInternalCaseHref,
+  buildInternalCasesHref,
   buildInternalClientHref,
-  buildInternalDocumentsHref
+  buildInternalDocumentsHref,
+  buildInternalNewCaseHref
 } from "@/lib/navigation";
 import { getStaffOverview } from "@/lib/services/dashboard";
 
@@ -148,13 +151,14 @@ export default async function InternalClientPage({
     ...overview.operationalCenter.queues.awaitingClient,
     ...overview.operationalCenter.queues.awaitingTeam
   ]
-    .filter((item) => item.href.includes(client.id))
+    .filter((item) => item.clientId === client.id)
     .slice(0, 8);
   const primaryCaseId = client.primaryCaseId || clientCases[0]?.id || null;
+  const casesHref = buildInternalCasesHref(client.id);
+  const newCaseHref = buildInternalNewCaseHref(client.id);
   const agendaHref = buildInternalAgendaHref(client.id, primaryCaseId);
   const documentsHref = buildInternalDocumentsHref(client.id, primaryCaseId);
   const dashboardHref = "/internal/advogada";
-  const dashboardCaseHref = "/internal/advogada#gestao-casos";
   const sourceTriageHref = client.sourceIntakeRequestId
     ? `/internal/advogada?intakeRequestId=${client.sourceIntakeRequestId}#triagens-recebidas`
     : null;
@@ -176,6 +180,7 @@ export default async function InternalClientPage({
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
         { href: buildInternalClientHref(client.id), label: "Cliente", active: true },
+        { href: casesHref, label: "Casos" },
         { href: agendaHref, label: "Agenda" },
         { href: documentsHref, label: "Documentos" }
       ]}
@@ -190,6 +195,7 @@ export default async function InternalClientPage({
       ]}
       actions={[
         { href: dashboardHref, label: "Voltar ao painel", tone: "secondary" },
+        { href: casesHref, label: "Abrir casos", tone: "secondary" },
         { href: agendaHref, label: "Abrir agenda", tone: "secondary" },
         { href: documentsHref, label: "Abrir documentos", tone: "secondary" }
       ]}
@@ -271,6 +277,11 @@ export default async function InternalClientPage({
             </div>
 
             <div className="client-ops-grid">
+              <Link className="shortcut-card" href={casesHref}>
+                <span className="shortcut-kicker">Casos</span>
+                <strong>Abrir central de casos</strong>
+                <p>Ver lista, detalhe e andamento dos casos deste cliente em rotas proprias.</p>
+              </Link>
               <Link className="shortcut-card" href={dashboardHref}>
                 <span className="shortcut-kicker">Painel</span>
                 <strong>Voltar ao dashboard</strong>
@@ -293,8 +304,8 @@ export default async function InternalClientPage({
                 <Link className="button secondary" href={sourceTriageHref}>
                   Revisar triagem de origem
                 </Link>
-                <Link className="button secondary" href={dashboardCaseHref}>
-                  Ir para a operacao de casos
+                <Link className="button secondary" href={newCaseHref}>
+                  Abrir novo caso
                 </Link>
               </div>
             ) : null}
@@ -444,6 +455,12 @@ export default async function InternalClientPage({
                   <div className="form-actions">
                     <Link
                       className="button secondary"
+                      href={buildInternalCaseHref(caseItem.id)}
+                    >
+                      Abrir caso
+                    </Link>
+                    <Link
+                      className="button secondary"
                       href={buildInternalAgendaHref(client.id, caseItem.id)}
                     >
                       Agenda do caso
@@ -460,9 +477,17 @@ export default async function InternalClientPage({
             </ul>
           ) : (
             <p className="empty-state">
-              Nenhum caso foi vinculado a este cliente ainda. Abra o primeiro acompanhamento pela operacao de casos no painel.
+              Nenhum caso foi vinculado a este cliente ainda. Use a central de casos para abrir o primeiro acompanhamento.
             </p>
           )}
+          <div className="form-actions">
+            <Link className="button secondary" href={casesHref}>
+              Ver todos os casos
+            </Link>
+            <Link className="button secondary" href={newCaseHref}>
+              Abrir novo caso
+            </Link>
+          </div>
         </SectionCard>
 
         <SectionCard

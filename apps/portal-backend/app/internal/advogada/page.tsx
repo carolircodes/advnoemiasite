@@ -12,39 +12,26 @@ import { requireProfile } from "@/lib/auth/guards";
 import {
   caseAreaLabels,
   caseAreas,
-  casePriorities,
-  casePriorityLabels,
   caseStatusLabels,
   caseStatuses,
   clientStatusLabels,
   clientStatuses,
   formatPortalDateTime,
   intakeRequestStatusLabels,
-  intakeRequestStatuses,
-  portalEventTypeLabels,
-  portalEventTypes
+  intakeRequestStatuses
 } from "@/lib/domain/portal";
 import {
   buildInternalAgendaHref,
+  buildInternalCaseHref,
+  buildInternalCasesHref,
   buildInternalClientHref,
-  buildInternalDocumentsHref
+  buildInternalDocumentsHref,
+  buildInternalNewCaseHref
 } from "@/lib/navigation";
-import {
-  createCaseForClient,
-  updateCaseDetails,
-  updateCaseStatus
-} from "@/lib/services/manage-cases";
 import { createClientWithInvite } from "@/lib/services/create-client";
 import { getStaffOverview } from "@/lib/services/dashboard";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
 import { updateIntakeRequestStatus } from "@/lib/services/public-intake";
-import { registerPortalEvent } from "@/lib/services/register-event";
-
-function buildDefaultDateTimeValue() {
-  const now = new Date();
-  const localValue = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return localValue.toISOString().slice(0, 16);
-}
 
 function getStringParam(
   value: string | string[] | undefined,
@@ -174,118 +161,6 @@ async function createClientAction(formData: FormData) {
 
   redirect("/internal/advogada?success=cliente-cadastrado");
 }
-async function updateCaseStatusAction(formData: FormData) {
-  "use server";
-
-  const profile = await requireProfile(["advogada", "admin"]);
-
-  try {
-    await updateCaseStatus(
-      {
-        caseId: formData.get("caseId"),
-        status: formData.get("status"),
-        internalNote: formData.get("internalNote"),
-        visibleToClient: formData.get("visibleToClient") === "on",
-        shouldNotifyClient: formData.get("shouldNotifyClient") === "on"
-      },
-      profile.id
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-atualizar-status";
-    redirect(`/internal/advogada?error=${message}`);
-  }
-
-  redirect("/internal/advogada?success=status-atualizado");
-}
-
-async function createCaseAction(formData: FormData) {
-  "use server";
-
-  const profile = await requireProfile(["advogada", "admin"]);
-
-  try {
-    await createCaseForClient(
-      {
-        clientId: formData.get("clientId"),
-        area: formData.get("area"),
-        title: formData.get("title"),
-        summary: formData.get("summary"),
-        priority: formData.get("priority"),
-        status: formData.get("status"),
-        visibleToClient: formData.get("visibleToClient") === "on",
-        shouldNotifyClient: formData.get("shouldNotifyClient") === "on"
-      },
-      profile.id
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-abrir-caso";
-    redirect(`/internal/advogada?error=${message}`);
-  }
-
-  redirect("/internal/advogada?success=caso-criado");
-}
-
-async function updateCaseDetailsAction(formData: FormData) {
-  "use server";
-
-  const profile = await requireProfile(["advogada", "admin"]);
-
-  try {
-    await updateCaseDetails(
-      {
-        caseId: formData.get("caseId"),
-        area: formData.get("area"),
-        title: formData.get("title"),
-        summary: formData.get("summary"),
-        priority: formData.get("priority"),
-        changeSummary: formData.get("changeSummary"),
-        visibleToClient: formData.get("visibleToClient") === "on",
-        shouldNotifyClient: formData.get("shouldNotifyClient") === "on"
-      },
-      profile.id
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-editar-caso";
-    redirect(`/internal/advogada?error=${message}`);
-  }
-
-  redirect("/internal/advogada?success=caso-editado");
-}
-
-async function registerEventAction(formData: FormData) {
-  "use server";
-
-  const profile = await requireProfile(["advogada", "admin"]);
-
-  try {
-    await registerPortalEvent(
-      {
-        caseId: formData.get("caseId"),
-        eventType: formData.get("eventType"),
-        title: formData.get("title"),
-        description: formData.get("description"),
-        publicSummary: formData.get("publicSummary"),
-        occurredAt: formData.get("occurredAt"),
-        visibleToClient: formData.get("visibleToClient") === "on",
-        shouldNotifyClient: formData.get("shouldNotifyClient") === "on",
-        payload: {
-          source: "painel-advogada"
-        }
-      },
-      profile.id
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-registrar";
-    redirect(`/internal/advogada?error=${message}`);
-  }
-
-  redirect("/internal/advogada?success=atualizacao-registrada");
-}
-
 async function updateIntakeRequestStatusAction(formData: FormData) {
   "use server";
 
@@ -329,7 +204,6 @@ export default async function InternalLawyerPage({
   const selectedIntakeRequestId = getStringParam(params.intakeRequestId);
   const pendingOnly = getStringParam(params.pending) === "1";
   const hasFilters = !!(query || selectedCaseStatus || dateFrom || dateTo || pendingOnly || sort !== "recent");
-  const hasCases = overview.caseOptions.length > 0;
   const hasClients = overview.clientOptions.length > 0;
   const now = new Date();
   const filteredClients = overview.clientOptions.filter((client) =>
@@ -534,7 +408,7 @@ export default async function InternalLawyerPage({
       ]}
       actions={[
         { href: "#central-prioridades", label: "Fila do dia", tone: "secondary" },
-        { href: "#clientes-operacao", label: "Clientes em operacao", tone: "secondary" },
+        { href: "#gestao-casos", label: "Central de casos", tone: "secondary" },
         { href: "#cadastro-cliente", label: "Cadastrar cliente" },
         { href: "#noemia-operacional", label: "Usar Noemia", tone: "secondary" }
       ]}
@@ -975,7 +849,7 @@ export default async function InternalLawyerPage({
 
         <SectionCard
           title="Casos em andamento"
-          description="Casos ativos que seguem em acompanhamento."
+          description="Leitura curta dos casos ativos, com atalhos para abrir a rota propria do caso e continuar o trabalho."
         >
           {activeCases.length ? (
             <ul className="update-feed compact">
@@ -984,11 +858,34 @@ export default async function InternalLawyerPage({
                   <div className="update-head">
                     <div>
                       <strong>{caseItem.title}</strong>
-                      <span className="item-meta">{caseItem.clientName}</span>
+                      <span className="item-meta">
+                        {caseItem.clientName} - {caseAreaLabels[caseItem.area as keyof typeof caseAreaLabels]}
+                      </span>
                     </div>
                     <span className="tag soft">{caseItem.statusLabel}</span>
                   </div>
-                  <span className="item-meta">{formatPortalDateTime(caseItem.created_at)}</span>
+                  <div className="pill-row">
+                    <span
+                      className={`pill ${
+                        caseItem.priority === "urgente"
+                          ? "critical"
+                          : caseItem.priority === "alta"
+                            ? "warning"
+                            : "muted"
+                      }`}
+                    >
+                      {caseItem.priorityLabel}
+                    </span>
+                    <span className="pill muted">{formatPortalDateTime(caseItem.updated_at)}</span>
+                  </div>
+                  <div className="form-actions">
+                    <Link className="button secondary" href={buildInternalCaseHref(caseItem.id)}>
+                      Abrir caso
+                    </Link>
+                    <Link className="button secondary" href={buildInternalClientHref(caseItem.clientId)}>
+                      Cliente
+                    </Link>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1138,6 +1035,11 @@ export default async function InternalLawyerPage({
                   </span>
                 </div>
                 <span className="item-meta">{formatPortalDateTime(event.occurred_at)}</span>
+                <div className="form-actions">
+                  <Link className="button secondary" href={buildInternalCaseHref(event.case_id)}>
+                    Abrir caso
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -1150,211 +1052,107 @@ export default async function InternalLawyerPage({
         )}
       </SectionCard>
 
-      <div className="grid two">
-        <SectionCard
-          id="gestao-casos"
-          title="Abrir novo caso"
-          description="Use este fluxo quando um cliente ja cadastrado precisar de um novo acompanhamento dentro do portal."
-        >
-          <form action={createCaseAction} className="stack">
-            <div className="fields">
-              <div className="field-full">
-                <label htmlFor="clientId">Cliente</label>
-                <select
-                  id="clientId"
-                  name="clientId"
-                  required
-                  disabled={!hasClients}
-                  defaultValue={preferredClient?.id || undefined}
-                >
-                  {hasClients ? (
-                    overview.clientOptions.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.fullName} - {client.statusLabel}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">Cadastre um cliente antes de abrir um caso</option>
-                  )}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="newCaseArea">Area do caso</label>
-                <select id="newCaseArea" name="area" required defaultValue="previdenciario">
-                  {caseAreas.map((area) => (
-                    <option key={area} value={area}>
-                      {caseAreaLabels[area]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="newCasePriority">Prioridade</label>
-                <select id="newCasePriority" name="priority" required defaultValue="normal">
-                  {casePriorities.map((priority) => (
-                    <option key={priority} value={priority}>
-                      {casePriorityLabels[priority]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-full">
-                <label htmlFor="newCaseTitle">Titulo do caso</label>
-                <input id="newCaseTitle" name="title" type="text" required />
-              </div>
-              <div className="field">
-                <label htmlFor="newCaseStatus">Status inicial</label>
-                <select id="newCaseStatus" name="status" required defaultValue="triagem">
-                  {caseStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {caseStatusLabels[status]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-full">
-                <label htmlFor="newCaseSummary">Resumo do caso</label>
-                <textarea
-                  id="newCaseSummary"
-                  name="summary"
-                  placeholder="Contexto inicial, objetivo do atendimento e proximo passo esperado."
-                />
-              </div>
-            </div>
-            <label className="checkbox-row" htmlFor="newCaseVisibleToClient">
-              <input id="newCaseVisibleToClient" name="visibleToClient" type="checkbox" defaultChecked />
-              Mostrar este novo caso na area do cliente
-            </label>
-            <label className="checkbox-row" htmlFor="newCaseShouldNotifyClient">
-              <input
-                id="newCaseShouldNotifyClient"
-                name="shouldNotifyClient"
-                type="checkbox"
-                defaultChecked
-              />
-              Preparar notificacao para a abertura do caso
-            </label>
-            <div className="notice">
-              Abrir o caso por aqui deixa o acompanhamento pronto para status, documentos, agenda e historico.
-            </div>
-            <div className="form-actions">
-              <FormSubmitButton pendingLabel="Abrindo caso..." disabled={!hasClients}>
-                Abrir caso
-              </FormSubmitButton>
-            </div>
-          </form>
-        </SectionCard>
+      <SectionCard
+        id="gestao-casos"
+        title="Central de casos"
+        description="O dashboard agora so aponta o caminho. Abertura, edicao, status e andamento do caso vivem em rotas proprias mais claras e utilizaveis."
+      >
+        <div className="grid three">
+          <Link className="route-card" href={buildInternalCasesHref(preferredClient?.id || null)}>
+            <span className="shortcut-kicker">Visao</span>
+            <strong>Abrir central de casos</strong>
+            <span>
+              Entre na lista de casos para filtrar, priorizar e abrir o acompanhamento certo sem poluir o painel principal.
+            </span>
+          </Link>
+          <Link className="route-card" href={buildInternalNewCaseHref(preferredClient?.id || null)}>
+            <span className="shortcut-kicker">Criacao</span>
+            <strong>Abrir novo caso</strong>
+            <span>
+              Use a rota de criacao focada para iniciar um acompanhamento com menos atrito e melhor leitura no mobile.
+            </span>
+          </Link>
+          <Link
+            className="route-card"
+            href={
+              preferredCase
+                ? buildInternalCaseHref(preferredCase.id)
+                : buildInternalCasesHref(preferredClient?.id || null)
+            }
+          >
+            <span className="shortcut-kicker">Execucao</span>
+            <strong>{preferredCase ? "Continuar caso em foco" : "Ver casos ativos"}</strong>
+            <span>
+              {preferredCase
+                ? `${preferredCase.title} pode seguir com edicao, status e andamento na pagina propria.`
+                : "Assim que houver um caso ativo, ele aparecera aqui como proximo atalho de execucao."}
+            </span>
+          </Link>
+        </div>
+      </SectionCard>
 
-        <SectionCard
-          title="Editar casos recentes"
-          description="Ajuste os dados principais dos casos mais recentes sem sair do painel. Mudancas de status continuam em um fluxo proprio para manter clareza."
-        >
-          {overview.latestCases.length ? (
-            <div className="stack">
-              {overview.latestCases.map((caseItem) => (
-                <div key={caseItem.id} className="subtle-panel stack">
-                  <div className="item-head">
-                    <div>
-                      <strong>{caseItem.title}</strong>
-                      <span className="item-meta">{caseItem.clientName}</span>
-                    </div>
-                    <span className="tag soft">{caseItem.statusLabel}</span>
+      <SectionCard
+        title="Casos em foco agora"
+        description="O painel so mostra leitura curta e atalhos. O trabalho detalhado continua dentro da central de casos."
+      >
+        {filteredCases.length ? (
+          <ul className="update-feed">
+            {filteredCases.slice(0, 6).map((caseItem) => (
+              <li key={caseItem.id} className="update-card">
+                <div className="update-head">
+                  <div>
+                    <strong>{caseItem.title}</strong>
+                    <span className="item-meta">
+                      {caseItem.clientName} - {caseAreaLabels[caseItem.area as keyof typeof caseAreaLabels]}
+                    </span>
                   </div>
-                  <form action={updateCaseDetailsAction} className="stack">
-                    <input type="hidden" name="caseId" value={caseItem.id} />
-                    <div className="fields">
-                      <div className="field-full">
-                        <label htmlFor={`case-title-${caseItem.id}`}>Titulo do caso</label>
-                        <input
-                          id={`case-title-${caseItem.id}`}
-                          name="title"
-                          type="text"
-                          defaultValue={caseItem.title}
-                          required
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor={`case-area-${caseItem.id}`}>Area</label>
-                        <select
-                          id={`case-area-${caseItem.id}`}
-                          name="area"
-                          defaultValue={caseItem.area}
-                          required
-                        >
-                          {caseAreas.map((area) => (
-                            <option key={area} value={area}>
-                              {caseAreaLabels[area]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor={`case-priority-${caseItem.id}`}>Prioridade</label>
-                        <select
-                          id={`case-priority-${caseItem.id}`}
-                          name="priority"
-                          defaultValue={caseItem.priority || "normal"}
-                          required
-                        >
-                          {casePriorities.map((priority) => (
-                            <option key={priority} value={priority}>
-                              {casePriorityLabels[priority]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field-full">
-                        <label htmlFor={`case-summary-${caseItem.id}`}>Resumo</label>
-                        <textarea
-                          id={`case-summary-${caseItem.id}`}
-                          name="summary"
-                          defaultValue={caseItem.summary || ""}
-                        />
-                      </div>
-                      <div className="field-full">
-                        <label htmlFor={`case-change-${caseItem.id}`}>Mensagem da alteracao</label>
-                        <textarea
-                          id={`case-change-${caseItem.id}`}
-                          name="changeSummary"
-                          placeholder="Explique a mudanca se ela tambem precisar aparecer para o cliente."
-                        />
-                      </div>
-                    </div>
-                    <label className="checkbox-row" htmlFor={`case-visible-${caseItem.id}`}>
-                      <input
-                        id={`case-visible-${caseItem.id}`}
-                        name="visibleToClient"
-                        type="checkbox"
-                      />
-                      Refletir esta edicao na area do cliente
-                    </label>
-                    <label className="checkbox-row" htmlFor={`case-notify-${caseItem.id}`}>
-                      <input
-                        id={`case-notify-${caseItem.id}`}
-                        name="shouldNotifyClient"
-                        type="checkbox"
-                      />
-                      Preparar notificacao para esta edicao
-                    </label>
-                    <div className="form-actions">
-                      <FormSubmitButton pendingLabel="Salvando caso...">
-                        Salvar dados do caso
-                      </FormSubmitButton>
-                      <Link className="button secondary" href="#status-caso">
-                        Alterar status
-                      </Link>
-                    </div>
-                  </form>
+                  <span className="tag soft">{caseItem.statusLabel}</span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">
-              Nenhum caso recente para editar no momento. Assim que houver um caso aberto, ele aparecera aqui.
-            </p>
-          )}
-        </SectionCard>
-      </div>
+                <div className="pill-row">
+                  <span
+                    className={`pill ${
+                      caseItem.priority === "urgente"
+                        ? "critical"
+                        : caseItem.priority === "alta"
+                          ? "warning"
+                          : "muted"
+                    }`}
+                  >
+                    {caseItem.priorityLabel}
+                  </span>
+                  <span className="pill muted">{formatPortalDateTime(caseItem.updated_at)}</span>
+                </div>
+                <div className="form-actions">
+                  <Link className="button secondary" href={buildInternalCaseHref(caseItem.id)}>
+                    Abrir caso
+                  </Link>
+                  <Link className="button secondary" href={buildInternalClientHref(caseItem.clientId)}>
+                    Cliente
+                  </Link>
+                  <Link
+                    className="button secondary"
+                    href={buildInternalAgendaHref(caseItem.clientId, caseItem.id)}
+                  >
+                    Agenda
+                  </Link>
+                  <Link
+                    className="button secondary"
+                    href={buildInternalDocumentsHref(caseItem.clientId, caseItem.id)}
+                  >
+                    Documentos
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty-state">
+            {hasFilters
+              ? "Nenhum caso em foco corresponde aos filtros atuais."
+              : "Os casos em operacao aparecerao aqui com atalhos rapidos para a nova central."}
+          </p>
+        )}
+      </SectionCard>
 
       <div className="grid two">
         <SectionCard
@@ -1451,166 +1249,58 @@ export default async function InternalLawyerPage({
         </SectionCard>
 
         <SectionCard
-          id="status-caso"
-          title="Alterar status do caso"
-          description="Atualize a fase do caso de forma direta, sem depender de ajuste tecnico."
+          title="Atalhos operacionais"
+          description="As acoes detalhadas de caso sairam do dashboard. Aqui ficam apenas os caminhos rapidos para continuar a operacao."
         >
-          <form action={updateCaseStatusAction} className="stack">
-            <div className="fields">
-              <div className="field-full">
-                <label htmlFor="statusCaseId">Caso</label>
-                <select
-                  id="statusCaseId"
-                  name="caseId"
-                  required
-                  disabled={!hasCases}
-                  defaultValue={preferredCase?.id || undefined}
-                >
-                  {hasCases ? (
-                    overview.caseOptions.map((caseItem) => (
-                      <option key={caseItem.id} value={caseItem.id}>
-                        {caseItem.title} - {caseItem.clientName} - {caseItem.statusLabel}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">Cadastre um cliente para abrir o primeiro caso</option>
-                  )}
-                </select>
-              </div>
-              <div className="field-full">
-                <label htmlFor="caseStatus">Novo status</label>
-                <select id="caseStatus" name="status" required defaultValue="em-andamento">
-                  {caseStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {caseStatusLabels[status]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-full">
-                <label htmlFor="internalNote">Observacao da mudanca</label>
-                <textarea
-                  id="internalNote"
-                  name="internalNote"
-                  placeholder="Explique o motivo da mudanca ou o proximo passo."
-                />
-              </div>
-            </div>
-            <label className="checkbox-row" htmlFor="statusVisibleToClient">
-              <input
-                id="statusVisibleToClient"
-                name="visibleToClient"
-                type="checkbox"
-                defaultChecked
-              />
-              Mostrar esta mudanca para o cliente
-            </label>
-            <label className="checkbox-row" htmlFor="statusShouldNotifyClient">
-              <input
-                id="statusShouldNotifyClient"
-                name="shouldNotifyClient"
-                type="checkbox"
-                defaultChecked
-              />
-              Preparar notificacao futura para esta mudanca
-            </label>
-            <div className="form-actions">
-              <FormSubmitButton
-                pendingLabel="Atualizando status..."
-                tone="secondary"
-                disabled={!hasCases}
-              >
-                Atualizar status do caso
-              </FormSubmitButton>
-            </div>
-          </form>
+          <div className="grid two">
+            <Link className="shortcut-card" href={buildInternalCasesHref(preferredClient?.id || null)}>
+              <span className="shortcut-kicker">Casos</span>
+              <strong>Ir para a central de casos</strong>
+              <p>Filtrar, abrir, revisar e continuar acompanhamentos em uma estrutura propria.</p>
+            </Link>
+            <Link className="shortcut-card" href={buildInternalNewCaseHref(preferredClient?.id || null)}>
+              <span className="shortcut-kicker">Novo</span>
+              <strong>Abrir novo caso</strong>
+              <p>Comecar um acompanhamento em fluxo dedicado, sem campos demais no dashboard.</p>
+            </Link>
+            <Link
+              className="shortcut-card"
+              href={
+                preferredCase
+                  ? buildInternalCaseHref(preferredCase.id)
+                  : buildInternalCasesHref(preferredClient?.id || null)
+              }
+            >
+              <span className="shortcut-kicker">Caso</span>
+              <strong>{preferredCase ? "Abrir caso priorizado" : "Revisar casos"}</strong>
+              <p>
+                {preferredCase
+                  ? `${preferredCase.title} ja esta pronto para status, andamento e leitura detalhada.`
+                  : "Abra a central de casos para encontrar o acompanhamento certo."}
+              </p>
+            </Link>
+            <Link
+              className="shortcut-card"
+              href={
+                preferredClient
+                  ? buildInternalClientHref(preferredClient.id)
+                  : "/internal/advogada#clientes-operacao"
+              }
+            >
+              <span className="shortcut-kicker">Cliente</span>
+              <strong>{preferredClient ? "Abrir cliente em foco" : "Ver clientes em operacao"}</strong>
+              <p>
+                {preferredClient
+                  ? "A ficha do cliente segue como hub para cruzar casos, agenda, documentos e notas."
+                  : "Use o bloco de clientes para abrir a ficha certa e seguir o atendimento."}
+              </p>
+            </Link>
+          </div>
+          <div className="notice">
+            Status, edicao e andamento do caso agora vivem nas rotas internas de casos para reduzir ruído visual e melhorar a operacao no mobile.
+          </div>
         </SectionCard>
       </div>
-
-      <SectionCard
-        id="atualizacoes-caso"
-        title="Registrar atualizacao do caso"
-        description="Quando precisar detalhar o andamento, registre aqui com titulo, descricao e resumo visivel."
-      >
-        <form action={registerEventAction} className="stack">
-            <div className="fields">
-              <div className="field-full">
-                <label htmlFor="caseId">Caso</label>
-              <select
-                id="caseId"
-                name="caseId"
-                required
-                disabled={!hasCases}
-                defaultValue={preferredCase?.id || undefined}
-              >
-                {hasCases ? (
-                  overview.caseOptions.map((caseItem) => (
-                    <option key={caseItem.id} value={caseItem.id}>
-                      {caseItem.title} - {caseItem.clientName} - {caseItem.statusLabel}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">Cadastre um cliente para abrir o primeiro caso</option>
-                )}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="eventType">Tipo de atualizacao</label>
-              <select id="eventType" name="eventType" required defaultValue="case_update">
-                {portalEventTypes.map((eventType) => (
-                  <option key={eventType} value={eventType}>
-                    {portalEventTypeLabels[eventType]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="occurredAt">Data da atualizacao</label>
-              <input
-                id="occurredAt"
-                name="occurredAt"
-                type="datetime-local"
-                defaultValue={buildDefaultDateTimeValue()}
-                required
-              />
-            </div>
-            <div className="field-full">
-              <label htmlFor="title">Titulo</label>
-              <input id="title" name="title" type="text" required />
-            </div>
-            <div className="field-full">
-              <label htmlFor="description">Descricao</label>
-              <textarea id="description" name="description" required />
-            </div>
-            <div className="field-full">
-              <label htmlFor="publicSummary">Mensagem visivel ao cliente</label>
-              <textarea
-                id="publicSummary"
-                name="publicSummary"
-                placeholder="Se ficar em branco, o portal aproveita a descricao."
-              />
-            </div>
-          </div>
-          <label className="checkbox-row" htmlFor="visibleToClient">
-            <input id="visibleToClient" name="visibleToClient" type="checkbox" defaultChecked />
-            Atualizacao visivel para o cliente
-          </label>
-          <label className="checkbox-row" htmlFor="shouldNotifyClient">
-            <input
-              id="shouldNotifyClient"
-              name="shouldNotifyClient"
-              type="checkbox"
-              defaultChecked
-            />
-            Preparar item de notificacao para esta atualizacao
-          </label>
-          <div className="form-actions">
-            <FormSubmitButton pendingLabel="Registrando atualizacao..." disabled={!hasCases}>
-              Registrar atualizacao
-            </FormSubmitButton>
-          </div>
-        </form>
-      </SectionCard>
     </AppFrame>
   );
 }
