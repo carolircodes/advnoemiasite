@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
@@ -15,6 +16,7 @@ import {
   formatFileSize,
   formatPortalDateTime
 } from "@/lib/domain/portal";
+import { buildInternalAgendaHref, buildInternalClientHref } from "@/lib/navigation";
 import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
 import {
   registerCaseDocument,
@@ -168,12 +170,24 @@ export default async function DocumentsPage({
       typeof params.success === "string" ? getSuccessMessage(params.success) : "";
     const query = getStringParam(params.q);
     const selectedStatus = getStringParam(params.status);
+    const selectedClientId = getStringParam(params.clientId);
+    const selectedCaseId = getStringParam(params.caseId);
     const pendingOnly = getStringParam(params.pending) === "1";
     const sort = getStringParam(params.sort, "recent");
+    const selectedClient =
+      overview.clientOptions.find((client) => client.id === selectedClientId) || null;
+    const caseOptionsForDocuments = overview.caseOptions.filter(
+      (caseItem) => !selectedClientId || caseItem.clientId === selectedClientId
+    );
+    const selectedCase =
+      overview.caseOptions.find((caseItem) => caseItem.id === selectedCaseId) || null;
+    const defaultCaseId = selectedCase?.id || caseOptionsForDocuments[0]?.id || undefined;
     const filteredDocuments = overview.latestDocuments
       .filter(
         (document) =>
           matchesSearch(query, [document.file_name, document.caseTitle, document.category]) &&
+          (!selectedClientId || document.clientId === selectedClientId) &&
+          (!selectedCaseId || document.case_id === selectedCaseId) &&
           (!selectedStatus || document.status === selectedStatus) &&
           (!pendingOnly ||
             document.status === "pendente" ||
@@ -188,6 +202,8 @@ export default async function DocumentsPage({
       .filter(
         (request) =>
           matchesSearch(query, [request.title, request.caseTitle, request.statusLabel]) &&
+          (!selectedClientId || request.clientId === selectedClientId) &&
+          (!selectedCaseId || request.case_id === selectedCaseId) &&
           (!pendingOnly || request.status === "pending")
       )
       .sort((left, right) =>
@@ -195,8 +211,15 @@ export default async function DocumentsPage({
           ? left.created_at.localeCompare(right.created_at)
           : right.created_at.localeCompare(left.created_at)
       );
-    const hasCases = overview.caseOptions.length > 0;
-    const hasFilters = !!(query || selectedStatus || pendingOnly || sort !== "recent");
+    const hasCases = caseOptionsForDocuments.length > 0;
+    const hasFilters = !!(
+      query ||
+      selectedStatus ||
+      selectedClientId ||
+      selectedCaseId ||
+      pendingOnly ||
+      sort !== "recent"
+    );
     const openRequests = filteredRequests.filter((request) => request.status === "pending");
 
     return (
@@ -214,9 +237,17 @@ export default async function DocumentsPage({
           />
         }
         navigation={[
-          { href: "/internal/advogada", label: "Painel" },
+          {
+            href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada",
+            label: selectedClient ? "Cliente" : "Painel"
+          },
           { href: "/documentos", label: "Documentos", active: true },
-          { href: "/agenda", label: "Agenda" }
+          {
+            href: selectedClient
+              ? buildInternalAgendaHref(selectedClient.id, selectedCase?.id || null)
+              : "/agenda",
+            label: "Agenda"
+          }
         ]}
         highlights={[
           { label: "Documentos recentes", value: String(filteredDocuments.length) },
@@ -235,11 +266,17 @@ export default async function DocumentsPage({
         actions={[
           { href: "#registrar-documento", label: "Registrar documento" },
           { href: "#solicitar-documento", label: "Solicitar documento", tone: "secondary" },
-          {
-            href: "/internal/advogada#cadastro-cliente",
-            label: "Cadastrar cliente",
-            tone: "secondary"
-          }
+          selectedClient
+            ? {
+                href: buildInternalClientHref(selectedClient.id),
+                label: "Abrir ficha",
+                tone: "secondary" as const
+              }
+            : {
+                href: "/internal/advogada#cadastro-cliente",
+                label: "Cadastrar cliente",
+                tone: "secondary" as const
+              }
         ]}
       >
         {error ? <div className="error-notice">{error}</div> : null}
@@ -273,6 +310,28 @@ export default async function DocumentsPage({
                 </select>
               </div>
               <div className="field">
+                <label htmlFor="documents-client">Cliente</label>
+                <select id="documents-client" name="clientId" defaultValue={selectedClientId}>
+                  <option value="">Todos os clientes</option>
+                  {overview.clientOptions.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="documents-case">Caso</label>
+                <select id="documents-case" name="caseId" defaultValue={selectedCaseId}>
+                  <option value="">Todos os casos</option>
+                  {caseOptionsForDocuments.map((caseItem) => (
+                    <option key={caseItem.id} value={caseItem.id}>
+                      {caseItem.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
                 <label htmlFor="documents-sort">Ordenacao</label>
                 <select id="documents-sort" name="sort" defaultValue={sort}>
                   <option value="recent">Mais recentes primeiro</option>
@@ -280,6 +339,14 @@ export default async function DocumentsPage({
                 </select>
               </div>
             </div>
+            {selectedClient || selectedCase ? (
+              <div className="notice">
+                {selectedClient
+                  ? `${selectedClient.fullName} esta no foco desta central documental.`
+                  : "Filtro de cliente ativo."}{" "}
+                {selectedCase ? `Caso selecionado: ${selectedCase.title}.` : ""}
+              </div>
+            ) : null}
             <label className="checkbox-row" htmlFor="documents-pending">
               <input
                 id="documents-pending"
@@ -297,6 +364,11 @@ export default async function DocumentsPage({
               <a className="button secondary" href="/documentos">
                 Limpar filtros
               </a>
+              {selectedClient ? (
+                <Link className="button secondary" href={buildInternalClientHref(selectedClient.id)}>
+                  Voltar para o cliente
+                </Link>
+              ) : null}
             </div>
           </form>
         </SectionCard>
@@ -311,8 +383,8 @@ export default async function DocumentsPage({
             <strong>{openRequests.length}</strong>
           </div>
           <div className="metric-card">
-            <span>Casos com documentos</span>
-            <strong>{overview.caseOptions.length}</strong>
+            <span>Casos filtrados</span>
+            <strong>{caseOptionsForDocuments.length}</strong>
           </div>
           <div className="metric-card">
             <span>E-mails pendentes</span>
@@ -330,9 +402,15 @@ export default async function DocumentsPage({
               <div className="fields">
                 <div className="field-full">
                   <label htmlFor="caseId">Caso</label>
-                  <select id="caseId" name="caseId" required disabled={!hasCases}>
+                  <select
+                    id="caseId"
+                    name="caseId"
+                    required
+                    disabled={!hasCases}
+                    defaultValue={defaultCaseId}
+                  >
                     {hasCases ? (
-                      overview.caseOptions.map((caseItem) => (
+                      caseOptionsForDocuments.map((caseItem) => (
                         <option key={caseItem.id} value={caseItem.id}>
                           {caseItem.title} - {caseItem.clientName} - {caseItem.statusLabel}
                         </option>
@@ -430,9 +508,15 @@ export default async function DocumentsPage({
               <div className="fields">
                 <div className="field-full">
                   <label htmlFor="requestCaseId">Caso</label>
-                  <select id="requestCaseId" name="caseId" required disabled={!hasCases}>
+                  <select
+                    id="requestCaseId"
+                    name="caseId"
+                    required
+                    disabled={!hasCases}
+                    defaultValue={defaultCaseId}
+                  >
                     {hasCases ? (
-                      overview.caseOptions.map((caseItem) => (
+                      caseOptionsForDocuments.map((caseItem) => (
                         <option key={caseItem.id} value={caseItem.id}>
                           {caseItem.title} - {caseItem.clientName} - {caseItem.statusLabel}
                         </option>

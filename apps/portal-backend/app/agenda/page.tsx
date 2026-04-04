@@ -16,6 +16,7 @@ import {
   appointmentTypeLabels,
   formatPortalDateTime
 } from "@/lib/domain/portal";
+import { buildInternalClientHref, buildInternalDocumentsHref } from "@/lib/navigation";
 import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
 import {
   cancelCaseAppointment,
@@ -361,8 +362,16 @@ export default async function AgendaPage({
           />
         }
         navigation={[
-          { href: "/internal/advogada", label: "Painel" },
-          { href: "/documentos", label: "Documentos" },
+          {
+            href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada",
+            label: selectedClient ? "Cliente" : "Painel"
+          },
+          {
+            href: selectedClient
+              ? buildInternalDocumentsHref(selectedClient.id, selectedCase?.id || null)
+              : "/documentos",
+            label: "Documentos"
+          },
           { href: "/agenda", label: "Agenda", active: true }
         ]}
         highlights={[
@@ -378,7 +387,11 @@ export default async function AgendaPage({
         actions={[
           { href: "#registrar-compromisso", label: "Criar compromisso" },
           { href: "#editar-compromisso", label: "Editar agenda", tone: "secondary" },
-          { href: selectedClient ? `/internal/advogada?clientId=${selectedClient.id}#clientes` : "/internal/advogada#clientes", label: "Abrir ficha", tone: "secondary" }
+          {
+            href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada#clientes-operacao",
+            label: "Abrir ficha",
+            tone: "secondary"
+          }
         ]}
       >
         {error ? <div className="error-notice">{error}</div> : null}
@@ -637,7 +650,7 @@ export default async function AgendaPage({
                     <div className="form-actions">
                       <Link
                         className="button secondary"
-                        href={`/internal/advogada?clientId=${appointment.client_id}#clientes`}
+                        href={buildInternalClientHref(appointment.client_id)}
                       >
                         Abrir ficha
                       </Link>
@@ -693,7 +706,7 @@ export default async function AgendaPage({
                   <div className="form-actions">
                     <Link
                       className="button secondary"
-                      href={`/internal/advogada?clientId=${appointment.client_id}#clientes`}
+                      href={buildInternalClientHref(appointment.client_id)}
                     >
                       Ficha do cliente
                     </Link>

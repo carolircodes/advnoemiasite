@@ -25,6 +25,11 @@ import {
   portalEventTypes
 } from "@/lib/domain/portal";
 import {
+  buildInternalAgendaHref,
+  buildInternalClientHref,
+  buildInternalDocumentsHref
+} from "@/lib/navigation";
+import {
   createCaseForClient,
   updateCaseDetails,
   updateCaseStatus
@@ -32,7 +37,6 @@ import {
 import { createClientWithInvite } from "@/lib/services/create-client";
 import { getStaffOverview } from "@/lib/services/dashboard";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
-import { updateClientRecord } from "@/lib/services/manage-clients";
 import { updateIntakeRequestStatus } from "@/lib/services/public-intake";
 import { registerPortalEvent } from "@/lib/services/register-event";
 
@@ -143,10 +147,6 @@ function getSuccessMessage(success: string) {
   }
 }
 
-function buildClientPanelHref(clientId: string) {
-  return `/internal/advogada?clientId=${clientId}#clientes`;
-}
-
 async function createClientAction(formData: FormData) {
   "use server";
 
@@ -174,36 +174,6 @@ async function createClientAction(formData: FormData) {
 
   redirect("/internal/advogada?success=cliente-cadastrado");
 }
-
-async function updateClientAction(formData: FormData) {
-  "use server";
-
-  const profile = await requireProfile(["advogada", "admin"]);
-  const clientId = String(formData.get("clientId") || "");
-
-  try {
-    await updateClientRecord(
-      {
-        clientId,
-        fullName: formData.get("fullName"),
-        email: formData.get("email"),
-        cpf: formData.get("cpf"),
-        phone: formData.get("phone"),
-        status: formData.get("status"),
-        notes: formData.get("notes"),
-        isActive: formData.get("isActive") === "on"
-      },
-      profile.id
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-atualizar-cliente";
-    redirect(`/internal/advogada?clientId=${clientId}&error=${message}#clientes`);
-  }
-
-  redirect(`/internal/advogada?clientId=${clientId}&success=cliente-atualizado#clientes`);
-}
-
 async function updateCaseStatusAction(formData: FormData) {
   "use server";
 
@@ -357,7 +327,6 @@ export default async function InternalLawyerPage({
   const dateFrom = getStringParam(params.dateFrom);
   const dateTo = getStringParam(params.dateTo);
   const selectedIntakeRequestId = getStringParam(params.intakeRequestId);
-  const selectedClientId = getStringParam(params.clientId);
   const pendingOnly = getStringParam(params.pending) === "1";
   const hasFilters = !!(query || selectedCaseStatus || dateFrom || dateTo || pendingOnly || sort !== "recent");
   const hasCases = overview.caseOptions.length > 0;
@@ -394,28 +363,6 @@ export default async function InternalLawyerPage({
     .slice(0, 6);
   const selectedIntakeRequest =
     overview.latestIntakeRequests.find((item) => item.id === selectedIntakeRequestId) || null;
-  const selectedClient =
-    filteredClients.find((client) => client.id === selectedClientId) || filteredClients[0] || null;
-  const selectedClientAgendaHref = selectedClient ? `/agenda?clientId=${selectedClient.id}` : "/agenda";
-  const selectedClientDocumentsHref = selectedClient
-    ? `/documentos?q=${encodeURIComponent(selectedClient.fullName)}`
-    : "/documentos";
-  const selectedClientPortalState = selectedClient
-    ? !selectedClient.isActive
-      ? "Acesso bloqueado"
-      : selectedClient.firstLoginCompletedAt
-        ? "Primeiro acesso concluido"
-        : selectedClient.invitedAt
-          ? "Convite pendente"
-          : "Sem convite emitido"
-    : "";
-  const selectedClientPortalTone = selectedClient
-    ? !selectedClient.isActive
-      ? "warning"
-      : selectedClient.firstLoginCompletedAt
-        ? "success"
-        : "muted"
-    : "muted";
   const filteredCases = overview.caseOptions
     .filter(
       (caseItem) =>
@@ -439,6 +386,13 @@ export default async function InternalLawyerPage({
 
       return right.created_at.localeCompare(left.created_at);
     });
+  const preferredClient = filteredClients[0] || overview.clientOptions[0] || null;
+  const preferredCase =
+    filteredCases.find((caseItem) => caseItem.status !== "concluido") ||
+    filteredCases[0] ||
+    overview.caseOptions.find((caseItem) => caseItem.status !== "concluido") ||
+    overview.caseOptions[0] ||
+    null;
   const upcomingAppointments = overview.latestAppointments
     .filter(
       (appointment) =>
@@ -580,7 +534,7 @@ export default async function InternalLawyerPage({
       ]}
       actions={[
         { href: "#central-prioridades", label: "Fila do dia", tone: "secondary" },
-        { href: "#clientes", label: "Abrir ficha do cliente", tone: "secondary" },
+        { href: "#clientes-operacao", label: "Clientes em operacao", tone: "secondary" },
         { href: "#cadastro-cliente", label: "Cadastrar cliente" },
         { href: "#noemia-operacional", label: "Usar Noemia", tone: "secondary" }
       ]}
@@ -956,20 +910,14 @@ export default async function InternalLawyerPage({
 
       <div className="grid three">
         <SectionCard
+          id="clientes-operacao"
           title="Clientes em operacao"
-          description="Abra a ficha operacional, veja o estado do portal e va direto para a proxima acao com menos atrito."
+          description="O dashboard fica em modo resumo: abra a rota propria do cliente para contato, portal, agenda, documentos e pendencias."
         >
           {filteredClients.length ? (
             <div className="client-directory">
               {filteredClients.slice(0, 6).map((client) => (
-                <div
-                  key={client.id}
-                  className={
-                    client.id === selectedClient?.id
-                      ? "client-directory-card active"
-                      : "client-directory-card"
-                  }
-                >
+                <div key={client.id} className="client-directory-card">
                   <div className="client-directory-head">
                     <div>
                       <strong>{client.fullName}</strong>
@@ -992,12 +940,26 @@ export default async function InternalLawyerPage({
                     <span className="item-meta">
                       Ultima atividade em {formatPortalDateTime(client.lastActivityAt)}
                     </span>
-                    <Link
-                      className="button secondary"
-                      href={buildClientPanelHref(client.id)}
-                    >
-                      Abrir ficha
-                    </Link>
+                    <div className="client-directory-actions">
+                      <Link
+                        className="button secondary"
+                        href={buildInternalClientHref(client.id)}
+                      >
+                        Abrir ficha
+                      </Link>
+                      <Link
+                        className="button secondary"
+                        href={buildInternalAgendaHref(client.id, client.primaryCaseId)}
+                      >
+                        Agenda
+                      </Link>
+                      <Link
+                        className="button secondary"
+                        href={buildInternalDocumentsHref(client.id, client.primaryCaseId)}
+                      >
+                        Documentos
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1064,279 +1026,6 @@ export default async function InternalLawyerPage({
           )}
         </SectionCard>
       </div>
-
-      <SectionCard
-        id="clientes"
-        title={selectedClient ? `Ficha operacional de ${selectedClient.fullName}` : "Ficha operacional do cliente"}
-        description="Esta area concentra contato, acesso ao portal, pendencias e edicao do cadastro sem tirar voce do fluxo interno."
-      >
-        {selectedClient ? (
-          <div className="grid two client-sheet-grid">
-            <div className="stack">
-              <div className="client-sheet-card">
-                <div className="client-sheet-head">
-                  <div>
-                    <span className="shortcut-kicker">Visao geral</span>
-                    <h3>{selectedClient.fullName}</h3>
-                    <p className="client-sheet-copy">
-                      {selectedClient.primaryCaseTitle
-                        ? `${selectedClient.primaryCaseTitle} segue como caso principal desta ficha.`
-                        : "Cliente sem caso principal aberto no momento."}
-                    </p>
-                  </div>
-                  <div className="pill-row">
-                    <span className="pill success">{selectedClient.statusLabel}</span>
-                    <span className={`pill ${selectedClientPortalTone}`}>
-                      {selectedClientPortalState}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="summary-grid compact">
-                  <div className="summary-card">
-                    <span>Casos vinculados</span>
-                    <strong>{selectedClient.caseCount}</strong>
-                    <p>{selectedClient.activeCaseCount} ainda pedem acompanhamento ativo.</p>
-                  </div>
-                  <div className="summary-card">
-                    <span>Pendencias abertas</span>
-                    <strong>{selectedClient.pendingDocumentRequestsCount}</strong>
-                    <p>Solicitacoes documentais em aberto para este cliente.</p>
-                  </div>
-                  <div className="summary-card">
-                    <span>Agenda vinculada</span>
-                    <strong>{selectedClient.upcomingAppointmentsCount}</strong>
-                    <p>Compromissos futuros ja conectados ao atendimento.</p>
-                  </div>
-                </div>
-
-                <div className="support-panel">
-                  <div className="support-row">
-                    <span className="support-label">Contato principal</span>
-                    <strong>{selectedClient.email}</strong>
-                    <span className="item-meta">{selectedClient.phone || "Telefone ainda nao informado."}</span>
-                  </div>
-                  <div className="support-row">
-                    <span className="support-label">Portal do cliente</span>
-                    <strong>
-                      {selectedClient.firstLoginCompletedAt
-                        ? `Primeiro acesso concluido em ${formatPortalDateTime(
-                            selectedClient.firstLoginCompletedAt
-                          )}`
-                        : selectedClient.invitedAt
-                          ? `Convite enviado em ${formatPortalDateTime(selectedClient.invitedAt)}`
-                          : "Convite ainda nao emitido"}
-                    </strong>
-                    <span className="item-meta">
-                      Ultima atividade em {formatPortalDateTime(selectedClient.lastActivityAt)}
-                    </span>
-                  </div>
-                  <div className="support-row">
-                    <span className="support-label">Caso principal</span>
-                    <strong>
-                      {selectedClient.primaryCaseTitle || "Sem caso principal definido"}
-                    </strong>
-                    <span className="item-meta">
-                      {selectedClient.primaryCaseStatusLabel || "Abra ou vincule um caso para continuar."}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="client-ops-grid">
-                  <Link className="shortcut-card" href={selectedClientAgendaHref}>
-                    <span className="shortcut-kicker">Agenda</span>
-                    <strong>Abrir compromissos</strong>
-                    <p>Filtrar a agenda pelo cliente e seguir com criacao, reagendamento ou cancelamento.</p>
-                  </Link>
-                  <Link className="shortcut-card" href={selectedClientDocumentsHref}>
-                    <span className="shortcut-kicker">Documentos</span>
-                    <strong>Ver documentos</strong>
-                    <p>Entrar direto na leitura documental e nas pendencias ligadas a este atendimento.</p>
-                  </Link>
-                  <Link className="shortcut-card" href="#status-caso">
-                    <span className="shortcut-kicker">Fluxo</span>
-                    <strong>Atualizar caso</strong>
-                    <p>Usar os formularios do painel para mudar status, registrar andamento ou abrir novo caso.</p>
-                  </Link>
-                </div>
-
-                <div className="grid two">
-                  <div className="subtle-panel stack">
-                    <span className="shortcut-kicker">Casos recentes</span>
-                    {selectedClient.latestCases.length ? (
-                      <ul className="list">
-                        {selectedClient.latestCases.map((caseItem) => (
-                          <li key={caseItem.id}>
-                            <div className="item-head">
-                              <strong>{caseItem.title}</strong>
-                              <span className="tag soft">{caseItem.statusLabel}</span>
-                            </div>
-                            <span className="item-meta">
-                              {caseAreaLabels[caseItem.area as keyof typeof caseAreaLabels]} - {caseItem.priorityLabel}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="empty-state">
-                        Nenhum caso vinculado ainda. Use a area de casos para abrir o primeiro acompanhamento.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="subtle-panel stack">
-                    <span className="shortcut-kicker">Pendencias e sinais</span>
-                    {selectedClient.openDocumentRequests.length ||
-                    selectedClient.upcomingAppointments.length ||
-                    selectedClient.recentEvents.length ? (
-                      <ul className="list">
-                        {selectedClient.openDocumentRequests.map((request) => (
-                          <li key={request.id}>
-                            <div className="item-head">
-                              <strong>{request.title}</strong>
-                              <span className="tag soft">{request.statusLabel}</span>
-                            </div>
-                            <span className="item-meta">
-                              {request.due_at
-                                ? `Prazo ${formatPortalDateTime(request.due_at)}`
-                                : "Sem prazo definido"}
-                            </span>
-                          </li>
-                        ))}
-                        {selectedClient.upcomingAppointments.map((appointment) => (
-                          <li key={appointment.id}>
-                            <div className="item-head">
-                              <strong>{appointment.title}</strong>
-                              <span className="tag soft">{appointment.statusLabel}</span>
-                            </div>
-                            <span className="item-meta">
-                              {formatPortalDateTime(appointment.starts_at)}
-                            </span>
-                          </li>
-                        ))}
-                        {selectedClient.recentEvents.map((event) => (
-                          <li key={event.id}>
-                            <div className="item-head">
-                              <strong>{event.title}</strong>
-                              <span className="tag soft">{event.eventLabel}</span>
-                            </div>
-                            <span className="item-meta">
-                              {formatPortalDateTime(event.occurred_at)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="empty-state">
-                        Ainda nao ha agenda, pendencia documental ou historico recente visivel para este cliente.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <SectionCard
-              title="Editar cliente"
-              description="Atualize contato, status e acesso ao portal com retorno visual claro e sem sair da central."
-            >
-              <form action={updateClientAction} className="stack">
-                <input type="hidden" name="clientId" value={selectedClient.id} />
-                <div className="fields">
-                  <div className="field-full">
-                    <label htmlFor="client-edit-fullName">Nome completo</label>
-                    <input
-                      id="client-edit-fullName"
-                      name="fullName"
-                      type="text"
-                      defaultValue={selectedClient.fullName}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="client-edit-email">E-mail</label>
-                    <input
-                      id="client-edit-email"
-                      name="email"
-                      type="email"
-                      defaultValue={selectedClient.email}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="client-edit-phone">Telefone</label>
-                    <input
-                      id="client-edit-phone"
-                      name="phone"
-                      type="text"
-                      defaultValue={selectedClient.phone}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="client-edit-cpf">CPF</label>
-                    <input
-                      id="client-edit-cpf"
-                      name="cpf"
-                      type="text"
-                      defaultValue={selectedClient.cpf}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="client-edit-status">Status do cliente</label>
-                    <select
-                      id="client-edit-status"
-                      name="status"
-                      defaultValue={selectedClient.status}
-                      required
-                    >
-                      {clientStatuses.map((status) => (
-                        <option key={status} value={status}>
-                          {clientStatusLabels[status]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field-full">
-                    <label htmlFor="client-edit-notes">Observacoes internas</label>
-                    <textarea
-                      id="client-edit-notes"
-                      name="notes"
-                      defaultValue={selectedClient.notes}
-                      placeholder="Contexto, combinados, preferencia de contato ou observacoes operacionais."
-                    />
-                  </div>
-                </div>
-                <label className="checkbox-row" htmlFor="client-edit-isActive">
-                  <input
-                    id="client-edit-isActive"
-                    name="isActive"
-                    type="checkbox"
-                    defaultChecked={selectedClient.isActive}
-                  />
-                  Manter acesso do cliente ativo no portal
-                </label>
-                <div className="notice">
-                  Esta edicao sincroniza o cadastro interno com o perfil autenticado do portal para evitar dados divergentes.
-                </div>
-                <div className="form-actions">
-                  <FormSubmitButton pendingLabel="Salvando ficha do cliente...">
-                    Salvar ficha do cliente
-                  </FormSubmitButton>
-                  <Link className="button secondary" href={selectedClientAgendaHref}>
-                    Abrir agenda deste cliente
-                  </Link>
-                </div>
-              </form>
-            </SectionCard>
-          </div>
-        ) : (
-          <p className="empty-state">
-            Nenhum cliente encontrado para os filtros atuais. Ajuste a busca ou cadastre um novo atendimento.
-          </p>
-        )}
-      </SectionCard>
 
       <div className="grid two">
         <SectionCard
@@ -1476,7 +1165,7 @@ export default async function InternalLawyerPage({
                   name="clientId"
                   required
                   disabled={!hasClients}
-                  defaultValue={selectedClient?.id || undefined}
+                  defaultValue={preferredClient?.id || undefined}
                 >
                   {hasClients ? (
                     overview.clientOptions.map((client) => (
@@ -1775,7 +1464,7 @@ export default async function InternalLawyerPage({
                   name="caseId"
                   required
                   disabled={!hasCases}
-                  defaultValue={selectedClient?.primaryCaseId || undefined}
+                  defaultValue={preferredCase?.id || undefined}
                 >
                   {hasCases ? (
                     overview.caseOptions.map((caseItem) => (
@@ -1852,7 +1541,7 @@ export default async function InternalLawyerPage({
                 name="caseId"
                 required
                 disabled={!hasCases}
-                defaultValue={selectedClient?.primaryCaseId || undefined}
+                defaultValue={preferredCase?.id || undefined}
               >
                 {hasCases ? (
                   overview.caseOptions.map((caseItem) => (

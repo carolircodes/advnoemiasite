@@ -17,6 +17,11 @@ import {
   publicIntakeUrgencyLabels,
   portalEventTypeLabels
 } from "@/lib/domain/portal";
+import {
+  buildInternalAgendaHref,
+  buildInternalClientHref,
+  buildInternalDocumentsHref
+} from "@/lib/navigation";
 import type { PortalProfile } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -452,6 +457,10 @@ export async function getStaffOverview() {
   const latestCases = caseOptions.slice(0, 6);
   const latestEvents = events.map((event) => ({
     ...event,
+    clientId: caseMap.get(event.case_id)?.client_id || null,
+    clientName:
+      profileMap.get(clientMap.get(caseMap.get(event.case_id)?.client_id || "")?.profile_id || "")
+        ?.full_name || "Cliente",
     caseTitle: caseMap.get(event.case_id)?.title || "Caso",
     eventLabel:
       caseEventTypeLabels[event.event_type as keyof typeof caseEventTypeLabels] ||
@@ -460,11 +469,19 @@ export async function getStaffOverview() {
   }));
   const latestDocuments = documents.map((document) => ({
     ...document,
+    clientId: caseMap.get(document.case_id)?.client_id || null,
+    clientName:
+      profileMap.get(clientMap.get(caseMap.get(document.case_id)?.client_id || "")?.profile_id || "")
+        ?.full_name || "Cliente",
     caseTitle: caseMap.get(document.case_id)?.title || "Caso",
     statusLabel: documentStatusLabels[document.status as keyof typeof documentStatusLabels]
   }));
   const latestDocumentRequests = requests.map((request) => ({
     ...request,
+    clientId: caseMap.get(request.case_id)?.client_id || null,
+    clientName:
+      profileMap.get(clientMap.get(caseMap.get(request.case_id)?.client_id || "")?.profile_id || "")
+        ?.full_name || "Cliente",
     caseTitle: caseMap.get(request.case_id)?.title || "Caso",
     statusLabel:
       documentRequestStatusLabels[
@@ -508,6 +525,7 @@ export async function getStaffOverview() {
   }));
   const casesByClientId = new Map<string, typeof caseOptions>();
   const appointmentsByClientId = new Map<string, typeof latestAppointments>();
+  const documentsByClientId = new Map<string, typeof latestDocuments>();
   const eventsByClientId = new Map<string, typeof latestEvents>();
   const documentRequestsByClientId = new Map<string, typeof latestDocumentRequests>();
 
@@ -521,6 +539,16 @@ export async function getStaffOverview() {
     const current = appointmentsByClientId.get(appointment.client_id) || [];
     current.push(appointment);
     appointmentsByClientId.set(appointment.client_id, current);
+  }
+
+  for (const document of latestDocuments) {
+    if (!document.clientId) {
+      continue;
+    }
+
+    const current = documentsByClientId.get(document.clientId) || [];
+    current.push(document);
+    documentsByClientId.set(document.clientId, current);
   }
 
   for (const event of latestEvents) {
@@ -554,23 +582,30 @@ export async function getStaffOverview() {
     const appointmentsForClient = [...(appointmentsByClientId.get(client.id) || [])].sort(
       (left, right) => left.starts_at.localeCompare(right.starts_at)
     );
-    const upcomingAppointmentsForClient = appointmentsForClient
+    const documentsForClient = [...(documentsByClientId.get(client.id) || [])].sort(
+      (left, right) => right.document_date.localeCompare(left.document_date)
+    );
+    const allUpcomingAppointmentsForClient = appointmentsForClient
       .filter(
         (appointment) =>
           appointment.starts_at >= nowIso &&
           appointment.status !== "cancelled" &&
           appointment.status !== "completed"
       )
+      .sort((left, right) => left.starts_at.localeCompare(right.starts_at));
+    const upcomingAppointmentsForClient = allUpcomingAppointmentsForClient
       .slice(0, 3);
     const recentEventsForClient = [...(eventsByClientId.get(client.id) || [])]
       .sort((left, right) => right.occurred_at.localeCompare(left.occurred_at))
       .slice(0, 3);
-    const openDocumentRequestsForClient = [...(documentRequestsByClientId.get(client.id) || [])]
+    const allOpenDocumentRequestsForClient = [...(documentRequestsByClientId.get(client.id) || [])]
       .filter((request) => request.status === "pending")
       .sort((left, right) =>
         (right.due_at || right.created_at).localeCompare(left.due_at || left.created_at)
-      )
+      );
+    const openDocumentRequestsForClient = allOpenDocumentRequestsForClient
       .slice(0, 3);
+    const recentDocumentsForClient = documentsForClient.slice(0, 3);
     const primaryCase =
       latestCasesForClient.find((caseItem) => caseItem.status !== "concluido") ||
       latestCasesForClient[0] ||
@@ -583,6 +618,13 @@ export async function getStaffOverview() {
         caseItem.last_status_changed_at,
         caseItem.created_at
       ]),
+      ...documentsForClient.flatMap((document) => [document.document_date, document.created_at]),
+      ...allOpenDocumentRequestsForClient.flatMap((request) => [
+        request.completed_at,
+        request.updated_at,
+        request.due_at,
+        request.created_at
+      ]),
       ...appointmentsForClient.flatMap((appointment) => [appointment.updated_at, appointment.starts_at]),
       ...recentEventsForClient.map((event) => event.occurred_at)
     ]);
@@ -592,8 +634,12 @@ export async function getStaffOverview() {
       caseCount: latestCasesForClient.length,
       activeCaseCount: latestCasesForClient.filter((caseItem) => caseItem.status !== "concluido")
         .length,
-      upcomingAppointmentsCount: upcomingAppointmentsForClient.length,
-      pendingDocumentRequestsCount: openDocumentRequestsForClient.length,
+      documentCount: documentsForClient.length,
+      pendingDocumentCount: documentsForClient.filter(
+        (document) => document.status === "pendente" || document.status === "solicitado"
+      ).length,
+      upcomingAppointmentsCount: allUpcomingAppointmentsForClient.length,
+      pendingDocumentRequestsCount: allOpenDocumentRequestsForClient.length,
       lastActivityAt:
         lastActivityTimestamp === null
           ? client.createdAt
@@ -604,6 +650,7 @@ export async function getStaffOverview() {
       primaryCaseStatus: primaryCase?.status || null,
       primaryCaseStatusLabel: primaryCase?.statusLabel || null,
       latestCases: latestCasesForClient.slice(0, 3),
+      recentDocuments: recentDocumentsForClient,
       upcomingAppointments: upcomingAppointmentsForClient,
       openDocumentRequests: openDocumentRequestsForClient,
       recentEvents: recentEventsForClient
@@ -701,7 +748,7 @@ export async function getStaffOverview() {
       kindLabel: "Onboarding",
       title: `${client.fullName} ainda nao concluiu o primeiro acesso`,
       description: `O convite continua aberto em ${client.email} e o portal ainda nao foi ativado.`,
-      href: "/internal/advogada#cadastro-cliente",
+      href: buildInternalClientHref(client.id, "portal"),
       actionLabel: "Acompanhar acesso",
       meta: [client.statusLabel, "Convite emitido"],
       timingLabel: `Convite enviado ${formatElapsedLabel(client.invitedAt, nowTimestamp)}`,
@@ -726,7 +773,7 @@ export async function getStaffOverview() {
           kindLabel: "Documento",
           title: `${request.title} - ${request.statusLabel}`,
           description: `${request.caseTitle} saiu da fila documental recente.`,
-          href: "/documentos#solicitacoes-abertas",
+          href: buildInternalDocumentsHref(request.clientId, request.case_id),
           actionLabel: "Abrir documentos",
           meta: [request.caseTitle],
           timingLabel: `Atualizada ${formatElapsedLabel(request.updated_at, nowTimestamp)}`,
@@ -763,7 +810,7 @@ export async function getStaffOverview() {
         request.instructions || `${request.caseTitle} segue aguardando esse envio do cliente.`,
         150
       ),
-      href: "/documentos#solicitacoes-abertas",
+      href: buildInternalDocumentsHref(request.clientId, request.case_id),
       actionLabel: requestOverdue ? "Cobrar documento" : "Ver solicitacao",
       meta: [
         request.caseTitle,
@@ -790,7 +837,7 @@ export async function getStaffOverview() {
           kindLabel: "Agenda",
           title: `${appointment.title} - ${appointment.statusLabel}`,
           description: `${appointment.caseTitle} com ${appointment.clientName}.`,
-          href: "/agenda#historico-recente",
+          href: buildInternalAgendaHref(appointment.client_id, appointment.case_id),
           actionLabel: "Abrir agenda",
           meta: [appointment.typeLabel, appointment.caseTitle],
           timingLabel: `Atualizado ${formatElapsedLabel(appointment.updated_at, nowTimestamp)}`,
@@ -828,7 +875,7 @@ export async function getStaffOverview() {
           `${appointment.caseTitle} com ${appointment.clientName}. Revise orientacoes e preparo.`,
         150
       ),
-      href: "/agenda#proximos-compromissos",
+      href: buildInternalAgendaHref(appointment.client_id, appointment.case_id),
       actionLabel: appointmentHoursUntil <= 24 ? "Preparar compromisso" : "Revisar agenda",
       meta: [appointment.caseTitle, appointment.clientName, appointment.typeLabel],
       timingLabel: formatUpcomingLabel(appointment.starts_at, nowTimestamp),
@@ -863,7 +910,7 @@ export async function getStaffOverview() {
           kindLabel: "Caso",
           title: `${caseItem.title} - ${caseItem.statusLabel}`,
           description: `${caseItem.clientName} concluiu o ciclo principal do acompanhamento.`,
-          href: "/internal/advogada#gestao-casos",
+          href: buildInternalClientHref(caseItem.clientId, "casos"),
           actionLabel: "Revisar caso",
           meta: [caseItem.clientName, caseItem.priorityLabel],
           timingLabel: `Atualizado ${formatElapsedLabel(lastActionDate, nowTimestamp)}`,
@@ -901,7 +948,7 @@ export async function getStaffOverview() {
             "O caso esta parado aguardando retorno do cliente para seguir.",
           150
         ),
-        href: "/internal/advogada#atualizacoes-caso",
+        href: buildInternalClientHref(caseItem.clientId, "pendencias"),
         actionLabel: "Cobrar retorno",
         meta: [caseItem.clientName, caseItem.statusLabel, caseItem.priorityLabel],
         timingLabel: `Sem retorno ${formatElapsedLabel(lastActionDate, nowTimestamp)}`,
@@ -943,7 +990,7 @@ export async function getStaffOverview() {
           "O caso esta sem atualizacao recente e precisa de novo movimento interno.",
         150
       ),
-      href: "/internal/advogada#atualizacoes-caso",
+      href: buildInternalClientHref(caseItem.clientId, "casos"),
       actionLabel: "Atualizar caso",
       meta: [caseItem.clientName, caseItem.statusLabel, caseItem.priorityLabel],
       timingLabel: `Sem atualizacao ${formatElapsedLabel(lastActionDate, nowTimestamp)}`,

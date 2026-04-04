@@ -927,11 +927,22 @@ textarea {
   gap: 12px;
 }
 
+.client-directory-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
 .client-directory-meta {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .client-sheet-grid {
+  align-items: start;
+}
+
+.client-page-grid {
   align-items: start;
 }
 
@@ -1216,7 +1227,8 @@ textarea {
   .summary-grid,
   .summary-grid.compact,
   .client-directory-meta,
-  .client-ops-grid {
+  .client-ops-grid,
+  .client-directory-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1275,7 +1287,8 @@ textarea {
   .summary-grid,
   .summary-grid.compact,
   .client-directory-meta,
-  .client-ops-grid {
+  .client-ops-grid,
+  .client-directory-actions {
     grid-template-columns: 1fr;
   }
 
@@ -1314,7 +1327,8 @@ textarea {
 
   .session-action,
   .session-action .button,
-  .client-directory-footer .button {
+  .client-directory-footer .button,
+  .client-directory-actions .button {
     width: 100%;
   }
 
