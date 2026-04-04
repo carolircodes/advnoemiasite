@@ -4,11 +4,13 @@ import { assertStaffActor } from "@/lib/auth/guards";
 import {
   allowedDocumentExtensions,
   allowedDocumentMimeTypes,
+  documentRequestStatusLabels,
   documentStatusLabels,
   formatPortalDateTime,
   maxDocumentFileSizeBytes,
   registerCaseDocumentSchema,
-  requestCaseDocumentSchema
+  requestCaseDocumentSchema,
+  updateDocumentRequestStatusSchema
 } from "@/lib/domain/portal";
 import { queueCaseEventNotification } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -191,13 +193,33 @@ async function resolveCaseContext(caseId: string) {
   };
 }
 
+async function resolveDocumentRequestContext(requestId: string) {
+  const supabase = createAdminSupabaseClient();
+  const { data: requestRecord, error: requestError } = await supabase
+    .from("document_requests")
+    .select("id,case_id,title,status,visible_to_client,due_at")
+    .eq("id", requestId)
+    .single();
+
+  if (requestError || !requestRecord) {
+    throw new Error(requestError?.message || "Solicitacao de documento nao encontrada.");
+  }
+
+  const context = await resolveCaseContext(requestRecord.case_id);
+
+  return {
+    ...context,
+    requestRecord
+  };
+}
+
 async function createCaseEventForDocumentFlow(input: {
   caseId: string;
   clientId: string;
   actorProfileId: string;
   clientProfileId: string;
   clientEmail: string;
-  eventType: "new_document" | "document_request";
+  eventType: "new_document" | "document_request" | "case_update";
   title: string;
   description: string;
   publicSummary: string;
@@ -312,6 +334,22 @@ async function rollbackDocumentRecord(documentId: string | null) {
   }
 }
 
+async function restoreDocumentRequestStatus(requestId: string, status: string) {
+  const supabase = createAdminSupabaseClient();
+  const { error } = await supabase
+    .from("document_requests")
+    .update({ status })
+    .eq("id", requestId);
+
+  if (error) {
+    console.error("[document-requests.restore] Failed to restore request status", {
+      requestId,
+      status,
+      message: error.message
+    });
+  }
+}
+
 export async function registerCaseDocument(
   rawInput: unknown,
   actorProfileId: string,
@@ -324,10 +362,21 @@ export async function registerCaseDocument(
   const visibleToClient = input.visibleToClient;
   const shouldNotifyClient = visibleToClient && input.shouldNotifyClient;
   const visibility = visibleToClient ? "client" : "internal";
+  const relatedRequestContext = input.requestId
+    ? await resolveDocumentRequestContext(input.requestId)
+    : null;
 
   const { supabase, caseRecord, clientRecord, profileRecord } = await resolveCaseContext(
     input.caseId
   );
+
+  if (relatedRequestContext && relatedRequestContext.caseRecord.id !== caseRecord.id) {
+    throw new Error("A solicitacao escolhida pertence a outro caso.");
+  }
+
+  if (relatedRequestContext && relatedRequestContext.requestRecord.status !== "pending") {
+    throw new Error("A solicitacao escolhida ja nao esta pendente.");
+  }
 
   const documentId = crypto.randomUUID();
   const storagePath = buildStoragePath({
@@ -369,8 +418,27 @@ export async function registerCaseDocument(
 
   let eventId: string | null = null;
   let notificationId: string | null = null;
+  let resolvedRequestId: string | null = null;
+  let previousRequestStatus: string | null = null;
 
   try {
+    if (relatedRequestContext) {
+      previousRequestStatus = relatedRequestContext.requestRecord.status;
+      const { error: requestUpdateError } = await supabase
+        .from("document_requests")
+        .update({ status: "completed" })
+        .eq("id", relatedRequestContext.requestRecord.id);
+
+      if (requestUpdateError) {
+        throw new Error(
+          requestUpdateError.message ||
+            "Nao foi possivel concluir a solicitacao relacionada a este documento."
+        );
+      }
+
+      resolvedRequestId = relatedRequestContext.requestRecord.id;
+    }
+
     if (visibleToClient) {
       const activity = await createCaseEventForDocumentFlow({
         caseId: caseRecord.id,
@@ -385,6 +453,7 @@ export async function registerCaseDocument(
         payload: {
           source: "documentos",
           documentId: documentRecord.id,
+          requestId: resolvedRequestId,
           documentStatus: input.status,
           category: input.category,
           mimeType: file.mimeType,
@@ -408,6 +477,7 @@ export async function registerCaseDocument(
         caseTitle: caseRecord.title,
         status: input.status,
         visibility,
+        requestId: resolvedRequestId,
         storagePath,
         mimeType: file.mimeType,
         fileSizeBytes: uploadedFile?.size || null,
@@ -426,10 +496,14 @@ export async function registerCaseDocument(
       storagePath,
       eventId,
       notificationId,
+      resolvedRequestId,
       message: error instanceof Error ? error.message : String(error)
     });
 
     await rollbackNotificationAndEvent(eventId, notificationId);
+    if (resolvedRequestId && previousRequestStatus) {
+      await restoreDocumentRequestStatus(resolvedRequestId, previousRequestStatus);
+    }
     await rollbackDocumentRecord(documentRecord.id);
     await removeDocumentFile(storagePath);
     throw error;
@@ -438,6 +512,7 @@ export async function registerCaseDocument(
   return {
     documentId: documentRecord.id,
     storagePath,
+    resolvedRequestId,
     eventId,
     notificationId
   };
@@ -551,6 +626,107 @@ export async function requestCaseDocument(rawInput: unknown, actorProfileId: str
 
   return {
     documentRequestId: requestRecord.id,
+    eventId,
+    notificationId
+  };
+}
+
+export async function updateDocumentRequestStatus(rawInput: unknown, actorProfileId: string) {
+  await assertStaffActor(actorProfileId);
+  const input = updateDocumentRequestStatusSchema.parse(rawInput);
+  const { supabase, caseRecord, clientRecord, profileRecord, requestRecord } =
+    await resolveDocumentRequestContext(input.requestId);
+
+  if (requestRecord.status === input.status) {
+    throw new Error("A solicitacao ja esta com este status.");
+  }
+
+  const previousStatus = requestRecord.status;
+  const shouldNotifyClient = requestRecord.visible_to_client && input.shouldNotifyClient;
+
+  const { error: updateError } = await supabase
+    .from("document_requests")
+    .update({ status: input.status })
+    .eq("id", requestRecord.id);
+
+  if (updateError) {
+    throw new Error(updateError.message || "Nao foi possivel atualizar a solicitacao.");
+  }
+
+  let eventId: string | null = null;
+  let notificationId: string | null = null;
+
+  try {
+    if (requestRecord.visible_to_client) {
+      const nextStatusLabel =
+        documentRequestStatusLabels[
+          input.status as keyof typeof documentRequestStatusLabels
+        ] || input.status;
+      const publicSummary =
+        input.status === "completed"
+          ? `A pendencia documental "${requestRecord.title}" foi concluida pela equipe.`
+          : `A solicitacao "${requestRecord.title}" foi cancelada e nao exige mais acao sua.`;
+      const activity = await createCaseEventForDocumentFlow({
+        caseId: caseRecord.id,
+        clientId: clientRecord.id,
+        actorProfileId,
+        clientProfileId: profileRecord.id,
+        clientEmail: profileRecord.email || "",
+        eventType: "case_update",
+        title: `Solicitacao atualizada: ${requestRecord.title}`,
+        description: `A solicitacao documental foi atualizada para ${nextStatusLabel.toLowerCase()}.`,
+        publicSummary,
+        payload: {
+          source: "documentos",
+          documentRequestId: requestRecord.id,
+          previousStatus,
+          nextStatus: input.status
+        },
+        shouldNotifyClient
+      });
+
+      eventId = activity.eventId;
+      notificationId = activity.notificationId;
+    }
+
+    const { error: auditError } = await supabase.from("audit_logs").insert({
+      actor_profile_id: actorProfileId,
+      action: "document_requests.status.update",
+      entity_type: "document_requests",
+      entity_id: requestRecord.id,
+      payload: {
+        caseId: caseRecord.id,
+        previousStatus,
+        nextStatus: input.status,
+        eventId,
+        notificationId
+      }
+    });
+
+    if (auditError) {
+      throw new Error(
+        `Nao foi possivel registrar a auditoria da solicitacao: ${auditError.message}`
+      );
+    }
+  } catch (error) {
+    console.error("[document-requests.update] Rolling back request status after downstream failure", {
+      requestId: requestRecord.id,
+      previousStatus,
+      nextStatus: input.status,
+      eventId,
+      notificationId,
+      message: error instanceof Error ? error.message : String(error)
+    });
+
+    await rollbackNotificationAndEvent(eventId, notificationId);
+    await restoreDocumentRequestStatus(requestRecord.id, previousStatus);
+    throw error;
+  }
+
+  return {
+    requestId: requestRecord.id,
+    previousStatus,
+    nextStatus: input.status,
     eventId,
     notificationId
   };

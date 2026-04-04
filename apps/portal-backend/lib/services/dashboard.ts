@@ -5,6 +5,7 @@ import {
   appointmentStatusLabels,
   appointmentTypeLabels,
   caseEventTypeLabels,
+  casePriorityLabels,
   caseStatusLabels,
   clientStatusLabels,
   documentRequestStatusLabels,
@@ -31,50 +32,50 @@ export async function getStaffOverview() {
       .from("clients")
       .select("id,profile_id,status,created_at")
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(100),
     supabase
       .from("cases")
-      .select("id,title,area,status,client_id,created_at")
+      .select("id,title,area,summary,status,priority,client_id,created_at")
       .order("created_at", { ascending: false })
-      .limit(18),
+      .limit(100),
     supabase
       .from("case_events")
       .select(
         "id,case_id,event_type,title,occurred_at,visible_to_client,should_notify_client"
       )
       .order("occurred_at", { ascending: false })
-      .limit(8),
+      .limit(100),
     supabase
       .from("documents")
       .select(
         "id,case_id,file_name,category,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
       )
       .order("document_date", { ascending: false })
-      .limit(8),
+      .limit(100),
     supabase
       .from("document_requests")
       .select("id,case_id,title,status,visible_to_client,due_at,created_at")
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(100),
     supabase
       .from("appointments")
       .select(
         "id,case_id,client_id,title,appointment_type,status,visible_to_client,starts_at,notes,created_at,updated_at"
       )
       .order("starts_at", { ascending: true })
-      .limit(12),
+      .limit(100),
     supabase
       .from("appointment_history")
       .select(
         "id,appointment_id,case_id,client_id,change_type,title,appointment_type,status,visible_to_client,starts_at,changed_fields,created_at"
       )
       .order("created_at", { ascending: false })
-      .limit(12),
+      .limit(100),
     supabase
       .from("notifications_outbox")
       .select("id,status,template_key,created_at")
       .order("created_at", { ascending: false })
-      .limit(12)
+      .limit(100)
     ]);
 
   if (clientsResult.error) {
@@ -161,16 +162,32 @@ export async function getStaffOverview() {
   );
 
   return {
-    latestClients: clients.map((client) => ({
+    latestClients: clients.slice(0, 5).map((client) => ({
       id: client.id,
       fullName: profileMap.get(client.profile_id)?.full_name || "Cliente",
       email: profileMap.get(client.profile_id)?.email || "",
       statusLabel: clientStatusLabels[client.status as keyof typeof clientStatusLabels],
       createdAt: client.created_at
     })),
+    clientOptions: clients.map((client) => ({
+      id: client.id,
+      fullName: profileMap.get(client.profile_id)?.full_name || "Cliente",
+      email: profileMap.get(client.profile_id)?.email || "",
+      status: client.status,
+      statusLabel: clientStatusLabels[client.status as keyof typeof clientStatusLabels],
+      createdAt: client.created_at
+    })),
     caseOptions: cases.map((caseItem) => ({
       id: caseItem.id,
       title: caseItem.title,
+      area: caseItem.area,
+      summary: caseItem.summary || "",
+      priority: caseItem.priority || "normal",
+      priorityLabel:
+        casePriorityLabels[
+          (caseItem.priority || "normal") as keyof typeof casePriorityLabels
+        ] || "Normal",
+      created_at: caseItem.created_at,
       status: caseItem.status,
       statusLabel: caseStatusLabels[caseItem.status as keyof typeof caseStatusLabels],
       clientName:
@@ -179,6 +196,10 @@ export async function getStaffOverview() {
     })),
     latestCases: cases.slice(0, 6).map((caseItem) => ({
       ...caseItem,
+      priorityLabel:
+        casePriorityLabels[
+          (caseItem.priority || "normal") as keyof typeof casePriorityLabels
+        ] || "Normal",
       statusLabel: caseStatusLabels[caseItem.status as keyof typeof caseStatusLabels],
       clientName:
         profileMap.get(clientMap.get(caseItem.client_id)?.profile_id || "")?.full_name ||
@@ -311,7 +332,7 @@ export async function getClientWorkspace(profile: PortalProfile) {
       .eq("client_id", clientRecord.id)
       .eq("visible_to_client", true)
       .order("occurred_at", { ascending: false })
-      .limit(20)
+      .limit(100)
   ]);
 
   if (documentsResult.error) {

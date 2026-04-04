@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import {
   getDefaultDestinationForProfile,
@@ -126,9 +127,9 @@ export default async function UpdatePasswordPage({
             </div>
           </div>
           <div className="form-actions">
-            <button className="button" type="submit">
+            <FormSubmitButton pendingLabel="Atualizando senha...">
               Atualizar senha
-            </button>
+            </FormSubmitButton>
           </div>
         </form>
       </SectionCard>

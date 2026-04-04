@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import {
   getAccessMessage,
@@ -107,9 +108,9 @@ export default async function LoginPage({
               </div>
             </div>
             <div className="form-actions">
-              <button className="button" type="submit">
+              <FormSubmitButton pendingLabel="Entrando no portal...">
                 Entrar no portal
-              </button>
+              </FormSubmitButton>
               <Link className="button secondary" href="/auth/esqueci-senha">
                 Esqueci minha senha
               </Link>

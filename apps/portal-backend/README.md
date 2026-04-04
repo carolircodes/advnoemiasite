@@ -20,6 +20,7 @@ O fluxo local validado para este projeto e:
 - agenda real de compromissos e proximos passos
 - compromissos visiveis ao cliente em `/agenda`
 - edicao, reagendamento e cancelamento com historico persistido da agenda
+- processamento real da `notifications_outbox` por worker protegido por secret
 - rotas internas e areas autenticadas protegidas por sessao, role e RLS
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
@@ -36,7 +37,12 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/services/manage-appointments.ts`: compromissos, prazos e proximos passos do caso
 - `supabase/migrations/20260408_appointment_lifecycle.sql`: historico persistido da agenda
 - `supabase/migrations/20260409_document_upload_storage.sql`: bucket privado e metadata de upload
+- `supabase/migrations/20260410_visibility_rls_hardening.sql`: isolamento por visibilidade em agenda, atualizacoes e solicitacoes
 - `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
+- `lib/services/process-notifications.ts`: worker real para processar a `notifications_outbox`
+- `lib/notifications/email-templates.ts`: padrao de mensagens do portal
+- `app/api/worker/notifications/process/route.ts`: endpoint seguro para rodar a fila
+- `scripts/process-notifications.mjs`: gatilho local do worker
 - `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
 - `lib/supabase/`: clientes browser, server, admin e middleware
 - `scripts/bootstrap-admin.mjs`: bootstrap idempotente da advogada
@@ -63,6 +69,14 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=COLE_A_CHAVE_PUBLICA_LOCAL_DO_SUPABASE
 SUPABASE_SECRET_KEY=COLE_A_CHAVE_SECRETA_LOCAL_DO_SUPABASE
 INVITE_REDIRECT_URL=http://127.0.0.1:3000/auth/callback
 PASSWORD_RESET_REDIRECT_URL=http://127.0.0.1:3000/auth/callback
+NOTIFICATIONS_PROVIDER=smtp
+NOTIFICATIONS_WORKER_SECRET=troque-este-segredo-do-worker
+NOTIFICATIONS_SMTP_HOST=127.0.0.1
+NOTIFICATIONS_SMTP_PORT=54325
+NOTIFICATIONS_SMTP_USER=
+NOTIFICATIONS_SMTP_PASS=
+NOTIFICATIONS_SMTP_SECURE=false
+NOTIFICATIONS_REPLY_TO=atendimento@advnoemia.local
 RESEND_API_KEY=
 EMAIL_FROM=Noemia Paixao Advocacia <no-reply@advnoemia.local>
 PORTAL_ADMIN_EMAIL=advogada@advnoemia.local
@@ -75,6 +89,12 @@ Use o valor `Publishable` mostrado pelo `supabase start` em `NEXT_PUBLIC_SUPABAS
 Use o valor `Secret` mostrado pelo `supabase start` em `SUPABASE_SECRET_KEY`.
 
 O projeto ainda aceita os aliases antigos `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`, mas o padrao documentado e o definitivo.
+
+Para envio real de notificacoes do portal:
+
+- use `NOTIFICATIONS_PROVIDER=smtp` no ambiente local para falar com o Inbucket exposto em `127.0.0.1:54325`
+- use `NOTIFICATIONS_PROVIDER=resend` em ambiente externo quando quiser enviar pela API da Resend
+- defina `NOTIFICATIONS_WORKER_SECRET` antes de expor a rota do worker
 
 ## Setup local
 
@@ -144,6 +164,7 @@ No ambiente local atual:
 - o envio vai para a inbox local do Mailpit
 - o Mailpit fica em `http://127.0.0.1:54324`
 - o SMTP interno do Supabase local precisa apontar para `inbucket:1025`
+- o SMTP externo para o worker do portal fica exposto em `127.0.0.1:54325`
 - o callback de invite e recovery precisa apontar para `/auth/callback`
 
 Configuracao local relevante em `supabase/config.toml`:
@@ -152,6 +173,7 @@ Configuracao local relevante em `supabase/config.toml`:
 - `enable_confirmations = false`
 - `[auth.email.smtp].host = "inbucket"`
 - `[auth.email.smtp].port = 1025`
+- `[inbucket].smtp_port = 54325`
 - redirects incluindo `http://127.0.0.1:3000/auth/callback` e `http://localhost:3000/auth/callback`
 
 ## Controle de acesso validado
@@ -162,8 +184,37 @@ Configuracao local relevante em `supabase/config.toml`:
 - `/api/documents/[documentId]` exige sessao valida e reaplica a autorizacao do portal antes de abrir qualquer arquivo
 - clientes sem `first_login_completed_at` sao redirecionados para `/auth/primeiro-acesso`
 - leituras autenticadas do app passam por RLS real, sem `service_role` nas telas do portal
+- clientes autenticados so leem `appointments`, `case_events` e `document_requests` quando o item tambem estiver marcado como visivel ao cliente
 - mutacoes sensiveis ficam concentradas no backend com checagem adicional de actor autorizado
 - sessoes autenticadas comuns nao recebem permissao SQL direta de escrita nas tabelas do schema `public`
+
+## Fila real de notificacoes
+
+Eventos relevantes continuam alimentando `notifications_outbox`. Agora o portal tambem possui um worker real para processar essa fila.
+
+### Ambiente local
+
+1. Confirme o bloco `[inbucket]` em `supabase/config.toml` com `smtp_port = 54325`.
+2. Se voce acabou de alterar esse arquivo, reinicie o Supabase local.
+3. Defina no `.env.local`:
+   - `NOTIFICATIONS_PROVIDER=smtp`
+   - `NOTIFICATIONS_WORKER_SECRET=...`
+   - `NOTIFICATIONS_SMTP_HOST=127.0.0.1`
+   - `NOTIFICATIONS_SMTP_PORT=54325`
+4. Rode `npm run dev`.
+5. Gere um evento que alimente `notifications_outbox`.
+6. Rode `npm run notifications:process`.
+7. Confira o resultado no terminal e a inbox local em `http://127.0.0.1:54324`.
+
+### Fluxo do worker
+
+- `POST /api/worker/notifications/process`
+- autenticacao por `x-worker-secret` ou `Authorization: Bearer ...`
+- processa itens `pending` e `failed` disponiveis no horario atual
+- envia por SMTP ou Resend, conforme `NOTIFICATIONS_PROVIDER`
+- marca como `sent`, `failed` ou `skipped`
+
+Observacao: registros `client-invite` continuam sendo tratados como rastreio do onboarding, porque o convite principal segue no fluxo nativo do Supabase Auth.
 
 ## Fluxo local validado
 

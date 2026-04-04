@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
@@ -15,7 +16,8 @@ import {
 import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
 import {
   registerCaseDocument,
-  requestCaseDocument
+  requestCaseDocument,
+  updateDocumentRequestStatus
 } from "@/lib/services/manage-documents";
 
 function buildDefaultDateTimeValue() {
@@ -24,12 +26,32 @@ function buildDefaultDateTimeValue() {
   return localValue.toISOString().slice(0, 16);
 }
 
+function getStringParam(
+  value: string | string[] | undefined,
+  fallback = ""
+) {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function matchesSearch(query: string, values: Array<string | null | undefined>) {
+  if (!query) {
+    return true;
+  }
+
+  const normalizedQuery = query.toLowerCase();
+  return values.some((value) => value?.toLowerCase().includes(normalizedQuery));
+}
+
 function getSuccessMessage(success: string) {
   switch (success) {
     case "documento-registrado":
       return "Documento registrado com sucesso. A base do caso, o historico e a fila de notificacao ficaram alinhados.";
     case "solicitacao-criada":
       return "Solicitacao de documento criada com sucesso. O cliente ja pode acompanhar a pendencia no portal.";
+    case "solicitacao-concluida":
+      return "Pendencia documental concluida com sucesso. O portal ja refletiu essa mudanca.";
+    case "solicitacao-cancelada":
+      return "Solicitacao cancelada com sucesso. A equipe e o cliente passam a ver o novo estado.";
     default:
       return "";
   }
@@ -53,6 +75,7 @@ async function registerDocumentAction(formData: FormData) {
     await registerCaseDocument(
       {
         caseId: formData.get("caseId"),
+        requestId: formData.get("requestId"),
         category: formData.get("category"),
         description: formData.get("description"),
         status: formData.get("status"),
@@ -98,6 +121,34 @@ async function requestDocumentAction(formData: FormData) {
   redirect("/documentos?success=solicitacao-criada");
 }
 
+async function updateRequestStatusAction(formData: FormData) {
+  "use server";
+
+  const profile = await requireProfile(["advogada", "admin"]);
+  const status = String(formData.get("status") || "completed");
+
+  try {
+    await updateDocumentRequestStatus(
+      {
+        requestId: formData.get("requestId"),
+        status,
+        shouldNotifyClient: formData.get("shouldNotifyClient") === "on"
+      },
+      profile.id
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-atualizar-solicitacao";
+    redirect(`/documentos?error=${message}`);
+  }
+
+  redirect(
+    `/documentos?success=${
+      status === "completed" ? "solicitacao-concluida" : "solicitacao-cancelada"
+    }`
+  );
+}
+
 export default async function DocumentsPage({
   searchParams
 }: {
@@ -113,18 +164,69 @@ export default async function DocumentsPage({
     const error = getAccessMessage(rawError) || rawError;
     const success =
       typeof params.success === "string" ? getSuccessMessage(params.success) : "";
+    const query = getStringParam(params.q);
+    const selectedStatus = getStringParam(params.status);
+    const pendingOnly = getStringParam(params.pending) === "1";
+    const sort = getStringParam(params.sort, "recent");
+    const filteredDocuments = overview.latestDocuments
+      .filter(
+        (document) =>
+          matchesSearch(query, [document.file_name, document.caseTitle, document.category]) &&
+          (!selectedStatus || document.status === selectedStatus) &&
+          (!pendingOnly ||
+            document.status === "pendente" ||
+            document.status === "solicitado")
+      )
+      .sort((left, right) =>
+        sort === "oldest"
+          ? left.document_date.localeCompare(right.document_date)
+          : right.document_date.localeCompare(left.document_date)
+      );
+    const filteredRequests = overview.latestDocumentRequests
+      .filter(
+        (request) =>
+          matchesSearch(query, [request.title, request.caseTitle, request.statusLabel]) &&
+          (!pendingOnly || request.status === "pending")
+      )
+      .sort((left, right) =>
+        sort === "oldest"
+          ? left.created_at.localeCompare(right.created_at)
+          : right.created_at.localeCompare(left.created_at)
+      );
     const hasCases = overview.caseOptions.length > 0;
+    const hasFilters = !!(query || selectedStatus || pendingOnly || sort !== "recent");
+    const openRequests = filteredRequests.filter((request) => request.status === "pending");
 
     return (
       <AppFrame
         eyebrow="Documentos"
-        title="Gestao real de documentos e solicitacoes."
-        description="A equipe registra documentos, abre pendencias para o cliente e prepara notificacoes futuras na mesma base do caso."
-        actions={[
-          { href: "/api/internal/documents", label: "API de documentos", tone: "secondary" },
+        title="Central de documentos clara para registro, solicitacao e acompanhamento."
+        description="Aqui a equipe organiza uploads reais, pendencias documentais e pedidos ao cliente em um fluxo direto e facil de operar."
+        navigation={[
+          { href: "/internal/advogada", label: "Painel" },
+          { href: "/documentos", label: "Documentos", active: true },
+          { href: "/agenda", label: "Agenda" }
+        ]}
+        highlights={[
+          { label: "Documentos recentes", value: String(filteredDocuments.length) },
+          { label: "Solicitacoes abertas", value: String(openRequests.length) },
           {
-            href: "/api/internal/document-requests",
-            label: "API de solicitacoes",
+            label: "Pendencias documentais",
+            value: String(
+              filteredDocuments.filter(
+                (document) =>
+                  document.status === "pendente" || document.status === "solicitado"
+              ).length
+            )
+          },
+          { label: "Notificacoes pendentes", value: String(overview.pendingNotifications) }
+        ]}
+        actions={[
+          { href: "#registrar-documento", label: "Registrar documento" },
+          { href: "#solicitar-documento", label: "Solicitar documento", tone: "secondary" },
+          {
+            href: "/internal/advogada#cadastro-cliente",
+            label: "Cadastrar cliente",
             tone: "secondary"
           }
         ]}
@@ -132,14 +234,70 @@ export default async function DocumentsPage({
         {error ? <div className="error-notice">{error}</div> : null}
         {success ? <div className="success-notice">{success}</div> : null}
 
+        <SectionCard
+          title="Busca e filtros"
+          description="Filtre documentos e solicitacoes para focar no que esta pendente ou localizar um caso rapidamente."
+        >
+          <form className="stack">
+            <div className="fields">
+              <div className="field-full">
+                <label htmlFor="documents-q">Buscar por cliente, caso ou documento</label>
+                <input
+                  id="documents-q"
+                  name="q"
+                  type="search"
+                  defaultValue={query}
+                  placeholder="Nome do cliente, titulo do pedido, tipo do documento"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="documents-status">Status do documento</label>
+                <select id="documents-status" name="status" defaultValue={selectedStatus}>
+                  <option value="">Todos os status</option>
+                  {documentStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {documentStatusLabels[status]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="documents-sort">Ordenacao</label>
+                <select id="documents-sort" name="sort" defaultValue={sort}>
+                  <option value="recent">Mais recentes primeiro</option>
+                  <option value="oldest">Mais antigos primeiro</option>
+                </select>
+              </div>
+            </div>
+            <label className="checkbox-row" htmlFor="documents-pending">
+              <input
+                id="documents-pending"
+                name="pending"
+                type="checkbox"
+                value="1"
+                defaultChecked={pendingOnly}
+              />
+              Mostrar apenas pendencias e solicitacoes abertas
+            </label>
+            <div className="form-actions">
+              <button className="button secondary" type="submit">
+                Aplicar filtros
+              </button>
+              <a className="button secondary" href="/documentos">
+                Limpar filtros
+              </a>
+            </div>
+          </form>
+        </SectionCard>
+
         <div className="metric-grid">
           <div className="metric-card">
             <span>Documentos recentes</span>
-            <strong>{overview.latestDocuments.length}</strong>
+            <strong>{filteredDocuments.length}</strong>
           </div>
           <div className="metric-card">
             <span>Solicitacoes abertas</span>
-            <strong>{overview.openDocumentRequestsCount}</strong>
+            <strong>{openRequests.length}</strong>
           </div>
           <div className="metric-card">
             <span>Casos com documentos</span>
@@ -153,6 +311,7 @@ export default async function DocumentsPage({
 
         <div className="grid two">
           <SectionCard
+            id="registrar-documento"
             title="Registrar documento do caso"
             description="Envie o arquivo real, vincule ao caso e mantenha o historico e a fila de notificacoes alinhados quando o item for visivel ao cliente."
           >
@@ -207,6 +366,17 @@ export default async function DocumentsPage({
                   />
                 </div>
                 <div className="field-full">
+                  <label htmlFor="requestId">Concluir solicitacao relacionada</label>
+                  <select id="requestId" name="requestId" defaultValue="">
+                    <option value="">Nenhuma solicitacao vinculada</option>
+                    {openRequests.map((request) => (
+                      <option key={request.id} value={request.id}>
+                        {request.title} - {request.caseTitle}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field-full">
                   <label htmlFor="description">Descricao curta</label>
                   <textarea id="description" name="description" />
                 </div>
@@ -230,17 +400,18 @@ export default async function DocumentsPage({
                 Preparar notificacao por e-mail para este documento
               </label>
               <div className="notice">
-                O upload envia o arquivo para o storage privado do portal e grava o metadata do documento na mesma operacao.
+                O upload envia o arquivo para o storage privado do portal, grava o documento e pode concluir uma pendencia aberta na mesma operacao.
               </div>
               <div className="form-actions">
-                <button className="button" type="submit" disabled={!hasCases}>
+                <FormSubmitButton pendingLabel="Registrando documento..." disabled={!hasCases}>
                   Registrar documento
-                </button>
+                </FormSubmitButton>
               </div>
             </form>
           </SectionCard>
 
           <SectionCard
+            id="solicitar-documento"
             title="Solicitar documento ao cliente"
             description="Abra uma pendencia documental formal, com prazo e visibilidade controlados para o cliente."
           >
@@ -292,12 +463,12 @@ export default async function DocumentsPage({
                 Preparar notificacao por e-mail para esta solicitacao
               </label>
               <div className="notice">
-                A pendencia fica gravada em `document_requests` e tambem alimenta o historico do caso quando estiver visivel ao cliente.
+                A pendencia fica registrada no caso e, quando estiver visivel ao cliente, tambem aparece no acompanhamento dele.
               </div>
               <div className="form-actions">
-                <button className="button" type="submit" disabled={!hasCases}>
+                <FormSubmitButton pendingLabel="Criando solicitacao..." disabled={!hasCases}>
                   Criar solicitacao
-                </button>
+                </FormSubmitButton>
               </div>
             </form>
           </SectionCard>
@@ -308,9 +479,9 @@ export default async function DocumentsPage({
             title="Documentos recentes"
             description="A equipe acompanha o status operacional de cada documento por caso."
           >
-            {overview.latestDocuments.length ? (
+            {filteredDocuments.length ? (
               <ul className="update-feed">
-                {overview.latestDocuments.map((document) => (
+                {filteredDocuments.slice(0, 12).map((document) => (
                   <li key={document.id} className="update-card">
                     <div className="update-head">
                       <div>
@@ -377,7 +548,9 @@ export default async function DocumentsPage({
               </ul>
             ) : (
               <p className="empty-state">
-                Os documentos registrados para os casos aparecerao aqui.
+                {hasFilters
+                  ? "Nenhum documento corresponde aos filtros atuais."
+                  : "Os documentos registrados para os casos aparecerao aqui."}
               </p>
             )}
           </SectionCard>
@@ -386,9 +559,9 @@ export default async function DocumentsPage({
             title="Solicitacoes abertas"
             description="Acompanhe o que ainda esta pendente junto ao cliente."
           >
-            {overview.latestDocumentRequests.length ? (
+            {openRequests.length ? (
               <ul className="update-feed">
-                {overview.latestDocumentRequests.map((request) => (
+                {openRequests.slice(0, 12).map((request) => (
                   <li key={request.id} className="update-card">
                     <div className="update-head">
                       <div>
@@ -414,12 +587,36 @@ export default async function DocumentsPage({
                     <span className="item-meta">
                       Aberta em {formatPortalDateTime(request.created_at)}
                     </span>
+                    <div className="form-actions">
+                      <form action={updateRequestStatusAction}>
+                        <input type="hidden" name="requestId" value={request.id} />
+                        <input type="hidden" name="status" value="completed" />
+                        <input type="hidden" name="shouldNotifyClient" value="on" />
+                        <FormSubmitButton pendingLabel="Concluindo pendencia..." tone="secondary">
+                          Concluir pendencia
+                        </FormSubmitButton>
+                      </form>
+                      <form action={updateRequestStatusAction}>
+                        <input type="hidden" name="requestId" value={request.id} />
+                        <input type="hidden" name="status" value="cancelled" />
+                        <input type="hidden" name="shouldNotifyClient" value="on" />
+                        <FormSubmitButton
+                          pendingLabel="Cancelando solicitacao..."
+                          tone="danger"
+                          confirmMessage="Tem certeza que deseja cancelar esta solicitacao?"
+                        >
+                          Cancelar solicitacao
+                        </FormSubmitButton>
+                      </form>
+                    </div>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="empty-state">
-                As solicitacoes documentais abertas aparecerao aqui.
+                {hasFilters
+                  ? "Nenhuma solicitacao aberta corresponde aos filtros atuais."
+                  : "Nenhuma solicitacao documental pendente no momento."}
               </p>
             )}
           </SectionCard>
@@ -432,42 +629,114 @@ export default async function DocumentsPage({
   const params = searchParams ? await searchParams : {};
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
-  const availableDocuments = workspace.documents.filter(
-    (document) => document.status === "recebido" || document.status === "revisado"
+  const query = getStringParam(params.q);
+  const scope = getStringParam(params.scope, "all");
+  const sort = getStringParam(params.sort, "recent");
+  const hasFilters = !!(query || scope !== "all" || sort !== "recent");
+  const sortDocuments = <T extends { created_at: string }>(items: T[]) =>
+    [...items].sort((left, right) =>
+      sort === "oldest"
+        ? left.created_at.localeCompare(right.created_at)
+        : right.created_at.localeCompare(left.created_at)
+    );
+  const availableDocuments = sortDocuments(
+    workspace.documents.filter(
+      (document) =>
+        (scope === "all" || scope === "available") &&
+        (document.status === "recebido" || document.status === "revisado") &&
+        matchesSearch(query, [document.file_name, document.caseTitle, document.category])
+    )
   );
-  const pendingDocuments = workspace.documents.filter(
-    (document) => document.status === "pendente" || document.status === "solicitado"
+  const pendingDocuments = sortDocuments(
+    workspace.documents.filter(
+      (document) =>
+        (scope === "all" || scope === "pending") &&
+        (document.status === "pendente" || document.status === "solicitado") &&
+        matchesSearch(query, [document.file_name, document.caseTitle, document.category])
+    )
   );
-  const openRequests = workspace.documentRequests.filter((request) => request.status === "pending");
+  const openRequests = sortDocuments(
+    workspace.documentRequests.filter(
+      (request) =>
+        (scope === "all" || scope === "requests") &&
+        request.status === "pending" &&
+        matchesSearch(query, [request.title, request.caseTitle, request.instructions])
+    )
+  );
 
   return (
     <AppFrame
       eyebrow="Documentos"
-      title="Documentos e pendencias do seu caso."
-      description="Aqui voce acompanha os documentos liberados pela equipe, as pendencias documentais e as solicitacoes abertas do seu atendimento."
+      title="Documentos e pendencias organizados em um so lugar."
+      description="Voce acompanha aqui os arquivos liberados pela equipe, o que ainda esta pendente e as solicitacoes abertas do seu caso."
+      navigation={[
+        { href: "/cliente", label: "Meu painel" },
+        { href: "/documentos", label: "Documentos", active: true },
+        { href: "/agenda", label: "Agenda" }
+      ]}
+      highlights={[
+        { label: "Disponiveis", value: String(availableDocuments.length) },
+        { label: "Pendentes", value: String(pendingDocuments.length) },
+        { label: "Solicitacoes abertas", value: String(openRequests.length) },
+        {
+          label: "Total visivel",
+          value: String(workspace.documents.length + workspace.documentRequests.length)
+        }
+      ]}
+      actions={[
+        { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
+        { href: "/agenda", label: "Ver agenda", tone: "secondary" }
+      ]}
     >
       {error ? <div className="error-notice">{error}</div> : null}
-      <div className="metric-grid">
-        <div className="metric-card">
-          <span>Disponiveis</span>
-          <strong>{availableDocuments.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Pendentes</span>
-          <strong>{pendingDocuments.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Solicitacoes abertas</span>
-          <strong>{openRequests.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Total visivel</span>
-          <strong>{workspace.documents.length + workspace.documentRequests.length}</strong>
-        </div>
-      </div>
+
+      <SectionCard
+        title="Encontrar documentos"
+        description="Use a busca e os filtros para chegar mais rapido ao que esta disponivel, pendente ou aguardando voce."
+      >
+        <form className="stack">
+          <div className="fields">
+            <div className="field-full">
+              <label htmlFor="client-documents-q">Buscar documento ou solicitacao</label>
+              <input
+                id="client-documents-q"
+                name="q"
+                type="search"
+                defaultValue={query}
+                placeholder="Nome do documento, tipo ou titulo da solicitacao"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="client-documents-scope">Mostrar</label>
+              <select id="client-documents-scope" name="scope" defaultValue={scope}>
+                <option value="all">Tudo</option>
+                <option value="available">Somente disponiveis</option>
+                <option value="pending">Somente pendentes</option>
+                <option value="requests">Somente solicitacoes</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="client-documents-sort">Ordenacao</label>
+              <select id="client-documents-sort" name="sort" defaultValue={sort}>
+                <option value="recent">Mais recentes primeiro</option>
+                <option value="oldest">Mais antigos primeiro</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-actions">
+            <button className="button secondary" type="submit">
+              Aplicar filtros
+            </button>
+            <a className="button secondary" href="/documentos">
+              Limpar filtros
+            </a>
+          </div>
+        </form>
+      </SectionCard>
 
       <div className="grid two">
         <SectionCard
+          id="documentos-disponiveis"
           title="Documentos disponiveis"
           description="Arquivos ja liberados para consulta na sua area do cliente."
         >
@@ -523,12 +792,15 @@ export default async function DocumentsPage({
             </ul>
           ) : (
             <p className="empty-state">
-              Nenhum documento foi liberado para o seu portal ate o momento.
+              {hasFilters
+                ? "Nenhum documento disponivel corresponde aos filtros atuais."
+                : "Nenhum documento foi liberado para o seu portal ate o momento."}
             </p>
           )}
         </SectionCard>
 
         <SectionCard
+          id="documentos-pendentes"
           title="Documentos pendentes"
           description="Itens documentais que ainda dependem de envio, revisao ou retorno."
         >
@@ -584,13 +856,16 @@ export default async function DocumentsPage({
             </ul>
           ) : (
             <p className="empty-state">
-              Nenhuma pendencia documental visivel foi registrada no momento.
+              {hasFilters
+                ? "Nenhuma pendencia documental corresponde aos filtros atuais."
+                : "Nenhuma pendencia documental visivel foi registrada no momento."}
             </p>
           )}
         </SectionCard>
       </div>
 
       <SectionCard
+        id="solicitacoes-abertas"
         title="Solicitacoes abertas"
         description="Pedidos documentais enviados pela equipe e ainda em acompanhamento."
       >
@@ -627,7 +902,9 @@ export default async function DocumentsPage({
           </ul>
         ) : (
           <p className="empty-state">
-            Nenhuma solicitacao documental aberta esta visivel para voce agora.
+            {hasFilters
+              ? "Nenhuma solicitacao aberta corresponde aos filtros atuais."
+              : "Nenhuma solicitacao documental aberta esta visivel para voce agora."}
           </p>
         )}
       </SectionCard>

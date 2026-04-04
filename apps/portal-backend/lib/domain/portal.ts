@@ -28,6 +28,7 @@ export const caseStatuses = [
   "aguardando-retorno",
   "concluido"
 ] as const;
+export const casePriorities = ["baixa", "normal", "alta", "urgente"] as const;
 export const portalEventTypes = [
   "case_update",
   "new_document",
@@ -109,6 +110,7 @@ export type PortalRole = (typeof portalRoles)[number];
 export type CaseArea = (typeof caseAreas)[number];
 export type ClientStatus = (typeof clientStatuses)[number];
 export type CaseStatus = (typeof caseStatuses)[number];
+export type CasePriority = (typeof casePriorities)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
 export type AppointmentLifecycleEventType = (typeof appointmentLifecycleEventTypes)[number];
 export type AnyCaseEventType = PortalEventType | AppointmentLifecycleEventType;
@@ -145,6 +147,12 @@ export const caseStatusLabels: Record<CaseStatus, string> = {
   "em-andamento": "Em andamento",
   "aguardando-retorno": "Aguardando retorno",
   concluido: "Concluido"
+};
+export const casePriorityLabels: Record<CasePriority, string> = {
+  baixa: "Baixa",
+  normal: "Normal",
+  alta: "Alta",
+  urgente: "Urgente"
 };
 
 export const portalEventTypeLabels: Record<PortalEventType, string> = {
@@ -294,6 +302,14 @@ export const recordPortalEventSchema = z.object({
 
 export const registerCaseDocumentSchema = z.object({
   caseId: z.string().uuid("Informe um identificador de caso valido."),
+  requestId: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine((value) => value === "" || /^[0-9a-fA-F-]{36}$/.test(value), {
+      message: "Informe uma solicitacao valida para concluir."
+    }),
   fileName: z.string().trim().optional().default(""),
   category: z.string().trim().min(2, "Informe o tipo do documento.").max(120),
   description: z.string().trim().max(500).optional().default(""),
@@ -326,6 +342,48 @@ export const requestCaseDocumentSchema = z.object({
     }),
   visibleToClient: z.coerce.boolean().default(true),
   shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const updateCaseStatusSchema = z.object({
+  caseId: z.string().uuid("Informe um identificador de caso valido."),
+  status: z.enum(caseStatuses, {
+    errorMap: () => ({ message: "Selecione o novo status do caso." })
+  }),
+  internalNote: z.string().trim().max(1000).optional().default(""),
+  visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const createCaseSchema = z.object({
+  clientId: z.string().uuid("Informe um identificador de cliente valido."),
+  area: z.enum(caseAreas, {
+    errorMap: () => ({ message: "Selecione a area do caso." })
+  }),
+  title: z.string().trim().min(3, "Informe o titulo do caso.").max(160),
+  summary: z.string().trim().max(2000).optional().default(""),
+  priority: z.enum(casePriorities, {
+    errorMap: () => ({ message: "Selecione a prioridade do caso." })
+  }),
+  status: z.enum(caseStatuses, {
+    errorMap: () => ({ message: "Selecione o status inicial do caso." })
+  }),
+  visibleToClient: z.coerce.boolean().default(true),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const updateCaseDetailsSchema = z.object({
+  caseId: z.string().uuid("Informe um identificador de caso valido."),
+  area: z.enum(caseAreas, {
+    errorMap: () => ({ message: "Selecione a area do caso." })
+  }),
+  title: z.string().trim().min(3, "Informe o titulo do caso.").max(160),
+  summary: z.string().trim().max(2000).optional().default(""),
+  priority: z.enum(casePriorities, {
+    errorMap: () => ({ message: "Selecione a prioridade do caso." })
+  }),
+  changeSummary: z.string().trim().max(1000).optional().default(""),
+  visibleToClient: z.coerce.boolean().default(false),
+  shouldNotifyClient: z.coerce.boolean().default(false)
 });
 
 export const registerCaseAppointmentSchema = z.object({
@@ -370,6 +428,14 @@ export const updateCaseAppointmentSchema = z.object({
 
 export const cancelCaseAppointmentSchema = z.object({
   appointmentId: z.string().uuid("Informe um identificador de compromisso valido."),
+  shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const updateDocumentRequestStatusSchema = z.object({
+  requestId: z.string().uuid("Informe um identificador de solicitacao valido."),
+  status: z.enum(documentRequestStatuses, {
+    errorMap: () => ({ message: "Selecione o novo status da solicitacao." })
+  }),
   shouldNotifyClient: z.coerce.boolean().default(true)
 });
 

@@ -1,5 +1,11 @@
 project_id = "portal-backend"
 
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
 [auth]
 site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = [
@@ -20,7 +26,7 @@ port = 1025
 user = "local"
 pass = "local"
 admin_email = "no-reply@advnoemia.local"
-sender_name = "Noêmia Paixão Advocacia"
+sender_name = "Noemia Paixao Advocacia"
 
 [auth.email.template.invite]
 subject = "Seu acesso ao portal juridico"

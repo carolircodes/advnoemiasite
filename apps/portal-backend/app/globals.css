@@ -93,6 +93,85 @@ textarea {
   line-height: 1.7;
 }
 
+.hero-main {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+}
+
+.workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workspace-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.94rem;
+  font-weight: 700;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.workspace-link.active {
+  border-color: rgba(142, 106, 59, 0.22);
+  background: rgba(142, 106, 59, 0.12);
+  color: var(--accent-strong);
+}
+
+.workspace-link:hover {
+  transform: translateY(-1px);
+}
+
+.hero-highlights {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.highlight-chip,
+.notice-card,
+.summary-card,
+.shortcut-card,
+.route-card {
+  border: 1px solid rgba(14, 31, 27, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 244, 238, 0.92)),
+    var(--surface);
+}
+
+.highlight-chip {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+}
+
+.highlight-chip span,
+.shortcut-kicker,
+.summary-card span,
+.notice-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.highlight-chip strong {
+  font-size: 1.18rem;
+  line-height: 1.1;
+}
+
 .hero-actions {
   display: flex;
   flex-direction: column;
@@ -130,6 +209,10 @@ textarea {
   font-weight: 700;
   box-shadow: 0 14px 36px rgba(111, 81, 44, 0.2);
   cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
 }
 
 .button.secondary {
@@ -137,6 +220,22 @@ textarea {
   color: var(--text);
   border: 1px solid var(--line);
   box-shadow: none;
+}
+
+.button.danger {
+  background: linear-gradient(135deg, #9a4a42, #7f332d);
+  color: #fff6f3;
+  box-shadow: 0 14px 36px rgba(142, 67, 59, 0.22);
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  opacity: 0.68;
+  cursor: wait;
+  transform: none;
 }
 
 .page-grid {
@@ -171,6 +270,10 @@ textarea {
 .panel,
 .list-card {
   padding: 28px;
+}
+
+.panel[id] {
+  scroll-margin-top: 28px;
 }
 
 .subtle-panel {
@@ -288,6 +391,10 @@ textarea {
   margin-top: 18px;
 }
 
+.form-actions form {
+  margin: 0;
+}
+
 .notice,
 .error-notice,
 .success-notice {
@@ -303,11 +410,13 @@ textarea {
 .error-notice {
   background: rgba(142, 67, 59, 0.1);
   color: var(--danger);
+  border: 1px solid rgba(142, 67, 59, 0.16);
 }
 
 .success-notice {
   background: rgba(41, 93, 69, 0.12);
   color: var(--success);
+  border: 1px solid rgba(41, 93, 69, 0.16);
 }
 
 .list,
@@ -368,6 +477,10 @@ textarea {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 244, 238, 0.9)),
     var(--surface);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .update-card.featured {
@@ -448,6 +561,79 @@ textarea {
   letter-spacing: 0.04em;
 }
 
+.shortcut-grid,
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.shortcut-card,
+.route-card,
+.notice-card,
+.summary-card {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.shortcut-card:hover,
+.route-card:hover,
+.notice-card:hover,
+.summary-card:hover,
+.update-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(142, 106, 59, 0.18);
+  box-shadow: 0 18px 40px rgba(16, 32, 29, 0.08);
+}
+
+.shortcut-card strong,
+.route-card strong,
+.notice-card strong,
+.summary-card strong {
+  font-size: 1.06rem;
+  line-height: 1.2;
+}
+
+.shortcut-card p,
+.route-card span,
+.notice-card p,
+.summary-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.notice-grid,
+.route-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.notice-card span {
+  color: var(--accent-strong);
+}
+
+.priority-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.priority-list li {
+  padding: 16px 18px;
+  border: 1px solid rgba(142, 106, 59, 0.12);
+  border-radius: 18px;
+  background: rgba(248, 244, 238, 0.9);
+  line-height: 1.6;
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -474,6 +660,46 @@ textarea {
   line-height: 1.6;
 }
 
+.skeleton-card {
+  overflow: hidden;
+}
+
+.skeleton-stack,
+.skeleton-feed {
+  display: grid;
+  gap: 12px;
+}
+
+.skeleton-line {
+  display: block;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(16, 32, 29, 0.08) 0%,
+      rgba(255, 255, 255, 0.75) 50%,
+      rgba(16, 32, 29, 0.08) 100%
+    );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-line.short {
+  width: 62%;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 @media (max-width: 960px) {
   .hero-shell,
   .split,
@@ -481,6 +707,12 @@ textarea {
   .grid.three,
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-highlights,
+  .shortcut-grid,
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .hero-actions {
@@ -511,6 +743,21 @@ textarea {
   .hero-actions,
   .form-actions {
     flex-direction: column;
+  }
+
+  .hero-highlights,
+  .shortcut-grid,
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-nav {
+    flex-direction: column;
+  }
+
+  .workspace-link {
+    width: 100%;
+    justify-content: center;
   }
 
   .update-head {

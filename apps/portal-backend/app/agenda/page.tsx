@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
@@ -35,6 +36,56 @@ function formatDateTimeLocalValue(value: string) {
 
   const localValue = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return localValue.toISOString().slice(0, 16);
+}
+
+function getStringParam(
+  value: string | string[] | undefined,
+  fallback = ""
+) {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function matchesSearch(query: string, values: Array<string | null | undefined>) {
+  if (!query) {
+    return true;
+  }
+
+  const normalizedQuery = query.toLowerCase();
+  return values.some((value) => value?.toLowerCase().includes(normalizedQuery));
+}
+
+function isWithinDateRange(
+  value: string | null | undefined,
+  dateFrom: string,
+  dateTo: string
+) {
+  if (!value) {
+    return !dateFrom && !dateTo;
+  }
+
+  const current = new Date(value);
+
+  if (Number.isNaN(current.getTime())) {
+    return false;
+  }
+
+  if (dateFrom) {
+    const start = new Date(`${dateFrom}T00:00:00`);
+
+    if (current < start) {
+      return false;
+    }
+  }
+
+  if (dateTo) {
+    const end = new Date(`${dateTo}T23:59:59.999`);
+
+    if (current > end) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function isUpcomingAppointment(
@@ -190,55 +241,165 @@ export default async function AgendaPage({
   if (isStaffRole(profile.role)) {
     const overview = await getStaffOverview();
     const params = searchParams ? await searchParams : {};
-    const rawError =
-      typeof params.error === "string" ? decodeURIComponent(params.error) : "";
-    const error = getAccessMessage(rawError) || rawError;
+    const rawError = getStringParam(params.error);
+    const decodedError = rawError ? decodeURIComponent(rawError) : "";
+    const query = getStringParam(params.q);
+    const selectedStatus = getStringParam(params.status);
+    const dateFrom = getStringParam(params.dateFrom);
+    const dateTo = getStringParam(params.dateTo);
+    const scope = getStringParam(params.scope, "all");
+    const sort = getStringParam(params.sort, "nearest");
+    const hasFilters = !!(
+      query ||
+      selectedStatus ||
+      dateFrom ||
+      dateTo ||
+      scope !== "all" ||
+      sort !== "nearest"
+    );
+    const error = getAccessMessage(decodedError) || decodedError;
     const success =
       typeof params.success === "string" ? getSuccessMessage(params.success) : "";
     const hasCases = overview.caseOptions.length > 0;
     const now = new Date();
-    const upcomingAppointments = overview.latestAppointments.filter((appointment) =>
-      isUpcomingAppointment(appointment, now)
-    );
-    const recentHistory = [...overview.latestAppointments]
+    const filteredAppointments = [...overview.latestAppointments]
+      .filter(
+        (appointment) =>
+          matchesSearch(query, [
+            appointment.title,
+            appointment.caseTitle,
+            appointment.clientName,
+            appointment.typeLabel,
+            appointment.statusLabel
+          ]) &&
+          (!selectedStatus || appointment.status === selectedStatus) &&
+          isWithinDateRange(appointment.starts_at, dateFrom, dateTo) &&
+          (scope === "all" ||
+            (scope === "upcoming" && isUpcomingAppointment(appointment, now)) ||
+            (scope === "history" && !isUpcomingAppointment(appointment, now)))
+      )
+      .sort((left, right) =>
+        sort === "recent"
+          ? right.starts_at.localeCompare(left.starts_at)
+          : left.starts_at.localeCompare(right.starts_at)
+      );
+    const upcomingAppointments = filteredAppointments
+      .filter((appointment) => isUpcomingAppointment(appointment, now))
+      .slice(0, 8);
+    const recentHistory = filteredAppointments
       .filter((appointment) => !isUpcomingAppointment(appointment, now))
       .sort((left, right) => right.starts_at.localeCompare(left.starts_at))
       .slice(0, 6);
+    const filteredAppointmentHistory = overview.latestAppointmentHistory
+      .filter(
+        (item) =>
+          matchesSearch(query, [
+            item.title,
+            item.caseTitle,
+            item.clientName,
+            item.changeLabel,
+            item.typeLabel
+          ]) && isWithinDateRange(item.created_at, dateFrom, dateTo)
+      )
+      .slice(0, 10);
 
     return (
       <AppFrame
         eyebrow="Agenda"
-        title="Agenda real de compromissos, reagendamentos e cancelamentos."
-        description="A equipe registra compromissos, reprograma datas, cancela quando necessario e mantem a trilha operacional e a comunicacao futura alinhadas ao caso."
+        title="Central de agenda para compromissos, prazos e proximos passos."
+        description="A equipe acompanha aqui o ciclo completo da agenda do caso, com criacao, reagendamento, cancelamento e historico bem organizados."
+        navigation={[
+          { href: "/internal/advogada", label: "Painel" },
+          { href: "/documentos", label: "Documentos" },
+          { href: "/agenda", label: "Agenda", active: true }
+        ]}
+        highlights={[
+          { label: "Proximos compromissos", value: String(overview.upcomingAppointmentsCount) },
+          { label: "Casos disponiveis", value: String(overview.caseOptions.length) },
+          {
+            label: "Alteracoes recentes",
+            value: String(overview.latestAppointmentHistory.length)
+          },
+          { label: "Notificacoes pendentes", value: String(overview.pendingNotifications) }
+        ]}
         actions={[
-          { href: "/api/internal/appointments", label: "API de agenda", tone: "secondary" },
-          { href: "/internal/advogada", label: "Painel interno", tone: "secondary" }
+          { href: "#registrar-compromisso", label: "Criar compromisso" },
+          { href: "#editar-compromisso", label: "Editar agenda", tone: "secondary" },
+          {
+            href: "/internal/advogada#status-caso",
+            label: "Alterar status do caso",
+            tone: "secondary"
+          }
         ]}
       >
         {error ? <div className="error-notice">{error}</div> : null}
         {success ? <div className="success-notice">{success}</div> : null}
 
-        <div className="metric-grid">
-          <div className="metric-card">
-            <span>Proximos compromissos</span>
-            <strong>{overview.upcomingAppointmentsCount}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Casos disponiveis</span>
-            <strong>{overview.caseOptions.length}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Alteracoes recentes</span>
-            <strong>{overview.latestAppointmentHistory.length}</strong>
-          </div>
-          <div className="metric-card">
-            <span>E-mails pendentes</span>
-            <strong>{overview.pendingNotifications}</strong>
-          </div>
-        </div>
+        <SectionCard
+          title="Busca e filtros"
+          description="Filtre compromissos por cliente, caso, status ou periodo para localizar rapidamente o que importa."
+        >
+          <form className="stack">
+            <div className="fields">
+              <div className="field-full">
+                <label htmlFor="agenda-q">Buscar compromisso, caso ou cliente</label>
+                <input
+                  id="agenda-q"
+                  name="q"
+                  type="search"
+                  defaultValue={query}
+                  placeholder="Titulo, tipo, caso ou nome do cliente"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="agenda-status">Status</label>
+                <select id="agenda-status" name="status" defaultValue={selectedStatus}>
+                  <option value="">Todos os status</option>
+                  {appointmentStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {appointmentStatusLabels[status]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="agenda-scope">Escopo</label>
+                <select id="agenda-scope" name="scope" defaultValue={scope}>
+                  <option value="all">Tudo</option>
+                  <option value="upcoming">Somente proximos</option>
+                  <option value="history">Somente historico</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="agenda-sort">Ordenacao</label>
+                <select id="agenda-sort" name="sort" defaultValue={sort}>
+                  <option value="nearest">Mais proximos primeiro</option>
+                  <option value="recent">Mais recentes primeiro</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="agenda-date-from">De</label>
+                <input id="agenda-date-from" name="dateFrom" type="date" defaultValue={dateFrom} />
+              </div>
+              <div className="field">
+                <label htmlFor="agenda-date-to">Ate</label>
+                <input id="agenda-date-to" name="dateTo" type="date" defaultValue={dateTo} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button className="button secondary" type="submit">
+                Aplicar filtros
+              </button>
+              <a className="button secondary" href="/agenda">
+                Limpar filtros
+              </a>
+            </div>
+          </form>
+        </SectionCard>
 
         <div className="grid two">
           <SectionCard
+            id="registrar-compromisso"
             title="Registrar compromisso ou proximo passo"
             description="Use o mesmo fluxo para reuniao, retorno, prazo, audiencia ou ligacao, sempre vinculado ao caso e ao cliente correto."
           >
@@ -321,12 +482,12 @@ export default async function AgendaPage({
                 Preparar notificacao por e-mail para este compromisso
               </label>
               <div className="notice">
-                Quando o item for visivel, a agenda registra criacao, reagendamento ou cancelamento no historico do caso e deixa a outbox pronta para o envio futuro.
+                Quando o item for visivel, a agenda registra criacao, reagendamento ou cancelamento no historico do caso e deixa a notificacao futura preparada.
               </div>
               <div className="form-actions">
-                <button className="button" type="submit" disabled={!hasCases}>
+                <FormSubmitButton pendingLabel="Registrando compromisso..." disabled={!hasCases}>
                   Registrar compromisso
-                </button>
+                </FormSubmitButton>
               </div>
             </form>
           </SectionCard>
@@ -374,13 +535,16 @@ export default async function AgendaPage({
               </ul>
             ) : (
               <p className="empty-state">
-                Os proximos compromissos cadastrados para os casos aparecerao aqui.
+                {hasFilters
+                  ? "Nenhum compromisso futuro corresponde aos filtros atuais."
+                  : "Os proximos compromissos cadastrados para os casos aparecerao aqui."}
               </p>
             )}
           </SectionCard>
         </div>
 
         <SectionCard
+          id="editar-compromisso"
           title="Editar, reagendar ou cancelar"
           description="Cada formulario abaixo atualiza o compromisso atual, grava a alteracao no historico da agenda e prepara notificacao futura quando a mudanca for relevante para o cliente."
         >
@@ -489,9 +653,9 @@ export default async function AgendaPage({
                       Registrar notificacao futura para esta alteracao
                     </label>
                     <div className="form-actions">
-                      <button className="button" type="submit">
+                      <FormSubmitButton pendingLabel="Salvando alteracoes...">
                         Salvar alteracoes
-                      </button>
+                      </FormSubmitButton>
                     </div>
                   </form>
                   <form action={cancelAppointmentAction} className="stack">
@@ -509,15 +673,16 @@ export default async function AgendaPage({
                       Preparar notificacao de cancelamento para o cliente
                     </label>
                     <div className="form-actions">
-                      <button
-                        className="button secondary"
-                        type="submit"
+                      <FormSubmitButton
+                        tone="danger"
+                        pendingLabel="Cancelando compromisso..."
                         disabled={appointment.status === "cancelled"}
+                        confirmMessage="Tem certeza que deseja cancelar este compromisso?"
                       >
                         {appointment.status === "cancelled"
                           ? "Compromisso ja cancelado"
                           : "Cancelar compromisso"}
-                      </button>
+                      </FormSubmitButton>
                     </div>
                   </form>
                 </SectionCard>
@@ -525,13 +690,16 @@ export default async function AgendaPage({
             </div>
           ) : (
             <p className="empty-state">
-              Os primeiros compromissos editaveis aparecerao aqui assim que forem registrados.
+              {hasFilters
+                ? "Nenhum compromisso editavel corresponde aos filtros atuais."
+                : "Os primeiros compromissos editaveis aparecerao aqui assim que forem registrados."}
             </p>
           )}
         </SectionCard>
 
         <div className="grid two">
           <SectionCard
+            id="historico-recente"
             title="Historico recente da agenda"
             description="Itens passados, concluidos ou cancelados continuam vinculados ao caso e ajudam a acompanhar a linha do tempo do atendimento."
           >
@@ -569,7 +737,9 @@ export default async function AgendaPage({
               </ul>
             ) : (
               <p className="empty-state">
-                O historico recente da agenda aparecera aqui assim que os primeiros itens forem registrados.
+                {hasFilters
+                  ? "Nenhum item do historico recente corresponde aos filtros atuais."
+                  : "O historico recente da agenda aparecera aqui assim que os primeiros itens forem registrados."}
               </p>
             )}
           </SectionCard>
@@ -578,9 +748,9 @@ export default async function AgendaPage({
             title="Historico de alteracoes"
             description="Cada criacao, edicao, reagendamento ou cancelamento gera uma trilha persistida para operacao, auditoria e notificacao futura."
           >
-            {overview.latestAppointmentHistory.length ? (
+            {filteredAppointmentHistory.length ? (
               <ul className="update-feed">
-                {overview.latestAppointmentHistory.map((item) => (
+                {filteredAppointmentHistory.map((item) => (
                   <li key={item.id} className="update-card">
                     <div className="update-head">
                       <div>
@@ -622,7 +792,9 @@ export default async function AgendaPage({
               </ul>
             ) : (
               <p className="empty-state">
-                O historico de alteracoes da agenda aparecera aqui depois da primeira criacao.
+                {hasFilters
+                  ? "Nenhuma alteracao de agenda corresponde aos filtros atuais."
+                  : "O historico de alteracoes da agenda aparecera aqui depois da primeira criacao."}
               </p>
             )}
           </SectionCard>
@@ -633,13 +805,40 @@ export default async function AgendaPage({
 
   const workspace = await getClientWorkspace(profile);
   const params = searchParams ? await searchParams : {};
-  const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
-  const error = getAccessMessage(rawError) || rawError;
+  const rawError = getStringParam(params.error);
+  const decodedError = rawError ? decodeURIComponent(rawError) : "";
+  const error = getAccessMessage(decodedError) || decodedError;
+  const query = getStringParam(params.q);
+  const scope = getStringParam(params.scope, "all");
+  const dateFrom = getStringParam(params.dateFrom);
+  const dateTo = getStringParam(params.dateTo);
+  const sort = getStringParam(params.sort, "nearest");
   const now = new Date();
-  const upcomingAppointments = workspace.appointments.filter((appointment) =>
+  const hasFilters = !!(query || dateFrom || dateTo || scope !== "all" || sort !== "nearest");
+  const filteredAppointments = [...workspace.appointments]
+    .filter(
+      (appointment) =>
+        matchesSearch(query, [
+          appointment.title,
+          appointment.caseTitle,
+          appointment.typeLabel,
+          appointment.statusLabel,
+          appointment.description
+        ]) &&
+        isWithinDateRange(appointment.starts_at, dateFrom, dateTo) &&
+        (scope === "all" ||
+          (scope === "upcoming" && isUpcomingAppointment(appointment, now)) ||
+          (scope === "history" && !isUpcomingAppointment(appointment, now)))
+    )
+    .sort((left, right) =>
+      sort === "recent"
+        ? right.starts_at.localeCompare(left.starts_at)
+        : left.starts_at.localeCompare(right.starts_at)
+    );
+  const upcomingAppointments = filteredAppointments.filter((appointment) =>
     isUpcomingAppointment(appointment, now)
   );
-  const recentHistory = [...workspace.appointments]
+  const recentHistory = [...filteredAppointments]
     .filter((appointment) => !isUpcomingAppointment(appointment, now))
     .sort((left, right) => right.starts_at.localeCompare(left.starts_at))
     .slice(0, 8);
@@ -647,35 +846,95 @@ export default async function AgendaPage({
   return (
     <AppFrame
       eyebrow="Agenda"
-      title="Compromissos e proximos passos do seu caso."
-      description="Aqui voce acompanha compromissos futuros, reagendamentos, cancelamentos e o historico recente liberado pela equipe para o seu atendimento."
+      title="Sua agenda do caso, organizada para consulta rapida."
+      description="Aqui voce ve os proximos compromissos, os itens recentes e qualquer mudanca importante liberada pela equipe para o seu atendimento."
+      navigation={[
+        { href: "/cliente", label: "Meu painel" },
+        { href: "/documentos", label: "Documentos" },
+        { href: "/agenda", label: "Agenda", active: true }
+      ]}
+      highlights={[
+        { label: "Proximos compromissos", value: String(upcomingAppointments.length) },
+        { label: "Historico recente", value: String(recentHistory.length) },
+        { label: "Total visivel", value: String(workspace.appointments.length) },
+        {
+          label: "Proximo item",
+          value: upcomingAppointments[0]
+            ? formatPortalDateTime(upcomingAppointments[0].starts_at)
+            : "Sem agenda"
+        }
+      ]}
+      actions={[
+        { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
+        { href: "/documentos", label: "Ver documentos", tone: "secondary" }
+      ]}
     >
       {error ? <div className="error-notice">{error}</div> : null}
-      <div className="metric-grid">
-        <div className="metric-card">
-          <span>Proximos compromissos</span>
-          <strong>{upcomingAppointments.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Historico recente</span>
-          <strong>{recentHistory.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Total visivel</span>
-          <strong>{workspace.appointments.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Proximo item</span>
-          <strong>
-            {upcomingAppointments[0]
-              ? formatPortalDateTime(upcomingAppointments[0].starts_at)
-              : "Sem agenda"}
-          </strong>
-        </div>
-      </div>
+
+      <SectionCard
+        title="Encontrar compromissos"
+        description="Use a busca e os filtros para localizar mais rapido datas futuras, historico recente e mudancas visiveis no seu caso."
+      >
+        <form className="stack">
+          <div className="fields">
+            <div className="field-full">
+              <label htmlFor="client-agenda-q">Buscar por titulo ou tipo</label>
+              <input
+                id="client-agenda-q"
+                name="q"
+                type="search"
+                defaultValue={query}
+                placeholder="Compromisso, prazo, reuniao ou descricao"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="client-agenda-scope">Mostrar</label>
+              <select id="client-agenda-scope" name="scope" defaultValue={scope}>
+                <option value="all">Tudo</option>
+                <option value="upcoming">Somente proximos</option>
+                <option value="history">Somente historico</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="client-agenda-sort">Ordenacao</label>
+              <select id="client-agenda-sort" name="sort" defaultValue={sort}>
+                <option value="nearest">Mais proximos primeiro</option>
+                <option value="recent">Mais recentes primeiro</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="client-agenda-date-from">De</label>
+              <input
+                id="client-agenda-date-from"
+                name="dateFrom"
+                type="date"
+                defaultValue={dateFrom}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="client-agenda-date-to">Ate</label>
+              <input
+                id="client-agenda-date-to"
+                name="dateTo"
+                type="date"
+                defaultValue={dateTo}
+              />
+            </div>
+          </div>
+          <div className="form-actions">
+            <button className="button secondary" type="submit">
+              Aplicar filtros
+            </button>
+            <a className="button secondary" href="/agenda">
+              Limpar filtros
+            </a>
+          </div>
+        </form>
+      </SectionCard>
 
       <div className="grid two">
         <SectionCard
+          id="proximos-compromissos"
           title="Proximos compromissos"
           description="Somente itens visiveis ao cliente aparecem aqui, ordenados da data mais proxima para a mais distante."
         >
@@ -702,12 +961,15 @@ export default async function AgendaPage({
             </ul>
           ) : (
             <p className="empty-state">
-              Ainda nao ha compromissos visiveis vinculados ao seu caso.
+              {hasFilters
+                ? "Nenhum compromisso futuro corresponde aos filtros atuais."
+                : "Ainda nao ha compromissos visiveis vinculados ao seu caso."}
             </p>
           )}
         </SectionCard>
 
         <SectionCard
+          id="historico-recente"
           title="Historico recente"
           description="Compromissos concluidos, passados ou cancelados continuam disponiveis para consulta sem confundir a sua agenda futura."
         >
@@ -744,7 +1006,9 @@ export default async function AgendaPage({
             </ul>
           ) : (
             <p className="empty-state">
-              O historico recente da agenda aparecera aqui depois dos primeiros compromissos.
+              {hasFilters
+                ? "Nenhum item do historico recente corresponde aos filtros atuais."
+                : "O historico recente da agenda aparecera aqui depois dos primeiros compromissos."}
             </p>
           )}
         </SectionCard>

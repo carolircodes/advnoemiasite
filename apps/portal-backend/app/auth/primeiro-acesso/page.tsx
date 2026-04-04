@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { passwordSchema } from "@/lib/domain/portal";
@@ -128,9 +129,9 @@ export default async function FirstAccessPage({
             cadastral.
           </div>
           <div className="form-actions">
-            <button className="button" type="submit">
+            <FormSubmitButton pendingLabel="Salvando senha...">
               Salvar senha inicial
-            </button>
+            </FormSubmitButton>
           </div>
         </form>
       </SectionCard>

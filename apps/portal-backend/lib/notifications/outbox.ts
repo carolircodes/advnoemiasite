@@ -46,7 +46,7 @@ export async function queueEmailNotification(input: QueueEmailInput) {
     .single();
 
   if (error) {
-    throw new Error(`Não foi possível adicionar o e-mail à fila: ${error.message}`);
+    throw new Error(`Nao foi possivel adicionar o e-mail a fila: ${error.message}`);
   }
 
   return data;
@@ -63,7 +63,7 @@ export async function queueClientInviteTracking(input: {
     eventType: "client-invite",
     recipientProfileId: input.clientProfileId,
     recipientEmail: input.clientEmail,
-    subject: "Convite para acessar sua área do cliente",
+    subject: "Convite para acessar sua area do cliente",
     templateKey: "client-invite",
     payload: {
       fullName: input.fullName,
