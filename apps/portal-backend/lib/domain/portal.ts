@@ -29,6 +29,26 @@ export const caseStatuses = [
   "concluido"
 ] as const;
 export const casePriorities = ["baixa", "normal", "alta", "urgente"] as const;
+export const publicIntakeUrgencies = ["baixa", "moderada", "alta", "urgente"] as const;
+export const publicIntakeStages = [
+  "ainda-nao-iniciei",
+  "ja-estou-em-atendimento",
+  "tenho-prazo-proximo",
+  "recebi-negativa-ou-cobranca"
+] as const;
+export const publicContactPeriods = [
+  "manha",
+  "tarde",
+  "noite",
+  "horario-comercial"
+] as const;
+export const intakeRequestStatuses = [
+  "new",
+  "in_review",
+  "contacted",
+  "converted",
+  "closed"
+] as const;
 export const portalEventTypes = [
   "case_update",
   "new_document",
@@ -111,6 +131,10 @@ export type CaseArea = (typeof caseAreas)[number];
 export type ClientStatus = (typeof clientStatuses)[number];
 export type CaseStatus = (typeof caseStatuses)[number];
 export type CasePriority = (typeof casePriorities)[number];
+export type PublicIntakeUrgency = (typeof publicIntakeUrgencies)[number];
+export type PublicIntakeStage = (typeof publicIntakeStages)[number];
+export type PublicContactPeriod = (typeof publicContactPeriods)[number];
+export type IntakeRequestStatus = (typeof intakeRequestStatuses)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
 export type AppointmentLifecycleEventType = (typeof appointmentLifecycleEventTypes)[number];
 export type AnyCaseEventType = PortalEventType | AppointmentLifecycleEventType;
@@ -153,6 +177,31 @@ export const casePriorityLabels: Record<CasePriority, string> = {
   normal: "Normal",
   alta: "Alta",
   urgente: "Urgente"
+};
+export const publicIntakeUrgencyLabels: Record<PublicIntakeUrgency, string> = {
+  baixa: "Baixa",
+  moderada: "Moderada",
+  alta: "Alta",
+  urgente: "Urgente"
+};
+export const publicIntakeStageLabels: Record<PublicIntakeStage, string> = {
+  "ainda-nao-iniciei": "Ainda nao iniciei o atendimento",
+  "ja-estou-em-atendimento": "Ja estou em atendimento ou processo",
+  "tenho-prazo-proximo": "Tenho prazo, audiencia ou retorno proximo",
+  "recebi-negativa-ou-cobranca": "Recebi negativa, cobranca ou resposta recente"
+};
+export const publicContactPeriodLabels: Record<PublicContactPeriod, string> = {
+  manha: "Manha",
+  tarde: "Tarde",
+  noite: "Noite",
+  "horario-comercial": "Horario comercial"
+};
+export const intakeRequestStatusLabels: Record<IntakeRequestStatus, string> = {
+  new: "Nova",
+  in_review: "Em analise",
+  contacted: "Contato realizado",
+  converted: "Convertida",
+  closed: "Encerrada"
 };
 
 export const portalEventTypeLabels: Record<PortalEventType, string> = {
@@ -258,6 +307,51 @@ export const createClientSchema = z.object({
   status: z.enum(clientStatuses, {
     errorMap: () => ({ message: "Selecione o status inicial do cliente." })
   })
+});
+
+export const submitPublicTriageSchema = z.object({
+  fullName: z.string().trim().min(3, "Informe seu nome completo."),
+  email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
+  phone: z
+    .string()
+    .trim()
+    .transform(onlyDigits)
+    .refine(
+      (value) => value.length >= 10 && value.length <= 11,
+      "Informe um telefone com DDD."
+    ),
+  city: z.string().trim().max(120).optional().default(""),
+  caseArea: z.enum(caseAreas, {
+    errorMap: () => ({ message: "Selecione a area principal do atendimento." })
+  }),
+  currentStage: z.enum(publicIntakeStages, {
+    errorMap: () => ({ message: "Selecione o momento atual do seu caso." })
+  }),
+  urgencyLevel: z.enum(publicIntakeUrgencies, {
+    errorMap: () => ({ message: "Selecione o nivel de urgencia." })
+  }),
+  preferredContactPeriod: z.enum(publicContactPeriods, {
+    errorMap: () => ({ message: "Selecione o melhor horario para contato." })
+  }),
+  caseSummary: z
+    .string()
+    .trim()
+    .min(30, "Descreva em poucas linhas o que aconteceu e o que voce precisa.")
+    .max(2000, "Resuma o contexto em ate 2000 caracteres."),
+  consentAccepted: z.literal(true, {
+    errorMap: () => ({ message: "Confirme a autorizacao para envio da triagem." })
+  }),
+  sourcePath: z.string().trim().max(300).optional().default("/triagem"),
+  website: z.string().trim().max(0).optional().default("")
+});
+
+export const recordProductEventSchema = z.object({
+  eventKey: z.string().trim().min(3).max(120),
+  eventGroup: z.string().trim().min(3).max(80).optional().default("conversion"),
+  pagePath: z.string().trim().max(300).optional().default(""),
+  sessionId: z.string().trim().max(120).optional().default(""),
+  intakeRequestId: z.string().uuid().optional(),
+  payload: z.record(z.any()).optional().default({})
 });
 
 export const loginSchema = z.object({
@@ -437,6 +531,14 @@ export const updateDocumentRequestStatusSchema = z.object({
     errorMap: () => ({ message: "Selecione o novo status da solicitacao." })
   }),
   shouldNotifyClient: z.coerce.boolean().default(true)
+});
+
+export const updateIntakeRequestStatusSchema = z.object({
+  intakeRequestId: z.string().uuid("Informe uma triagem valida."),
+  status: z.enum(intakeRequestStatuses, {
+    errorMap: () => ({ message: "Selecione um status valido para a triagem." })
+  }),
+  internalNotes: z.string().trim().max(1200).optional().default("")
 });
 
 export function mapClientStatusToCaseStatus(status: ClientStatus): CaseStatus {

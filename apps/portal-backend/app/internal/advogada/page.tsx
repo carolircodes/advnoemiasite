@@ -16,6 +16,8 @@ import {
   clientStatusLabels,
   clientStatuses,
   formatPortalDateTime,
+  intakeRequestStatusLabels,
+  intakeRequestStatuses,
   portalEventTypeLabels,
   portalEventTypes
 } from "@/lib/domain/portal";
@@ -26,6 +28,7 @@ import {
 } from "@/lib/services/manage-cases";
 import { createClientWithInvite } from "@/lib/services/create-client";
 import { getStaffOverview } from "@/lib/services/dashboard";
+import { updateIntakeRequestStatus } from "@/lib/services/public-intake";
 import { registerPortalEvent } from "@/lib/services/register-event";
 
 function buildDefaultDateTimeValue() {
@@ -111,6 +114,8 @@ function getSuccessMessage(success: string) {
       return "Caso atualizado com sucesso. As informacoes principais do acompanhamento ja foram sincronizadas.";
     case "status-atualizado":
       return "Status do caso atualizado com sucesso. A trilha operacional e a comunicacao futura ficaram consistentes.";
+    case "triagem-atualizada":
+      return "Triagem atualizada com sucesso. O painel interno ja reflete o novo andamento.";
     default:
       return "";
   }
@@ -255,6 +260,29 @@ async function registerEventAction(formData: FormData) {
   redirect("/internal/advogada?success=atualizacao-registrada");
 }
 
+async function updateIntakeRequestStatusAction(formData: FormData) {
+  "use server";
+
+  const profile = await requireProfile(["advogada", "admin"]);
+
+  try {
+    await updateIntakeRequestStatus(
+      {
+        intakeRequestId: formData.get("intakeRequestId"),
+        status: formData.get("status"),
+        internalNotes: formData.get("internalNotes")
+      },
+      profile.id
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-atualizar-triagem";
+    redirect(`/internal/advogada?error=${message}`);
+  }
+
+  redirect("/internal/advogada?success=triagem-atualizada");
+}
+
 export default async function InternalLawyerPage({
   searchParams
 }: {
@@ -279,6 +307,22 @@ export default async function InternalLawyerPage({
   const filteredClients = overview.clientOptions.filter((client) =>
     matchesSearch(query, [client.fullName, client.email, client.statusLabel])
   );
+  const filteredIntakeRequests = overview.latestIntakeRequests
+    .filter(
+      (item) =>
+        matchesSearch(query, [
+          item.full_name,
+          item.email,
+          item.phone,
+          item.areaLabel,
+          item.stageLabel,
+          item.urgencyLabel,
+          item.statusLabel
+        ]) &&
+        isWithinDateRange(item.submitted_at, dateFrom, dateTo) &&
+        (!pendingOnly || item.status === "new" || item.status === "in_review")
+    )
+    .slice(0, 6);
   const filteredCases = overview.caseOptions
     .filter(
       (caseItem) =>
@@ -346,6 +390,9 @@ export default async function InternalLawyerPage({
     )
     .slice(0, 8);
   const urgentFocus = [
+    filteredIntakeRequests[0]
+      ? `Nova triagem: ${filteredIntakeRequests[0].full_name}`
+      : null,
     pendingRequests[0]
       ? `Solicitacao em aberto: ${pendingRequests[0].title}`
       : null,
@@ -368,12 +415,13 @@ export default async function InternalLawyerPage({
         { href: "/agenda", label: "Agenda" }
       ]}
       highlights={[
+        { label: "Triagens novas", value: String(overview.pendingIntakeRequestsCount) },
         { label: "Casos ativos", value: String(activeCasesCount) },
         { label: "Compromissos proximos", value: String(upcomingAppointments.length) },
-        { label: "Pendencias documentais", value: String(pendingRequests.length) },
         { label: "Notificacoes pendentes", value: String(overview.pendingNotifications) }
       ]}
       actions={[
+        { href: "#triagens-recebidas", label: "Revisar triagens", tone: "secondary" },
         { href: "#cadastro-cliente", label: "Cadastrar cliente" },
         { href: "#gestao-casos", label: "Abrir caso", tone: "secondary" },
         { href: "#atualizacoes-caso", label: "Registrar atualizacao", tone: "secondary" },
@@ -524,6 +572,82 @@ export default async function InternalLawyerPage({
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard
+        id="triagens-recebidas"
+        title="Triagens recebidas"
+        description="Entradas do site institucional que ja chegaram organizadas para analise inicial e retorno da equipe."
+      >
+        {filteredIntakeRequests.length ? (
+          <div className="grid two">
+            {filteredIntakeRequests.map((item) => (
+              <div key={item.id} className="subtle-panel stack">
+                <div className="update-head">
+                  <div>
+                    <strong>{item.full_name}</strong>
+                    <span className="item-meta">
+                      {item.email} - {item.phone}
+                    </span>
+                  </div>
+                  <span className="tag soft">{item.statusLabel}</span>
+                </div>
+                <div className="pill-row">
+                  <span className="pill warning">{item.areaLabel}</span>
+                  <span className="pill muted">{item.urgencyLabel}</span>
+                  <span className="pill muted">{item.preferredContactLabel}</span>
+                </div>
+                <p className="update-body">{item.case_summary}</p>
+                <span className="item-meta">
+                  {item.city ? `${item.city} - ` : ""}
+                  {item.stageLabel} - recebida em {formatPortalDateTime(item.submitted_at)}
+                </span>
+                <form action={updateIntakeRequestStatusAction} className="stack">
+                  <input type="hidden" name="intakeRequestId" value={item.id} />
+                  <div className="fields">
+                    <div className="field">
+                      <label htmlFor={`intake-status-${item.id}`}>Status da triagem</label>
+                      <select
+                        id={`intake-status-${item.id}`}
+                        name="status"
+                        defaultValue={item.status}
+                      >
+                        {intakeRequestStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {intakeRequestStatusLabels[status]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field-full">
+                      <label htmlFor={`intake-notes-${item.id}`}>Observacao interna</label>
+                      <textarea
+                        id={`intake-notes-${item.id}`}
+                        name="internalNotes"
+                        defaultValue={item.internal_notes || ""}
+                        placeholder="Ex.: retorno previsto para amanha, pedido de documentos ou contato ja realizado."
+                      />
+                    </div>
+                  </div>
+                  <div className="form-actions">
+                    <FormSubmitButton pendingLabel="Atualizando triagem..." tone="secondary">
+                      Salvar triagem
+                    </FormSubmitButton>
+                    <Link className="button secondary" href="#cadastro-cliente">
+                      Abrir cadastro do cliente
+                    </Link>
+                  </div>
+                </form>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">
+            {hasFilters
+              ? "Nenhuma triagem corresponde aos filtros atuais."
+              : "As triagens enviadas pelo site aparecerao aqui para organizacao do retorno."}
+          </p>
+        )}
+      </SectionCard>
 
       <div className="grid three">
         <SectionCard

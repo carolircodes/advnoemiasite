@@ -4,6 +4,9 @@ Base real do portal juridico com Supabase Auth, cadastro interno, convite por e-
 
 O fluxo local validado para este projeto e:
 
+- home publica com CTA para triagem e acesso do cliente
+- triagem publica persistida na base
+- triagens recebidas no painel interno
 - subir o Supabase local
 - aplicar a migration inicial
 - bootstrap da advogada
@@ -22,12 +25,16 @@ O fluxo local validado para este projeto e:
 - edicao, reagendamento e cancelamento com historico persistido da agenda
 - processamento real da `notifications_outbox` por worker protegido por secret
 - rotas internas e areas autenticadas protegidas por sessao, role e RLS
+- eventos principais de conversao registrados em `product_events`
 
 Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role manualmente.
 
 ## Estrutura principal
 
 - `app/`: rotas e telas do portal
+- `app/triagem/page.tsx`: triagem publica guiada em etapas
+- `app/api/public/triage/route.ts`: recebimento persistido da triagem
+- `app/api/public/events/route.ts`: eventos principais de conversao
 - `lib/auth/`: guards e resolucao de perfil
 - `lib/auth/access-control.ts`: matriz central de acesso, `next` seguro e redirects
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
@@ -38,8 +45,10 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `supabase/migrations/20260408_appointment_lifecycle.sql`: historico persistido da agenda
 - `supabase/migrations/20260409_document_upload_storage.sql`: bucket privado e metadata de upload
 - `supabase/migrations/20260410_visibility_rls_hardening.sql`: isolamento por visibilidade em agenda, atualizacoes e solicitacoes
+- `supabase/migrations/20260411_public_intake_and_product_events.sql`: triagem publica e eventos de conversao
 - `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
 - `lib/services/process-notifications.ts`: worker real para processar a `notifications_outbox`
+- `lib/services/public-intake.ts`: triagem publica, pipeline inicial e eventos de produto
 - `lib/notifications/email-templates.ts`: padrao de mensagens do portal
 - `app/api/worker/notifications/process/route.ts`: endpoint seguro para rodar a fila
 - `scripts/process-notifications.mjs`: gatilho local do worker
@@ -218,6 +227,18 @@ Observacao: registros `client-invite` continuam sendo tratados como rastreio do 
 
 ## Fluxo local validado
 
+### Jornada publica e triagem
+
+1. Abra `/`.
+2. Clique em `Iniciar atendimento`.
+3. Preencha a triagem em `/triagem`.
+4. Confirme no banco:
+   - novo registro em `intake_requests`
+   - novo registro em `product_events` com `event_key = triage_submitted`
+5. Entre como advogada em `/internal/advogada`.
+6. Confirme que a triagem aparece em `Triagens recebidas`.
+7. Atualize o status da triagem para organizar o retorno interno.
+
 ### Advogada
 
 1. Rode `npm run bootstrap:admin`.
@@ -341,6 +362,14 @@ Observacao: registros `client-invite` continuam sendo tratados como rastreio do 
 9. Confirme acesso apenas a `/cliente`, `/documentos` e `/agenda`.
 10. Confirme que o cliente nao abre `/internal/advogada` e recebe bloqueio em `/api/internal/*`.
 11. Cadastre dois clientes diferentes e confirme que um nao visualiza dados do outro nas telas nem nas consultas autenticadas do Supabase.
+
+### Eventos principais de conversao
+
+Os eventos abaixo passam a ser registrados em `product_events`:
+
+- `cta_start_triage_clicked`
+- `cta_client_portal_clicked`
+- `triage_submitted`
 
 ## Diagnostico rapido de invite
 

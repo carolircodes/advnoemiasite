@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -12,6 +13,16 @@ import {
 import { ensureProfileForUser, getCurrentProfile } from "@/lib/auth/guards";
 import { loginSchema } from "@/lib/domain/portal";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Entrar na area do cliente",
+  description:
+    "Acesso seguro ao portal do cliente e ao painel interno, com login por e-mail e senha.",
+  robots: {
+    index: false,
+    follow: false
+  }
+};
 
 function getLoginErrorMessage(error: string) {
   const accessMessage = getAccessMessage(error);
@@ -68,8 +79,7 @@ export default async function LoginPage({
 }) {
   const currentProfile = await getCurrentProfile();
   const params = await searchParams;
-  const nextPath =
-    typeof params.next === "string" ? normalizeNextPath(params.next) : null;
+  const nextPath = typeof params.next === "string" ? normalizeNextPath(params.next) : null;
 
   if (currentProfile?.is_active) {
     redirect(getPostAuthDestination(currentProfile, nextPath));
@@ -81,11 +91,22 @@ export default async function LoginPage({
   return (
     <AppFrame
       eyebrow="Acesso seguro"
-      title="Login unico para clientes e equipe autorizada."
-      description="O portal nao possui auto cadastro publico. Clientes entram com o convite enviado pela equipe e a area interna continua protegida por sessao e papel autorizado."
+      title="Entrar no portal com clareza, sem etapas confusas."
+      description="Clientes acessam o portal com o convite enviado pela equipe e, depois do primeiro acesso, entram com e-mail e senha. A area interna continua protegida para perfis autorizados."
+      navigation={[
+        { href: "/", label: "Inicio" },
+        { href: "/triagem", label: "Triagem" },
+        { href: "/auth/login", label: "Area do cliente", active: true }
+      ]}
+      highlights={[
+        { label: "Acesso", value: "E-mail e senha" },
+        { label: "Primeira entrada", value: "Por convite seguro" },
+        { label: "Recuperacao", value: "Link por e-mail" },
+        { label: "Ambiente", value: "Clientes e equipe" }
+      ]}
       actions={[
-        { href: "/auth/esqueci-senha", label: "Esqueci minha senha", tone: "secondary" },
-        { href: "/", label: "Voltar para a base", tone: "secondary" }
+        { href: "/auth/esqueci-senha", label: "Recuperar acesso", tone: "secondary" },
+        { href: "/triagem", label: "Ainda nao sou cliente", tone: "secondary" }
       ]}
     >
       {errorMessage ? <div className="error-notice">{errorMessage}</div> : null}
@@ -93,7 +114,7 @@ export default async function LoginPage({
       <div className="split">
         <SectionCard
           title="Entrar com e-mail e senha"
-          description="Use o e-mail cadastrado pela equipe. O mesmo login atende clientes e perfis internos autorizados."
+          description="Use o mesmo e-mail informado no atendimento. O portal direciona voce automaticamente para a area correta depois do login."
         >
           <form action={loginAction} className="stack">
             <input type="hidden" name="next" value={nextPath || ""} />
@@ -118,25 +139,37 @@ export default async function LoginPage({
           </form>
         </SectionCard>
 
-        <SectionCard
-          title="Primeiro acesso"
-          description="A equipe cria o cadastro interno, vincula o caso e libera o portal pelo e-mail informado. O acesso inicial sempre comeca pelo link seguro do convite."
-        >
-          <ul className="timeline">
-            <li>1. A advogada cadastra o cliente e abre o caso inicial.</li>
-            <li>2. O sistema envia um convite de acesso para o e-mail informado.</li>
-            <li>3. O cliente define sua propria senha na primeira entrada.</li>
-            <li>4. A partir disso, o login passa a ser sempre por e-mail + senha.</li>
-          </ul>
-          <div className="form-actions">
-            <Link className="button" href="/auth/esqueci-senha">
-              Preciso de novo link
-            </Link>
-            <Link className="button secondary" href="/">
-              Voltar para a base
-            </Link>
-          </div>
-        </SectionCard>
+        <div className="stack">
+          <SectionCard
+            title="Se este for seu primeiro acesso"
+            description="O convite inicial sempre parte da equipe, depois do cadastro interno do atendimento."
+          >
+            <ul className="timeline">
+              <li>1. A equipe cadastra o atendimento e prepara o portal.</li>
+              <li>2. Voce recebe um convite seguro por e-mail.</li>
+              <li>3. No primeiro acesso, define sua propria senha.</li>
+              <li>4. Depois disso, entra normalmente com e-mail e senha.</li>
+            </ul>
+          </SectionCard>
+
+          <SectionCard
+            title="Se ainda esta no primeiro contato"
+            description="A triagem e o melhor caminho para iniciar o atendimento com contexto e organizacao."
+          >
+            <div className="cta-strip">
+              <strong>Comece pela triagem organizada.</strong>
+              <p>Ela ajuda a equipe a entender seu momento atual e encaminhar o retorno com mais clareza.</p>
+              <div className="form-actions">
+                <Link className="button" href="/triagem">
+                  Iniciar triagem
+                </Link>
+                <Link className="button secondary" href="/">
+                  Voltar ao inicio
+                </Link>
+              </div>
+            </div>
+          </SectionCard>
+        </div>
       </div>
     </AppFrame>
   );

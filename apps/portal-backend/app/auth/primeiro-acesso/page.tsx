@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
@@ -7,6 +8,16 @@ import { requireProfile } from "@/lib/auth/guards";
 import { passwordSchema } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Primeiro acesso ao portal",
+  description:
+    "Defina sua senha inicial e conclua o primeiro acesso ao portal do cliente.",
+  robots: {
+    index: false,
+    follow: false
+  }
+};
 
 async function markClientFirstAccessCompleted(profileId: string, completedAt: string) {
   const admin = createAdminSupabaseClient();
@@ -75,11 +86,24 @@ async function firstAccessAction(formData: FormData) {
   const completedAt = new Date().toISOString();
   try {
     await markClientFirstAccessCompleted(profile.id, completedAt);
-  } catch (_error) {
+  } catch {
     redirect("/auth/primeiro-acesso?error=nao-foi-possivel-finalizar");
   }
 
   redirect("/cliente?success=primeiro-acesso-concluido");
+}
+
+function getErrorMessage(error: string) {
+  switch (error) {
+    case "senha-invalida":
+      return "Use uma senha valida e confirme a mesma combinacao nos dois campos.";
+    case "nao-foi-possivel-definir-senha":
+      return "Nao foi possivel salvar sua senha agora. Tente novamente em instantes.";
+    case "nao-foi-possivel-finalizar":
+      return "Sua senha foi atualizada, mas o primeiro acesso nao terminou corretamente. Tente novamente para concluir.";
+    default:
+      return error ? "Nao foi possivel concluir o primeiro acesso." : "";
+  }
 }
 
 export default async function FirstAccessPage({
@@ -95,46 +119,74 @@ export default async function FirstAccessPage({
 
   const params = await searchParams;
   const error = typeof params.error === "string" ? params.error : "";
+  const errorMessage = getErrorMessage(error);
 
   return (
     <AppFrame
       eyebrow="Primeiro acesso"
-      title="Defina a senha inicial da sua área do cliente."
-      description="Este passo é liberado depois que a equipe envia o convite por e-mail."
-      actions={[{ href: "/auth/esqueci-senha", label: "Recuperar senha", tone: "secondary" }]}
+      title="Defina sua senha inicial e entre no portal com seguranca."
+      description="Depois desta etapa, sua area do cliente passa a mostrar status, documentos, agenda e proximos passos sempre com o mesmo login."
+      actions={[{ href: "/auth/esqueci-senha", label: "Preciso de novo link", tone: "secondary" }]}
     >
-      {error ? (
-        <div className="error-notice">
-          Não foi possível concluir o primeiro acesso. Tente novamente com uma senha
-          válida.
+      {errorMessage ? <div className="error-notice">{errorMessage}</div> : null}
+
+      <div className="split">
+        <SectionCard
+          title="Criar senha inicial"
+          description="Escolha uma senha exclusiva para o portal. Ela passa a valer imediatamente para os proximos acessos."
+        >
+          <form action={firstAccessAction} className="stack">
+            <div className="fields">
+              <div className="field-full">
+                <label htmlFor="password">Nova senha</label>
+                <input id="password" name="password" type="password" required />
+              </div>
+              <div className="field-full">
+                <label htmlFor="confirmPassword">Confirmar senha</label>
+                <input id="confirmPassword" name="confirmPassword" type="password" required />
+              </div>
+            </div>
+            <div className="notice">
+              Use uma senha exclusiva para o portal. O CPF continua sendo apenas um dado cadastral interno.
+            </div>
+            <div className="form-actions">
+              <FormSubmitButton pendingLabel="Salvando senha...">
+                Salvar senha inicial
+              </FormSubmitButton>
+            </div>
+          </form>
+        </SectionCard>
+
+        <div className="stack">
+          <SectionCard
+            title="O que voce vai encontrar logo depois"
+            description="A primeira entrada nao termina na senha. Ela abre a jornada completa de acompanhamento."
+          >
+            <ul className="timeline">
+              <li>1. Status atual do caso com explicacao mais clara da fase do atendimento.</li>
+              <li>2. Documentos disponiveis, pendencias e solicitacoes em aberto.</li>
+              <li>3. Agenda com proximas datas e historico recente.</li>
+              <li>4. Atualizacoes liberadas pela equipe em ordem da mais recente.</li>
+            </ul>
+          </SectionCard>
+
+          <SectionCard
+            title="Se ainda nao houver muitos itens"
+            description="Isso nao significa que algo esta errado. O portal foi desenhado para crescer com o caso, sem parecer vazio ou tecnico."
+          >
+            <div className="support-panel">
+              <div className="support-row">
+                <span className="support-label">Status</span>
+                <strong>Voce entende rapidamente em que fase o atendimento esta.</strong>
+              </div>
+              <div className="support-row">
+                <span className="support-label">Proximas acoes</span>
+                <strong>Quando surgirem documentos, datas ou avisos, eles aparecerao nos blocos principais.</strong>
+              </div>
+            </div>
+          </SectionCard>
         </div>
-      ) : null}
-      <SectionCard
-        title="Senha inicial"
-        description="Depois desta etapa, o portal passa a usar e-mail + senha para os próximos acessos."
-      >
-        <form action={firstAccessAction} className="stack">
-          <div className="fields">
-            <div className="field-full">
-              <label htmlFor="password">Nova senha</label>
-              <input id="password" name="password" type="password" required />
-            </div>
-            <div className="field-full">
-              <label htmlFor="confirmPassword">Confirmar senha</label>
-              <input id="confirmPassword" name="confirmPassword" type="password" required />
-            </div>
-          </div>
-          <div className="notice">
-            Use uma senha exclusiva para o portal. O CPF permanece somente como dado
-            cadastral.
-          </div>
-          <div className="form-actions">
-            <FormSubmitButton pendingLabel="Salvando senha...">
-              Salvar senha inicial
-            </FormSubmitButton>
-          </div>
-        </form>
-      </SectionCard>
+      </div>
     </AppFrame>
   );
 }

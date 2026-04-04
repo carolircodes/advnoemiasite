@@ -1,10 +1,14 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+
+import { TrackedLink } from "@/components/tracked-link";
 
 type Action = {
   href: string;
   label: string;
   tone?: "primary" | "secondary";
+  trackingEventKey?: string;
+  trackingEventGroup?: string;
+  trackingPayload?: Record<string, unknown>;
 };
 
 type NavigationItem = {
@@ -44,13 +48,14 @@ export function AppFrame({
           {navigation.length ? (
             <nav className="workspace-nav" aria-label="Navegacao do portal">
               {navigation.map((item) => (
-                <Link
+                <TrackedLink
                   key={`${item.href}-${item.label}`}
                   href={item.href}
                   className={item.active ? "workspace-link active" : "workspace-link"}
+                  aria-current={item.active ? "page" : undefined}
                 >
                   {item.label}
-                </Link>
+                </TrackedLink>
               ))}
             </nav>
           ) : null}
@@ -73,13 +78,16 @@ export function AppFrame({
         {actions.length ? (
           <div className="hero-actions">
             {actions.map((action) => (
-              <Link
+              <TrackedLink
                 key={`${action.href}-${action.label}`}
                 href={action.href}
                 className={action.tone === "secondary" ? "button secondary" : "button"}
+                eventKey={action.trackingEventKey}
+                eventGroup={action.trackingEventGroup}
+                trackingPayload={action.trackingPayload}
               >
                 {action.label}
-              </Link>
+              </TrackedLink>
             ))}
           </div>
         ) : null}

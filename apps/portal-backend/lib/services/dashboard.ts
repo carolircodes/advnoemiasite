@@ -4,12 +4,17 @@ import {
   appointmentChangeLabels,
   appointmentStatusLabels,
   appointmentTypeLabels,
+  caseAreaLabels,
   caseEventTypeLabels,
   casePriorityLabels,
   caseStatusLabels,
   clientStatusLabels,
+  intakeRequestStatusLabels,
   documentRequestStatusLabels,
   documentStatusLabels,
+  publicContactPeriodLabels,
+  publicIntakeStageLabels,
+  publicIntakeUrgencyLabels,
   portalEventTypeLabels
 } from "@/lib/domain/portal";
 import type { PortalProfile } from "@/lib/auth/guards";
@@ -23,6 +28,7 @@ export async function getStaffOverview() {
     eventsResult,
     documentsResult,
     requestsResult,
+    intakeRequestsResult,
     appointmentsResult,
     appointmentHistoryResult,
     outboxResult
@@ -56,6 +62,13 @@ export async function getStaffOverview() {
       .from("document_requests")
       .select("id,case_id,title,status,visible_to_client,due_at,created_at")
       .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("intake_requests")
+      .select(
+        "id,full_name,email,phone,city,case_area,current_stage,urgency_level,preferred_contact_period,case_summary,status,submitted_at,reviewed_at,created_at,internal_notes"
+      )
+      .order("submitted_at", { ascending: false })
       .limit(100),
     supabase
       .from("appointments")
@@ -104,6 +117,12 @@ export async function getStaffOverview() {
     throw new Error(`Nao foi possivel carregar a agenda: ${appointmentsResult.error.message}`);
   }
 
+  if (intakeRequestsResult.error) {
+    throw new Error(
+      `Nao foi possivel carregar as triagens recebidas: ${intakeRequestsResult.error.message}`
+    );
+  }
+
   if (appointmentHistoryResult.error) {
     throw new Error(
       `Nao foi possivel carregar o historico da agenda: ${appointmentHistoryResult.error.message}`
@@ -121,6 +140,7 @@ export async function getStaffOverview() {
   const events = eventsResult.data || [];
   const documents = documentsResult.data || [];
   const requests = requestsResult.data || [];
+  const intakeRequests = intakeRequestsResult.data || [];
   const appointments = appointmentsResult.data || [];
   const appointmentHistory = appointmentHistoryResult.data || [];
   const caseClientIds = [...new Set(cases.map((item) => item.client_id))];
@@ -153,6 +173,9 @@ export async function getStaffOverview() {
     (item) => item.status === "pending"
   ).length;
   const openDocumentRequests = requests.filter((item) => item.status === "pending");
+  const pendingIntakeRequests = intakeRequests.filter((item) =>
+    item.status === "new" || item.status === "in_review"
+  );
   const nowIso = new Date().toISOString();
   const upcomingAppointments = appointments.filter(
     (item) =>
@@ -176,6 +199,26 @@ export async function getStaffOverview() {
       status: client.status,
       statusLabel: clientStatusLabels[client.status as keyof typeof clientStatusLabels],
       createdAt: client.created_at
+    })),
+    latestIntakeRequests: intakeRequests.map((item) => ({
+      ...item,
+      areaLabel: caseAreaLabels[item.case_area as keyof typeof caseAreaLabels],
+      stageLabel:
+        publicIntakeStageLabels[
+          item.current_stage as keyof typeof publicIntakeStageLabels
+        ] || item.current_stage,
+      urgencyLabel:
+        publicIntakeUrgencyLabels[
+          item.urgency_level as keyof typeof publicIntakeUrgencyLabels
+        ] || item.urgency_level,
+      preferredContactLabel:
+        publicContactPeriodLabels[
+          item.preferred_contact_period as keyof typeof publicContactPeriodLabels
+        ] || item.preferred_contact_period,
+      statusLabel:
+        intakeRequestStatusLabels[
+          item.status as keyof typeof intakeRequestStatusLabels
+        ] || item.status
     })),
     caseOptions: cases.map((caseItem) => ({
       id: caseItem.id,
@@ -263,6 +306,7 @@ export async function getStaffOverview() {
     })),
     upcomingAppointmentsCount: upcomingAppointments.length,
     openDocumentRequestsCount: openDocumentRequests.length,
+    pendingIntakeRequestsCount: pendingIntakeRequests.length,
     pendingNotifications,
     outboxPreview: outboxResult.data || []
   };

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -61,6 +62,14 @@ type NoticeItem = {
   cta: string;
 };
 
+export const metadata: Metadata = {
+  title: "Meu painel",
+  robots: {
+    index: false,
+    follow: false
+  }
+};
+
 export default async function ClientPage({
   searchParams
 }: {
@@ -90,6 +99,11 @@ export default async function ClientPage({
     .slice(0, 4);
   const nextAppointment = upcomingAppointments[0] || null;
   const mainCase = workspace.cases[0] || null;
+  const showOnboardingGuide =
+    !workspace.events.length &&
+    !workspace.documents.length &&
+    !workspace.documentRequests.length &&
+    !workspace.appointments.length;
   const importantNotices = [
     mainCase
       ? {
@@ -162,7 +176,7 @@ export default async function ClientPage({
       {error ? <div className="error-notice">{error}</div> : null}
       {success ? (
         <div className="success-notice">
-          Acesso atualizado com sucesso. Seu portal ja esta pronto para receber novas atualizacoes de caso.
+          Primeiro acesso concluido com sucesso. Seu portal esta pronto para acompanhar o caso com mais clareza.
         </div>
       ) : null}
 
@@ -235,6 +249,17 @@ export default async function ClientPage({
                 </Link>
               ))}
             </div>
+          ) : showOnboardingGuide ? (
+            <div className="support-panel">
+              <div className="support-row">
+                <span className="support-label">Primeiros sinais</span>
+                <strong>Seu portal foi aberto com sucesso e vai ficar mais completo conforme o caso avancar.</strong>
+              </div>
+              <div className="support-row">
+                <span className="support-label">O que entra aqui</span>
+                <strong>Status do caso, documentos, agenda e atualizacoes liberadas pela equipe.</strong>
+              </div>
+            </div>
           ) : (
             <p className="empty-state">
               Quando houver proxima etapa, documento pendente ou nova atualizacao, o aviso aparece aqui.
@@ -242,6 +267,36 @@ export default async function ClientPage({
           )}
         </SectionCard>
       </div>
+
+      {showOnboardingGuide ? (
+        <SectionCard
+          title="Como acompanhar daqui pra frente"
+          description="Mesmo quando o caso ainda esta no inicio, voce ja consegue entender como o portal vai organizar o atendimento."
+        >
+          <div className="journey-grid">
+            <div className="journey-step">
+              <span>1</span>
+              <strong>Status do caso</strong>
+              <p>Mostra a fase atual do atendimento com linguagem mais clara e menos tecnica.</p>
+            </div>
+            <div className="journey-step">
+              <span>2</span>
+              <strong>Documentos e pendencias</strong>
+              <p>Concentra arquivos liberados e pedidos documentais em um so lugar.</p>
+            </div>
+            <div className="journey-step">
+              <span>3</span>
+              <strong>Agenda e datas</strong>
+              <p>Reune compromissos, prazos e retornos futuros em uma leitura mais simples.</p>
+            </div>
+            <div className="journey-step">
+              <span>4</span>
+              <strong>Historico de atualizacoes</strong>
+              <p>Registra os andamentos liberados pela equipe conforme o caso avancar.</p>
+            </div>
+          </div>
+        </SectionCard>
+      ) : null}
 
       <div className="grid two">
         <SectionCard
