@@ -8,25 +8,55 @@ type ChatMessage = {
 };
 
 type NoemiaAssistantProps = {
-  audience: "visitor" | "client";
+  audience: "visitor" | "client" | "staff";
   displayName: string;
   suggestedPrompts: string[];
+  currentPath?: string;
 };
 
-const visitorWelcome =
-  "Posso orientar sobre triagem, funcionamento do portal e os proximos passos antes do atendimento.";
-const clientWelcome =
-  "Posso explicar o que aparece no seu portal, resumir status, agenda, documentos e orientar o proximo passo mais pratico.";
+const audienceCopy = {
+  visitor: {
+    welcome:
+      "Posso orientar sobre triagem, funcionamento do portal e os proximos passos antes do atendimento.",
+    modeLabel: "Orientacao inicial",
+    usageHint:
+      "Pergunte sobre triagem, areas atendidas, funcionamento do portal e proximos passos.",
+    placeholder:
+      "Ex.: Como funciona a triagem e quando recebo acesso ao portal?",
+    pendingText: "Estou organizando a resposta com base no fluxo publico e institucional."
+  },
+  client: {
+    welcome:
+      "Posso explicar o que aparece no seu portal, resumir status, agenda, documentos e orientar o proximo passo mais pratico.",
+    modeLabel: "Contexto do portal do cliente",
+    usageHint:
+      "Pergunte sobre status, documentos, agenda ou o que significa uma etapa do seu caso.",
+    placeholder: "Ex.: O que significa o status atual do meu caso?",
+    pendingText: "Estou organizando a resposta com base no contexto disponivel do portal."
+  },
+  staff: {
+    welcome:
+      "Posso resumir triagens, apontar prioridades, sugerir proximos passos internos e montar textos-base de retorno para a rotina da advogada.",
+    modeLabel: "Operacao interna",
+    usageHint:
+      "Peca resumo de triagens, leitura de prioridades, proximo passo interno ou um rascunho de retorno ao cliente.",
+    placeholder:
+      "Ex.: Resuma as prioridades de hoje e diga o que devo tratar primeiro.",
+    pendingText: "Estou cruzando operacao, telemetria e filas internas para responder com mais clareza."
+  }
+} as const;
 
 export function NoemiaAssistant({
   audience,
   displayName,
-  suggestedPrompts
+  suggestedPrompts,
+  currentPath = "/noemia"
 }: NoemiaAssistantProps) {
+  const copy = audienceCopy[audience];
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      content: audience === "client" ? clientWelcome : visitorWelcome
+      content: copy.welcome
     }
   ]);
   const [draft, setDraft] = useState("");
@@ -54,7 +84,7 @@ export function NoemiaAssistant({
         },
         body: JSON.stringify({
           audience,
-          currentPath: "/noemia",
+          currentPath,
           message: cleanMessage,
           history: nextHistory.slice(-8)
         })
@@ -86,15 +116,17 @@ export function NoemiaAssistant({
       <div className="support-panel">
         <div className="support-row">
           <span className="support-label">Modo ativo</span>
-          <strong>{audience === "client" ? `Portal de ${displayName}` : "Orientacao inicial"}</strong>
+          <strong>
+            {audience === "client"
+              ? `Portal de ${displayName}`
+              : audience === "staff"
+                ? `Apoio interno para ${displayName}`
+                : copy.modeLabel}
+          </strong>
         </div>
         <div className="support-row">
           <span className="support-label">Como usar melhor</span>
-          <strong>
-            {audience === "client"
-              ? "Pergunte sobre status, documentos, agenda ou o que significa uma etapa do seu caso."
-              : "Pergunte sobre triagem, areas atendidas, funcionamento do portal e proximos passos."}
-          </strong>
+          <strong>{copy.usageHint}</strong>
         </div>
       </div>
 
@@ -127,7 +159,7 @@ export function NoemiaAssistant({
         {isPending ? (
           <article className="chat-bubble assistant pending">
             <span>Noemia</span>
-            <p>Estou organizando a resposta com base no contexto disponivel do portal.</p>
+            <p>{copy.pendingText}</p>
           </article>
         ) : null}
       </div>
@@ -146,11 +178,7 @@ export function NoemiaAssistant({
             name="message"
             value={draft}
             onChange={(event) => setDraft(event.currentTarget.value)}
-            placeholder={
-              audience === "client"
-                ? "Ex.: O que significa o status atual do meu caso?"
-                : "Ex.: Como funciona a triagem e quando recebo acesso ao portal?"
-            }
+            placeholder={copy.placeholder}
           />
         </div>
         <div className="form-actions">

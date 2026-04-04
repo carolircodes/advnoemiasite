@@ -19,6 +19,8 @@ const TRACKED_AUTOMATION_TEMPLATES = new Set([
 const EVENT_LABELS: Record<string, string> = {
   site_visit_started: "Visita inicial",
   cta_start_triage_clicked: "Clique para iniciar triagem",
+  cta_client_portal_clicked: "Clique para entrar no portal",
+  cta_noemia_clicked: "Clique para abrir Noemia",
   triage_started: "Triagem iniciada",
   triage_submitted: "Triagem enviada",
   client_created: "Cliente criado",
@@ -187,6 +189,9 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
   const automationDispatches = automationDispatchesResult.data || [];
 
   const clientMapByProfile = new Map(clients.map((client) => [client.profile_id, client]));
+  const clientProfileIds = new Set(
+    clients.map((client) => client.profile_id).filter(Boolean)
+  );
   const linkedClientCreations = clients.filter((client) => client.source_intake_request_id);
   const linkedPortalAccesses = profiles.filter((profile) => {
     const linkedClient = clientMapByProfile.get(profile.id);
@@ -316,9 +321,17 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
     )
   ).sort((left, right) => right.count - left.count);
 
+  const portalEvents = productEvents.filter((event) => {
+    if (!event.profile_id) {
+      return false;
+    }
+
+    return clientProfileIds.has(event.profile_id);
+  });
+
   const portalUsage = {
     activeClients: getUniqueCount(
-      productEvents
+      portalEvents
         .filter((event) =>
           [
             "portal_access_completed",
@@ -332,17 +345,21 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
         )
         .map((event) => event.profile_id)
     ),
-    dashboardViews: productEvents.filter((event) => event.event_key === "client_portal_viewed")
+    dashboardViews: portalEvents.filter((event) => event.event_key === "client_portal_viewed")
       .length,
-    documentViews: productEvents.filter((event) =>
+    documentViews: portalEvents.filter((event) =>
       ["client_documents_viewed", "client_document_previewed", "client_document_downloaded"].includes(
         event.event_key
       )
     ).length,
-    agendaViews: productEvents.filter((event) => event.event_key === "client_agenda_viewed")
+    agendaViews: portalEvents.filter((event) => event.event_key === "client_agenda_viewed")
       .length,
-    noemiaMessages: productEvents.filter((event) => event.event_key === "noemia_message_sent")
-      .length
+    noemiaMessages: productEvents.filter(
+      (event) =>
+        event.event_key === "noemia_message_sent" &&
+        ((event.profile_id && clientProfileIds.has(event.profile_id)) ||
+          event.payload?.audience === "client")
+    ).length
   };
 
   const pendingAutomationNotifications = notifications.filter(

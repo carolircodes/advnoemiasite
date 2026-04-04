@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
@@ -150,29 +151,39 @@ export default async function ClientPage({
   ].filter(Boolean) as NoticeItem[];
 
   return (
-    <AppFrame
-      eyebrow="Area do cliente"
-      title={`Seu caso em um painel claro, organizado e facil de acompanhar, ${profile.full_name}.`}
-      description="Aqui voce encontra o status atual do caso, as proximas datas, os documentos liberados e os avisos que realmente importam no acompanhamento do dia a dia."
-      navigation={[
-        { href: "/cliente", label: "Meu painel", active: true },
-        { href: "/documentos", label: "Documentos" },
-        { href: "/agenda", label: "Agenda" }
-      ]}
-      highlights={[
-        { label: "Status do caso", value: mainCase ? mainCase.statusLabel : "Em preparacao" },
-        { label: "Proximas datas", value: String(upcomingAppointments.length) },
-        { label: "Documentos liberados", value: String(availableDocuments.length) },
-        {
-          label: "Pendencias abertas",
-          value: String(openRequests.length + pendingDocuments.length)
-        }
-      ]}
-      actions={[
-        { href: "/documentos", label: "Ver documentos" },
-        { href: "/agenda", label: "Ver agenda", tone: "secondary" }
-      ]}
-    >
+    <>
+      <ProductEventBeacon
+        eventKey="client_portal_viewed"
+        eventGroup="portal"
+        payload={{
+          hasCase: Boolean(mainCase),
+          openRequests: openRequests.length,
+          upcomingAppointments: upcomingAppointments.length
+        }}
+      />
+      <AppFrame
+        eyebrow="Area do cliente"
+        title={`Seu caso em um painel claro, organizado e facil de acompanhar, ${profile.full_name}.`}
+        description="Aqui voce encontra o status atual do caso, as proximas datas, os documentos liberados e os avisos que realmente importam no acompanhamento do dia a dia."
+        navigation={[
+          { href: "/cliente", label: "Meu painel", active: true },
+          { href: "/documentos", label: "Documentos" },
+          { href: "/agenda", label: "Agenda" }
+        ]}
+        highlights={[
+          { label: "Status do caso", value: mainCase ? mainCase.statusLabel : "Em preparacao" },
+          { label: "Proximas datas", value: String(upcomingAppointments.length) },
+          { label: "Documentos liberados", value: String(availableDocuments.length) },
+          {
+            label: "Pendencias abertas",
+            value: String(openRequests.length + pendingDocuments.length)
+          }
+        ]}
+        actions={[
+          { href: "/documentos", label: "Ver documentos" },
+          { href: "/agenda", label: "Ver agenda", tone: "secondary" }
+        ]}
+      >
       {error ? <div className="error-notice">{error}</div> : null}
       {success ? (
         <div className="success-notice">
@@ -421,6 +432,7 @@ export default async function ClientPage({
           </p>
         )}
       </SectionCard>
-    </AppFrame>
+      </AppFrame>
+    </>
   );
 }

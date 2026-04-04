@@ -21,10 +21,18 @@ export const metadata: Metadata = {
 
 export default async function NoemiaPage() {
   const profile = await getCurrentProfile();
+  const isStaffMode =
+    !!profile && profile.is_active && (profile.role === "advogada" || profile.role === "admin");
   const isClientMode =
     profile?.role === "cliente" && profile.is_active && !!profile.first_login_completed_at;
-  const audience = isClientMode ? "client" : "visitor";
-  const navigation = isClientMode
+  const audience = isStaffMode ? "staff" : isClientMode ? "client" : "visitor";
+  const navigation = isStaffMode
+    ? [
+        { href: "/internal/advogada", label: "Painel" },
+        { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
+        { href: "/noemia", label: "Noemia", active: true }
+      ]
+    : isClientMode
     ? [
         { href: "/cliente", label: "Meu painel" },
         { href: "/documentos", label: "Documentos" },
@@ -37,7 +45,13 @@ export default async function NoemiaPage() {
         { href: "/noemia", label: "Noemia", active: true },
         { href: "/auth/login", label: "Area do cliente" }
       ];
-  const suggestedPrompts = isClientMode
+  const suggestedPrompts = isStaffMode
+    ? [
+        "Resuma as prioridades de hoje e diga o que devo tratar primeiro.",
+        "Quais casos estao sem atualizacao ha mais tempo e qual proximo passo interno faz sentido?",
+        "Monte um texto-base curto para cobrar o cliente sobre documentos pendentes."
+      ]
+    : isClientMode
     ? [
         "Explique o status atual do meu caso em linguagem simples.",
         "Quais documentos estao pendentes no meu portal?",
@@ -51,37 +65,75 @@ export default async function NoemiaPage() {
 
   return (
     <>
-      <ProductEventBeacon eventKey="noemia_opened" eventGroup="ai" />
+      <ProductEventBeacon eventKey="noemia_opened" eventGroup="ai" payload={{ audience }} />
       <AppFrame
         eyebrow="Noemia"
         title={
-          isClientMode
+          isStaffMode
+            ? "Uma assistente operacional para transformar sinais do painel em acao pratica."
+            : isClientMode
             ? "Uma assistente para traduzir o seu portal em linguagem mais simples."
             : "Uma assistente inicial para orientar a jornada antes e depois da triagem."
         }
         description={
-          isClientMode
+          isStaffMode
+            ? "Noemia cruza filas internas, triagens, pendencias, agenda e BI para resumir prioridades, sugerir proximo passo e apoiar a rotina da advogada."
+            : isClientMode
             ? "Noemia usa apenas o contexto do seu proprio portal para explicar status, agenda, documentos e proximos passos com mais clareza."
             : "Noemia ajuda visitantes a entender triagem, atendimento, convite e funcionamento do portal sem substituir o retorno tecnico da equipe."
         }
         navigation={navigation}
         highlights={[
-          { label: "Modo", value: isClientMode ? "Cliente autenticado" : "Visitante" },
-          { label: "Base", value: isClientMode ? "Contexto do seu portal" : "Fluxo institucional" },
-          { label: "Melhor uso", value: "Duvidas simples e orientacao" },
-          { label: "Limite", value: "Sem estrategia juridica final" }
+          {
+            label: "Modo",
+            value: isStaffMode
+              ? "Operacao interna"
+              : isClientMode
+                ? "Cliente autenticado"
+                : "Visitante"
+          },
+          {
+            label: "Base",
+            value: isStaffMode
+              ? "Filas, BI e operacao"
+              : isClientMode
+                ? "Contexto do seu portal"
+                : "Fluxo institucional"
+          },
+          {
+            label: "Melhor uso",
+            value: isStaffMode ? "Prioridade e proximo passo" : "Duvidas simples e orientacao"
+          },
+          {
+            label: "Limite",
+            value: isStaffMode ? "Nao substitui decisao juridica final" : "Sem estrategia juridica final"
+          }
         ]}
         actions={[
-          isClientMode
+          isStaffMode
+            ? {
+                href: "/internal/advogada",
+                label: "Voltar ao painel",
+                tone: "secondary" as const
+              }
+            : isClientMode
             ? { href: "/cliente", label: "Voltar ao meu painel", tone: "secondary" as const }
             : { href: "/triagem", label: "Iniciar triagem", tone: "secondary" as const }
         ]}
       >
         <div className="grid two">
           <SectionCard
-            title={isClientMode ? "Conversa com contexto do seu caso" : "Orientacao inicial com contexto do escritorio"}
+            title={
+              isStaffMode
+                ? "Conversa com contexto operacional do escritorio"
+                : isClientMode
+                  ? "Conversa com contexto do seu caso"
+                  : "Orientacao inicial com contexto do escritorio"
+            }
             description={
-              isClientMode
+              isStaffMode
+                ? "Use a assistente para resumir triagens, enxergar prioridades, montar proximos passos e rascunhar retornos com mais velocidade."
+                : isClientMode
                 ? "Pergunte de forma direta. A assistente responde com base no que esta visivel no seu proprio portal."
                 : "Use a assistente para tirar duvidas antes da triagem ou entender como o portal funciona."
             }
@@ -90,6 +142,7 @@ export default async function NoemiaPage() {
               audience={audience}
               displayName={profile?.full_name || "Voce"}
               suggestedPrompts={suggestedPrompts}
+              currentPath="/noemia"
             />
           </SectionCard>
 
@@ -99,7 +152,14 @@ export default async function NoemiaPage() {
               description="Esta primeira camada ja foi pensada para ser util desde o primeiro dia, sem prometer mais do que deve."
             >
               <ul className="timeline">
-                {isClientMode ? (
+                {isStaffMode ? (
+                  <>
+                    <li>1. Resume triagens, filas e pendencias com linguagem mais acionavel.</li>
+                    <li>2. Sugere prioridade inicial e proximo passo interno com base no contexto atual.</li>
+                    <li>3. Ajuda a transformar leitura operacional em texto-base de retorno ao cliente.</li>
+                    <li>4. Mantem limites claros quando a pergunta exigir criterio juridico final da equipe.</li>
+                  </>
+                ) : isClientMode ? (
                   <>
                     <li>1. Explica o status atual do caso em linguagem menos tecnica.</li>
                     <li>2. Resume o que ha de documentos, pendencias e proximas datas visiveis.</li>
@@ -125,19 +185,27 @@ export default async function NoemiaPage() {
                 <div className="support-row">
                   <span className="support-label">Seguranca</span>
                   <strong>
-                    {isClientMode
+                    {isStaffMode
+                      ? "A assistente usa o contexto interno do escritorio apenas para apoiar a operacao da equipe."
+                      : isClientMode
                       ? "A assistente usa apenas o contexto do seu proprio portal autenticado."
                       : "A assistente usa apenas o fluxo publico e institucional do escritorio."}
                   </strong>
                 </div>
                 <div className="support-row">
                   <span className="support-label">Escopo</span>
-                  <strong>Ela explica, resume e orienta; nao substitui decisao tecnica individual do caso.</strong>
+                  <strong>
+                    {isStaffMode
+                      ? "Ela resume, organiza e sugere; nao substitui o criterio tecnico e estrategico da advogada."
+                      : "Ela explica, resume e orienta; nao substitui decisao tecnica individual do caso."}
+                  </strong>
                 </div>
                 <div className="support-row">
                   <span className="support-label">Proximo passo</span>
                   <strong>
-                    {isClientMode
+                    {isStaffMode
+                      ? "Use a resposta como apoio para agir mais rapido no painel, nao como decisao final automatica."
+                      : isClientMode
                       ? "Se a duvida exigir analise juridica do caso, a melhor saida continua sendo falar com a equipe."
                       : "Se a pergunta depender do seu caso concreto, o caminho certo continua sendo preencher a triagem."}
                   </strong>

@@ -31,6 +31,251 @@
   <link rel="stylesheet" href="assets/css/premium-system.css" />
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
   <link rel="stylesheet" href="assets/css/site-refinements.css" />
+
+  <style>
+    .hero {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background:
+        linear-gradient(90deg, rgba(7, 17, 15, 0.94) 0%, rgba(7, 17, 15, 0.88) 30%, rgba(7, 17, 15, 0.58) 56%, rgba(7, 17, 15, 0.18) 100%),
+        url("mae.jpeg") no-repeat 82% center / cover;
+      transform: scale(1.02);
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: clamp(28px, 4vw, 52px);
+      align-items: center;
+      min-height: 720px;
+      padding-top: clamp(32px, 4vw, 56px);
+      padding-bottom: clamp(32px, 4vw, 56px);
+    }
+
+    .hero-copy {
+      max-width: 620px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-copy h1,
+    .hero-copy p,
+    .hero-copy .eyebrow {
+      max-width: 100%;
+    }
+
+    .hero-copy h1 {
+      line-height: 1.08;
+      margin-bottom: 18px;
+    }
+
+    .hero-copy p {
+      max-width: 58ch;
+      margin-bottom: 24px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .hero-points {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 18px;
+    }
+
+    .hero-point {
+      min-height: 184px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      border-radius: 28px;
+    }
+
+    .hero-point strong {
+      display: block;
+      margin-bottom: 12px;
+      line-height: 1.2;
+      font-size: clamp(1.1rem, 1.5vw, 1.35rem);
+    }
+
+    .hero-point p {
+      margin: 0;
+      max-width: 100%;
+      line-height: 1.6;
+    }
+
+    .hero-panel {
+      position: relative;
+      z-index: 2;
+      padding: 22px;
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(17, 27, 24, 0.34), rgba(7, 11, 10, 0.18));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      max-width: 520px;
+      justify-self: end;
+      width: 100%;
+    }
+
+    .panel-visual {
+      min-height: 100%;
+    }
+
+    .hero-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .preview-row {
+      position: relative;
+      margin: 0;
+      padding: 0;
+    }
+
+    .preview-row > div {
+      min-height: 118px;
+      padding: 24px 24px 22px;
+      border-radius: 24px;
+      background: rgba(7, 8, 10, 0.52);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .preview-row strong {
+      display: block;
+      margin: 0;
+      font-size: clamp(1.15rem, 1.4vw, 1.5rem);
+      line-height: 1.15;
+      color: #fff;
+    }
+
+    .preview-row span {
+      display: block;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.86);
+      line-height: 1.55;
+      font-size: 1rem;
+    }
+
+    .pathway-grid,
+    .feature-grid,
+    .metric-grid {
+      gap: 22px;
+    }
+
+    @media (max-width: 1180px) {
+      .hero::before {
+        background:
+          linear-gradient(90deg, rgba(7, 17, 15, 0.95) 0%, rgba(7, 17, 15, 0.9) 38%, rgba(7, 17, 15, 0.66) 62%, rgba(7, 17, 15, 0.24) 100%),
+          url("mae.jpeg") no-repeat 76% center / cover;
+      }
+
+      .hero-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 0.88fr);
+        gap: 24px;
+        min-height: 680px;
+      }
+
+      .hero-copy {
+        max-width: 560px;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .hero::before {
+        background:
+          linear-gradient(180deg, rgba(7, 17, 15, 0.92) 0%, rgba(7, 17, 15, 0.84) 34%, rgba(7, 17, 15, 0.7) 60%, rgba(7, 17, 15, 0.58) 100%),
+          url("mae.jpeg") no-repeat center top / cover;
+      }
+
+      .hero-grid {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        gap: 26px;
+      }
+
+      .hero-copy {
+        max-width: 100%;
+      }
+
+      .hero-panel {
+        max-width: 100%;
+        justify-self: stretch;
+      }
+
+      .hero-points {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-point {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .hero-grid {
+        padding-top: 22px;
+        padding-bottom: 22px;
+      }
+
+      .hero-copy h1 {
+        font-size: clamp(2rem, 8vw, 2.8rem);
+      }
+
+      .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .hero-actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .hero-panel {
+        padding: 16px;
+        border-radius: 24px;
+      }
+
+      .preview-row > div {
+        min-height: unset;
+        padding: 18px 18px 16px;
+        border-radius: 20px;
+      }
+
+      .preview-row strong {
+        font-size: 1.1rem;
+      }
+
+      .preview-row span {
+        font-size: 0.96rem;
+        line-height: 1.5;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="page-shell">

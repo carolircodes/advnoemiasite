@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { canAccessPortalPath } from "@/lib/auth/access-control";
 import { getCurrentProfile } from "@/lib/auth/guards";
 import { getAccessibleDocumentFile } from "@/lib/services/manage-documents";
+import { recordProductEvent } from "@/lib/services/public-intake";
 
 function canPreviewInBrowser(mimeType: string | null) {
   return !!mimeType && (mimeType === "application/pdf" || mimeType.startsWith("image/"));
@@ -54,6 +55,32 @@ export async function GET(
 
     const forceDownload = request.nextUrl.searchParams.get("download") === "1";
     const fileBuffer = Buffer.from(await result.file.arrayBuffer());
+
+    if (profile.role === "cliente") {
+      try {
+        await recordProductEvent({
+          eventKey: forceDownload
+            ? "client_document_downloaded"
+            : "client_document_previewed",
+          eventGroup: "portal",
+          pagePath: "/documentos",
+          profileId: profile.id,
+          payload: {
+            documentId: result.document.id,
+            caseId: result.document.case_id,
+            category: result.document.category,
+            mimeType: result.document.mime_type || "",
+            accessMode: forceDownload ? "download" : "preview"
+          }
+        });
+      } catch (trackingError) {
+        console.error("[documents.route] Failed to record document usage event", {
+          documentId,
+          profileId: profile.id,
+          message: trackingError instanceof Error ? trackingError.message : String(trackingError)
+        });
+      }
+    }
 
     return new NextResponse(fileBuffer, {
       status: 200,

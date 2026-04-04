@@ -220,7 +220,7 @@ export default function HomePage() {
                 <TrackedLink
                   href="/noemia"
                   className="button secondary"
-                  eventKey="noemia_opened"
+                  eventKey="cta_noemia_clicked"
                   eventGroup="ai"
                   trackingPayload={{ location: "home_footer" }}
                 >

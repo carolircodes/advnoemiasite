@@ -53,10 +53,15 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `app/api/worker/notifications/process/route.ts`: endpoint seguro para rodar a fila
 - `scripts/process-notifications.mjs`: gatilho local do worker
 - `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
+- `lib/services/intelligence.ts`: funil, leitura de eventos, uso do portal e sugestoes operacionais
+- `app/internal/advogada/inteligencia/page.tsx`: visualizacao simples de BI do produto
+- `app/noemia/page.tsx`: experiencia inicial da assistente em modo visitante e cliente
+- `app/api/noemia/chat/route.ts`: backend da Noemia com registro de eventos de uso
 - `lib/supabase/`: clientes browser, server, admin e middleware
 - `scripts/bootstrap-admin.mjs`: bootstrap idempotente da advogada
 - `supabase/config.toml`: configuracao local do Supabase Auth e Mailpit
 - `supabase/migrations/20260403_initial_portal.sql`: schema inicial
+- `supabase/migrations/20260412_intelligence_automation_and_noemia.sql`: estrutura adicional desta etapa
 - `supabase/templates/`: templates locais de invite e recovery
 
 ## Pre-requisitos
@@ -88,6 +93,8 @@ NOTIFICATIONS_SMTP_SECURE=false
 NOTIFICATIONS_REPLY_TO=atendimento@advnoemia.local
 RESEND_API_KEY=
 EMAIL_FROM=Noemia Paixao Advocacia <no-reply@advnoemia.local>
+OPENAI_API_KEY=
+OPENAI_MODEL=
 PORTAL_ADMIN_EMAIL=advogada@advnoemia.local
 PORTAL_ADMIN_FULL_NAME=Noemia Paixao
 PORTAL_ADMIN_TEMP_PASSWORD=TroqueEstaSenha123
@@ -135,7 +142,7 @@ Servicos locais relevantes:
 npm run supabase:db:reset
 ```
 
-Esse comando reaplica `20260403_initial_portal.sql`.
+Esse comando reaplica todas as migrations locais, incluindo triagem publica, eventos de produto, automacoes e a base da Noemia.
 
 ### 5. Executar o bootstrap da advogada
 
@@ -224,6 +231,63 @@ Eventos relevantes continuam alimentando `notifications_outbox`. Agora o portal 
 - marca como `sent`, `failed` ou `skipped`
 
 Observacao: registros `client-invite` continuam sendo tratados como rastreio do onboarding, porque o convite principal segue no fluxo nativo do Supabase Auth.
+
+## Camada inteligente desta etapa
+
+Esta etapa adiciona leitura real do funil, automacoes operacionais baseadas em evento e a primeira camada de IA do produto.
+
+### Inteligencia de negocio
+
+- abra `/internal/advogada/inteligencia` para visualizar:
+  - funil `visita -> CTA -> triagem iniciada -> triagem enviada -> cliente criado -> login`
+  - taxa de conversao e abandono da triagem
+  - uso do portal com eventos reais
+  - eventos recentes e breakdown de `product_events`
+- o painel principal da advogada em `/internal/advogada` agora tambem traz:
+  - radar inteligente dos ultimos 30 dias
+  - sugestoes orientadas por dados
+  - priorizacao operacional sem precisar sair do fluxo principal
+
+### Automacoes operacionais
+
+- `triagem enviada` gera notificacao clara para a advogada
+- `triagem urgente` gera destaque automatico adicional
+- `cliente sem primeiro acesso` entra em lembrete automatico
+- `documento solicitado e nao enviado` entra em lembrete automatico
+- `compromissos proximos` entram em notificacao automatica
+- o processamento acontece por:
+  - evento imediato no envio da triagem
+  - `npm run notifications:process` para rodar o worker protegido da outbox
+
+### Noemia
+
+- configure `OPENAI_API_KEY` no `.env.local`
+- opcionalmente defina `OPENAI_MODEL`
+- abra `/noemia`
+- comportamento atual:
+  - visitante: explica triagem, portal e proximos passos
+  - cliente autenticado: usa o contexto do proprio portal para explicar status, documentos e agenda
+- os eventos `noemia_opened` e `noemia_message_sent` entram em `product_events`
+
+### Telemetria desta etapa
+
+Os eventos abaixo passam a alimentar a leitura inteligente do produto:
+
+- `site_visit_started`
+- `cta_start_triage_clicked`
+- `cta_client_portal_clicked`
+- `cta_noemia_clicked`
+- `triage_started`
+- `triage_submitted`
+- `client_created`
+- `portal_access_completed`
+- `client_portal_viewed`
+- `client_documents_viewed`
+- `client_agenda_viewed`
+- `client_document_previewed`
+- `client_document_downloaded`
+- `noemia_opened`
+- `noemia_message_sent`
 
 ## Fluxo local validado
 
@@ -365,11 +429,55 @@ Observacao: registros `client-invite` continuam sendo tratados como rastreio do 
 
 ### Eventos principais de conversao
 
-Os eventos abaixo passam a ser registrados em `product_events`:
+Os eventos de conversao e uso passam a ser registrados em `product_events`:
 
 - `cta_start_triage_clicked`
 - `cta_client_portal_clicked`
+- `cta_noemia_clicked`
+- `site_visit_started`
+- `triage_started`
 - `triage_submitted`
+- `client_created`
+- `portal_access_completed`
+- `client_portal_viewed`
+- `client_documents_viewed`
+- `client_agenda_viewed`
+- `client_document_previewed`
+- `client_document_downloaded`
+- `noemia_opened`
+- `noemia_message_sent`
+
+### Checklist desta etapa
+
+1. Acesse `/` e confirme `site_visit_started`.
+2. Clique em `Iniciar atendimento` e confirme `cta_start_triage_clicked`.
+3. Abra `/triagem`, avance a primeira etapa e confirme `triage_started`.
+4. Envie a triagem e confirme:
+   - novo registro em `intake_requests`
+   - novo `triage_submitted` em `product_events`
+   - notificacao interna com template `triage-submitted`
+   - template `triage-urgent` quando a urgencia for `urgente`
+5. No painel interno, cadastre o cliente a partir da triagem e confirme:
+   - `client_created` em `product_events`
+   - `clients.source_intake_request_id` preenchido
+6. Conclua o primeiro acesso do cliente e confirme:
+   - `portal_access_completed`
+   - `profiles.first_login_completed_at`
+7. Entre como cliente e abra:
+   - `/cliente` para `client_portal_viewed`
+   - `/documentos` para `client_documents_viewed`
+   - `/agenda` para `client_agenda_viewed`
+8. Visualize e baixe um documento e confirme:
+   - `client_document_previewed`
+   - `client_document_downloaded`
+9. Rode `npm run notifications:process` e confirme:
+   - `automation_dispatches` preenchida
+   - `notifications_outbox` com itens `sent`, `failed` ou `skipped`
+10. Abra `/internal/advogada/inteligencia` e confirme que o funil e o uso do portal refletem os eventos acima.
+11. Configure `OPENAI_API_KEY`, abra `/noemia` e confirme:
+   - resposta da assistente em modo visitante
+   - resposta em modo cliente autenticado
+   - `noemia_message_sent` em `product_events`
 
 ## Diagnostico rapido de invite
 

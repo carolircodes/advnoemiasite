@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import { NoemiaAssistant } from "@/components/noemia-assistant";
+import { OperationalList } from "@/components/operational-list";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
@@ -28,6 +30,7 @@ import {
 } from "@/lib/services/manage-cases";
 import { createClientWithInvite } from "@/lib/services/create-client";
 import { getStaffOverview } from "@/lib/services/dashboard";
+import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
 import { updateIntakeRequestStatus } from "@/lib/services/public-intake";
 import { registerPortalEvent } from "@/lib/services/register-event";
 
@@ -306,6 +309,7 @@ export default async function InternalLawyerPage({
 }) {
   const profile = await requireProfile(["advogada", "admin"]);
   const overview = await getStaffOverview();
+  const intelligence = await getBusinessIntelligenceOverview(30);
   const params = await searchParams;
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
@@ -391,7 +395,6 @@ export default async function InternalLawyerPage({
         (!pendingOnly || appointment.visible_to_client)
     )
     .slice(0, 6);
-  const activeCasesCount = filteredCases.filter((caseItem) => caseItem.status !== "concluido").length;
   const activeCases = filteredCases.filter((caseItem) => caseItem.status !== "concluido").slice(0, 6);
   const pendingDocuments = overview.latestDocuments.filter(
     (document) =>
@@ -418,26 +421,82 @@ export default async function InternalLawyerPage({
         isWithinDateRange(event.occurred_at, dateFrom, dateTo)
     )
     .slice(0, 8);
-  const urgentFocus = [
-    filteredIntakeRequests[0]
-      ? `Nova triagem: ${filteredIntakeRequests[0].full_name}`
-      : null,
-    pendingRequests[0]
-      ? `Solicitacao em aberto: ${pendingRequests[0].title}`
-      : null,
-    upcomingAppointments[0]
-      ? `Proximo compromisso: ${upcomingAppointments[0].title}`
-      : null,
-    pendingNotifications[0]
-      ? `${pendingNotifications.length} notificacoes aguardando envio`
-      : null
-  ].filter(Boolean) as string[];
+  const operationalSummary = overview.operationalCenter.summary;
+  const todayQueue = overview.operationalCenter.queues.today.slice(0, 5);
+  const thisWeekQueue = overview.operationalCenter.queues.thisWeek.slice(0, 5);
+  const awaitingClientQueue = overview.operationalCenter.queues.awaitingClient.slice(0, 5);
+  const awaitingTeamQueue = overview.operationalCenter.queues.awaitingTeam.slice(0, 5);
+  const recentlyCompletedQueue =
+    overview.operationalCenter.queues.recentlyCompleted.slice(0, 5);
+  const operationalHighlights = [
+    {
+      label: "Criticos agora",
+      value: String(operationalSummary.criticalCount),
+      note: "Triagens urgentes, pendencias vencidas ou compromissos que ja pedem preparo.",
+      tone: "critical"
+    },
+    {
+      label: "Fazer hoje",
+      value: String(operationalSummary.todayCount),
+      note: todayQueue[0]
+        ? `${todayQueue[0].title} esta puxando a fila neste momento.`
+        : "A fila do dia esta limpa neste momento.",
+      tone: "warning"
+    },
+    {
+      label: "Aguardando cliente",
+      value: String(operationalSummary.waitingClientCount),
+      note: "Itens parados por falta de retorno, envio documental ou primeiro acesso.",
+      tone: "neutral"
+    },
+    {
+      label: "Aguardando equipe",
+      value: String(operationalSummary.waitingTeamCount),
+      note: "Casos, triagens e ajustes internos que ainda pedem um proximo movimento.",
+      tone: "success"
+    }
+  ] as const;
+  const operationalSignals = [
+    {
+      label: "Triagens urgentes",
+      value: String(operationalSummary.urgentTriageCount),
+      body: "Entradas que pedem leitura inicial sem ficar perdidas no restante do painel."
+    },
+    {
+      label: "Convites travados",
+      value: String(operationalSummary.inviteStalledCount),
+      body: "Clientes criados que ainda nao concluiram o primeiro acesso ao portal."
+    },
+    {
+      label: "Pendencias envelhecidas",
+      value: String(operationalSummary.agedPendingDocumentsCount),
+      body: "Solicitacoes documentais vencidas ou abertas ha tempo demais."
+    },
+    {
+      label: "Casos sem atualizacao",
+      value: String(operationalSummary.staleCasesCount),
+      body: "Acompanhamentos que ja merecem novo andamento, retorno ou decisao interna."
+    }
+  ];
+  const suggestedMoves = intelligence.suggestions.slice(0, 4);
+  const operationalHeadline =
+    operationalSummary.criticalCount > 0
+      ? `${operationalSummary.criticalCount} item(ns) ja cruzaram o limite de atencao e merecem acao antes do restante da fila.`
+      : operationalSummary.todayCount > 0
+        ? `${operationalSummary.todayCount} item(ns) entram no radar de hoje e ajudam a organizar a rotina sem leitura manual dispersa.`
+        : "A operacao esta estavel agora. O painel segue atento para destacar o que mudar de prioridade.";
+  const noemiaPrompts = [
+    "Resuma a fila de hoje e diga por onde devo comecar.",
+    "Quais pendencias estao envelhecendo e qual proximo passo interno faz mais sentido?",
+    "Monte um texto-base curto para cobrar documentos do cliente.",
+    "Quais casos estao sem atualizacao recente e como eu deveria prioriza-los?"
+  ];
 
   return (
     <AppFrame
       eyebrow="Painel da advogada"
-      title={`Visao operacional clara para ${profile.full_name}.`}
-      description="O painel agora separa o que exige atencao imediata das acoes do dia, para voce localizar clientes, casos, pendencias e proximos passos sem ficar navegando em excesso."
+      title={`Central operacional premium para ${profile.full_name}.`}
+      description="O painel agora comeca pela prioridade real: organiza o trabalho em filas uteis, destaca o que envelheceu e usa inteligencia do produto para apoiar decisao, retorno e acompanhamento."
       navigation={[
         { href: "/internal/advogada", label: "Painel", active: true },
         { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
@@ -445,18 +504,21 @@ export default async function InternalLawyerPage({
         { href: "/agenda", label: "Agenda" }
       ]}
       highlights={[
-        { label: "Triagens novas", value: String(overview.pendingIntakeRequestsCount) },
-        { label: "Casos ativos", value: String(activeCasesCount) },
-        { label: "Compromissos proximos", value: String(upcomingAppointments.length) },
-        { label: "Notificacoes pendentes", value: String(overview.pendingNotifications) }
+        { label: "Criticos agora", value: String(operationalSummary.criticalCount) },
+        { label: "Fazer hoje", value: String(operationalSummary.todayCount) },
+        { label: "Aguardando cliente", value: String(operationalSummary.waitingClientCount) },
+        { label: "Aguardando equipe", value: String(operationalSummary.waitingTeamCount) }
       ]}
       actions={[
+        { href: "#central-prioridades", label: "Ver fila de hoje", tone: "secondary" },
+        { href: "#noemia-operacional", label: "Usar Noemia", tone: "secondary" },
         { href: "#triagens-recebidas", label: "Revisar triagens", tone: "secondary" },
         { href: "#cadastro-cliente", label: "Cadastrar cliente" },
-        { href: "/internal/advogada/inteligencia", label: "Ver inteligencia", tone: "secondary" },
-        { href: "#gestao-casos", label: "Abrir caso", tone: "secondary" },
-        { href: "#atualizacoes-caso", label: "Registrar atualizacao", tone: "secondary" },
-        { href: "#status-caso", label: "Alterar status do caso", tone: "secondary" }
+        {
+          href: "/internal/advogada/inteligencia",
+          label: "Abrir inteligencia",
+          tone: "secondary"
+        }
       ]}
     >
       {error ? <div className="error-notice">{error}</div> : null}
@@ -527,78 +589,223 @@ export default async function InternalLawyerPage({
       </SectionCard>
 
       <SectionCard
-        title="Acoes rapidas"
-        description="Use estes atalhos quando souber exatamente o que precisa fazer. Cada card leva voce direto para a acao principal."
+        id="central-prioridades"
+        title="Central de prioridades"
+        description="A rotina agora comeca pela fila certa: o que exige acao hoje, o que pede preparo nesta semana e o que ficou esperando cliente ou equipe."
       >
-        <div className="shortcut-grid">
-          <Link href="#cadastro-cliente" className="shortcut-card">
-            <span className="shortcut-kicker">Atendimento</span>
-            <strong>Cadastrar cliente</strong>
-            <p>Abrir cadastro, gerar convite e iniciar o caso sem etapas manuais.</p>
-          </Link>
-          <Link href="#atualizacoes-caso" className="shortcut-card">
-            <span className="shortcut-kicker">Andamento</span>
-            <strong>Registrar atualizacao</strong>
-            <p>Adicionar novo andamento visivel ou interno com resumo para o portal.</p>
-          </Link>
-          <Link href="#gestao-casos" className="shortcut-card">
-            <span className="shortcut-kicker">Casos</span>
-            <strong>Abrir ou editar caso</strong>
-            <p>Organizar titulo, area, prioridade e resumo do caso sem sair do painel.</p>
-          </Link>
-          <Link href="/documentos#solicitar-documento" className="shortcut-card">
-            <span className="shortcut-kicker">Documentos</span>
-            <strong>Solicitar documento</strong>
-            <p>Abrir uma pendencia documental com orientacoes e prazo para o cliente.</p>
-          </Link>
-          <Link href="/documentos#registrar-documento" className="shortcut-card">
-            <span className="shortcut-kicker">Arquivos</span>
-            <strong>Registrar documento</strong>
-            <p>Enviar o arquivo real para o caso e definir se ele aparece no portal.</p>
-          </Link>
-          <Link href="/agenda#registrar-compromisso" className="shortcut-card">
-            <span className="shortcut-kicker">Agenda</span>
-            <strong>Criar compromisso</strong>
-            <p>Marcar prazo, reuniao, retorno ou audiencia com data e visibilidade.</p>
-          </Link>
-          <Link href="#status-caso" className="shortcut-card">
-            <span className="shortcut-kicker">Fluxo</span>
-            <strong>Alterar status do caso</strong>
-            <p>Atualizar a fase do caso e refletir isso com clareza para a equipe e o cliente.</p>
-          </Link>
+        <div className="operational-band">
+          {operationalHighlights.map((item) => (
+            <article key={item.label} className={`operational-band-card ${item.tone}`}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.note}</p>
+            </article>
+          ))}
+        </div>
+        <div className="support-panel">
+          <div className="support-row">
+            <span className="support-label">Leitura rapida</span>
+            <strong>{operationalHeadline}</strong>
+          </div>
+          <div className="support-row">
+            <span className="support-label">Regua operacional</span>
+            <strong>
+              Novo = entrou nas ultimas 24h. Pendente = esta parado e pede retorno.
+              Critico = ficou urgente, envelheceu ou venceu prazo.
+            </strong>
+          </div>
         </div>
       </SectionCard>
 
       <div className="grid two">
         <SectionCard
-          title="O que merece atencao hoje"
-          description="Resumo rapido do que esta mais perto de vencer, acontecer ou travar o fluxo."
+          title={`Fazer hoje (${operationalSummary.todayCount})`}
+          description="Itens para atacar primeiro porque ja estao urgentes, venceram prazo ou travam outros passos."
         >
-          {urgentFocus.length ? (
-            <ul className="priority-list">
-              {urgentFocus.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="empty-state">
-              O painel volta a destacar aqui o que ficar mais urgente ao longo do uso.
-            </p>
-          )}
+          <OperationalList
+            items={todayQueue}
+            emptyMessage="Quando algo cruzar o limite de prioridade do dia, a fila aparece aqui primeiro."
+          />
         </SectionCard>
 
         <SectionCard
-          title="Navegacao do trabalho"
-          description="Se quiser sair do painel, estes caminhos levam direto para as areas tematicas do portal."
+          title={`Acompanhar esta semana (${operationalSummary.thisWeekCount})`}
+          description="Compromissos e pendencias proximas que merecem preparo antes de virarem urgencia."
         >
-          <div className="route-grid">
-            <Link href="/documentos" className="route-card">
-              <strong>Central de documentos</strong>
-              <span>Upload, solicitacoes e consulta do que esta pendente.</span>
+          <OperationalList
+            items={thisWeekQueue}
+            emptyMessage="Sem compromissos ou prazos desta semana pedindo preparo adicional agora."
+          />
+        </SectionCard>
+      </div>
+
+      <div className="grid two">
+        <SectionCard
+          title={`Aguardando cliente (${operationalSummary.waitingClientCount})`}
+          description="Aqui ficam convites, documentos e retornos que dependem do cliente para a fila voltar a andar."
+        >
+          <OperationalList
+            items={awaitingClientQueue}
+            emptyMessage="Nao ha itens relevantes aguardando retorno do cliente neste momento."
+          />
+        </SectionCard>
+
+        <SectionCard
+          title={`Aguardando equipe (${operationalSummary.waitingTeamCount})`}
+          description="Fila interna para triagens, casos e pendencias que ainda precisam de um movimento da equipe."
+        >
+          <OperationalList
+            items={awaitingTeamQueue}
+            emptyMessage="A fila interna esta limpa agora. Novos movimentos da equipe aparecerao aqui."
+          />
+        </SectionCard>
+      </div>
+
+      <div className="grid two">
+        <SectionCard
+          title="Regua operacional inteligente"
+          description="Os sinais abaixo ajudam a diferenciar item novo, pendente e critico sem varrer cada modulo manualmente."
+        >
+          <div className="summary-grid">
+            {operationalSignals.map((item) => (
+              <article key={item.label} className="summary-card">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <p>{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Sugestoes orientadas pelo uso real"
+          description="Telemetria, automacoes e comportamento do fluxo ajudam o painel a apontar o que tende a destravar mais rapido a rotina."
+        >
+          {suggestedMoves.length ? (
+            <div className="notice-grid">
+              {suggestedMoves.map((item) => (
+                <Link key={item.title} href={item.href} className="notice-card">
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                  <span>Abrir area relacionada</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">
+              Ainda nao houve mudanca suficiente de comportamento para sugerir nova acao. Quando o uso ou a operacao mudarem, os proximos movimentos aparecem aqui.
+            </p>
+          )}
+        </SectionCard>
+      </div>
+
+      <SectionCard
+        id="noemia-operacional"
+        title="Noemia aplicada ao trabalho"
+        description="A assistente agora ajuda a resumir a fila, sugerir prioridade, recuperar contexto do caso e rascunhar retornos sem tirar voce do painel."
+      >
+        <div className="grid two">
+          <div className="stack">
+            <div className="support-panel">
+              <div className="support-row">
+                <span className="support-label">O que ela acelera</span>
+                <strong>
+                  Resume triagens, sinaliza o que esta envelhecendo e transforma contexto disperso em proximo passo acionavel.
+                </strong>
+              </div>
+              <div className="support-row">
+                <span className="support-label">Melhor uso</span>
+                <strong>
+                  Peca prioridade inicial, historico recente, proxima acao interna ou um texto-base curto para retorno ao cliente.
+                </strong>
+              </div>
+              <div className="support-row">
+                <span className="support-label">Limite</span>
+                <strong>
+                  Ela apoia a leitura operacional, mas a decisao juridica final e o criterio tecnico continuam com a equipe.
+                </strong>
+              </div>
+            </div>
+
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Prompts que aceleram</span>
+              <ul className="timeline">
+                {noemiaPrompts.map((prompt) => (
+                  <li key={prompt}>{prompt}</li>
+                ))}
+              </ul>
+              <div className="form-actions">
+                <Link className="button secondary" href="/noemia">
+                  Abrir Noemia em tela dedicada
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <NoemiaAssistant
+            audience="staff"
+            displayName={profile.full_name}
+            suggestedPrompts={noemiaPrompts}
+            currentPath="/internal/advogada"
+          />
+        </div>
+      </SectionCard>
+
+      <div className="grid two">
+        <SectionCard
+          title={`Concluido recentemente (${operationalSummary.recentlyCompletedCount})`}
+          description="Fechamentos recentes aparecem aqui para dar contexto sem poluir as filas que ainda pedem acao."
+        >
+          <OperationalList
+            items={recentlyCompletedQueue}
+            emptyMessage="Quando triagens, compromissos e pendencias forem resolvidos, o fechamento recente aparece aqui."
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="Acoes rapidas"
+          description="Use estes atalhos quando souber exatamente o que precisa fazer. Cada card leva voce direto para a acao principal."
+        >
+          <div className="shortcut-grid">
+            <Link href="#cadastro-cliente" className="shortcut-card">
+              <span className="shortcut-kicker">Atendimento</span>
+              <strong>Cadastrar cliente</strong>
+              <p>Abrir cadastro, gerar convite e iniciar o caso sem etapas manuais.</p>
             </Link>
-            <Link href="/agenda" className="route-card">
-              <strong>Central de agenda</strong>
-              <span>Compromissos, reagendamentos, cancelamentos e historico.</span>
+            <Link href="#atualizacoes-caso" className="shortcut-card">
+              <span className="shortcut-kicker">Andamento</span>
+              <strong>Registrar atualizacao</strong>
+              <p>Adicionar novo andamento visivel ou interno com resumo para o portal.</p>
+            </Link>
+            <Link href="#gestao-casos" className="shortcut-card">
+              <span className="shortcut-kicker">Casos</span>
+              <strong>Abrir ou editar caso</strong>
+              <p>Organizar titulo, area, prioridade e resumo do caso sem sair do painel.</p>
+            </Link>
+            <Link href="/documentos#solicitar-documento" className="shortcut-card">
+              <span className="shortcut-kicker">Documentos</span>
+              <strong>Solicitar documento</strong>
+              <p>Abrir uma pendencia documental com orientacoes e prazo para o cliente.</p>
+            </Link>
+            <Link href="/documentos#registrar-documento" className="shortcut-card">
+              <span className="shortcut-kicker">Arquivos</span>
+              <strong>Registrar documento</strong>
+              <p>Enviar o arquivo real para o caso e definir se ele aparece no portal.</p>
+            </Link>
+            <Link href="/agenda#registrar-compromisso" className="shortcut-card">
+              <span className="shortcut-kicker">Agenda</span>
+              <strong>Criar compromisso</strong>
+              <p>Marcar prazo, reuniao, retorno ou audiencia com data e visibilidade.</p>
+            </Link>
+            <Link href="#status-caso" className="shortcut-card">
+              <span className="shortcut-kicker">Fluxo</span>
+              <strong>Alterar status do caso</strong>
+              <p>Atualizar a fase do caso e refletir isso com clareza para a equipe e o cliente.</p>
+            </Link>
+            <Link href="/noemia" className="shortcut-card">
+              <span className="shortcut-kicker">IA aplicada</span>
+              <strong>Consultar Noemia</strong>
+              <p>Usar a assistente em tela cheia para resumir o contexto e rascunhar retornos.</p>
             </Link>
           </div>
         </SectionCard>

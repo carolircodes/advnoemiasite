@@ -54,7 +54,14 @@ export default function TriagePage() {
           { label: "Seguranca", value: "Dados persistidos" }
         ]}
         actions={[
-          { href: "/noemia", label: "Tirar uma duvida antes de enviar", tone: "secondary" },
+          {
+            href: "/noemia",
+            label: "Tirar uma duvida antes de enviar",
+            tone: "secondary",
+            trackingEventKey: "cta_noemia_clicked",
+            trackingEventGroup: "ai",
+            trackingPayload: { location: "triagem_header" }
+          },
           { href: "/auth/login", label: "Ja recebi convite", tone: "secondary" }
         ]}
       >

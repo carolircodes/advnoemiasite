@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
@@ -665,29 +666,39 @@ export default async function DocumentsPage({
   );
 
   return (
-    <AppFrame
-      eyebrow="Documentos"
-      title="Documentos e pendencias organizados em um so lugar."
-      description="Voce acompanha aqui os arquivos liberados pela equipe, o que ainda esta pendente e as solicitacoes abertas do seu caso."
-      navigation={[
-        { href: "/cliente", label: "Meu painel" },
-        { href: "/documentos", label: "Documentos", active: true },
-        { href: "/agenda", label: "Agenda" }
-      ]}
-      highlights={[
-        { label: "Disponiveis", value: String(availableDocuments.length) },
-        { label: "Pendentes", value: String(pendingDocuments.length) },
-        { label: "Solicitacoes abertas", value: String(openRequests.length) },
-        {
-          label: "Total visivel",
-          value: String(workspace.documents.length + workspace.documentRequests.length)
-        }
-      ]}
-      actions={[
-        { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
-        { href: "/agenda", label: "Ver agenda", tone: "secondary" }
-      ]}
-    >
+    <>
+      <ProductEventBeacon
+        eventKey="client_documents_viewed"
+        eventGroup="portal"
+        payload={{
+          scope,
+          availableDocuments: availableDocuments.length,
+          openRequests: openRequests.length
+        }}
+      />
+      <AppFrame
+        eyebrow="Documentos"
+        title="Documentos e pendencias organizados em um so lugar."
+        description="Voce acompanha aqui os arquivos liberados pela equipe, o que ainda esta pendente e as solicitacoes abertas do seu caso."
+        navigation={[
+          { href: "/cliente", label: "Meu painel" },
+          { href: "/documentos", label: "Documentos", active: true },
+          { href: "/agenda", label: "Agenda" }
+        ]}
+        highlights={[
+          { label: "Disponiveis", value: String(availableDocuments.length) },
+          { label: "Pendentes", value: String(pendingDocuments.length) },
+          { label: "Solicitacoes abertas", value: String(openRequests.length) },
+          {
+            label: "Total visivel",
+            value: String(workspace.documents.length + workspace.documentRequests.length)
+          }
+        ]}
+        actions={[
+          { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
+          { href: "/agenda", label: "Ver agenda", tone: "secondary" }
+        ]}
+      >
       {error ? <div className="error-notice">{error}</div> : null}
 
       <SectionCard
@@ -908,6 +919,7 @@ export default async function DocumentsPage({
           </p>
         )}
       </SectionCard>
-    </AppFrame>
+      </AppFrame>
+    </>
   );
 }

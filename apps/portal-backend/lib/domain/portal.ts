@@ -125,7 +125,7 @@ export const appointmentChangeTypes = [
   "rescheduled",
   "cancelled"
 ] as const;
-export const noemiaAudiences = ["visitor", "client"] as const;
+export const noemiaAudiences = ["visitor", "client", "staff"] as const;
 
 export type PortalRole = (typeof portalRoles)[number];
 export type CaseArea = (typeof caseAreas)[number];

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
@@ -844,31 +845,41 @@ export default async function AgendaPage({
     .slice(0, 8);
 
   return (
-    <AppFrame
-      eyebrow="Agenda"
-      title="Sua agenda do caso, organizada para consulta rapida."
-      description="Aqui voce ve os proximos compromissos, os itens recentes e qualquer mudanca importante liberada pela equipe para o seu atendimento."
-      navigation={[
-        { href: "/cliente", label: "Meu painel" },
-        { href: "/documentos", label: "Documentos" },
-        { href: "/agenda", label: "Agenda", active: true }
-      ]}
-      highlights={[
-        { label: "Proximos compromissos", value: String(upcomingAppointments.length) },
-        { label: "Historico recente", value: String(recentHistory.length) },
-        { label: "Total visivel", value: String(workspace.appointments.length) },
-        {
-          label: "Proximo item",
-          value: upcomingAppointments[0]
-            ? formatPortalDateTime(upcomingAppointments[0].starts_at)
-            : "Sem agenda"
-        }
-      ]}
-      actions={[
-        { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
-        { href: "/documentos", label: "Ver documentos", tone: "secondary" }
-      ]}
-    >
+    <>
+      <ProductEventBeacon
+        eventKey="client_agenda_viewed"
+        eventGroup="portal"
+        payload={{
+          scope,
+          upcomingAppointments: upcomingAppointments.length,
+          recentHistory: recentHistory.length
+        }}
+      />
+      <AppFrame
+        eyebrow="Agenda"
+        title="Sua agenda do caso, organizada para consulta rapida."
+        description="Aqui voce ve os proximos compromissos, os itens recentes e qualquer mudanca importante liberada pela equipe para o seu atendimento."
+        navigation={[
+          { href: "/cliente", label: "Meu painel" },
+          { href: "/documentos", label: "Documentos" },
+          { href: "/agenda", label: "Agenda", active: true }
+        ]}
+        highlights={[
+          { label: "Proximos compromissos", value: String(upcomingAppointments.length) },
+          { label: "Historico recente", value: String(recentHistory.length) },
+          { label: "Total visivel", value: String(workspace.appointments.length) },
+          {
+            label: "Proximo item",
+            value: upcomingAppointments[0]
+              ? formatPortalDateTime(upcomingAppointments[0].starts_at)
+              : "Sem agenda"
+          }
+        ]}
+        actions={[
+          { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
+          { href: "/documentos", label: "Ver documentos", tone: "secondary" }
+        ]}
+      >
       {error ? <div className="error-notice">{error}</div> : null}
 
       <SectionCard
@@ -1013,6 +1024,7 @@ export default async function AgendaPage({
           )}
         </SectionCard>
       </div>
-    </AppFrame>
+      </AppFrame>
+    </>
   );
 }
