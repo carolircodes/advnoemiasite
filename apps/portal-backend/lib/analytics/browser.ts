@@ -1,6 +1,7 @@
 "use client";
 
 const SESSION_STORAGE_KEY = "portal_product_session_id";
+const SESSION_FLAG_PREFIX = "portal_product_flag:";
 
 type ProductEventPayload = {
   eventKey: string;
@@ -65,4 +66,24 @@ export function trackProductEvent(input: ProductEventPayload) {
     },
     body
   }).catch(() => undefined);
+}
+
+export function trackProductEventOncePerSession(input: ProductEventPayload) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const flagKey = `${SESSION_FLAG_PREFIX}${input.eventKey}`;
+
+  try {
+    if (window.sessionStorage.getItem(flagKey)) {
+      return;
+    }
+
+    window.sessionStorage.setItem(flagKey, "1");
+  } catch {
+    // Continue and track even if sessionStorage is unavailable.
+  }
+
+  trackProductEvent(input);
 }

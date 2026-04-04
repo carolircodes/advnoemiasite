@@ -102,6 +102,21 @@ function getPriorityRank(priority: string) {
   }
 }
 
+function getUrgencyRank(urgency: string) {
+  switch (urgency) {
+    case "urgente":
+      return 4;
+    case "alta":
+      return 3;
+    case "moderada":
+      return 2;
+    case "baixa":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 function getSuccessMessage(success: string) {
   switch (success) {
     case "cliente-cadastrado":
@@ -129,6 +144,7 @@ async function createClientAction(formData: FormData) {
   try {
     await createClientWithInvite(
       {
+        intakeRequestId: formData.get("intakeRequestId"),
         fullName: formData.get("fullName"),
         email: formData.get("email"),
         cpf: formData.get("cpf"),
@@ -299,6 +315,7 @@ export default async function InternalLawyerPage({
   const sort = getStringParam(params.sort, "recent");
   const dateFrom = getStringParam(params.dateFrom);
   const dateTo = getStringParam(params.dateTo);
+  const selectedIntakeRequestId = getStringParam(params.intakeRequestId);
   const pendingOnly = getStringParam(params.pending) === "1";
   const hasFilters = !!(query || selectedCaseStatus || dateFrom || dateTo || pendingOnly || sort !== "recent");
   const hasCases = overview.caseOptions.length > 0;
@@ -322,7 +339,19 @@ export default async function InternalLawyerPage({
         isWithinDateRange(item.submitted_at, dateFrom, dateTo) &&
         (!pendingOnly || item.status === "new" || item.status === "in_review")
     )
+    .sort((left, right) => {
+      const urgencyDifference =
+        getUrgencyRank(right.urgency_level) - getUrgencyRank(left.urgency_level);
+
+      if (urgencyDifference !== 0) {
+        return urgencyDifference;
+      }
+
+      return right.submitted_at.localeCompare(left.submitted_at);
+    })
     .slice(0, 6);
+  const selectedIntakeRequest =
+    overview.latestIntakeRequests.find((item) => item.id === selectedIntakeRequestId) || null;
   const filteredCases = overview.caseOptions
     .filter(
       (caseItem) =>
@@ -411,6 +440,7 @@ export default async function InternalLawyerPage({
       description="O painel agora separa o que exige atencao imediata das acoes do dia, para voce localizar clientes, casos, pendencias e proximos passos sem ficar navegando em excesso."
       navigation={[
         { href: "/internal/advogada", label: "Painel", active: true },
+        { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
         { href: "/documentos", label: "Documentos" },
         { href: "/agenda", label: "Agenda" }
       ]}
@@ -423,6 +453,7 @@ export default async function InternalLawyerPage({
       actions={[
         { href: "#triagens-recebidas", label: "Revisar triagens", tone: "secondary" },
         { href: "#cadastro-cliente", label: "Cadastrar cliente" },
+        { href: "/internal/advogada/inteligencia", label: "Ver inteligencia", tone: "secondary" },
         { href: "#gestao-casos", label: "Abrir caso", tone: "secondary" },
         { href: "#atualizacoes-caso", label: "Registrar atualizacao", tone: "secondary" },
         { href: "#status-caso", label: "Alterar status do caso", tone: "secondary" }
@@ -632,8 +663,11 @@ export default async function InternalLawyerPage({
                     <FormSubmitButton pendingLabel="Atualizando triagem..." tone="secondary">
                       Salvar triagem
                     </FormSubmitButton>
-                    <Link className="button secondary" href="#cadastro-cliente">
-                      Abrir cadastro do cliente
+                    <Link
+                      className="button secondary"
+                      href={`/internal/advogada?intakeRequestId=${item.id}#cadastro-cliente`}
+                    >
+                      Converter em cliente
                     </Link>
                   </div>
                 </form>
@@ -1061,14 +1095,31 @@ export default async function InternalLawyerPage({
           description="Fluxo mais usado do dia a dia: abrir cadastro, iniciar caso e preparar o convite."
         >
           <form action={createClientAction} className="stack">
+            <input
+              type="hidden"
+              name="intakeRequestId"
+              value={selectedIntakeRequest?.id || ""}
+            />
             <div className="fields">
               <div className="field-full">
                 <label htmlFor="fullName">Nome completo</label>
-                <input id="fullName" name="fullName" type="text" required />
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  defaultValue={selectedIntakeRequest?.full_name || ""}
+                  required
+                />
               </div>
               <div className="field">
                 <label htmlFor="email">E-mail</label>
-                <input id="email" name="email" type="email" required />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={selectedIntakeRequest?.email || ""}
+                  required
+                />
               </div>
               <div className="field">
                 <label htmlFor="cpf">CPF</label>
@@ -1076,11 +1127,22 @@ export default async function InternalLawyerPage({
               </div>
               <div className="field">
                 <label htmlFor="phone">Telefone</label>
-                <input id="phone" name="phone" type="text" required />
+                <input
+                  id="phone"
+                  name="phone"
+                  type="text"
+                  defaultValue={selectedIntakeRequest?.phone || ""}
+                  required
+                />
               </div>
               <div className="field">
                 <label htmlFor="caseArea">Area do caso</label>
-                <select id="caseArea" name="caseArea" required>
+                <select
+                  id="caseArea"
+                  name="caseArea"
+                  required
+                  defaultValue={selectedIntakeRequest?.case_area || "previdenciario"}
+                >
                   {caseAreas.map((area) => (
                     <option key={area} value={area}>
                       {caseAreaLabels[area]}
@@ -1100,11 +1162,17 @@ export default async function InternalLawyerPage({
               </div>
               <div className="field-full">
                 <label htmlFor="notes">Observacoes internas</label>
-                <textarea id="notes" name="notes" />
+                <textarea
+                  id="notes"
+                  name="notes"
+                  defaultValue={selectedIntakeRequest?.case_summary || ""}
+                />
               </div>
             </div>
             <div className="notice">
-              O mesmo envio ja cuida do cliente, do caso inicial e do convite de acesso.
+              {selectedIntakeRequest
+                ? `Esta ficha ja veio conectada com a triagem de ${selectedIntakeRequest.full_name}. Ao concluir o cadastro, a conversao fica refletida no funil e a triagem e marcada como convertida.`
+                : "O mesmo envio ja cuida do cliente, do caso inicial e do convite de acesso."}
             </div>
             <div className="form-actions">
               <FormSubmitButton pendingLabel="Cadastrando cliente...">

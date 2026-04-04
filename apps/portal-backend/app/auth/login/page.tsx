@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/access-control";
 import { ensureProfileForUser, getCurrentProfile } from "@/lib/auth/guards";
 import { loginSchema } from "@/lib/domain/portal";
+import { recordProductEvent } from "@/lib/services/public-intake";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -68,6 +69,23 @@ async function loginAction(formData: FormData) {
 
   const requestedPath = normalizeNextPath(String(formData.get("next") || ""));
   const profile = await ensureProfileForUser(data.user);
+
+  try {
+    await recordProductEvent({
+      eventKey: "portal_access_completed",
+      eventGroup: "portal",
+      profileId: profile.id,
+      payload: {
+        role: profile.role,
+        source: "password-login"
+      }
+    });
+  } catch (trackingError) {
+    console.error("[auth.login] Failed to record portal access event", {
+      profileId: profile.id,
+      message: trackingError instanceof Error ? trackingError.message : String(trackingError)
+    });
+  }
 
   redirect(getPostAuthDestination(profile, requestedPath));
 }

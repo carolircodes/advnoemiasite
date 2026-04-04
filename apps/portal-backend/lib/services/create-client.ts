@@ -8,6 +8,7 @@ import {
   mapClientStatusToCaseStatus
 } from "@/lib/domain/portal";
 import { queueClientInviteTracking } from "@/lib/notifications/outbox";
+import { recordProductEvent } from "@/lib/services/public-intake";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -89,6 +90,7 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
       .upsert(
         {
           profile_id: userId,
+          source_intake_request_id: input.intakeRequestId || null,
           cpf: input.cpf,
           phone: input.phone,
           notes: input.notes || null,
@@ -179,6 +181,45 @@ export async function createClientWithInvite(rawInput: unknown, actorProfileId: 
       throw new Error(
         `Nao foi possivel registrar a auditoria do cadastro: ${auditError.message}`
       );
+    }
+
+    if (input.intakeRequestId) {
+      const { error: intakeError } = await supabase
+        .from("intake_requests")
+        .update({
+          status: "converted",
+          reviewed_at: invitedAt
+        })
+        .eq("id", input.intakeRequestId);
+
+      if (intakeError) {
+        console.error("[clients.create] Failed to synchronize intake request", {
+          intakeRequestId: input.intakeRequestId,
+          clientId: client.id,
+          message: intakeError.message
+        });
+      }
+    }
+
+    try {
+      await recordProductEvent({
+        eventKey: "client_created",
+        eventGroup: "conversion",
+        intakeRequestId: input.intakeRequestId || undefined,
+        profileId: userId,
+        payload: {
+          clientId: client.id,
+          clientStatus: input.status,
+          caseId: caseRecord.id,
+          source: input.intakeRequestId ? "intake-conversion" : "internal-panel"
+        }
+      });
+    } catch (trackingError) {
+      console.error("[clients.create] Failed to record product event", {
+        clientId: client.id,
+        intakeRequestId: input.intakeRequestId || null,
+        message: trackingError instanceof Error ? trackingError.message : String(trackingError)
+      });
     }
 
     return {

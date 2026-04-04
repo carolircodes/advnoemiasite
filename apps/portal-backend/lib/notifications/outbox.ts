@@ -52,6 +52,33 @@ export async function queueEmailNotification(input: QueueEmailInput) {
   return data;
 }
 
+export async function listStaffEmailRecipients() {
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase
+    .from("staff_members")
+    .select(
+      "profile_id,receives_notification_emails,profiles!inner(id,email,full_name,role,is_active)"
+    )
+    .eq("receives_notification_emails", true);
+
+  if (error) {
+    throw new Error(`Nao foi possivel carregar os destinatarios internos: ${error.message}`);
+  }
+
+  return (data || [])
+    .map((item) => {
+      const profile = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
+      return {
+        profileId: profile?.id || "",
+        email: profile?.email || "",
+        fullName: profile?.full_name || "Equipe",
+        role: profile?.role || "",
+        isActive: Boolean(profile?.is_active)
+      };
+    })
+    .filter((item) => item.profileId && item.email && item.isActive);
+}
+
 export async function queueClientInviteTracking(input: {
   clientProfileId: string;
   clientEmail: string;

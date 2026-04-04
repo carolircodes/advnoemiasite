@@ -12,7 +12,10 @@ import {
   publicIntakeUrgencies,
   publicIntakeUrgencyLabels
 } from "@/lib/domain/portal";
-import { getProductSessionId } from "@/lib/analytics/browser";
+import {
+  getProductSessionId,
+  trackProductEventOncePerSession
+} from "@/lib/analytics/browser";
 
 type TriageFormState = {
   fullName: string;
@@ -91,6 +94,7 @@ export function TriageForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<null | { intakeRequestId: string }>(null);
   const [isPending, startTransition] = useTransition();
+  const [hasTrackedStart, setHasTrackedStart] = useState(false);
 
   function updateField<Key extends keyof TriageFormState>(
     key: Key,
@@ -123,6 +127,17 @@ export function TriageForm() {
     }
 
     setError("");
+    if (stepIndex === 0 && !hasTrackedStart) {
+      trackProductEventOncePerSession({
+        eventKey: "triage_started",
+        eventGroup: "conversion",
+        pagePath: "/triagem",
+        payload: {
+          step: "contact-finished"
+        }
+      });
+      setHasTrackedStart(true);
+    }
     setStepIndex((current) => Math.min(current + 1, steps.length - 1));
   }
 

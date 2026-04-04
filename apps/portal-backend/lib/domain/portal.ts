@@ -125,6 +125,7 @@ export const appointmentChangeTypes = [
   "rescheduled",
   "cancelled"
 ] as const;
+export const noemiaAudiences = ["visitor", "client"] as const;
 
 export type PortalRole = (typeof portalRoles)[number];
 export type CaseArea = (typeof caseAreas)[number];
@@ -142,6 +143,7 @@ export type DocumentStatus = (typeof documentStatuses)[number];
 export type DocumentRequestStatus = (typeof documentRequestStatuses)[number];
 export type AppointmentType = (typeof appointmentTypes)[number];
 export type AppointmentChangeType = (typeof appointmentChangeTypes)[number];
+export type NoemiaAudience = (typeof noemiaAudiences)[number];
 
 export function isPortalRole(value: unknown): value is PortalRole {
   return typeof value === "string" && portalRoles.includes(value as PortalRole);
@@ -285,6 +287,14 @@ export function formatFileSize(bytes: number | null | undefined) {
 }
 
 export const createClientSchema = z.object({
+  intakeRequestId: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine((value) => value === "" || /^[0-9a-fA-F-]{36}$/.test(value), {
+      message: "Informe uma triagem valida para vincular ao cliente."
+    }),
   fullName: z.string().trim().min(3, "Informe o nome completo."),
   email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
   cpf: z
@@ -539,6 +549,26 @@ export const updateIntakeRequestStatusSchema = z.object({
     errorMap: () => ({ message: "Selecione um status valido para a triagem." })
   }),
   internalNotes: z.string().trim().max(1200).optional().default("")
+});
+
+export const askNoemiaSchema = z.object({
+  audience: z.enum(noemiaAudiences).default("visitor"),
+  currentPath: z.string().trim().max(300).optional().default(""),
+  message: z
+    .string()
+    .trim()
+    .min(5, "Escreva uma pergunta com pelo menos 5 caracteres.")
+    .max(2000, "A pergunta precisa ter no maximo 2000 caracteres."),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().trim().min(1).max(3000)
+      })
+    )
+    .max(10)
+    .optional()
+    .default([])
 });
 
 export function mapClientStatusToCaseStatus(status: ClientStatus): CaseStatus {

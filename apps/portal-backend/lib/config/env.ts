@@ -20,6 +20,8 @@ const envSchema = z
   NOTIFICATIONS_REPLY_TO: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_MODEL: z.string().min(1).optional(),
   PORTAL_ADMIN_EMAIL: z.string().email().optional(),
   PORTAL_ADMIN_FULL_NAME: z.string().min(3).optional(),
   PORTAL_ADMIN_TEMP_PASSWORD: z.string().min(8).optional()
@@ -86,6 +88,8 @@ type ServerEnv = {
   NOTIFICATIONS_REPLY_TO?: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_MODEL?: string;
   PORTAL_ADMIN_EMAIL?: string;
   PORTAL_ADMIN_FULL_NAME?: string;
   PORTAL_ADMIN_TEMP_PASSWORD?: string;
@@ -163,6 +167,8 @@ export function getServerEnv(): ServerEnv {
     NOTIFICATIONS_REPLY_TO: parsed.NOTIFICATIONS_REPLY_TO,
     RESEND_API_KEY: parsed.RESEND_API_KEY,
     EMAIL_FROM: parsed.EMAIL_FROM,
+    OPENAI_API_KEY: parsed.OPENAI_API_KEY,
+    OPENAI_MODEL: parsed.OPENAI_MODEL,
     PORTAL_ADMIN_EMAIL: parsed.PORTAL_ADMIN_EMAIL,
     PORTAL_ADMIN_FULL_NAME: parsed.PORTAL_ADMIN_FULL_NAME,
     PORTAL_ADMIN_TEMP_PASSWORD: parsed.PORTAL_ADMIN_TEMP_PASSWORD,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppFrame } from "@/components/app-frame";
+import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TriageForm } from "@/components/triage-form";
 
@@ -29,26 +30,35 @@ export const metadata: Metadata = {
 
 export default function TriagePage() {
   return (
-    <AppFrame
-      eyebrow="Triagem inicial"
-      title="Uma triagem guiada para iniciar o atendimento com mais clareza e menos atrito."
-      description="Voce responde em etapas curtas, a equipe recebe o contexto organizado e o proximo passo fica mais claro desde o inicio."
-      navigation={[
-        { href: "/", label: "Inicio" },
-        { href: "/triagem", label: "Triagem", active: true },
-        { href: "/auth/login", label: "Area do cliente" }
-      ]}
-      highlights={[
-        { label: "Tempo medio", value: "Poucos minutos" },
-        { label: "Retorno", value: "Com contexto organizado" },
-        { label: "Fluxo", value: "Site + portal integrados" },
-        { label: "Seguranca", value: "Dados persistidos" }
-      ]}
-      actions={[
-        { href: "/auth/login", label: "Ja recebi convite", tone: "secondary" }
-      ]}
-    >
-      <div className="split">
+    <>
+      <ProductEventBeacon
+        eventKey="site_visit_started"
+        eventGroup="traffic"
+        payload={{ entryPoint: "triagem" }}
+        oncePerSession
+      />
+      <AppFrame
+        eyebrow="Triagem inicial"
+        title="Uma triagem guiada para iniciar o atendimento com mais clareza e menos atrito."
+        description="Voce responde em etapas curtas, a equipe recebe o contexto organizado e o proximo passo fica mais claro desde o inicio."
+        navigation={[
+          { href: "/", label: "Inicio" },
+          { href: "/triagem", label: "Triagem", active: true },
+          { href: "/noemia", label: "Noemia" },
+          { href: "/auth/login", label: "Area do cliente" }
+        ]}
+        highlights={[
+          { label: "Tempo medio", value: "Poucos minutos" },
+          { label: "Retorno", value: "Com contexto organizado" },
+          { label: "Fluxo", value: "Site + portal integrados" },
+          { label: "Seguranca", value: "Dados persistidos" }
+        ]}
+        actions={[
+          { href: "/noemia", label: "Tirar uma duvida antes de enviar", tone: "secondary" },
+          { href: "/auth/login", label: "Ja recebi convite", tone: "secondary" }
+        ]}
+      >
+        <div className="split">
         <SectionCard
           title="Preencha sua triagem"
           description="Cada etapa existe para ajudar a equipe a entender seu momento com mais rapidez e conduzir o atendimento com mais criterio."
@@ -100,7 +110,8 @@ export default function TriagePage() {
             </div>
           </SectionCard>
         </div>
-      </div>
-    </AppFrame>
+        </div>
+      </AppFrame>
+    </>
   );
 }

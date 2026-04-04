@@ -11,6 +11,7 @@ import {
   submitPublicTriageSchema,
   updateIntakeRequestStatusSchema
 } from "@/lib/domain/portal";
+import { notifyStaffAboutIntakeRequest } from "@/lib/services/automation-rules";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type ProductEventInput = {
@@ -112,6 +113,26 @@ export async function submitPublicTriage(
     console.error("[triage.submit] Failed to record conversion event", {
       intakeRequestId: data.id,
       message: trackingError instanceof Error ? trackingError.message : String(trackingError)
+    });
+  }
+
+  try {
+    await notifyStaffAboutIntakeRequest({
+      intakeRequestId: data.id,
+      fullName: input.fullName,
+      caseArea: input.caseArea,
+      urgencyLevel: input.urgencyLevel,
+      currentStage: input.currentStage,
+      preferredContactPeriod: input.preferredContactPeriod,
+      email: input.email,
+      phone: input.phone,
+      caseSummary: input.caseSummary,
+      submittedAt: data.submitted_at
+    });
+  } catch (automationError) {
+    console.error("[triage.submit] Failed to queue internal triage automation", {
+      intakeRequestId: data.id,
+      message: automationError instanceof Error ? automationError.message : String(automationError)
     });
   }
 

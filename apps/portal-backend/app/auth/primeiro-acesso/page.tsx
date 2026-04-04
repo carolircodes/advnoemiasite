@@ -6,6 +6,7 @@ import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { passwordSchema } from "@/lib/domain/portal";
+import { recordProductEvent } from "@/lib/services/public-intake";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -61,6 +62,25 @@ async function markClientFirstAccessCompleted(profileId: string, completedAt: st
   }
 }
 
+async function getLinkedIntakeRequestId(profileId: string) {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("clients")
+    .select("source_intake_request_id")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[auth.first-access] Failed to load linked intake request", {
+      profileId,
+      message: error.message
+    });
+    return null;
+  }
+
+  return data?.source_intake_request_id || null;
+}
+
 async function firstAccessAction(formData: FormData) {
   "use server";
 
@@ -88,6 +108,24 @@ async function firstAccessAction(formData: FormData) {
     await markClientFirstAccessCompleted(profile.id, completedAt);
   } catch {
     redirect("/auth/primeiro-acesso?error=nao-foi-possivel-finalizar");
+  }
+
+  try {
+    await recordProductEvent({
+      eventKey: "portal_access_completed",
+      eventGroup: "portal",
+      profileId: profile.id,
+      intakeRequestId: (await getLinkedIntakeRequestId(profile.id)) || undefined,
+      payload: {
+        role: profile.role,
+        source: "first-access"
+      }
+    });
+  } catch (trackingError) {
+    console.error("[auth.first-access] Failed to record portal access event", {
+      profileId: profile.id,
+      message: trackingError instanceof Error ? trackingError.message : String(trackingError)
+    });
   }
 
   redirect("/cliente?success=primeiro-acesso-concluido");

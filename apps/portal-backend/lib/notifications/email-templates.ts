@@ -146,10 +146,142 @@ function renderCaseEventEmail(record: NotificationTemplateRecord) {
   };
 }
 
+function renderInternalTriageEmail(record: NotificationTemplateRecord) {
+  const payload = record.payload || {};
+  const fullName = asString(payload.fullName, "Novo contato");
+  const caseAreaLabel = asString(payload.caseAreaLabel, "Atendimento juridico");
+  const urgencyLabel = asString(payload.urgencyLabel, "Moderada");
+  const stageLabel = asString(payload.stageLabel, "Contexto inicial");
+  const submittedAtLabel = asString(payload.submittedAtLabel, "Agora");
+  const caseSummary = asString(
+    payload.caseSummary,
+    "A triagem foi registrada e ja pode ser revisada no painel interno."
+  );
+  const destinationPath = asString(payload.destinationPath, "/internal/advogada#triagens-recebidas");
+  const urgent = record.template_key === "triage-urgent";
+
+  const layout = buildMessageLayout({
+    eyebrow: urgent ? "Triagem urgente" : "Nova triagem",
+    title: urgent ? `Prioridade alta: ${fullName}` : `Nova triagem de ${fullName}`,
+    intro: `${caseAreaLabel} • ${urgencyLabel} • ${stageLabel}`,
+    body: `${caseSummary}\n\nRecebida em: ${submittedAtLabel}.`,
+    ctaLabel: "Abrir painel interno",
+    ctaHref: buildPortalUrl(destinationPath),
+    footer:
+      "Esta notificacao operacional ajuda a equipe a agir com mais rapidez nas novas entradas do atendimento."
+  });
+
+  return {
+    subject: record.subject,
+    ...layout
+  };
+}
+
+function renderReminderEmail(record: NotificationTemplateRecord) {
+  const payload = record.payload || {};
+  const fullName = asString(payload.fullName, "Cliente");
+  const destinationPath = asString(payload.destinationPath, "/auth/login");
+
+  if (record.template_key === "invite-reminder") {
+    const invitedAtLabel = asString(payload.invitedAtLabel, "recentemente");
+    const reminderStage = asString(payload.reminderStage, "24h");
+    const layout = buildMessageLayout({
+      eyebrow: "Lembrete de acesso",
+      title: "Seu portal continua pronto para o primeiro acesso",
+      intro: `${fullName}, o convite inicial ainda esta disponivel para voce concluir a entrada no portal.`,
+      body:
+        `O acesso foi preparado em ${invitedAtLabel}. ` +
+        (reminderStage === "72h"
+          ? "Se precisar, voce pode entrar normalmente com o e-mail cadastrado ou pedir novo apoio da equipe."
+          : "Assim que concluir a entrada, voce passa a acompanhar status, documentos e agenda no mesmo lugar."),
+      ctaLabel: "Entrar no portal",
+      ctaHref: buildPortalUrl(destinationPath)
+    });
+
+    return {
+      subject: record.subject,
+      ...layout
+    };
+  }
+
+  if (record.template_key === "document-request-reminder") {
+    const requestTitle = asString(payload.requestTitle, "Documento pendente");
+    const caseTitle = asString(payload.caseTitle, "seu caso");
+    const dueAtLabel = asString(payload.dueAtLabel, "sem prazo definido");
+    const reminderStage = asString(payload.reminderStage, "open");
+    const instructions = asString(payload.instructions, "");
+    const intro =
+      reminderStage === "overdue"
+        ? `${fullName}, ainda existe uma solicitacao documental em aberto para ${caseTitle}.`
+        : `${fullName}, a equipe segue aguardando um documento importante para ${caseTitle}.`;
+    const body =
+      `Documento solicitado: ${requestTitle}. ` +
+      `Prazo: ${dueAtLabel}.` +
+      (instructions ? `\n\nOrientacoes da equipe: ${instructions}` : "");
+
+    const layout = buildMessageLayout({
+      eyebrow: "Pendencia documental",
+      title: "Ha um documento aguardando voce no portal",
+      intro,
+      body,
+      ctaLabel: "Abrir documentos",
+      ctaHref: buildPortalUrl(destinationPath)
+    });
+
+    return {
+      subject: record.subject,
+      ...layout
+    };
+  }
+
+  if (record.template_key === "appointment-reminder") {
+    const title = asString(payload.title, "Compromisso do caso");
+    const caseTitle = asString(payload.caseTitle, "seu caso");
+    const startsAtLabel = asString(payload.startsAtLabel, "em breve");
+    const notes = asString(payload.notes, "");
+    const layout = buildMessageLayout({
+      eyebrow: "Lembrete de compromisso",
+      title,
+      intro: `${fullName}, ha um compromisso importante previsto para ${caseTitle}.`,
+      body:
+        `Data e hora: ${startsAtLabel}.` +
+        (notes ? `\n\nObservacoes da equipe: ${notes}` : ""),
+      ctaLabel: "Abrir agenda",
+      ctaHref: buildPortalUrl(destinationPath)
+    });
+
+    return {
+      subject: record.subject,
+      ...layout
+    };
+  }
+
+  const layout = buildMessageLayout({
+    eyebrow: "Portal juridico",
+    title: record.subject,
+    intro: `${fullName}, ha uma nova movimentacao aguardando sua atencao.`,
+    body: "Entre no portal para revisar os detalhes atualizados do seu atendimento.",
+    ctaLabel: "Abrir portal",
+    ctaHref: buildPortalUrl(destinationPath)
+  });
+
+  return {
+    subject: record.subject,
+    ...layout
+  };
+}
+
 export function renderNotificationEmail(record: NotificationTemplateRecord): RenderedEmail {
   switch (record.template_key) {
     case "client-invite":
       return renderInviteTrackingEmail(record);
+    case "triage-submitted":
+    case "triage-urgent":
+      return renderInternalTriageEmail(record);
+    case "invite-reminder":
+    case "document-request-reminder":
+    case "appointment-reminder":
+      return renderReminderEmail(record);
     case "case-update":
     case "new-document":
     case "new-appointment":

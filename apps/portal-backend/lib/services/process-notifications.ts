@@ -2,6 +2,7 @@ import "server-only";
 
 import { renderNotificationEmail } from "@/lib/notifications/email-templates";
 import { sendNotificationEmail } from "@/lib/notifications/email-delivery";
+import { runOperationalAutomationRules } from "@/lib/services/automation-rules";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const MAX_NOTIFICATION_ATTEMPTS = 5;
@@ -147,6 +148,7 @@ async function processNotification(record: NotificationRecord) {
 }
 
 export async function processPendingNotifications(limit = 10) {
+  const automationSummary = await runOperationalAutomationRules();
   const supabase = createAdminSupabaseClient();
   const safeLimit = Math.min(Math.max(limit, 1), 50);
   const now = new Date().toISOString();
@@ -172,6 +174,7 @@ export async function processPendingNotifications(limit = 10) {
   }
 
   return {
+    automation: automationSummary,
     processed: results.length,
     sent: results.filter((item) => item.status === "sent").length,
     skipped: results.filter((item) => item.status === "skipped").length,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppFrame } from "@/components/app-frame";
+import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
 
@@ -45,6 +46,12 @@ const legalServiceSchema = {
 export default function HomePage() {
   return (
     <>
+      <ProductEventBeacon
+        eventKey="site_visit_started"
+        eventGroup="traffic"
+        payload={{ entryPoint: "home" }}
+        oncePerSession
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(legalServiceSchema) }}
@@ -56,6 +63,7 @@ export default function HomePage() {
         navigation={[
           { href: "/", label: "Inicio", active: true },
           { href: "/triagem", label: "Triagem" },
+          { href: "/noemia", label: "Noemia" },
           { href: "/auth/login", label: "Area do cliente" }
         ]}
         highlights={[
@@ -208,6 +216,15 @@ export default function HomePage() {
                   trackingPayload={{ location: "home_footer" }}
                 >
                   Ja sou cliente
+                </TrackedLink>
+                <TrackedLink
+                  href="/noemia"
+                  className="button secondary"
+                  eventKey="noemia_opened"
+                  eventGroup="ai"
+                  trackingPayload={{ location: "home_footer" }}
+                >
+                  Tirar duvidas com Noemia
                 </TrackedLink>
               </div>
             </div>
