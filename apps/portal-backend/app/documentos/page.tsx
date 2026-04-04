@@ -5,9 +5,11 @@ import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
 import {
+  documentUploadAccept,
   documentRequestStatusLabels,
   documentStatuses,
   documentStatusLabels,
+  formatFileSize,
   formatPortalDateTime
 } from "@/lib/domain/portal";
 import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
@@ -33,16 +35,24 @@ function getSuccessMessage(success: string) {
   }
 }
 
+function buildDocumentHref(documentId: string, asDownload = false) {
+  return asDownload ? `/api/documents/${documentId}?download=1` : `/api/documents/${documentId}`;
+}
+
+function canPreviewDocument(mimeType: string | null | undefined) {
+  return !!mimeType && (mimeType === "application/pdf" || mimeType.startsWith("image/"));
+}
+
 async function registerDocumentAction(formData: FormData) {
   "use server";
 
   const profile = await requireProfile(["advogada", "admin"]);
+  const uploadedFile = formData.get("file");
 
   try {
     await registerCaseDocument(
       {
         caseId: formData.get("caseId"),
-        fileName: formData.get("fileName"),
         category: formData.get("category"),
         description: formData.get("description"),
         status: formData.get("status"),
@@ -50,7 +60,8 @@ async function registerDocumentAction(formData: FormData) {
         visibleToClient: formData.get("visibleToClient") === "on",
         shouldNotifyClient: formData.get("shouldNotifyClient") === "on"
       },
-      profile.id
+      profile.id,
+      uploadedFile instanceof File ? uploadedFile : null
     );
   } catch (error) {
     const message =
@@ -143,9 +154,9 @@ export default async function DocumentsPage({
         <div className="grid two">
           <SectionCard
             title="Registrar documento do caso"
-            description="Cadastre o documento, o status e a visibilidade. Se ele for visivel ao cliente, o portal ja registra o evento correspondente."
+            description="Envie o arquivo real, vincule ao caso e mantenha o historico e a fila de notificacoes alinhados quando o item for visivel ao cliente."
           >
-            <form action={registerDocumentAction} className="stack">
+            <form action={registerDocumentAction} className="stack" encType="multipart/form-data">
               <div className="fields">
                 <div className="field-full">
                   <label htmlFor="caseId">Caso</label>
@@ -161,9 +172,15 @@ export default async function DocumentsPage({
                     )}
                   </select>
                 </div>
-                <div className="field">
-                  <label htmlFor="fileName">Nome do documento</label>
-                  <input id="fileName" name="fileName" type="text" required />
+                <div className="field-full">
+                  <label htmlFor="file">Arquivo</label>
+                  <input
+                    id="file"
+                    name="file"
+                    type="file"
+                    accept={documentUploadAccept}
+                    required
+                  />
                 </div>
                 <div className="field">
                   <label htmlFor="category">Tipo</label>
@@ -213,7 +230,7 @@ export default async function DocumentsPage({
                 Preparar notificacao por e-mail para este documento
               </label>
               <div className="notice">
-                O registro e real e fica vinculado ao caso. O upload do arquivo pode entrar depois sem mudar o fluxo operacional.
+                O upload envia o arquivo para o storage privado do portal e grava o metadata do documento na mesma operacao.
               </div>
               <div className="form-actions">
                 <button className="button" type="submit" disabled={!hasCases}>
@@ -319,10 +336,42 @@ export default async function DocumentsPage({
                       >
                         {document.visibility === "client" ? "Visivel ao cliente" : "Uso interno"}
                       </span>
+                      <span className="pill muted">
+                        {document.storage_path ? "Arquivo enviado" : "Sem arquivo"}
+                      </span>
                     </div>
                     <span className="item-meta">
                       {formatPortalDateTime(document.document_date)}
+                      {document.file_size_bytes
+                        ? ` - ${formatFileSize(document.file_size_bytes)}`
+                        : ""}
                     </span>
+                    <div className="form-actions">
+                      {document.storage_path ? (
+                        <>
+                          {canPreviewDocument(document.mime_type) ? (
+                            <a
+                              className="button secondary"
+                              href={buildDocumentHref(document.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Visualizar arquivo
+                            </a>
+                          ) : null}
+                          <a
+                            className="button secondary"
+                            href={buildDocumentHref(document.id, true)}
+                          >
+                            Baixar arquivo
+                          </a>
+                        </>
+                      ) : (
+                        <span className="item-meta">
+                          Arquivo ainda nao enviado para este registro.
+                        </span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -440,7 +489,34 @@ export default async function DocumentsPage({
                     <span className="pill success">{document.statusLabel}</span>
                     <span className="pill muted">
                       {formatPortalDateTime(document.document_date)}
+                      {document.file_size_bytes
+                        ? ` - ${formatFileSize(document.file_size_bytes)}`
+                        : ""}
                     </span>
+                  </div>
+                  <div className="form-actions">
+                    {document.storage_path ? (
+                      <>
+                        {canPreviewDocument(document.mime_type) ? (
+                          <a
+                            className="button secondary"
+                            href={buildDocumentHref(document.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Visualizar arquivo
+                          </a>
+                        ) : null}
+                        <a
+                          className="button secondary"
+                          href={buildDocumentHref(document.id, true)}
+                        >
+                          Baixar arquivo
+                        </a>
+                      </>
+                    ) : (
+                      <span className="item-meta">Arquivo ainda indisponivel no portal.</span>
+                    )}
                   </div>
                 </li>
               ))}
@@ -474,7 +550,34 @@ export default async function DocumentsPage({
                     <span className="pill warning">{document.statusLabel}</span>
                     <span className="pill muted">
                       {formatPortalDateTime(document.document_date)}
+                      {document.file_size_bytes
+                        ? ` - ${formatFileSize(document.file_size_bytes)}`
+                        : ""}
                     </span>
+                  </div>
+                  <div className="form-actions">
+                    {document.storage_path ? (
+                      <>
+                        {canPreviewDocument(document.mime_type) ? (
+                          <a
+                            className="button secondary"
+                            href={buildDocumentHref(document.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Visualizar arquivo
+                          </a>
+                        ) : null}
+                        <a
+                          className="button secondary"
+                          href={buildDocumentHref(document.id, true)}
+                        >
+                          Baixar arquivo
+                        </a>
+                      </>
+                    ) : (
+                      <span className="item-meta">Arquivo ainda indisponivel no portal.</span>
+                    )}
                   </div>
                 </li>
               ))}

@@ -56,6 +56,35 @@ export const notificationStatuses = [
   "skipped"
 ] as const;
 export const documentVisibility = ["client", "internal"] as const;
+export const allowedDocumentMimeTypes = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif"
+] as const;
+export const allowedDocumentExtensions = [
+  "pdf",
+  "doc",
+  "docx",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif"
+] as const;
+export const documentPreviewMimeTypes = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif"
+] as const;
+export const documentUploadAccept =
+  ".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.gif";
+export const maxDocumentFileSizeBytes = 20 * 1024 * 1024;
 export const appointmentStatuses = [
   "scheduled",
   "confirmed",
@@ -182,6 +211,22 @@ export function formatPortalDateTime(value: string) {
   }).format(date);
 }
 
+export function formatFileSize(bytes: number | null | undefined) {
+  if (!bytes || Number.isNaN(bytes) || bytes <= 0) {
+    return "";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export const createClientSchema = z.object({
   fullName: z.string().trim().min(3, "Informe o nome completo."),
   email: z.string().trim().email("Informe um e-mail valido.").toLowerCase(),
@@ -249,7 +294,7 @@ export const recordPortalEventSchema = z.object({
 
 export const registerCaseDocumentSchema = z.object({
   caseId: z.string().uuid("Informe um identificador de caso valido."),
-  fileName: z.string().trim().min(3, "Informe o nome do documento."),
+  fileName: z.string().trim().optional().default(""),
   category: z.string().trim().min(2, "Informe o tipo do documento.").max(120),
   description: z.string().trim().max(500).optional().default(""),
   status: z.enum(documentStatuses, {

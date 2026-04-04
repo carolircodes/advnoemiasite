@@ -46,7 +46,9 @@ export async function getStaffOverview() {
       .limit(8),
     supabase
       .from("documents")
-      .select("id,case_id,file_name,category,status,visibility,document_date,created_at")
+      .select(
+        "id,case_id,file_name,category,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
+      )
       .order("document_date", { ascending: false })
       .limit(8),
     supabase
@@ -279,7 +281,7 @@ export async function getClientWorkspace(profile: PortalProfile) {
       ? supabase
           .from("documents")
           .select(
-            "id,case_id,file_name,category,description,status,visibility,document_date,created_at"
+            "id,case_id,file_name,category,description,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
           )
           .in("case_id", caseIds)
           .eq("visibility", "client")

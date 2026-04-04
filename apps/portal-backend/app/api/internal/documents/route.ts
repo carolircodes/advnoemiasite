@@ -25,8 +25,33 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = await request.json();
-    const result = await registerCaseDocument(payload, access.profile.id);
+    const contentType = request.headers.get("content-type") || "";
+
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        {
+          error:
+            "Use multipart/form-data para enviar o arquivo real do documento."
+        },
+        { status: 415 }
+      );
+    }
+
+    const formData = await request.formData();
+    const uploadedFile = formData.get("file");
+    const result = await registerCaseDocument(
+      {
+        caseId: formData.get("caseId"),
+        category: formData.get("category"),
+        description: formData.get("description"),
+        status: formData.get("status"),
+        documentDate: formData.get("documentDate"),
+        visibleToClient: formData.get("visibleToClient") === "on",
+        shouldNotifyClient: formData.get("shouldNotifyClient") === "on"
+      },
+      access.profile.id,
+      uploadedFile instanceof File ? uploadedFile : null
+    );
     return NextResponse.json({ ok: true, result }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

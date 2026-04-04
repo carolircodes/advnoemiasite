@@ -15,6 +15,7 @@ O fluxo local validado para este projeto e:
 - registro de atualizacao real do caso
 - visualizacao do historico pelo cliente
 - gestao real de documentos do caso
+- upload real de arquivos do caso em storage privado
 - solicitacoes documentais visiveis no portal
 - agenda real de compromissos e proximos passos
 - compromissos visiveis ao cliente em `/agenda`
@@ -31,8 +32,10 @@ Nao e necessario criar usuario manualmente no Supabase Studio nem ajustar role m
 - `lib/config/env.ts`: padronizacao das variaveis de ambiente
 - `lib/services/create-client.ts`: cadastro interno do cliente e convite
 - `lib/services/manage-documents.ts`: registro e solicitacao de documentos do caso
+- `app/api/documents/[documentId]/route.ts`: acesso autenticado e seguro aos arquivos do storage
 - `lib/services/manage-appointments.ts`: compromissos, prazos e proximos passos do caso
 - `supabase/migrations/20260408_appointment_lifecycle.sql`: historico persistido da agenda
+- `supabase/migrations/20260409_document_upload_storage.sql`: bucket privado e metadata de upload
 - `lib/services/register-event.ts`: atualizacoes reais do caso e fila de notificacoes
 - `lib/services/dashboard.ts`: agregacao do painel interno e da area do cliente
 - `lib/supabase/`: clientes browser, server, admin e middleware
@@ -156,6 +159,7 @@ Configuracao local relevante em `supabase/config.toml`:
 - `/internal/advogada` e `/api/internal/*` exigem sessao autenticada com role `advogada` ou `admin`
 - `/cliente` exige sessao autenticada com role `cliente`
 - `/documentos` e `/agenda` exigem sessao autenticada e respeitam o role do usuario
+- `/api/documents/[documentId]` exige sessao valida e reaplica a autorizacao do portal antes de abrir qualquer arquivo
 - clientes sem `first_login_completed_at` sao redirecionados para `/auth/primeiro-acesso`
 - leituras autenticadas do app passam por RLS real, sem `service_role` nas telas do portal
 - mutacoes sensiveis ficam concentradas no backend com checagem adicional de actor autorizado
@@ -218,25 +222,31 @@ Configuracao local relevante em `supabase/config.toml`:
 ### Gestao de documentos do caso
 
 1. Entre como advogada em `/documentos`.
-2. No card `Registrar documento do caso`, escolha o caso e preencha:
-   - nome do documento
+2. No card `Registrar documento do caso`, escolha o caso e envie:
+   - arquivo real em PDF, imagem ou documento
    - tipo
    - descricao curta
    - status
    - data
    - visibilidade para o cliente
-3. Se o documento for visivel e a notificacao estiver habilitada, confirme o novo item em `notifications_outbox`.
-4. No card `Solicitar documento ao cliente`, abra uma nova solicitacao com orientacoes e prazo.
-5. Confirme que:
+3. Confirme que:
+   - o arquivo foi enviado para o bucket privado `portal-case-documents`
+   - o registro foi criado em `documents` com `storage_path`, `mime_type` e `file_size_bytes`
+4. Se o documento for visivel e a notificacao estiver habilitada, confirme o novo item em `notifications_outbox`.
+5. No card `Solicitar documento ao cliente`, abra uma nova solicitacao com orientacoes e prazo.
+6. Confirme que:
    - o documento foi criado em `documents`
    - a solicitacao foi criada em `document_requests`
    - eventos visiveis foram registrados em `case_events`
    - a fila foi alimentada em `notifications_outbox` quando cabivel
-6. Entre como cliente e abra `/documentos`.
-7. Confirme as tres visoes:
+7. Entre como cliente e abra `/documentos`.
+8. Confirme as tres visoes:
    - `Documentos disponiveis`
    - `Documentos pendentes`
    - `Solicitacoes abertas`
+9. Use `Visualizar arquivo` ou `Baixar arquivo` e confirme que:
+   - o cliente acessa apenas arquivos visiveis do proprio caso
+   - acessos sem sessao ou de outro cliente nao conseguem abrir o arquivo
 
 ### Agenda do caso
 

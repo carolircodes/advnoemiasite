@@ -2,8 +2,11 @@ import "server-only";
 
 import { assertStaffActor } from "@/lib/auth/guards";
 import {
+  allowedDocumentExtensions,
+  allowedDocumentMimeTypes,
   documentStatusLabels,
   formatPortalDateTime,
+  maxDocumentFileSizeBytes,
   registerCaseDocumentSchema,
   requestCaseDocumentSchema
 } from "@/lib/domain/portal";
@@ -11,12 +14,140 @@ import { queueCaseEventNotification } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+export const CASE_DOCUMENTS_BUCKET = "portal-case-documents";
+
+const fallbackMimeTypeByExtension: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif"
+};
+
 function resolveDateTime(value: string) {
   if (!value) {
     return new Date().toISOString();
   }
 
   return new Date(value).toISOString();
+}
+
+function extractFileExtension(fileName: string) {
+  const parts = fileName.toLowerCase().split(".");
+  return parts.length > 1 ? parts.pop() || "" : "";
+}
+
+function sanitizeStorageSegment(value: string) {
+  const normalized = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .toLowerCase();
+
+  return normalized.slice(0, 140) || "arquivo";
+}
+
+function resolveUploadedFileMimeType(file: File) {
+  const extension = extractFileExtension(file.name);
+
+  if (file.type && allowedDocumentMimeTypes.includes(file.type as (typeof allowedDocumentMimeTypes)[number])) {
+    return file.type;
+  }
+
+  if (extension && fallbackMimeTypeByExtension[extension]) {
+    return fallbackMimeTypeByExtension[extension];
+  }
+
+  return "";
+}
+
+function validateUploadedFile(file: File | null) {
+  if (!(file instanceof File) || !file.size) {
+    throw new Error("Selecione um arquivo PDF, imagem ou documento para continuar.");
+  }
+
+  if (file.size > maxDocumentFileSizeBytes) {
+    throw new Error("O arquivo excede o limite de 20 MB para upload no portal.");
+  }
+
+  const extension = extractFileExtension(file.name);
+  const hasAllowedExtension = allowedDocumentExtensions.includes(
+    extension as (typeof allowedDocumentExtensions)[number]
+  );
+  const mimeType = resolveUploadedFileMimeType(file);
+
+  if (!hasAllowedExtension || !mimeType) {
+    throw new Error(
+      "Formato de arquivo nao suportado. Envie PDF, DOC, DOCX, JPG, PNG, WEBP ou GIF."
+    );
+  }
+
+  return {
+    fileName: file.name,
+    mimeType,
+    extension
+  };
+}
+
+function buildStoragePath(input: {
+  clientId: string;
+  caseId: string;
+  documentId: string;
+  fileName: string;
+}) {
+  const safeFileName = sanitizeStorageSegment(input.fileName);
+  return `clients/${input.clientId}/cases/${input.caseId}/documents/${input.documentId}/${safeFileName}`;
+}
+
+async function uploadDocumentFile(input: {
+  storagePath: string;
+  file: File;
+  mimeType: string;
+}) {
+  const supabase = createAdminSupabaseClient();
+  const fileBuffer = Buffer.from(await input.file.arrayBuffer());
+  const { error } = await supabase.storage
+    .from(CASE_DOCUMENTS_BUCKET)
+    .upload(input.storagePath, fileBuffer, {
+      contentType: input.mimeType,
+      upsert: false
+    });
+
+  if (error) {
+    throw new Error(`Nao foi possivel enviar o arquivo para o storage: ${error.message}`);
+  }
+}
+
+async function removeDocumentFile(storagePath: string | null) {
+  if (!storagePath) {
+    return;
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const { error } = await supabase.storage.from(CASE_DOCUMENTS_BUCKET).remove([storagePath]);
+
+  if (error) {
+    console.error("[documents.storage] Failed to remove storage object", {
+      storagePath,
+      message: error.message
+    });
+  }
+}
+
+function buildDocumentPublicSummary(status: string, description: string) {
+  if (description) {
+    return description;
+  }
+
+  const statusLabel =
+    documentStatusLabels[status as keyof typeof documentStatusLabels] || "Registrado";
+
+  return `A equipe liberou um documento no portal com status ${statusLabel.toLowerCase()}.`;
 }
 
 async function resolveCaseContext(caseId: string) {
@@ -72,6 +203,7 @@ async function createCaseEventForDocumentFlow(input: {
   publicSummary: string;
   payload: Record<string, unknown>;
   shouldNotifyClient: boolean;
+  occurredAt?: string;
 }) {
   const supabase = createAdminSupabaseClient();
   const { data: eventRecord, error: eventError } = await supabase
@@ -86,7 +218,7 @@ async function createCaseEventForDocumentFlow(input: {
       triggered_by: input.actorProfileId,
       visible_to_client: true,
       should_notify_client: input.shouldNotifyClient,
-      occurred_at: new Date().toISOString(),
+      occurred_at: input.occurredAt || new Date().toISOString(),
       payload: input.payload
     })
     .select("id")
@@ -164,9 +296,30 @@ async function rollbackNotificationAndEvent(eventId: string | null, notification
   }
 }
 
-export async function registerCaseDocument(rawInput: unknown, actorProfileId: string) {
+async function rollbackDocumentRecord(documentId: string | null) {
+  if (!documentId) {
+    return;
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const { error } = await supabase.from("documents").delete().eq("id", documentId);
+
+  if (error) {
+    console.error("[documents.rollback] Failed to rollback document", {
+      documentId,
+      message: error.message
+    });
+  }
+}
+
+export async function registerCaseDocument(
+  rawInput: unknown,
+  actorProfileId: string,
+  uploadedFile: File | null
+) {
   await assertStaffActor(actorProfileId);
   const input = registerCaseDocumentSchema.parse(rawInput);
+  const file = validateUploadedFile(uploadedFile);
   const documentDate = resolveDateTime(input.documentDate);
   const visibleToClient = input.visibleToClient;
   const shouldNotifyClient = visibleToClient && input.shouldNotifyClient;
@@ -176,23 +329,41 @@ export async function registerCaseDocument(rawInput: unknown, actorProfileId: st
     input.caseId
   );
 
+  const documentId = crypto.randomUUID();
+  const storagePath = buildStoragePath({
+    clientId: clientRecord.id,
+    caseId: caseRecord.id,
+    documentId,
+    fileName: file.fileName
+  });
+
+  await uploadDocumentFile({
+    storagePath,
+    file: uploadedFile as File,
+    mimeType: file.mimeType
+  });
+
   const { data: documentRecord, error: documentError } = await supabase
     .from("documents")
     .insert({
+      id: documentId,
       case_id: caseRecord.id,
-      file_name: input.fileName,
-      storage_path: null,
+      file_name: file.fileName,
+      storage_path: storagePath,
       category: input.category,
       description: input.description || null,
       status: input.status,
       document_date: documentDate,
       visibility,
-      uploaded_by: actorProfileId
+      uploaded_by: actorProfileId,
+      mime_type: file.mimeType,
+      file_size_bytes: uploadedFile?.size || null
     })
-    .select("id,file_name,status,visibility")
+    .select("id,file_name,status,visibility,storage_path,mime_type,file_size_bytes")
     .single();
 
   if (documentError || !documentRecord) {
+    await removeDocumentFile(storagePath);
     throw new Error(documentError?.message || "Nao foi possivel registrar o documento.");
   }
 
@@ -201,36 +372,26 @@ export async function registerCaseDocument(rawInput: unknown, actorProfileId: st
 
   try {
     if (visibleToClient) {
-      const eventType =
-        input.status === "solicitado" || input.status === "pendente"
-          ? "document_request"
-          : "new_document";
-      const activityTitle =
-        eventType === "document_request"
-          ? `Documento pendente: ${input.fileName}`
-          : `Novo documento disponivel: ${input.fileName}`;
-      const publicSummary =
-        input.description ||
-        (eventType === "document_request"
-          ? "A equipe registrou uma pendencia documental no seu caso."
-          : "A equipe liberou um novo documento na sua area do cliente.");
       const activity = await createCaseEventForDocumentFlow({
         caseId: caseRecord.id,
         clientId: clientRecord.id,
         actorProfileId,
         clientProfileId: profileRecord.id,
         clientEmail: profileRecord.email || "",
-        eventType,
-        title: activityTitle,
+        eventType: "new_document",
+        title: `Novo documento disponivel: ${file.fileName}`,
         description: input.description,
-        publicSummary,
+        publicSummary: buildDocumentPublicSummary(input.status, input.description),
         payload: {
           source: "documentos",
           documentId: documentRecord.id,
           documentStatus: input.status,
-          category: input.category
+          category: input.category,
+          mimeType: file.mimeType,
+          fileSizeBytes: uploadedFile?.size || null
         },
-        shouldNotifyClient
+        shouldNotifyClient,
+        occurredAt: documentDate
       });
 
       eventId = activity.eventId;
@@ -247,6 +408,9 @@ export async function registerCaseDocument(rawInput: unknown, actorProfileId: st
         caseTitle: caseRecord.title,
         status: input.status,
         visibility,
+        storagePath,
+        mimeType: file.mimeType,
+        fileSizeBytes: uploadedFile?.size || null,
         eventId,
         notificationId
       }
@@ -259,30 +423,21 @@ export async function registerCaseDocument(rawInput: unknown, actorProfileId: st
     console.error("[documents.create] Rolling back document after downstream failure", {
       caseId: caseRecord.id,
       documentId: documentRecord.id,
+      storagePath,
       eventId,
       notificationId,
       message: error instanceof Error ? error.message : String(error)
     });
 
     await rollbackNotificationAndEvent(eventId, notificationId);
-
-    const { error: deleteDocumentError } = await supabase
-      .from("documents")
-      .delete()
-      .eq("id", documentRecord.id);
-
-    if (deleteDocumentError) {
-      console.error("[documents.create] Failed to rollback document", {
-        documentId: documentRecord.id,
-        message: deleteDocumentError.message
-      });
-    }
-
+    await rollbackDocumentRecord(documentRecord.id);
+    await removeDocumentFile(storagePath);
     throw error;
   }
 
   return {
     documentId: documentRecord.id,
+    storagePath,
     eventId,
     notificationId
   };
@@ -405,7 +560,9 @@ export async function listLatestDocuments(limit = 20) {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("documents")
-    .select("id,case_id,file_name,category,status,visibility,document_date,created_at")
+    .select(
+      "id,case_id,file_name,category,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
+    )
     .order("document_date", { ascending: false })
     .limit(limit);
 
@@ -432,4 +589,43 @@ export async function listLatestDocumentRequests(limit = 20) {
   }
 
   return data || [];
+}
+
+export async function getAccessibleDocumentFile(documentId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data: documentRecord, error: documentError } = await supabase
+    .from("documents")
+    .select(
+      "id,case_id,file_name,category,status,visibility,document_date,storage_path,mime_type,file_size_bytes"
+    )
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (documentError) {
+    throw new Error(`Nao foi possivel validar o acesso ao documento: ${documentError.message}`);
+  }
+
+  if (!documentRecord) {
+    return null;
+  }
+
+  if (!documentRecord.storage_path) {
+    throw new Error("O arquivo deste documento ainda nao foi enviado para o portal.");
+  }
+
+  const adminSupabase = createAdminSupabaseClient();
+  const { data: fileBlob, error: storageError } = await adminSupabase.storage
+    .from(CASE_DOCUMENTS_BUCKET)
+    .download(documentRecord.storage_path);
+
+  if (storageError || !fileBlob) {
+    throw new Error(
+      storageError?.message || "Nao foi possivel carregar o arquivo solicitado."
+    );
+  }
+
+  return {
+    document: documentRecord,
+    file: fileBlob
+  };
 }
