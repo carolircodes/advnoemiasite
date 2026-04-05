@@ -16,17 +16,7 @@ export async function POST(request: Request) {
     // Verificar se OPENAI_API_KEY está disponível
     const env = getServerEnv();
     
-    // Temporariamente desabilitar validação da chave para funcionar com fallback melhorado
-    // TODO: Restaurar quando tiver chave OpenAI válida
-    const useRealAPI = false; // env.OPENAI_API_KEY && env.OPENAI_API_KEY.startsWith('sk-') && !env.OPENAI_API_KEY.includes('test');
-    
-    if (!useRealAPI) {
-      console.log("[noemia.chat] Usando fallback melhorado (chave OpenAI inválida/indisponível)");
-      const { POST: fallbackHandler } = await import("./fallback");
-      return fallbackHandler(request);
-    }
-
-    // Tentar usar a API principal
+    // Tentar usar a API principal (agora não vai lançar erro se não tiver chave)
     try {
       const result = await answerNoemia(payload, profile);
 
@@ -59,7 +49,6 @@ export async function POST(request: Request) {
     } catch (apiError) {
       // Se a API principal falhar, usar fallback
       console.error("[noemia.chat] API principal falhou:", apiError);
-      console.log("[noemia.chat] Detalhes do erro:", apiError instanceof Error ? apiError.message : String(apiError));
       
       const { POST: fallbackHandler } = await import("./fallback");
       return fallbackHandler(request);

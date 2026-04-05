@@ -241,19 +241,26 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
         : "visitor";
 
   if (requestedAudience === "client" && (!profile || profile.role !== "cliente")) {
-    throw new Error("Faca login como cliente para receber respostas baseadas no seu portal.");
+    console.log("[noemia] Cliente não autenticado, usando audience visitor");
+    // Não lançar erro - mudar para visitor
+    effectiveAudience = "visitor";
   }
 
   if (requestedAudience === "staff" && (!profile || profile.role === "cliente")) {
-    throw new Error("Faca login com um perfil interno para receber apoio operacional da Noemia.");
+    console.log("[noemia] Staff não autenticado, usando audience visitor");
+    // Não lançar erro - mudar para visitor
+    effectiveAudience = "visitor";
   }
 
   if (!env.OPENAI_API_KEY) {
     console.error("[noemia] OPENAI_API_KEY não encontrada no ambiente");
     console.log("[noemia] Env disponível:", Object.keys(env).filter(k => k.includes('OPENAI')));
-    throw new Error(
-      "A Noemia ainda nao foi configurada neste ambiente. Defina OPENAI_API_KEY e OPENAI_MODEL no .env.local."
-    );
+    
+    // NÃO lançar erro - retornar resposta padrão
+    return {
+      audience: effectiveAudience,
+      answer: "Olá! Sou a NoemIA. No momento estou operando em modo de configuração. Como posso te ajudar hoje?"
+    };
   }
 
   const contextText =
@@ -310,14 +317,25 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`Nao foi possivel consultar a Noemia agora: ${details}`);
+    console.error("[noemia] Erro na chamada OpenAI:", details);
+      
+    // Retornar sempre resposta amigável, nunca lançar erro
+    return {
+      audience: effectiveAudience,
+      answer: "Olá! Sou a NoemIA. No momento estou operando em modo de configuração. Como posso te ajudar hoje?"
+    };
   }
 
   const payload = await response.json();
   const answer = extractResponseText(payload);
 
   if (!answer) {
-    throw new Error("A Noemia nao retornou uma resposta valida nesta tentativa.");
+    console.error("[noemia] Resposta vazia da OpenAI");
+    // Retornar sempre resposta amigável, nunca lançar erro
+    return {
+      audience: effectiveAudience,
+      answer: "Olá! Sou a NoemIA. No momento estou operando em modo de configuração. Como posso te ajudar hoje?"
+    };
   }
 
   return {
