@@ -22,6 +22,7 @@ const envSchema = z
   NOTIFICATIONS_REPLY_TO: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(1).optional(),
+  CRON_SECRET: z.string().min(12).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().min(1).optional(),
   PORTAL_ADMIN_EMAIL: z.string().email().optional(),
@@ -91,6 +92,7 @@ type ServerEnv = {
   NOTIFICATIONS_REPLY_TO?: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  CRON_SECRET?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
   PORTAL_ADMIN_EMAIL?: string;
@@ -171,6 +173,7 @@ export function getServerEnv(): ServerEnv {
     NOTIFICATIONS_REPLY_TO: parsed.NOTIFICATIONS_REPLY_TO,
     RESEND_API_KEY: parsed.RESEND_API_KEY,
     EMAIL_FROM: parsed.EMAIL_FROM,
+    CRON_SECRET: parsed.CRON_SECRET,
     OPENAI_API_KEY: parsed.OPENAI_API_KEY,
     OPENAI_MODEL: parsed.OPENAI_MODEL,
     PORTAL_ADMIN_EMAIL: parsed.PORTAL_ADMIN_EMAIL,

@@ -68,7 +68,8 @@ export const documentStatuses = [
   "revisado"
 ] as const;
 export const documentRequestStatuses = ["pending", "completed", "cancelled"] as const;
-export const notificationChannels = ["email"] as const;
+export const notificationChannels = ["email", "whatsapp", "noemia"] as const;
+export const clientTiers = ["novo-cliente", "em-andamento", "pendencia", "vip"] as const;
 export const notificationStatuses = [
   "pending",
   "processing",
@@ -144,6 +145,8 @@ export type DocumentRequestStatus = (typeof documentRequestStatuses)[number];
 export type AppointmentType = (typeof appointmentTypes)[number];
 export type AppointmentChangeType = (typeof appointmentChangeTypes)[number];
 export type NoemiaAudience = (typeof noemiaAudiences)[number];
+export type NotificationChannel = (typeof notificationChannels)[number];
+export type ClientTier = (typeof clientTiers)[number];
 
 export function isPortalRole(value: unknown): value is PortalRole {
   return typeof value === "string" && portalRoles.includes(value as PortalRole);

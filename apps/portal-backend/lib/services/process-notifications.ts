@@ -1,7 +1,7 @@
 import "server-only";
 
+import { routeNotificationByChannel } from "@/lib/notifications/channel-router";
 import { renderNotificationEmail } from "@/lib/notifications/email-templates";
-import { sendNotificationEmail } from "@/lib/notifications/email-delivery";
 import { runOperationalAutomationRules } from "@/lib/services/automation-rules";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
@@ -10,6 +10,8 @@ const MAX_NOTIFICATION_ATTEMPTS = 5;
 type NotificationRecord = {
   id: string;
   event_type: string;
+  channel: string;
+  recipient_profile_id: string | null;
   recipient_email: string;
   subject: string;
   template_key: string;
@@ -106,6 +108,31 @@ async function markNotificationAsFailed(
   }
 }
 
+async function logNotificationSentToHistory(record: NotificationRecord) {
+  try {
+    const supabase = createAdminSupabaseClient();
+    await supabase.from("audit_logs").insert({
+      actor_profile_id: record.recipient_profile_id || null,
+      action: "notification.sent",
+      entity_type: "notifications_outbox",
+      entity_id: record.id,
+      payload: {
+        channel: record.channel || "email",
+        templateKey: record.template_key,
+        recipientEmail: record.recipient_email,
+        eventType: record.event_type,
+        sentAt: new Date().toISOString()
+      }
+    });
+  } catch (logError) {
+    // Nao-bloqueante: falha no log nao interrompe o envio
+    console.warn(
+      "[notifications.history] Falha ao registrar historico de envio:",
+      logError instanceof Error ? logError.message : String(logError)
+    );
+  }
+}
+
 async function processNotification(record: NotificationRecord) {
   const processingTimestamp = await markNotificationAsProcessing(record);
 
@@ -120,15 +147,29 @@ async function processNotification(record: NotificationRecord) {
     };
   }
 
+  const channel = record.channel || "email";
+
   try {
-    const renderedEmail = renderNotificationEmail(record);
-    await sendNotificationEmail({
-      to: record.recipient_email,
-      subject: renderedEmail.subject,
-      html: renderedEmail.html,
-      text: renderedEmail.text
-    });
+    if (channel === "email") {
+      const renderedEmail = renderNotificationEmail(record);
+      await routeNotificationByChannel("email", {
+        to: record.recipient_email,
+        subject: renderedEmail.subject,
+        html: renderedEmail.html,
+        text: renderedEmail.text
+      });
+    } else {
+      // Canais futuros (whatsapp, noemia): roteador lanca erro informativo
+      await routeNotificationByChannel(channel, {
+        to: record.recipient_email,
+        subject: record.subject,
+        html: "",
+        text: ""
+      });
+    }
+
     await markNotificationAsSent(record.id);
+    await logNotificationSentToHistory(record);
 
     return {
       id: record.id,
@@ -155,7 +196,7 @@ export async function processPendingNotifications(limit = 10) {
   const { data, error } = await supabase
     .from("notifications_outbox")
     .select(
-      "id,event_type,recipient_email,subject,template_key,payload,status,attempts,available_at"
+      "id,event_type,channel,recipient_profile_id,recipient_email,subject,template_key,payload,status,attempts,available_at"
     )
     .in("status", ["pending", "failed"])
     .lt("attempts", MAX_NOTIFICATION_ATTEMPTS)

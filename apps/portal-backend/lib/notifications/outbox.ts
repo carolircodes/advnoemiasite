@@ -108,6 +108,10 @@ export async function queueCaseEventNotification(input: {
   title: string;
   publicSummary: string;
   relatedId: string;
+  /** Tier visual do cliente — controla o tema do e-mail. Derivado automaticamente se omitido. */
+  clientTier?: string;
+  /** Prioridade do caso — "urgente" promove o cliente para o tier vip. */
+  casePriority?: string;
 }) {
   return queueEmailNotification({
     eventType: input.eventType,
@@ -118,7 +122,9 @@ export async function queueCaseEventNotification(input: {
     payload: {
       title: input.title,
       publicSummary: input.publicSummary,
-      eventLabel: caseEventTypeLabels[input.eventType]
+      eventLabel: caseEventTypeLabels[input.eventType],
+      ...(input.clientTier ? { clientTier: input.clientTier } : {}),
+      ...(input.casePriority ? { casePriority: input.casePriority } : {})
     },
     relatedTable: "case_events",
     relatedId: input.relatedId
