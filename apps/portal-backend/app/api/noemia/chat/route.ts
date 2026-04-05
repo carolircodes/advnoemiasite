@@ -57,11 +57,6 @@ export async function POST(request: Request) {
     // Tratamento de erro mais amigável
     console.error("[noemia.chat] Erro geral na API:", error);
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-    
-    console.error("[noemia.chat] Erro geral na API:", {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    });
 
     // Mensagens amigáveis para erros comuns
     const friendlyMessages: Record<string, string> = {
