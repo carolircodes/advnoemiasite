@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import type { ClientUploadState } from "@/components/client-document-upload";
+import { ClientDocumentUploadCard } from "@/components/client-document-upload";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
@@ -160,15 +162,19 @@ async function updateRequestStatusAction(formData: FormData) {
   );
 }
 
-async function submitClientDocumentAction(formData: FormData) {
+async function submitClientDocumentAction(
+  _prevState: ClientUploadState,
+  formData: FormData
+): Promise<ClientUploadState> {
   "use server";
 
+  // requireProfile redirects to login if session expired — correct behavior
   const profile = await requireProfile(["cliente"]);
   const requestId = String(formData.get("requestId") || "").trim();
   const uploadedFile = formData.get("file");
 
   if (!requestId) {
-    redirect("/documentos?error=solicitacao-invalida");
+    return { status: "error", message: "Solicitacao nao identificada. Recarregue a pagina e tente novamente." };
   }
 
   try {
@@ -177,13 +183,16 @@ async function submitClientDocumentAction(formData: FormData) {
       profile.id,
       uploadedFile instanceof File ? uploadedFile : null
     );
+    return { status: "success" };
   } catch (error) {
-    const message =
-      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-enviar-documento";
-    redirect(`/documentos?error=${message}`);
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel enviar o documento. Tente novamente."
+    };
   }
-
-  redirect("/documentos?success=documento-enviado");
 }
 
 export default async function DocumentsPage({
@@ -797,6 +806,10 @@ export default async function DocumentsPage({
         matchesSearch(query, [request.title, request.caseTitle, request.instructions])
     )
   );
+  const completedRequests = workspace.documentRequests
+    .filter((request) => request.status === "completed")
+    .sort((left, right) => right.created_at.localeCompare(left.created_at))
+    .slice(0, 8);
 
   return (
     <>
@@ -811,8 +824,8 @@ export default async function DocumentsPage({
       />
       <AppFrame
         eyebrow="Documentos"
-        title="Documentos e pendencias organizados em um so lugar."
-        description="Voce acompanha aqui os arquivos liberados pela equipe, o que ainda esta pendente e as solicitacoes abertas do seu caso."
+        title="Tudo sobre os documentos do seu caso."
+        description="Aqui voce encontra os arquivos liberados pela equipe, responde solicitacoes abertas e acompanha o andamento de cada entrega."
         utilityContent={
           <PortalSessionBanner
             role={profile.role}
@@ -829,16 +842,16 @@ export default async function DocumentsPage({
         ]}
         highlights={[
           { label: "Disponiveis", value: String(availableDocuments.length) },
-          { label: "Pendentes", value: String(pendingDocuments.length) },
-          { label: "Solicitacoes abertas", value: String(openRequests.length) },
-          {
-            label: "Total visivel",
-            value: String(workspace.documents.length + workspace.documentRequests.length)
-          }
+          { label: "Aguardando envio", value: String(openRequests.length) },
+          { label: "Enviados", value: String(completedRequests.length) },
+          { label: "Total no portal", value: String(workspace.documents.length) }
         ]}
         actions={[
-          { href: "/cliente", label: "Voltar ao painel", tone: "secondary" },
-          { href: "/agenda", label: "Ver agenda", tone: "secondary" }
+          ...(openRequests.length > 0
+            ? [{ href: "#solicitacoes-abertas", label: "Enviar documento" }]
+            : []),
+          { href: "/cliente", label: "Meu painel", tone: "secondary" as const },
+          { href: "/agenda", label: "Agenda", tone: "secondary" as const }
         ]}
       >
       {error ? <div className="error-notice">{error}</div> : null}
@@ -891,8 +904,8 @@ export default async function DocumentsPage({
       <div className="grid two">
         <SectionCard
           id="documentos-disponiveis"
-          title="Documentos disponiveis"
-          description="Arquivos ja liberados para consulta na sua area do cliente."
+          title="Documentos disponíveis"
+          description="Arquivos liberados pela equipe para consulta e download na sua area do portal."
         >
           {availableDocuments.length ? (
             <ul className="update-feed">
@@ -909,11 +922,13 @@ export default async function DocumentsPage({
                     {document.description || "Documento registrado e liberado pela equipe."}
                   </p>
                   <div className="pill-row">
-                    <span className="pill success">{document.statusLabel}</span>
+                    <span className="pill success">
+                      {document.status === "revisado" ? "Aprovado pela equipe" : "Disponível"}
+                    </span>
                     <span className="pill muted">
                       {formatPortalDateTime(document.document_date)}
                       {document.file_size_bytes
-                        ? ` - ${formatFileSize(document.file_size_bytes)}`
+                        ? ` — ${formatFileSize(document.file_size_bytes)}`
                         : ""}
                     </span>
                   </div>
@@ -955,8 +970,8 @@ export default async function DocumentsPage({
 
         <SectionCard
           id="documentos-pendentes"
-          title="Documentos pendentes"
-          description="Itens documentais que ainda dependem de envio, revisao ou retorno."
+          title="Em acompanhamento"
+          description="Documentos que a equipe registrou como pendentes ou em revisao para o seu caso."
         >
           {pendingDocuments.length ? (
             <ul className="update-feed">
@@ -1020,59 +1035,60 @@ export default async function DocumentsPage({
 
       <SectionCard
         id="solicitacoes-abertas"
-        title="Solicitacoes abertas"
-        description="Pedidos documentais enviados pela equipe e ainda em acompanhamento."
+        title="Documentos aguardando envio"
+        description="A equipe precisa destes arquivos para avançar com o seu caso. O envio e seguro e leva menos de um minuto."
       >
         {openRequests.length ? (
           <ul className="update-feed">
             {openRequests.map((request) => (
-              <li key={request.id} className="update-card">
-                <div className="update-head">
+              <li
+                key={request.id}
+                className="update-card"
+                style={{ gap: "20px", padding: "24px 26px" }}
+              >
+                {/* Card header */}
+                <div className="update-head" style={{ alignItems: "center" }}>
                   <div>
-                    <strong>{request.title}</strong>
+                    <strong style={{ fontSize: "1.08rem" }}>{request.title}</strong>
                     <span className="item-meta">{request.caseTitle}</span>
                   </div>
-                  <span className="tag soft">
-                    {
-                      documentRequestStatusLabels[
-                        request.status as keyof typeof documentRequestStatusLabels
-                      ]
-                    }
-                  </span>
-                </div>
-                <p className="update-body">
-                  {request.instructions || "A equipe abriu uma nova solicitacao documental."}
-                </p>
-                <div className="pill-row">
-                  <span className="pill warning">Acao do cliente</span>
-                  <span className="pill muted">
-                    {request.due_at
-                      ? `Prazo ${formatPortalDateTime(request.due_at)}`
-                      : "Sem prazo definido"}
-                  </span>
-                </div>
-                <form
-                  action={submitClientDocumentAction}
-                  className="stack"
-                  encType="multipart/form-data"
-                >
-                  <input type="hidden" name="requestId" value={request.id} />
-                  <div className="field-full">
-                    <label htmlFor={`upload-file-${request.id}`}>Enviar documento</label>
-                    <input
-                      id={`upload-file-${request.id}`}
-                      name="file"
-                      type="file"
-                      accept={documentUploadAccept}
-                      required
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "5px 12px",
+                      borderRadius: "999px",
+                      background: "rgba(142, 106, 59, 0.1)",
+                      color: "var(--accent-strong)",
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "50%",
+                        background: "var(--accent)",
+                        display: "inline-block",
+                      }}
                     />
-                  </div>
-                  <div className="form-actions">
-                    <FormSubmitButton pendingLabel="Enviando documento...">
-                      Enviar arquivo
-                    </FormSubmitButton>
-                  </div>
-                </form>
+                    Aguardando envio
+                  </span>
+                </div>
+
+                <ClientDocumentUploadCard
+                  requestId={request.id}
+                  requestTitle={request.title}
+                  instructions={request.instructions ?? null}
+                  dueAtLabel={request.due_at ? formatPortalDateTime(request.due_at) : null}
+                  uploadAction={submitClientDocumentAction}
+                />
               </li>
             ))}
           </ul>
@@ -1080,10 +1096,74 @@ export default async function DocumentsPage({
           <p className="empty-state">
             {hasFilters
               ? "Nenhuma solicitacao aberta corresponde aos filtros atuais."
-              : "Nenhuma solicitacao documental aberta esta visivel para voce agora."}
+              : "Nenhuma acao necessaria no momento. Quando a equipe precisar de um documento, vai aparecer aqui."}
           </p>
         )}
       </SectionCard>
+
+      {completedRequests.length > 0 ? (
+        <SectionCard
+          title="Histórico de envios"
+          description="Documentos que voce ja enviou ao escritorio. A equipe confirma o recebimento e te avisa."
+        >
+          <ul className="update-feed compact">
+            {completedRequests.map((request) => (
+              <li key={request.id} className="update-card" style={{ padding: "16px 20px", gap: "10px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        flexShrink: 0,
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        background: "rgba(41, 93, 69, 0.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "15px",
+                        color: "var(--success)",
+                      }}
+                    >
+                      ✓
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <p
+                        style={{
+                          margin: "0 0 2px",
+                          fontWeight: 700,
+                          fontSize: "0.93rem",
+                          color: "var(--text)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {request.title}
+                      </p>
+                      <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--muted)" }}>
+                        {request.caseTitle} · {formatPortalDateTime(request.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="pill success" style={{ flexShrink: 0 }}>
+                    Recebido
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      ) : null}
+
       </AppFrame>
     </>
   );
