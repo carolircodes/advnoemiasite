@@ -104,6 +104,9 @@ type NotificationEnv = {
   smtpSecure: boolean;
 };
 
+// Exportar tipos para uso externo
+export type { ServerEnv, PublicEnv, NotificationEnv };
+
 let cachedServerEnv: ServerEnv | null = null;
 let cachedPublicEnv: PublicEnv | null = null;
 let cachedNotificationEnv: NotificationEnv | null = null;
