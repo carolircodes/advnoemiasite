@@ -4,11 +4,11 @@ import { redirect } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { SectionCard } from "@/components/section-card";
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
-import { getServerEnv } from "@/lib/config/env";
-import { forgotPasswordSchema } from "@/lib/domain/portal";
-import { appendEntryContextToPath, readEntryContext, type EntryContext } from "@/lib/entry-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { CLIENT_LOGIN_PATH } from "../../../lib/auth/access-control";
+import { getServerEnv } from "../../../lib/config/env";
+import { forgotPasswordSchema } from "../../../lib/domain/portal";
+import { appendEntryContextToPath, readEntryContext, type EntryContext } from "../../../lib/entry-context";
+import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Recuperar acesso ao portal",

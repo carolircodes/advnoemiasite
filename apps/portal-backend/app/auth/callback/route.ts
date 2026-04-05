@@ -5,12 +5,12 @@ import {
   buildLoginRedirectPath,
   getPostAuthDestination,
   normalizeNextPath
-} from "@/lib/auth/access-control";
+} from "../../../lib/auth/access-control";
 import {
   ensureProfileForUser
-} from "@/lib/auth/guards";
-import { getServerEnv } from "@/lib/config/env";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+} from "../../../lib/auth/guards";
+import { getServerEnv } from "../../../lib/config/env";
+import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
 function normalizeOtpType(type: string | null): EmailOtpType | null {
   if (!type) {

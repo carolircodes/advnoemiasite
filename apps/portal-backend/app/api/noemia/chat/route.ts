@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentProfile } from "@/lib/auth/guards";
-import { answerNoemia } from "@/lib/services/noemia";
-import { recordProductEvent } from "@/lib/services/public-intake";
-import { getServerEnv } from "@/lib/config/env";
+import { getCurrentProfile } from "../../../../lib/auth/guards";
+import { answerNoemia } from "../../../../lib/services/noemia";
+import { recordProductEvent } from "../../../../lib/services/public-intake";
+import { getServerEnv } from "../../../../lib/config/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
