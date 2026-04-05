@@ -1,0 +1,238 @@
+/* DESIGN SYSTEM OFICIAL - Noêmia Paixão Advocacia */
+/* REGRA ABSOLUTA: Usar apenas cores da paleta oficial */
+
+/* ===== PALETA OFICIAL ===== */
+:root {
+  /* Cores Principais */
+  --primary-dark: #0F2A23;
+  --primary-secondary: #1C3D33;
+  --gold: #C8A96A;
+  --bg-light: #F8F6F2;
+  --bg-white: #FFFFFF;
+  
+  /* Textos */
+  --text-primary: #0B1F1A;
+  --text-secondary: #4A5C57;
+  
+  /* Utilitários */
+  --border-light: rgba(15, 42, 35, 0.1);
+  --shadow-light: 0 8px 24px rgba(15, 42, 35, 0.08);
+  --shadow-medium: 0 16px 32px rgba(15, 42, 35, 0.12);
+  --radius-smooth: 12px;
+  --radius-large: 24px;
+  --radius-full: 999px;
+}
+
+/* ===== BOTÕES OFICIAIS (APENAS 3 ESTILOS) ===== */
+
+/* Botão Primário - Ação Principal */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--primary-dark);
+  color: var(--bg-white);
+  border: none;
+  border-radius: var(--radius-smooth);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  min-height: 52px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-light);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-secondary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-medium);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Botão Secundário */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: transparent;
+  color: var(--primary-dark);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-smooth);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  min-height: 52px;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-light);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Botão de Destaque - Gold */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--gold);
+  color: var(--primary-dark);
+  border: none;
+  border-radius: var(--radius-smooth);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  min-height: 52px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-light);
+}
+
+.btn-gold:hover:not(:disabled) {
+  background: #D4B57A;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-medium);
+}
+
+.btn-gold:active {
+  transform: translateY(0);
+}
+
+.btn-gold:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ===== VARIÇÕES DE TAMANHO ===== */
+.btn-small {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+
+.btn-large {
+  padding: 18px 36px;
+  font-size: 1.1rem;
+  min-height: 60px;
+}
+
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ===== CARDS PREMIUM ===== */
+.card-premium {
+  background: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-large);
+  padding: 32px;
+  box-shadow: var(--shadow-light);
+  transition: all 0.3s ease;
+}
+
+.card-premium:hover {
+  box-shadow: var(--shadow-medium);
+  transform: translateY(-2px);
+}
+
+/* ===== TIPOGRAFIA ===== */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+/* ===== ESPAÇAMENTO ===== */
+.space-sm { margin: 8px 0; }
+.space-md { margin: 16px 0; }
+.space-lg { margin: 24px 0; }
+.space-xl { margin: 32px 0; }
+
+/* ===== UTILITÁRIOS ===== */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 768px) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-gold {
+    padding: 12px 24px;
+    font-size: 0.95rem;
+    min-height: 48px;
+  }
+  
+  .card-premium {
+    padding: 24px;
+  }
+}
+
+/* ===== FOCO E ACESSIBILIDADE ===== */
+.btn-primary:focus,
+.btn-secondary:focus,
+.btn-gold:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ===== ANIMAÇÕES SUAVES ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ===== REGRA DE PROTEÇÃO ===== */
+/* Impedir cores fora da paleta */
+.cta-standardized,
+.btn-conversa,
+.btn-qualificacao,
+.btn-contato-direto,
+.btn-cliente-existente,
+.btn-documento,
+.btn-agendar,
+.btn-conteudo {
+  /* Forçar uso das classes oficiais */
+  background: var(--primary-dark) !important;
+  color: var(--bg-white) !important;
+  border: 1px solid var(--border-light) !important;
+}
