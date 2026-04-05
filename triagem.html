@@ -9,7 +9,7 @@
     content="Formulário de triagem inicial para organizar seu atendimento jurídico antes do contato com a equipe."
   />
   <meta name="robots" content="noindex,follow" />
-  <meta name="theme-color" content="#f7f3eb" />
+  <meta name="theme-color" content="#f6f1e8" />
   <link rel="canonical" href="https://advnoemia.com.br/triagem.html" />
   <meta property="og:locale" content="pt_BR" />
   <meta property="og:title" content="Triagem Inicial | Noêmia Paixão Advocacia" />
@@ -28,236 +28,273 @@
   />
   <meta name="twitter:image" content="https://advnoemia.com.br/mae.jpeg" />
   <link rel="icon" href="logo.png" type="image/png" />
-  <link rel="stylesheet" href="assets/css/premium-system.css" />
+  <link rel="stylesheet" href="assets/css/internal-pages.css" />
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
-  <link rel="stylesheet" href="assets/css/site-refinements.css" />
+  <link rel="stylesheet" href="assets/css/premium-system.css" />
 
   <style>
-    :root{
-      --cream:#f7f3eb;
-      --cream-2:#fffdf9;
-      --gold:#b88a3b;
-      --gold-soft:#d9c19a;
-      --ink:#2b2118;
-      --muted:#6c5d4a;
-      --line:rgba(150,116,58,.20);
-      --shadow:0 24px 60px rgba(54,39,18,.08);
-      --radius:28px;
-    }
-
-    body{
+    /* Especificidades da página de triagem */
+    .triage-hero::before {
       background:
-        radial-gradient(circle at top left, rgba(199,164,93,.10), transparent 22%),
-        linear-gradient(180deg, #fffcf7 0%, #f7f2e9 100%);
-      color:var(--ink);
+        radial-gradient(circle at 12% 18%, rgba(234, 215, 175, 0.20), transparent 0 24%),
+        radial-gradient(circle at 82% 14%, rgba(181, 141, 73, 0.22), transparent 0 18%),
+        linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0));
     }
 
-    .page-shell{
-      min-height:100vh;
-      background:transparent;
+    .triage-hero::after {
+      background: radial-gradient(circle, rgba(181,141,73,0.20) 0%, rgba(181,141,73,0) 68%);
     }
 
-    .topbar{
-      background:linear-gradient(90deg, rgba(255,248,236,.95), rgba(246,238,224,.95));
-      border-bottom:1px solid var(--line);
-      color:var(--muted);
+    .triage-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(400px, 0.95fr);
+      gap: clamp(32px, 4vw, 48px);
+      align-items: start;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .timeline-item {
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      transition: all 0.3s ease;
+    }
+
+    .timeline-item:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .timeline-item strong {
+      display: block;
+      font-size: 1.1rem;
+      color: var(--ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .timeline-item p {
+      color: var(--ink-soft);
+      line-height: 1.6;
+    }
+
+    .trust-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .trust-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: var(--gold-soft);
+      color: var(--ink);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid rgba(181, 141, 73, 0.2);
+    }
+
+    .stack-card {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: var(--surface-strong);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+    }
+
+    .stack-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      color: var(--ink);
+      margin-bottom: 0.75rem;
+    }
+
+    .stack-card p {
+      color: var(--ink-soft);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.3rem;
+      padding: 0.55rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(181, 141, 73, 0.2);
+      background: var(--gold-soft);
+      color: var(--ink);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    .form-status {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .mini-note {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      color: var(--ink-soft);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .triage-layout {
+        grid-template-columns: 1fr;
+      }
+      
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Topbar específico */
+    .topbar {
+      background: linear-gradient(90deg, rgba(255,251,244,.98) 0%, rgba(245,237,224,.96) 100%);
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-soft);
       backdrop-filter: blur(14px);
     }
 
-    .topbar .pill-row span,
-    .pill-row span{
-      background:rgba(255,250,242,.92);
-      border:1px solid var(--line);
-      color:#8b672d;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+    .topbar-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0.75rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
     }
 
-    .header{
-      background:rgba(255,251,245,.78);
-      border-bottom:1px solid rgba(155,124,66,.14);
-      backdrop-filter: blur(18px);
-      position:sticky;
-      top:0;
-      z-index:50;
+    .pill-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
-    .brand-copy strong,
-    .nav-menu a,
-    .brand-copy small{
-      color:var(--ink);
+    .pill-row span {
+      padding: 0.25rem 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      color: var(--ink-soft);
     }
 
-    .nav-menu a.is-active{
-      color:#8b672d;
+    /* Header específico */
+    .header {
+      background: rgba(246, 241, 232, 0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(16, 38, 29, 0.06);
     }
 
-    .glass-card{
-      background:
-        linear-gradient(135deg, rgba(255,255,255,.92) 0%, rgba(248,242,231,.96) 100%);
-      border:1px solid var(--line);
-      box-shadow:var(--shadow);
-      backdrop-filter:none;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      color: var(--ink);
+      text-decoration: none;
     }
 
-    #formulario-triagem{
-      scroll-margin-top:100px;
+    .brand-mark img {
+      width: 40px;
+      height: 40px;
     }
 
-    .login-main{
-      padding:clamp(2rem, 5vw, 4rem) 0 5rem;
-      background:transparent;
+    .brand-copy strong {
+      display: block;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--ink);
     }
 
-    .triage-layout{
-      display:grid;
-      grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
-      gap:1.5rem;
-      align-items:start;
+    .brand-copy small {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
     }
 
-    .eyebrow{
-      background:rgba(255,250,242,.95);
-      border:1px solid rgba(171,132,63,.28);
-      color:#8b672d;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+    .nav-actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
     }
 
-    .triage-copy h1,
-    .triage-form-card h2{
-      color:var(--ink);
-      letter-spacing:-.04em;
+    .menu-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      width: 24px;
+      height: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
     }
 
-    .body-copy,
-    .triage-copy p,
-    .triage-form-card p,
-    .timeline-item p,
-    .mini-note,
-    .field-group label{
-      color:var(--muted);
+    .menu-toggle span {
+      width: 100%;
+      height: 2px;
+      background: var(--ink);
+      transition: all 0.3s ease;
     }
 
-    .timeline{
-      display:grid;
-      gap:1rem;
-      margin-top:1.75rem;
-    }
-
-    .timeline-item{
-      padding:1.15rem 1.2rem;
-      border-radius:22px;
-      background:linear-gradient(135deg, rgba(255,251,244,.95), rgba(245,236,220,.85));
-      border:1px solid rgba(171,132,63,.20);
-      box-shadow:0 14px 34px rgba(44,32,15,.05);
-    }
-
-    .timeline-item strong,
-    .stack-card strong{
-      color:var(--ink);
-    }
-
-    .stack-card{
-      margin-top:1.25rem;
-      padding:1.25rem;
-      border-radius:24px;
-      background:linear-gradient(135deg, rgba(255,248,236,.96), rgba(242,232,214,.90));
-      border:1px solid rgba(171,132,63,.22);
-      box-shadow:0 18px 40px rgba(44,32,15,.06);
-    }
-
-    .field-group input,
-    .field-group select,
-    .field-group textarea{
-      background:rgba(255,255,255,.95);
-      border:1px solid rgba(161,129,72,.22);
-      color:var(--ink);
-      box-shadow:inset 0 1px 2px rgba(25,18,9,.04);
-    }
-
-    .field-group input::placeholder,
-    .field-group textarea::placeholder{
-      color:#9a8d7b;
-    }
-
-    .field-group input:focus,
-    .field-group select:focus,
-    .field-group textarea:focus{
-      outline:none;
-      border-color:rgba(184,138,59,.55);
-      box-shadow:0 0 0 4px rgba(184,138,59,.12);
-    }
-
-    .btn{
-      box-shadow:none;
-    }
-
-    .btn-primary{
-      background:linear-gradient(135deg, #c39a55 0%, #a9792d 100%);
-      color:#fffaf0;
-      border:1px solid rgba(137,95,29,.35);
-      box-shadow:0 20px 40px rgba(146,102,37,.20);
-    }
-
-    .btn-primary:hover{
-      transform:translateY(-1px);
-      box-shadow:0 24px 44px rgba(146,102,37,.24);
-    }
-
-    .btn-secondary{
-      background:rgba(255,250,242,.9);
-      color:var(--ink);
-      border:1px solid rgba(171,132,63,.24);
-    }
-
-    .form-status{
-      color:#7a623f;
-    }
-
-    .triage-trust-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px 16px;
-      margin-top:1.35rem;
-      padding:0;
-      list-style:none;
-    }
-
-    .triage-trust-row li{
-      font-size:0.88rem;
-      color:var(--muted);
-      padding:0.45rem 0.75rem;
-      border-radius:999px;
-      border:1px solid rgba(171,132,63,.22);
-      background:rgba(255,252,246,.9);
-    }
-
-    .triage-trust-row strong{
-      color:var(--ink);
-      font-weight:700;
-    }
-
-    @media (max-width: 980px){
-      .triage-layout{
-        grid-template-columns:1fr;
+    @media (max-width: 768px) {
+      .nav-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        padding: 1rem;
       }
-      .header{
-        position:relative;
+      
+      .nav-menu.active {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
       }
-
-      .header-inner .nav-actions{
-        flex-wrap:wrap;
-        justify-content:flex-end;
-        gap:8px;
+      
+      .menu-toggle {
+        display: flex;
       }
-
-      .header-inner .nav-actions .btn{
-        min-height:48px;
-        font-size:0.8rem;
-        padding:0 12px;
+      
+      .nav-actions {
+        display: none;
       }
     }
   </style>
-
 </head>
 <body>
   <div class="page-shell">
@@ -273,7 +310,7 @@
     </div>
 
     <header class="header">
-      <div class="container header-inner">
+      <div class="header-content">
         <a class="brand" href="index.html" aria-label="Página inicial">
           <div class="brand-mark">
             <img src="logo.png" alt="Logo Noêmia Paixão Advocacia" />
@@ -284,14 +321,9 @@
           </div>
         </a>
 
-        <button
-          class="menu-toggle"
-          type="button"
-          data-menu-toggle
-          aria-label="Abrir menu"
-          aria-expanded="false"
-          aria-controls="triageMenu"
-        >
+        <button class="menu-toggle" type="button" aria-label="Abrir menu">
+          <span></span>
+          <span></span>
           <span></span>
         </button>
 
@@ -309,130 +341,177 @@
       </div>
     </header>
 
-    <main class="login-main">
-      <div class="container triage-layout">
-        <section class="triage-copy glass-card">
-          <span class="eyebrow" id="triageEyebrow">Pré-atendimento jurídico</span>
-          <h1 id="triageTitle">Conte o essencial do seu caso antes de falar com a equipe.</h1>
-          <p class="body-copy" id="triageIntro">
-            Este formulário ajuda a organizar as informações iniciais, filtrar melhor a demanda e tornar o primeiro
-            contato pelo WhatsApp mais produtivo para você e para a Dra. Noêmia.
-          </p>
-
-          <ul class="triage-trust-row" aria-label="Compromissos do escritório">
-            <li><strong>OAB/RN 3939</strong> — atendimento profissional</li>
-            <li><strong>Triagem gratuita</strong> — sem custo para organizar o primeiro contato</li>
-            <li><strong>Resposta humana</strong> — equipe lê o contexto antes de responder</li>
-          </ul>
-
-          <div class="timeline">
-            <article class="timeline-item">
-              <strong>1. Você preenche a triagem</strong>
-              <p id="timelineStep1">São solicitados apenas os dados necessários para entender melhor o contexto inicial do problema.</p>
-            </article>
-
-            <article class="timeline-item">
-              <strong>2. O WhatsApp é aberto com mensagem pronta</strong>
-              <p id="timelineStep2">A triagem é convertida em uma mensagem organizada, com área jurídica, urgência e resumo do caso.</p>
-            </article>
-
-            <article class="timeline-item">
-              <strong>3. O atendimento começa com mais critério</strong>
-              <p id="timelineStep3">A equipe recebe contexto melhor, consegue filtrar prioridades e orientar os próximos passos com mais clareza.</p>
-            </article>
-          </div>
-
-          <div class="stack-card">
-            <strong>Indicação automática da área</strong>
-            <p class="body-copy" id="stackCardCopy">
-              Se você chegou a partir de uma área ou artigo específico, o tipo de problema já pode vir sugerido para agilizar a triagem.
+    <main>
+      <section class="internal-hero triage-hero">
+        <div class="internal-hero-grid">
+          <div class="internal-hero-copy">
+            <span class="eyebrow" id="triageEyebrow">Pré-atendimento jurídico</span>
+            <h1 id="triageTitle">Conte o essencial do seu caso antes de falar com a equipe.</h1>
+            <p id="triageIntro">
+              Este formulário ajuda a organizar as informações iniciais, filtrar melhor a demanda e tornar o primeiro
+              contato pelo WhatsApp mais produtivo para você e para a Dra. Noêmia.
             </p>
-            <div class="pill-row">
-              <span id="triageAreaBadge">Atendimento geral</span>
-              <span id="triageOriginBadge">Origem do contato</span>
+
+            <div class="trust-badges" aria-label="Compromissos do escritório">
+              <span class="trust-badge"><strong>OAB/RN 3939</strong> — atendimento profissional</span>
+              <span class="trust-badge"><strong>Triagem gratuita</strong> — sem custo para organizar o primeiro contato</span>
+              <span class="trust-badge"><strong>Resposta humana</strong> — equipe lê o contexto antes de responder</span>
+            </div>
+
+            <div class="timeline">
+              <article class="timeline-item">
+                <strong>1. Você preenche a triagem</strong>
+                <p id="timelineStep1">São solicitados apenas os dados necessários para entender melhor o contexto inicial do problema.</p>
+              </article>
+
+              <article class="timeline-item">
+                <strong>2. O WhatsApp é aberto com mensagem pronta</strong>
+                <p id="timelineStep2">A triagem é convertida em uma mensagem organizada, com área jurídica, urgência e resumo do caso.</p>
+              </article>
+
+              <article class="timeline-item">
+                <strong>3. O atendimento começa com mais critério</strong>
+                <p id="timelineStep3">A equipe recebe contexto melhor, consegue filtrar prioridades e orientar os próximos passos com mais clareza.</p>
+              </article>
+            </div>
+
+            <div class="stack-card">
+              <h3>Indicação automática da área</h3>
+              <p id="stackCardCopy">
+                Se você chegou a partir de uma área ou artigo específico, o tipo de problema já pode vir sugerido para agilizar a triagem.
+              </p>
+              <div class="pill-row">
+                <span class="badge" id="triageAreaBadge">Atendimento geral</span>
+                <span class="badge" id="triageOriginBadge">Origem do contato</span>
+              </div>
             </div>
           </div>
-        </section>
 
-        <section class="triage-form-card glass-card" id="formulario-triagem">
-          <span class="eyebrow">Formulário de triagem</span>
-          <h2 id="formTitle">Falar com a especialista pelo WhatsApp</h2>
-          <p class="body-copy" id="formIntro">
-            Preencha os campos com calma. Ao enviar, abrimos o WhatsApp com uma mensagem já redigida — você só confirma o envio.
-            Isso agiliza a análise inicial e evita que informações importantes se percam no chat.
-          </p>
+          <div class="internal-hero-visual">
+            <div class="card" id="formulario-triagem">
+              <span class="eyebrow">Formulário de triagem</span>
+              <h2 id="formTitle">Falar com a especialista pelo WhatsApp</h2>
+              <p id="formIntro">
+                Preencha os campos com calma. Ao enviar, abrimos o WhatsApp com uma mensagem já redigida — você só confirma o envio.
+                Isso agiliza a análise inicial e evita que informações importantes se percam no chat.
+              </p>
 
-          <form class="triage-form" data-triage-form>
-            <div class="field-grid">
-              <div class="field-group">
-                <label for="leadName">Nome</label>
-                <input id="leadName" name="name" type="text" placeholder="Seu nome completo" required />
-              </div>
+              <form class="triage-form" data-triage-form>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="leadName">Nome</label>
+                    <input class="form-input" id="leadName" name="name" type="text" placeholder="Seu nome completo" required />
+                  </div>
 
-              <div class="field-group">
-                <label for="leadPhone">Telefone</label>
-                <input id="leadPhone" name="phone" type="tel" placeholder="(84) 99999-9999" required />
-              </div>
+                  <div class="form-group">
+                    <label for="leadPhone">Telefone</label>
+                    <input class="form-input" id="leadPhone" name="phone" type="tel" placeholder="(84) 99999-9999" required />
+                  </div>
+                </div>
+
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="leadCity">Cidade</label>
+                    <input class="form-input" id="leadCity" name="city" type="text" placeholder="Cidade e estado" required />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="leadProblemType">Tipo de problema</label>
+                    <select class="form-select" id="leadProblemType" name="problem_type" required>
+                      <option value="">Selecione</option>
+                      <option value="previdenciario">Direito Previdenciário</option>
+                      <option value="consumidor-bancario">Direito do Consumidor e Bancário</option>
+                      <option value="consumidor">Direito do Consumidor</option>
+                      <option value="bancario">Direito Bancário</option>
+                      <option value="familia">Direito de Família</option>
+                      <option value="civil">Direito Civil</option>
+                      <option value="outro">Outro assunto jurídico</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="leadDescription" id="descriptionLabel">Breve descrição</label>
+                  <textarea
+                    class="form-textarea"
+                    id="leadDescription"
+                    name="description"
+                    rows="6"
+                    placeholder="Explique de forma resumida o que aconteceu, há quanto tempo e o que mais preocupa você neste momento."
+                    required
+                  ></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label for="leadUrgency">Urgência</label>
+                  <select class="form-select" id="leadUrgency" name="urgency" required>
+                    <option value="">Selecione</option>
+                    <option value="alta">Alta: existe prazo, bloqueio, desconto atual ou situação urgente</option>
+                    <option value="media">Média: preciso de orientação em breve</option>
+                    <option value="baixa">Baixa: quero entender meus direitos e avaliar o caso</option>
+                  </select>
+                </div>
+
+                <input type="hidden" name="area" value="geral" data-triage-area-input />
+                <input type="hidden" name="source" value="site" data-triage-source-input />
+                <input type="hidden" name="page" value="triagem.html" data-triage-page-input />
+                <input type="hidden" name="campaign" value="" data-triage-campaign-input />
+                <input type="hidden" name="video" value="" data-triage-video-input />
+
+                <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar e abrir WhatsApp com a mensagem pronta</button>
+                <div class="form-status" data-triage-status role="status" aria-live="polite"></div>
+              </form>
+
+              <p class="mini-note" id="miniNote">
+                A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba seu caso com mais contexto.
+              </p>
             </div>
-
-            <div class="field-grid">
-              <div class="field-group">
-                <label for="leadCity">Cidade</label>
-                <input id="leadCity" name="city" type="text" placeholder="Cidade e estado" required />
-              </div>
-
-              <div class="field-group">
-                <label for="leadProblemType">Tipo de problema</label>
-                <select id="leadProblemType" name="problem_type" required>
-                  <option value="">Selecione</option>
-                  <option value="previdenciario">Direito Previdenciário</option>
-                  <option value="consumidor-bancario">Direito do Consumidor e Bancário</option>
-                  <option value="consumidor">Direito do Consumidor</option>
-                  <option value="bancario">Direito Bancário</option>
-                  <option value="familia">Direito de Família</option>
-                  <option value="civil">Direito Civil</option>
-                  <option value="outro">Outro assunto jurídico</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="field-group">
-              <label for="leadDescription" id="descriptionLabel">Breve descrição</label>
-              <textarea
-                id="leadDescription"
-                name="description"
-                rows="6"
-                placeholder="Explique de forma resumida o que aconteceu, há quanto tempo e o que mais preocupa você neste momento."
-                required
-              ></textarea>
-            </div>
-
-            <div class="field-group">
-              <label for="leadUrgency">Urgência</label>
-              <select id="leadUrgency" name="urgency" required>
-                <option value="">Selecione</option>
-                <option value="alta">Alta: existe prazo, bloqueio, desconto atual ou situação urgente</option>
-                <option value="media">Média: preciso de orientação em breve</option>
-                <option value="baixa">Baixa: quero entender meus direitos e avaliar o caso</option>
-              </select>
-            </div>
-
-            <input type="hidden" name="area" value="geral" data-triage-area-input />
-            <input type="hidden" name="source" value="site" data-triage-source-input />
-            <input type="hidden" name="page" value="triagem.html" data-triage-page-input />
-            <input type="hidden" name="campaign" value="" data-triage-campaign-input />
-            <input type="hidden" name="video" value="" data-triage-video-input />
-
-            <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar e abrir WhatsApp com a mensagem pronta</button>
-            <div class="form-status" data-triage-status role="status" aria-live="polite"></div>
-          </form>
-
-          <p class="mini-note" id="miniNote">
-            A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba seu caso com mais contexto.
-          </p>
-        </section>
-      </div>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>Noêmia Paixão Advocacia</h3>
+          <p>Atendimento jurídico estratégico com clareza, técnica e organização para casos previdenciários, bancários, familiares e cíveis.</p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Áreas de Atuação</h3>
+          <p><a href="direito-previdenciario.html">Direito Previdenciário</a></p>
+          <p><a href="direito-consumidor-bancario.html">Direito do Consumidor e Bancário</a></p>
+          <p><a href="direito-familia.html">Direito de Família</a></p>
+          <p><a href="direito-civil.html">Direito Civil</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Links Úteis</h3>
+          <p><a href="blog.html">Blog Jurídico</a></p>
+          <p><a href="triagem.html">Triagem Inicial</a></p>
+          <p><a href="https://portal.advnoemia.com.br/portal/login">Área do Cliente</a></p>
+          <p><a href="https://portal.advnoemia.com.br/documentos">Documentos</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Contato</h3>
+          <p>Natal/RN - Atendimento Online</p>
+          <p>OAB/RN 3939</p>
+          <p><a href="triagem.html">Agende sua triagem</a></p>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <div>© 2026 • Noêmia Paixão Advocacia • Todos os direitos reservados • OAB/RN 3939.</div>
+        <div class="footer-links">
+          <a href="blog.html">Blog</a>
+          <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
+          <a href="https://portal.advnoemia.com.br/documentos">Documentos</a>
+          <a href="https://portal.advnoemia.com.br/agenda">Agenda</a>
+        </div>
+      </div>
+    </footer>
   </div>
 
   <script src="assets/js/premium-system.js"></script>
@@ -658,62 +737,12 @@
         miniNote.textContent = "A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba sua situação previdenciária com mais contexto.";
       }
     })();
-  </script>
-  <script>
-  (function () {
-    // O envio principal da triagem e tratado por assets/js/contact-capture.js.
-    // Este bloco legado permanece apenas para preservar compatibilidade do template.
-    return;
 
-    const whatsappNumber = "5584996248241"; // TROQUE pelo número real com DDI e DDD
-
-    function normalize(text) {
-      return (text || "").toString().trim();
-    }
-
-    function optionText(select) {
-      if (!select) return "";
-      const option = select.options[select.selectedIndex];
-      return option ? option.textContent.trim() : "";
-    }
-
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-
-      const name = normalize(form.elements["name"]?.value);
-      const phone = normalize(form.elements["phone"]?.value);
-      const city = normalize(form.elements["city"]?.value);
-      const problemType = optionText(form.elements["problem_type"]);
-      const description = normalize(form.elements["description"]?.value);
-      const urgency = optionText(form.elements["urgency"]);
-      const area = normalize(form.elements["area"]?.value || "geral");
-      const source = normalize(form.elements["source"]?.value || "site");
-      const page = normalize(form.elements["page"]?.value || "triagem.html");
-
-      const message =
-`Olá, Dra. Noêmia! Vim pela triagem do site e gostaria de atendimento.
-
-*Dados iniciais*
- Nome: ${name}
- Telefone: ${phone}
- Cidade: ${city}
-
-*Contexto do caso*
- Área sugerida: ${problemType || area}
- Urgência: ${urgency}
- Origem: ${source}
- Página: ${page}
-
-*Resumo do problema*
-${description}
-
-Fico no aguardo das orientações sobre os próximos passos.`;
-
-      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-      window.location.href = url;
+    // Menu toggle functionality
+    document.querySelector('.menu-toggle').addEventListener('click', function() {
+      document.querySelector('.nav-menu').classList.toggle('active');
     });
-  })();
-</script>
+  </script>
 </body>
 </html>
 

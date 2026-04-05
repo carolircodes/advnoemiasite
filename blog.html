@@ -1,13 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <link rel="icon" href="logo.png" type="image/png">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Blog Jurídico | Noêmia Paixão Advocacia</title>
   <meta name="description" content="Conteúdo jurídico com clareza e responsabilidade para orientar decisões em temas previdenciários, bancários, familiares e cíveis." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
-  <meta name="theme-color" content="#0c100d" />
+  <meta name="theme-color" content="#f6f1e8" />
   <link rel="canonical" href="https://advnoemia.com.br/blog.html" />
   <meta property="og:locale" content="pt_BR" />
   <meta property="og:title" content="Blog Jurídico | Noêmia Paixão Advocacia" />
@@ -19,1274 +18,484 @@
   <meta name="twitter:title" content="Blog Jurídico | Noêmia Paixão Advocacia" />
   <meta name="twitter:description" content="Artigos jurídicos para orientar com clareza, estratégia e responsabilidade antes de decisões importantes." />
   <meta name="twitter:image" content="https://advnoemia.com.br/mae.jpeg" />
+  <link rel="icon" href="logo.png" type="image/png" />
+  <link rel="stylesheet" href="assets/css/internal-pages.css" />
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
+  <link rel="stylesheet" href="assets/css/premium-system.css" />
 
   <style>
-    :root {
-      --bg: #0b0f0d;
-      --bg-soft: #121814;
-      --bg-elevated: #182019;
-      --card: rgba(255,255,255,0.04);
-      --card-strong: rgba(255,255,255,0.06);
-      --gold: #c8a96b;
-      --gold-strong: #e2c78f;
-      --gold-soft: rgba(200,169,107,0.18);
-      --text: #f6f2ea;
-      --muted: #d5ccbc;
-      --muted-2: rgba(255,255,255,0.72);
-      --line: rgba(200,169,107,0.22);
-      --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
-      --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.24);
-      --radius: 26px;
-      --max: 1200px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
-      color: var(--text);
+    /* Especificidades da página de blog */
+    .blog-hero::before {
       background:
-        radial-gradient(circle at top right, rgba(200,169,107,0.08), transparent 20%),
-        radial-gradient(circle at left 25%, rgba(9,30,20,0.28), transparent 30%),
-        linear-gradient(180deg, #0c100d 0%, #080b09 100%);
-      overflow-x: hidden;
+        radial-gradient(circle at 12% 18%, rgba(234, 215, 175, 0.15), transparent 0 24%),
+        radial-gradient(circle at 82% 14%, rgba(181, 141, 73, 0.18), transparent 0 18%),
+        linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0));
     }
 
-    body.menu-open {
-      overflow: hidden;
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    img {
-      max-width: 100%;
-      display: block;
-    }
-
-    .container {
-      width: min(calc(100% - 32px), var(--max));
-      margin: 0 auto;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.02);
-      color: var(--gold);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-
-    .topbar {
-      background: linear-gradient(90deg, rgba(200,169,107,0.12), rgba(255,255,255,0.02), rgba(200,169,107,0.08));
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
-      letter-spacing: 0.05em;
-    }
-
-    .topbar-inner {
-      min-height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      padding: 6px 0;
-    }
-
-    .topbar-note {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .topbar-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      background: var(--gold-strong);
-      box-shadow: 0 0 12px rgba(226,199,143,0.45);
-      flex-shrink: 0;
-    }
-
-    .topbar-links {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      flex-wrap: wrap;
-    }
-
-    .topbar a {
-      color: var(--muted);
-      transition: 0.2s ease;
-    }
-
-    .topbar a:hover {
-      color: var(--gold-strong);
-    }
-
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(8, 11, 9, 0.82);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-
-    .nav-inner {
-      min-height: 78px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      position: relative;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      min-width: 0;
-      flex: 1;
-    }
-
-    .brand-mark {
-      width: auto;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .brand-mark img {
-      height: 42px;
-      width: auto;
-    }
-
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      line-height: 1.05;
-      min-width: 0;
-    }
-
-    .brand-text strong {
-      color: var(--gold);
-      font-size: 20px;
-      font-weight: 500;
-      letter-spacing: 0.01em;
-      margin: 0 0 4px 0;
-      white-space: nowrap;
-    }
-
-    .brand-text small {
-      color: #ffffff;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 8px;
-      font-weight: 500;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      margin: 0;
-      white-space: nowrap;
-      opacity: 0.9;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 28px;
-      color: rgba(255,255,255,0.82);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 13px;
-    }
-
-    .nav-links a {
-      transition: 0.2s ease;
-      position: relative;
-      padding: 4px 0;
-    }
-
-    .nav-links a:hover,
-    .nav-links a.active {
-      color: var(--gold-strong);
-    }
-
-    .nav-links a::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      bottom: -6px;
-      width: 0;
-      height: 1px;
-      background: var(--gold-strong);
-      transition: width 0.25s ease;
-    }
-
-    .nav-links a:hover::after,
-    .nav-links a.active::after {
-      width: 100%;
-    }
-
-    .nav-cta-wrap {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 50px;
-      padding: 0 22px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      transition: 0.25s ease;
-      cursor: pointer;
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    .btn:hover {
-      transform: translateY(-2px);
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #b9965a, #e2c98f);
-      color: #15110c;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 10px 24px rgba(200,169,107,0.16);
-    }
-
-    .btn-primary:hover {
-      box-shadow: 0 16px 30px rgba(200,169,107,0.24);
-    }
-
-    .btn-secondary {
-      background: rgba(255,255,255,0.02);
-      color: var(--text);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255,255,255,0.06);
-    }
-
-    .menu-toggle {
-      display: none;
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.03);
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .menu-toggle span,
-    .menu-toggle span::before,
-    .menu-toggle span::after {
-      content: "";
-      display: block;
-      width: 20px;
-      height: 2px;
-      background: #fff;
-      border-radius: 2px;
-      position: relative;
-      transition: 0.25s ease;
-    }
-
-    .menu-toggle span::before {
-      position: absolute;
-      top: -6px;
-    }
-
-    .menu-toggle span::after {
-      position: absolute;
-      top: 6px;
-    }
-
-    .menu-toggle.active span {
-      background: transparent;
-    }
-
-    .menu-toggle.active span::before {
-      top: 0;
-      transform: rotate(45deg);
-    }
-
-    .menu-toggle.active span::after {
-      top: 0;
-      transform: rotate(-45deg);
-    }
-
-    .hero {
-      position: relative;
-      padding: 100px 0 58px;
-      overflow: hidden;
-    }
-
-    .hero::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(circle at 10% 20%, rgba(200,169,107,0.08), transparent 25%),
-        radial-gradient(circle at 90% 10%, rgba(200,169,107,0.05), transparent 22%);
-      pointer-events: none;
-    }
-
-    .hero-wrap {
-      position: relative;
-      z-index: 2;
-      text-align: center;
-      max-width: 940px;
-      margin: 0 auto;
-    }
-
-    .hero h1 {
-      margin: 20px 0 18px;
-      font-size: clamp(42px, 6vw, 74px);
-      line-height: 0.96;
-      letter-spacing: -0.04em;
-    }
-
-    .hero h1 span {
-      color: var(--gold-strong);
-    }
-
-    .hero p {
-      margin: 0 auto 28px;
-      max-width: 760px;
-      color: var(--muted);
-      font-size: 18px;
-      line-height: 1.72;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-
-    .hero-actions {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin-bottom: 26px;
-    }
-
-    .hero-mini {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .hero-mini span {
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.03);
-      color: var(--muted-2);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
-    }
-
-    section {
-      padding: 38px 0;
-    }
-
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 20px;
-      margin-bottom: 26px;
-    }
-
-    .section-head h2 {
-      margin: 0;
-      font-size: clamp(32px, 5vw, 56px);
-      line-height: 0.98;
-    }
-
-    .section-head p {
-      max-width: 560px;
-      margin: 0;
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.75;
-      font-size: 16px;
-    }
-
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 26px;
-    }
-
-    .filter-chip {
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.02);
-      color: var(--muted-2);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      transition: 0.25s ease;
-    }
-
-    .filter-chip:hover {
-      border-color: rgba(226,199,143,0.26);
-      color: var(--gold-strong);
-      background: rgba(255,255,255,0.04);
-    }
-
-    .featured {
-      display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .featured-main,
-    .featured-side {
-      min-height: 100%;
-    }
-
-    .featured-main {
-      position: relative;
-      padding: 34px;
-      border-radius: 30px;
-      background:
-        radial-gradient(circle at top right, rgba(200,169,107,0.16), transparent 24%),
-        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255,255,255,0.05);
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-      justify-content: end;
-      overflow: hidden;
-    }
-
-    .featured-main::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(to bottom, rgba(8,11,9,0.06), rgba(8,11,9,0.72)),
-        url('mae.jpeg') center center / cover no-repeat;
-      opacity: 0.22;
-      pointer-events: none;
-    }
-
-    .featured-main > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .featured-label {
-      display: inline-flex;
-      width: fit-content;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.04);
-      color: var(--gold-strong);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      margin-bottom: 18px;
-    }
-
-    .featured-main h3 {
-      margin: 0 0 12px;
-      font-size: clamp(30px, 4vw, 46px);
-      line-height: 0.98;
-      max-width: 700px;
-    }
-
-    .featured-main p {
-      margin: 0 0 22px;
-      max-width: 700px;
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 16px;
-      line-height: 1.78;
-    }
-
-    .featured-side {
-      display: grid;
-      gap: 18px;
-    }
-
-    .mini-feature {
-      padding: 24px;
-      border-radius: 26px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255,255,255,0.05);
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .mini-feature h3 {
-      margin: 0 0 10px;
-      font-size: 27px;
-      line-height: 1.08;
-    }
-
-    .mini-feature p {
-      margin: 0 0 18px;
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 15px;
-      line-height: 1.72;
+    .blog-hero::after {
+      background: radial-gradient(circle, rgba(181,141,73,0.15) 0%, rgba(181,141,73,0) 68%);
     }
 
     .blog-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+      margin-top: 3rem;
     }
 
-    .article-card {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: 330px;
-      padding: 26px;
-      border-radius: 28px;
-      background:
-        radial-gradient(circle at top right, rgba(200,169,107,0.14), transparent 22%),
-        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255,255,255,0.05);
-      box-shadow: var(--shadow);
+    .blog-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
       overflow: hidden;
-      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      transition: all 0.3s ease;
+      cursor: pointer;
     }
 
-    .article-card:hover {
-      transform: translateY(-6px);
-      border-color: rgba(226,199,143,0.24);
-      box-shadow: 0 28px 70px rgba(0,0,0,0.34);
-    }
-
-    .article-card .category {
-      display: inline-flex;
-      align-items: center;
-      width: fit-content;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      color: var(--gold-strong);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      background: rgba(255,255,255,0.02);
-      margin-bottom: 18px;
-    }
-
-    .article-card h3 {
-      margin: 0 0 12px;
-      font-size: 28px;
-      line-height: 1.08;
-    }
-
-    .article-card p {
-      margin: 0 0 22px;
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.76;
-      font-size: 15px;
-    }
-
-    .article-card .read-more {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--gold-strong);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-    }
-
-    .cta {
-      display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      gap: 24px;
-      align-items: center;
-      padding: 40px;
-      border-radius: 34px;
-      background:
-        linear-gradient(135deg, rgba(200,169,107,0.18), rgba(255,255,255,0.02)),
-        rgba(255,255,255,0.03);
-      border: 1px solid var(--line);
+    .blog-card:hover {
+      transform: translateY(-4px);
       box-shadow: var(--shadow);
-      margin-top: 12px;
     }
 
-    .cta h2 {
-      margin: 14px 0 14px;
-      font-size: clamp(34px, 5vw, 58px);
-      line-height: 0.96;
-    }
-
-    .cta p {
-      margin: 0;
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.82;
-      font-size: 16px;
-    }
-
-    .cta-box {
-      padding: 26px;
-      border-radius: 24px;
-      background: rgba(8,10,9,0.46);
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-
-    .cta-box strong {
-      display: block;
-      margin-bottom: 10px;
-      font-size: 24px;
-    }
-
-    .cta-box span {
-      display: block;
-      margin-bottom: 18px;
-      color: var(--muted);
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.75;
-    }
-
-    .footer {
-      padding: 34px 0 112px;
-      color: rgba(255,255,255,0.62);
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 14px;
-    }
-
-    .footer-main {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr 0.9fr;
-      gap: 18px;
-      margin-bottom: 24px;
-    }
-
-    .footer-card {
-      padding: 22px;
-      border-radius: 24px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .footer-card strong {
-      display: block;
-      margin-bottom: 10px;
-      color: var(--gold-strong);
-      font-size: 18px;
-      font-family: Georgia, "Times New Roman", serif;
-    }
-
-    .footer-card p,
-    .footer-card a {
-      color: rgba(255,255,255,0.7);
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.72;
-      font-size: 14px;
-    }
-
-    .footer-links {
-      display: grid;
-      gap: 10px;
-    }
-
-    .footer-links a:hover {
-      color: var(--gold-strong);
-    }
-
-    .footer-bar {
-      padding-top: 24px;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 14px;
-    }
-
-    .whatsapp-float {
-      position: fixed;
-      right: 18px;
-      bottom: 88px;
-      width: 58px;
-      height: 58px;
-      border-radius: 999px;
+    .blog-card-image {
+      height: 200px;
+      background: linear-gradient(135deg, var(--gold-soft), var(--surface));
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 90;
-      background: linear-gradient(135deg, #d8bc81, #b58f52);
-      box-shadow: 0 14px 30px rgba(0,0,0,0.24);
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--gold);
     }
 
-    .whatsapp-float img {
-      width: 26px;
-      height: 26px;
+    .blog-card-content {
+      padding: 1.5rem;
     }
 
-    .mobile-cta-bar {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 95;
-      display: none;
-      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-      background: rgba(8,11,9,0.92);
-      backdrop-filter: blur(14px);
-      border-top: 1px solid rgba(255,255,255,0.08);
+    .blog-card-category {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: var(--gold-soft);
+      color: var(--ink);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
     }
 
-    .mobile-cta-bar .btn {
+    .blog-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      line-height: 1.3;
+      color: var(--ink);
+      margin-bottom: 0.75rem;
+    }
+
+    .blog-card p {
+      color: var(--ink-soft);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .blog-card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+    }
+
+    .blog-card-date {
+      font-weight: 500;
+    }
+
+    .blog-card-read-time {
+      opacity: 0.7;
+    }
+
+    .blog-categories {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 2rem 0;
+    }
+
+    .category-filter {
+      padding: 0.5rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .category-filter:hover,
+    .category-filter.active {
+      background: var(--gold);
+      color: white;
+      border-color: var(--gold);
+    }
+
+    .blog-search {
+      max-width: 500px;
+      margin: 0 auto 3rem;
+    }
+
+    .search-input {
       width: 100%;
-      min-height: 52px;
+      padding: 1rem 1.5rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 1rem;
+      transition: all 0.3s ease;
     }
 
-    @media (max-width: 1080px) {
-      .featured,
-      .cta,
-      .footer-main {
-        grid-template-columns: 1fr;
-      }
-
-      .blog-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    .search-input:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(181, 141, 73, 0.1);
     }
 
-    @media (max-width: 860px) {
-      .menu-toggle {
-        display: inline-flex;
-      }
-
-      .nav-cta {
-        display: none;
-      }
-
-      .nav-links {
-        position: fixed;
-        inset: 119px 12px auto 12px;
-        display: none;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-        padding: 12px;
-        background: rgba(10, 14, 12, 0.98);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 22px;
-        box-shadow: var(--shadow-soft);
-        max-height: calc(100vh - 150px);
-        overflow-y: auto;
-      }
-
-      .nav-links.open {
-        display: flex;
-      }
-
-      .nav-links a {
-        width: 100%;
-        padding: 14px 14px;
-        border-radius: 14px;
-      }
-
-      .nav-links a::after {
-        display: none;
-      }
-
-      .nav-links a:hover,
-      .nav-links a.active {
-        background: rgba(255,255,255,0.04);
-      }
+    .blog-featured {
+      margin-bottom: 4rem;
     }
 
-    @media (max-width: 760px) {
-      .container {
-        width: min(calc(100% - 24px), var(--max));
-      }
+    .featured-card {
+      background: var(--surface-strong);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      min-height: 400px;
+    }
 
-      .topbar-inner {
-        justify-content: center;
-        text-align: center;
-      }
+    .featured-image {
+      background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: var(--font-display);
+      font-size: 3rem;
+    }
 
-      .topbar-links {
-        justify-content: center;
-      }
+    .featured-content {
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
 
-      .brand-mark img {
-        height: 36px;
-      }
+    .featured-content .eyebrow {
+      margin-bottom: 1rem;
+    }
 
-      .brand-text strong {
-        font-size: 15px;
-        white-space: normal;
-      }
+    .featured-content h2 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      line-height: 1.2;
+      color: var(--ink);
+      margin-bottom: 1rem;
+    }
 
-      .brand-text small {
-        font-size: 6px;
-        letter-spacing: 0.14em;
-        white-space: normal;
-      }
+    .featured-content p {
+      color: var(--ink-soft);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
 
-      .hero {
-        padding-top: 56px;
-        padding-bottom: 42px;
-      }
-
-      .hero h1 {
-        font-size: clamp(34px, 11vw, 50px);
-        line-height: 1.02;
-        margin: 18px 0 18px;
-      }
-
-      .hero p {
-        font-size: 16px;
-        line-height: 1.75;
-      }
-
-      .hero-actions {
-        flex-direction: column;
-      }
-
-      .hero-actions .btn {
-        width: 100%;
-      }
-
-      .section-head {
-        flex-direction: column;
-        align-items: start;
-        margin-bottom: 22px;
-      }
-
-      .section-head h2 {
-        font-size: clamp(28px, 9vw, 40px);
-      }
-
-      .featured-main,
-      .mini-feature,
-      .article-card,
-      .cta,
-      .cta-box {
-        padding: 22px;
-      }
-
-      .featured-main h3,
-      .mini-feature h3,
-      .article-card h3 {
-        font-size: 24px;
-      }
-
+    @media (max-width: 768px) {
       .blog-grid {
         grid-template-columns: 1fr;
+        gap: 1.5rem;
       }
-
-      .whatsapp-float {
-        width: 56px;
-        height: 56px;
-        right: 14px;
-        bottom: 82px;
+      
+      .featured-card {
+        grid-template-columns: 1fr;
+        min-height: auto;
       }
-
-      .mobile-cta-bar {
-        display: block;
+      
+      .featured-image {
+        height: 200px;
       }
-
-      .footer {
-        padding-bottom: 124px;
+      
+      .featured-content {
+        padding: 2rem;
       }
-    }
-
-    @media (max-width: 420px) {
-      .brand {
-        gap: 10px;
-      }
-
-      .brand-text strong {
-        font-size: 14px;
-      }
-
-      .btn {
-        min-height: 48px;
-        padding: 0 18px;
-        font-size: 12px;
-      }
-
-      .eyebrow {
-        font-size: 10px;
-        padding: 8px 12px;
-      }
-
-      .article-card p,
-      .featured-main p,
-      .mini-feature p,
-      .cta p {
-        font-size: 14px;
+      
+      .featured-content h2 {
+        font-size: 1.5rem;
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/css/site-refinements.css" />
 </head>
 <body>
-  <div class="topbar">
-    <div class="container topbar-inner">
-      <div class="topbar-note">
-        <span class="topbar-dot"></span>
-        <span>Conteúdo jurídico para orientar com clareza antes de decisões importantes.</span>
-      </div>
-      <div class="topbar-links">
-        <a href="index.html">Início</a>
-        <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
-        <a href="#artigos">Artigos</a>
-        <a href="#contato">Contato</a>
-      </div>
-    </div>
-  </div>
+  <div class="page-shell">
+    <header class="header">
+      <div class="header-content">
+        <a class="brand" href="index.html" aria-label="Página inicial">
+          <div class="brand-mark">
+            <img src="logo.png" alt="Logo Noêmia Paixão Advocacia" />
+          </div>
+          <div class="brand-copy">
+            <strong>Noêmia Paixão Advocacia</strong>
+            <small>Blog Jurídico</small>
+          </div>
+        </a>
 
-  <nav class="nav">
-    <div class="container nav-inner">
-      <a class="brand" href="index.html" aria-label="Ir para a página inicial">
-        <div class="brand-mark">
-          <img src="logo.png" alt="Logo Noêmia Paixão Advocacia">
-        </div>
-        <div class="brand-text">
-          <strong>Noêmia Paixão Advocacia</strong>
-          <small>Atendimento Jurídico Estratégico</small>
-        </div>
-      </a>
-
-      <div class="nav-links" id="navLinks">
-        <a href="index.html">Início</a>
-        <a href="blog.html" class="active">Blog</a>
-        <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
-        <a href="#artigos">Artigos</a>
-        <a href="#contato">Contato</a>
-      </div>
-
-      <div class="nav-cta-wrap">
-            <a class="btn btn-primary nav-cta" href="triagem.html?area=geral&amp;origem=blog&amp;pagina=blog.html">Falar com a especialista</a>
-
-        <button class="menu-toggle" id="menuToggle" aria-label="Abrir menu" aria-expanded="false" aria-controls="navLinks">
+        <button class="menu-toggle" type="button" aria-label="Abrir menu">
+          <span></span>
+          <span></span>
           <span></span>
         </button>
-      </div>
-    </div>
-  </nav>
 
-  <header class="hero">
-    <div class="container hero-wrap">
-      <span class="eyebrow">Blog Jurídico</span>
-      <h1>Entenda seus <span>direitos, riscos</span> e próximos passos com clareza.</h1>
-      <p>
-        Conteúdo pensado para orientar, reduzir insegurança e ajudar você a identificar quando é o momento de buscar análise jurídica individual.
-      </p>
+        <nav class="nav-menu" id="blogMenu">
+          <a href="index.html">Home</a>
+          <a href="blog.html" class="is-active">Blog</a>
+          <a href="triagem.html">Triagem</a>
+          <a href="https://portal.advnoemia.com.br/portal/login">Área reservada</a>
+        </nav>
 
-      <div class="hero-actions">
-            <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=blog&amp;pagina=blog.html">Enviar caso para triagem</a>
-        <a class="btn btn-secondary" href="#artigos">Ler artigos estratégicos</a>
-      </div>
-
-      <div class="hero-mini">
-        <span>Previdenciário</span>
-        <span>Consumidor e Bancário</span>
-        <span>Família</span>
-        <span>Civil</span>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    <section>
-      <div class="container">
-        <div class="section-head">
-          <h2>Artigos em destaque</h2>
-          <p>
-            Seleção de conteúdos com maior demanda no atendimento, organizados para orientar com responsabilidade e facilitar a próxima decisão.
-          </p>
+        <div class="nav-actions">
+          <a class="btn btn-secondary" href="index.html">Página inicial</a>
+          <a class="btn btn-primary" href="triagem.html">Falar com especialista</a>
         </div>
+      </div>
+    </header>
 
-        <div class="featured">
-          <a class="featured-main" href="artigos/desconto-indevido-conta.html">
-            <span class="featured-label">Destaque principal</span>
-            <h3>Banco descontou dinheiro da minha conta sem autorização: o que fazer?</h3>
+    <main>
+      <section class="internal-hero blog-hero">
+        <div class="internal-hero-grid">
+          <div class="internal-hero-copy">
+            <span class="eyebrow">Conteúdo Jurídico</span>
+            <h1>Artigos para orientar suas decisões jurídicas com clareza e responsabilidade.</h1>
             <p>
-              Veja os primeiros passos, como reunir provas, quando o desconto pode ser indevido e em que momento vale buscar orientação jurídica.
-            </p>
-            <span class="read-more" style="color: var(--gold-strong); font-family: Arial, Helvetica, sans-serif; font-weight: 700;">Ler artigo completo â†’</span>
-          </a>
-
-          <div class="featured-side">
-            <a class="mini-feature" href="artigos/revisao-aposentadoria-2026.html">
-              <span class="featured-label">Previdenciário</span>
-              <h3>Quem tem direito à revisão de aposentadoria em 2026?</h3>
-              <p>Entenda em quais casos pode valer a pena analisar o benefício e buscar revisão.</p>
-              <span class="read-more" style="color: var(--gold-strong); font-family: Arial, Helvetica, sans-serif; font-weight: 700;">Ler artigo â†’</span>
-            </a>
-
-            <a class="mini-feature" href="artigos/revisao-pensao-alimenticia.html">
-              <span class="featured-label">Família</span>
-              <h3>Pensão alimentícia: quando pode pedir revisão?</h3>
-              <p>Saiba quando pode existir mudança no valor e o que costuma ser analisado nesses casos.</p>
-              <span class="read-more" style="color: var(--gold-strong); font-family: Arial, Helvetica, sans-serif; font-weight: 700;">Ler artigo â†’</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="artigos">
-      <div class="container">
-        <div class="section-head">
-          <h2>Todos os artigos</h2>
-        </div>
-
-        <div class="filters">
-          <span class="filter-chip">Visão geral</span>
-          <span class="filter-chip">Previdenciário</span>
-          <span class="filter-chip">Consumidor e Bancário</span>
-          <span class="filter-chip">Família</span>
-          <span class="filter-chip">Civil</span>
-        </div>
-
-        <div class="blog-grid">
-          <a class="article-card" href="artigos/desconto-indevido-conta.html">
-            <div>
-              <span class="category">Direito bancário</span>
-              <h3>Banco descontou dinheiro da minha conta sem autorização: o que fazer?</h3>
-              <p>Entenda os primeiros passos, como reunir provas e quando buscar orientação jurídica.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/desconto-indevido-inss.html">
-            <div>
-              <span class="category">Previdenciário</span>
-              <h3>Aposentado sofreu desconto indevido no benefício do INSS: como resolver?</h3>
-              <p>Saiba como identificar irregularidades e quando é importante agir rapidamente.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/emprestimo-consignado-indevido.html">
-            <div>
-              <span class="category">Consumidor e bancário</span>
-              <h3>Empréstimo consignado não reconhecido: quais são os seus direitos?</h3>
-              <p>Veja o que fazer ao notar contrato indevido, desconto desconhecido ou fraude.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/revisao-aposentadoria-2026.html">
-            <div>
-              <span class="category">Previdenciário</span>
-              <h3>Quem tem direito à revisão de aposentadoria em 2026?</h3>
-              <p>Veja em quais situações pode valer a pena analisar seu benefício previdenciário.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/aposentadoria-negada-inss.html">
-            <div>
-              <span class="category">Previdenciário</span>
-              <h3>Aposentadoria negada pelo INSS: o que fazer agora?</h3>
-              <p>Entenda quais podem ser os próximos passos após uma negativa do benefício.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/revisao-pensao-alimenticia.html">
-            <div>
-              <span class="category">Família</span>
-              <h3>Pensão alimentícia: quando pode pedir revisão?</h3>
-              <p>Saiba quando pode existir mudança no valor e quais situações justificam revisão.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/nome-negativado-indevidamente.html">
-            <div>
-              <span class="category">Consumidor</span>
-              <h3>Meu nome foi negativado indevidamente: cabe indenização?</h3>
-              <p>Entenda quando a negativação pode ser irregular e quais direitos podem existir.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/divorcio-primeiros-passos.html">
-            <div>
-              <span class="category">Família</span>
-              <h3>Divórcio: quais são os primeiros passos?</h3>
-              <p>Veja como entender o início do processo com mais clareza e menos insegurança.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-
-          <a class="article-card" href="artigos/contrato-descumprido.html">
-            <div>
-              <span class="category">Civil</span>
-              <h3>Contrato descumprido: posso processar?</h3>
-              <p>Saiba quando o descumprimento pode gerar responsabilidade e como agir melhor.</p>
-            </div>
-            <span class="read-more">Ler artigo completo â†’</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="container">
-        <div class="cta" id="contato">
-          <div>
-            <span class="eyebrow">Precisa de orientação?</span>
-            <h2>Conteúdo ajuda. A estratégia correta depende da análise do seu caso.</h2>
-            <p>
-              Se você chegou até aqui porque está vivendo uma situação concreta, fale com a equipe para receber orientação inicial com clareza, seriedade e direção jurídica.
+              Conteúdo elaborado pela Dra. Noêmia Paixão para ajudar você a entender melhor seus direitos 
+              e tomar decisões mais informadas em temas previdenciários, de consumo, família e civis.
             </p>
           </div>
-
-          <div class="cta-box">
-            <strong>Atendimento inicial pelo WhatsApp</strong>
-            <span>
-              Um primeiro contato bem conduzido ajuda a organizar o problema, identificar os documentos relevantes e definir o melhor próximo passo.
-            </span>
-            <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=blog&amp;pagina=blog.html">Falar com a especialista</a>
+          <div class="internal-hero-visual">
+            <div class="card">
+              <h3>Navegue por área</h3>
+              <div class="blog-categories">
+                <button class="category-filter active">Todos</button>
+                <button class="category-filter">Previdenciário</button>
+                <button class="category-filter">Consumidor</button>
+                <button class="category-filter">Família</button>
+                <button class="category-filter">Civil</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
-  </main>
+      </section>
 
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-main">
-        <div class="footer-card">
-          <strong>Noêmia Paixão Advocacia</strong>
-          <p>
-            Conteúdo jurídico com clareza, autoridade e responsabilidade, pensado para informar e aproximar o cliente da orientação adequada.
-          </p>
-        </div>
+      <section class="section">
+        <div class="container">
+          <div class="blog-search">
+            <input type="search" class="search-input" placeholder="Buscar artigos..." />
+          </div>
 
-        <div class="footer-card">
-          <strong>Navegação</strong>
-          <div class="footer-links">
-            <a href="index.html">Início</a>
-            <a href="blog.html">Blog</a>
-            <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
-            <a href="#artigos">Artigos</a>
-            <a href="#contato">Contato</a>
+          <div class="blog-featured">
+            <div class="featured-card">
+              <div class="featured-image">
+                📋
+              </div>
+              <div class="featured-content">
+                <span class="eyebrow">Artigo em Destaque</span>
+                <h2>Como funciona a revisão da aposentadoria por INSS</h2>
+                <p>
+                  Entenda os critérios, prazos e documentos necessários para solicitar a revisão do seu benefício 
+                  e garantir que você receba o valor correto a que tem direito.
+                </p>
+                <div class="btn-group">
+                  <a href="#" class="btn btn-primary">Ler artigo completo</a>
+                  <a href="triagem.html?area=previdenciario" class="btn btn-secondary">Falar com especialista</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="blog-grid">
+            <article class="blog-card">
+              <div class="blog-card-image">
+                👵
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Previdenciário</span>
+                <h3>Aposentadoria especial: quem tem direito e como solicitar</h3>
+                <p>
+                  Trabalhadores expostos a agentes nocivos podem ter direito à aposentadoria com tempo reduzido. 
+                  Veja os requisitos e o passo a passo para solicitar.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">15 de março de 2026</span>
+                  <span class="blog-card-read-time">5 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                💳
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Consumidor</span>
+                <h3>Desconto indevido em conta: o que fazer e como reaver</h3>
+                <p>
+                  Cobranças não autorizadas no seu extrato bancário? Saiba como identificar, contestar 
+                  e reaver valores descontados indevidamente.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">12 de março de 2026</span>
+                  <span class="blog-card-read-time">4 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                👨‍👩‍👧‍👦
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Família</span>
+                <h3>Guarda compartilhada: direitos e deveres dos pais</h3>
+                <p>
+                  A guarda compartilhada vem se tornando a regra no Brasil. Entenda como funciona, 
+                  quais são os critérios e os direitos e deveres envolvidos.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">10 de março de 2026</span>
+                  <span class="blog-card-read-time">6 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                📝
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Civil</span>
+                <h3>Contrato de aluguel: principais cláusulas e cuidados</h3>
+                <p>
+                  Antes de assinar um contrato de locação, conheça os pontos essenciais que merecem 
+                  atenção para evitar problemas futuros.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">8 de março de 2026</span>
+                  <span class="blog-card-read-time">5 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                🏦
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Consumidor</span>
+                <h3>Negativação indevida: como limpar o nome</h3>
+                <p>
+                  Ser negativado injustamente pode causar grandes prejuízos. Saiba como identificar 
+                  a irregularidade e os procedimentos para limpar seu nome.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">5 de março de 2026</span>
+                  <span class="blog-card-read-time">7 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                💰
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Previdenciário</span>
+                <h3>BPC/LOAS: quem tem direito e como solicitar</h3>
+                <p>
+                  O Benefício de Prestação Continuada é um direito fundamental para pessoas em situação 
+                  de vulnerabilidade. Entenda os requisitos e o processo de solicitação.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">3 de março de 2026</span>
+                  <span class="blog-card-read-time">6 min de leitura</span>
+                </div>
+              </div>
+            </article>
           </div>
         </div>
+      </section>
+    </main>
 
-        <div class="footer-card">
-          <strong>Contato</strong>
-          <div class="footer-links">
-            <a href="triagem.html?area=geral&amp;origem=blog&amp;pagina=blog.html">Triagem no WhatsApp</a>
-            <a href="index.html">Site principal</a>
-            <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
-            <a href="#contato">Atendimento inicial</a>
-          </div>
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>Noêmia Paixão Advocacia</h3>
+          <p>Atendimento jurídico estratégico com clareza, técnica e organização para casos previdenciários, bancários, familiares e cíveis.</p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Áreas de Atuação</h3>
+          <p><a href="direito-previdenciario.html">Direito Previdenciário</a></p>
+          <p><a href="direito-consumidor-bancario.html">Direito do Consumidor e Bancário</a></p>
+          <p><a href="direito-familia.html">Direito de Família</a></p>
+          <p><a href="direito-civil.html">Direito Civil</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Links Úteis</h3>
+          <p><a href="blog.html">Blog Jurídico</a></p>
+          <p><a href="triagem.html">Triagem Inicial</a></p>
+          <p><a href="https://portal.advnoemia.com.br/portal/login">Área do Cliente</a></p>
+          <p><a href="https://portal.advnoemia.com.br/documentos">Documentos</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Contato</h3>
+          <p>Natal/RN - Atendimento Online</p>
+          <p>OAB/RN 3939</p>
+          <p><a href="triagem.html">Agende sua triagem</a></p>
         </div>
       </div>
-
-      <div class="footer-bar">
-        <div>© 2026 ⬢ Noêmia Paixão Advocacia ⬢ Todos os direitos reservados ⬢ OAB/RN 3939.</div>
-        <div>Conteúdo informativo. A análise individual do caso continua sendo essencial.</div>
+      
+      <div class="footer-bottom">
+        <div>© 2026 • Noêmia Paixão Advocacia • Todos os direitos reservados • OAB/RN 3939.</div>
+        <div class="footer-links">
+          <a href="blog.html">Blog</a>
+          <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
+          <a href="https://portal.advnoemia.com.br/documentos">Documentos</a>
+          <a href="https://portal.advnoemia.com.br/agenda">Agenda</a>
+        </div>
       </div>
-    </div>
-  </footer>
-
-  <a class="whatsapp-float" href="triagem.html?area=geral&amp;origem=blog&amp;pagina=blog.html" aria-label="WhatsApp">
-    <img src="assets/icons/contact-mark.svg" alt="WhatsApp">
-  </a>
-
-  <div class="mobile-cta-bar">
-    <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=blog&amp;pagina=blog.html">Falar com a especialista</a>
+    </footer>
   </div>
 
-  <script>
-    const menuToggle = document.getElementById('menuToggle');
-    const navLinks = document.getElementById('navLinks');
-
-    if (menuToggle && navLinks) {
-      menuToggle.addEventListener('click', function () {
-        const isOpen = navLinks.classList.toggle('open');
-        menuToggle.classList.toggle('active', isOpen);
-        menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        document.body.classList.toggle('menu-open', isOpen);
-      });
-
-      navLinks.querySelectorAll('a').forEach(link => {
-        link.addEventListener('click', () => {
-          navLinks.classList.remove('open');
-          menuToggle.classList.remove('active');
-          menuToggle.setAttribute('aria-expanded', 'false');
-          document.body.classList.remove('menu-open');
-        });
-      });
-
-      document.addEventListener('click', function (event) {
-        const clickedInsideMenu = navLinks.contains(event.target) || menuToggle.contains(event.target);
-        if (!clickedInsideMenu) {
-          navLinks.classList.remove('open');
-          menuToggle.classList.remove('active');
-          menuToggle.setAttribute('aria-expanded', 'false');
-          document.body.classList.remove('menu-open');
-        }
-      });
-    }
-  </script>
-  <script src="assets/js/entry-context.js"></script>
+  <script src="assets/js/premium-system.js"></script>
   <script src="assets/js/contact-capture.js"></script>
+
+  <script>
+    // Menu toggle functionality
+    document.querySelector('.menu-toggle').addEventListener('click', function() {
+      document.querySelector('.nav-menu').classList.toggle('active');
+    });
+
+    // Category filter functionality
+    document.querySelectorAll('.category-filter').forEach(filter => {
+      filter.addEventListener('click', function() {
+        document.querySelectorAll('.category-filter').forEach(f => f.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+  </script>
 </body>
 </html>
-
-
-

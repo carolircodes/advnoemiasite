@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoemIA | Atendimento Inteligente | Noêmia Paixão Advocacia</title>
+  <meta name="description" content="Fale com a NoemIA, assistente inteligente do escritório Noêmia Paixão Advocacia. Tire dúvidas iniciais, entenda seu caso e siga para o atendimento com mais clareza." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta name="theme-color" content="#f6f1e8" />
+  <link rel="canonical" href="https://advnoemia.com.br/noemia.html" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="NoemIA | Atendimento Inteligente | Noêmia Paixão Advocacia" />
+  <meta property="og:description" content="Orientação inicial mais clara, mais rápida e mais organizada com a assistente inteligente do escritório." />
+  <meta property="og:image" content="https://advnoemia.com.br/mae.jpeg" />
+  <meta property="og:url" content="https://advnoemia.com.br/noemia.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NoemIA | Atendimento Inteligente | Noêmia Paixão Advocacia" />
+  <meta name="twitter:description" content="Fale com a NoemIA e entenda melhor seu caso com mais agilidade, clareza e sofisticação." />
+  <meta name="twitter:image" content="https://advnoemia.com.br/mae.jpeg" />
+  <link rel="icon" href="logo.png" type="image/png" />
+  <link rel="stylesheet" href="assets/css/premium-system.css" />
+  <link rel="stylesheet" href="assets/css/contact-capture.css" />
+  <link rel="stylesheet" href="assets/css/site-refinements.css" />
+  <style>
+    :root {
+      --bg-ivory: #f6f1e8;
+      --bg-soft: #fbf8f2;
+      --surface: rgba(255,255,255,0.82);
+      --surface-strong: rgba(255,255,255,0.92);
+      --ink: #10261d;
+      --ink-soft: #4d6158;
+      --gold: #b58d49;
+      --gold-soft: #ead7af;
+      --gold-deep: #8c6b30;
+      --line: rgba(16, 38, 29, 0.09);
+      --shadow: 0 24px 70px rgba(14, 28, 23, 0.09);
+      --shadow-soft: 0 14px 34px rgba(16, 38, 29, 0.06);
+      --hero-overlay: linear-gradient(135deg, rgba(8,18,16,0.95) 0%, rgba(12,30,24,0.88) 48%, rgba(12,30,24,0.74) 100%);
+    }
+
+    .page-shell {
+      background:
+        radial-gradient(circle at top left, rgba(181, 141, 73, 0.10), transparent 24%),
+        linear-gradient(180deg, #f7f4ef 0%, #f2eee7 100%);
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(246, 241, 232, 0.78);
+      border-bottom: 1px solid rgba(16, 38, 29, 0.06);
+    }
+
+    .nav-menu a.is-active,
+    .nav-menu a:hover {
+      color: var(--gold-deep);
+    }
+
+    .noemia-hero {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      padding: clamp(40px, 6vw, 78px) 0 clamp(64px, 8vw, 100px);
+    }
+
+    .noemia-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(234, 215, 175, 0.16), transparent 0 24%),
+        radial-gradient(circle at 82% 14%, rgba(181, 141, 73, 0.18), transparent 0 18%),
+        linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0));
+      z-index: -2;
+    }
+
+    .noemia-hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -25% auto;
+      width: 460px;
+      height: 460px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(181,141,73,0.16) 0%, rgba(181,141,73,0) 68%);
+      filter: blur(16px);
+      z-index: -1;
+    }
+
+    .noemia-hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+      gap: clamp(28px, 4vw, 54px);
+      align-items: center;
+    }
+
+    .noemia-hero-copy {
+      max-width: 700px;
+    }
+
+    .noemia-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(140,107,48,0.18);
+      background: rgba(255,255,255,0.7);
+      box-shadow: var(--shadow-soft);
+      color: var(--gold-deep);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+
+    .noemia-badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d9bf86, #9e7638);
+      box-shadow: 0 0 0 6px rgba(181, 141, 73, 0.12);
+    }
+
+    .noemia-hero h1 {
+      margin: 0 0 18px;
+      font-size: clamp(2.2rem, 5vw, 4.25rem);
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      max-width: 13ch;
+    }
+
+    .noemia-hero h1 span {
+      color: var(--gold-deep);
+    }
+
+    .noemia-lead {
+      margin: 0 0 26px;
+      max-width: 60ch;
+      font-size: 1.06rem;
+      line-height: 1.85;
+      color: var(--ink-soft);
+    }
+
+    .noemia-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .btn-noemia {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      padding: 0 24px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 1px solid transparent;
+      transition: transform .25s ease, box-shadow .25s ease, background .25s ease, border-color .25s ease;
+    }
+
+    .btn-noemia:hover { transform: translateY(-2px); }
+
+    .btn-noemia-primary {
+      color: #f7f3ea;
+      background: linear-gradient(135deg, #0f241c 0%, #17382c 100%);
+      box-shadow: 0 18px 36px rgba(15, 36, 28, 0.18);
+    }
+
+    .btn-noemia-secondary {
+      color: var(--ink);
+      background: rgba(255,255,255,0.72);
+      border-color: rgba(16, 38, 29, 0.09);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .noemia-microcopy {
+      margin: 0;
+      color: #6c7b74;
+      line-height: 1.7;
+      font-size: 0.95rem;
+      max-width: 58ch;
+    }
+
+    .noemia-highlights {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .noemia-highlight {
+      padding: 18px 18px 16px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.68);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .noemia-highlight strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--ink);
+      font-size: 1rem;
+    }
+
+    .noemia-highlight p {
+      margin: 0;
+      color: var(--ink-soft);
+      line-height: 1.6;
+      font-size: 0.96rem;
+    }
+
+    .noemia-hero-card {
+      position: relative;
+      padding: 24px;
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(249,246,239,0.94));
+      border: 1px solid rgba(16, 38, 29, 0.08);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .noemia-hero-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--gold-deep) 0%, var(--gold-soft) 50%, var(--gold-deep) 100%);
+    }
+
+    .assistant-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+
+    .assistant-id {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .assistant-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #17382c 0%, #0f241c 100%);
+      color: #ead7af;
+      font-weight: 800;
+      font-size: 1.12rem;
+      box-shadow: 0 12px 24px rgba(15, 36, 28, 0.18);
+    }
+
+    .assistant-id strong {
+      display: block;
+      font-size: 1.25rem;
+      color: var(--ink);
+    }
+
+    .assistant-id span {
+      display: block;
+      color: var(--gold-deep);
+      font-size: 0.82rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .assistant-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(15, 36, 28, 0.06);
+      color: #284035;
+      font-size: 0.86rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .assistant-status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2e6e55;
+      box-shadow: 0 0 0 6px rgba(46,110,85,0.12);
+    }
+
+    .assistant-chat {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .assistant-bubble {
+      max-width: 88%;
+      padding: 15px 16px;
+      border-radius: 20px;
+      line-height: 1.7;
+      font-size: 0.96rem;
+    }
+
+    .assistant-bubble.ai {
+      background: #f3ede2;
+      border: 1px solid rgba(140,107,48,0.12);
+      color: #24352e;
+    }
+
+    .assistant-bubble.user {
+      margin-left: auto;
+      color: #f6f1e8;
+      background: linear-gradient(135deg, #17382c 0%, #10261d 100%);
+    }
+
+    .prompt-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .prompt-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(16,38,29,0.09);
+      background: rgba(255,255,255,0.72);
+      color: #17382c;
+      font-size: 0.92rem;
+      text-decoration: none;
+      box-shadow: 0 10px 24px rgba(16,38,29,0.04);
+    }
+
+    .assistant-composer {
+      padding: 16px;
+      border-radius: 24px;
+      background: rgba(245,241,233,0.9);
+      border: 1px solid rgba(16,38,29,0.08);
+    }
+
+    .assistant-composer label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .assistant-composer textarea {
+      width: 100%;
+      min-height: 146px;
+      resize: vertical;
+      border-radius: 18px;
+      border: 1px solid rgba(16,38,29,0.12);
+      background: rgba(255,255,255,0.92);
+      padding: 16px 18px;
+      font: inherit;
+      color: var(--ink);
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .assistant-composer textarea::placeholder { color: #7a8781; }
+
+    .assistant-composer-footer {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .assistant-trust {
+      color: #68766f;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      max-width: 32ch;
+    }
+
+    .section-soft {
+      padding: 0 0 90px;
+    }
+
+    .section-card {
+      border-radius: 34px;
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(16,38,29,0.08);
+      box-shadow: var(--shadow-soft);
+      padding: clamp(26px, 4vw, 38px);
+    }
+
+    .section-head-premium {
+      max-width: 740px;
+      margin-bottom: 28px;
+    }
+
+    .section-head-premium h2 {
+      margin: 0 0 12px;
+      color: var(--ink);
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .section-head-premium p {
+      margin: 0;
+      color: var(--ink-soft);
+      line-height: 1.8;
+      font-size: 1rem;
+    }
+
+    .noemia-questions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .question-card {
+      padding: 22px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(248,244,236,0.92));
+      border: 1px solid rgba(16,38,29,0.08);
+      box-shadow: 0 12px 28px rgba(16,38,29,0.05);
+    }
+
+    .question-card strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--ink);
+      font-size: 1.04rem;
+    }
+
+    .question-card p {
+      margin: 0 0 16px;
+      color: var(--ink-soft);
+      line-height: 1.7;
+    }
+
+    .question-card a {
+      color: var(--gold-deep);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .journey-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .journey-card {
+      position: relative;
+      padding: 26px 24px;
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(17, 38, 29, 0.98), rgba(22, 51, 40, 0.98));
+      color: #f7f3ea;
+      box-shadow: 0 22px 44px rgba(10, 24, 19, 0.2);
+      overflow: hidden;
+    }
+
+    .journey-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, #8c6b30 0%, #ead7af 50%, #8c6b30 100%);
+      opacity: 0.95;
+    }
+
+    .journey-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      color: #ead7af;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-weight: 700;
+    }
+
+    .journey-card h3 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      line-height: 1.2;
+    }
+
+    .journey-card p {
+      margin: 0;
+      line-height: 1.7;
+      color: rgba(247,243,234,0.84);
+    }
+
+    .cta-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+      gap: 24px;
+      align-items: center;
+      padding: clamp(28px, 4vw, 38px);
+      border-radius: 34px;
+      background: linear-gradient(135deg, rgba(16,38,29,0.98) 0%, rgba(22,53,41,0.98) 60%, rgba(36,66,53,0.98) 100%);
+      box-shadow: 0 28px 64px rgba(12, 28, 22, 0.24);
+      color: #f7f3ea;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-panel::before {
+      content: "";
+      position: absolute;
+      top: -140px;
+      right: -80px;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(234,215,175,0.18), rgba(234,215,175,0));
+    }
+
+    .cta-panel h2 {
+      margin: 0 0 12px;
+      font-size: clamp(1.8rem, 3.2vw, 2.9rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .cta-panel p {
+      margin: 0;
+      color: rgba(247,243,234,0.84);
+      line-height: 1.8;
+      max-width: 58ch;
+    }
+
+    .cta-panel-actions {
+      display: grid;
+      gap: 14px;
+      justify-items: end;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-panel .btn-noemia-secondary {
+      background: rgba(255,255,255,0.14);
+      border-color: rgba(255,255,255,0.12);
+      color: #f7f3ea;
+    }
+
+    .smart-note {
+      margin-top: 16px;
+      color: rgba(247,243,234,0.72);
+      font-size: 0.92rem;
+    }
+
+    .floating-contact {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 55;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 56px;
+      padding: 0 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      background: linear-gradient(135deg, #17382c 0%, #0f241c 100%);
+      color: #f7f3ea;
+      box-shadow: 0 20px 44px rgba(15, 36, 28, 0.22);
+      font-weight: 700;
+    }
+
+    @media (max-width: 1120px) {
+      .noemia-hero-grid,
+      .cta-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-panel-actions { justify-items: start; }
+    }
+
+    @media (max-width: 980px) {
+      .noemia-highlights,
+      .noemia-questions,
+      .journey-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .topbar-inner,
+      .header-inner {
+        gap: 16px;
+      }
+
+      .noemia-hero {
+        padding-top: 28px;
+      }
+
+      .assistant-top {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .noemia-actions,
+      .assistant-composer-footer {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .btn-noemia,
+      .prompt-chip,
+      .floating-contact {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .assistant-bubble {
+        max-width: 100%;
+      }
+
+      .floating-contact {
+        right: 14px;
+        left: 14px;
+        bottom: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="topbar">
+      <div class="container topbar-inner">
+        <span>Atendimento jurídico estratégico com clareza, organização e inteligência aplicada ao primeiro contato.</span>
+        <div class="pill-row">
+          <span>OAB/RN 3939</span>
+          <span>NoemIA</span>
+          <span>Experiência premium</span>
+        </div>
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html" aria-label="Página inicial">
+          <div class="brand-mark">
+            <img src="logo.png" alt="Logo Noêmia Paixão Advocacia" />
+          </div>
+          <div class="brand-copy">
+            <strong>Noêmia Paixão Advocacia</strong>
+            <small>Atendimento Jurídico Estratégico</small>
+          </div>
+        </a>
+
+        <button
+          class="menu-toggle"
+          type="button"
+          data-menu-toggle
+          aria-label="Abrir menu"
+          aria-expanded="false"
+          aria-controls="siteMenu"
+        >
+          <span></span>
+        </button>
+
+        <nav class="nav-menu" id="siteMenu">
+          <a href="index.html">Home</a>
+          <a href="index.html#areas">Atuação</a>
+          <a href="index.html#como-funciona">Como funciona</a>
+          <a href="blog.html">Conteúdo</a>
+          <a href="noemia.html" class="is-active">NoemIA</a>
+          <a class="menu-only" href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
+          <a class="menu-only" href="triagem.html?area=geral&amp;origem=noemia&amp;pagina=noemia.html">Falar com a especialista</a>
+        </nav>
+
+        <div class="nav-actions">
+          <a class="btn btn-secondary" href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
+          <a class="btn btn-primary" href="triagem.html?area=geral&amp;origem=noemia&amp;pagina=noemia.html">Falar com a especialista</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="noemia-hero">
+        <div class="container noemia-hero-grid">
+          <div class="noemia-hero-copy">
+            <span class="noemia-badge">Atendimento inteligente 24h</span>
+            <h1>Fale com a <span>NoemIA</span> e entenda seu caso com mais clareza.</h1>
+            <p class="noemia-lead">
+              A NoemIA é a assistente inteligente do escritório. Ela ajuda você a organizar sua situação inicial,
+              compreender melhor os próximos passos e seguir para o atendimento com mais objetividade, sofisticação e segurança.
+            </p>
+
+            <div class="noemia-actions">
+              <a href="#painel-pergunta" class="btn-noemia btn-noemia-primary">Fazer uma pergunta agora</a>
+              <a href="triagem.html?area=geral&amp;origem=noemia-hero&amp;pagina=noemia.html" class="btn-noemia btn-noemia-secondary">Iniciar atendimento</a>
+            </div>
+
+            <p class="noemia-microcopy">
+              Orientação inicial inteligente para reduzir dúvidas, organizar o primeiro contato e facilitar o encaminhamento correto.
+            </p>
+
+            <div class="noemia-highlights">
+              <article class="noemia-highlight">
+                <strong>Clareza imediata</strong>
+                <p>Entenda melhor sua situação antes mesmo de falar com a equipe.</p>
+              </article>
+              <article class="noemia-highlight">
+                <strong>Direcionamento elegante</strong>
+                <p>A conversa conduz você ao próximo passo mais adequado ao seu caso.</p>
+              </article>
+              <article class="noemia-highlight">
+                <strong>Continuidade real</strong>
+                <p>Quando necessário, a orientação segue para atendimento humano com a advogada.</p>
+              </article>
+            </div>
+          </div>
+
+          <div class="noemia-hero-card" id="painel-pergunta">
+            <div class="assistant-top">
+              <div class="assistant-id">
+                <div class="assistant-avatar">N</div>
+                <div>
+                  <span>Assistente do escritório</span>
+                  <strong>NoemIA</strong>
+                </div>
+              </div>
+              <div class="assistant-status">Disponível agora</div>
+            </div>
+
+            <div class="assistant-chat">
+              <div class="assistant-bubble ai">
+                Olá. Sou a NoemIA, assistente inteligente do escritório Noêmia Paixão Advocacia. Posso ajudar você a entender sua situação inicial e indicar o melhor próximo passo.
+              </div>
+              <div class="assistant-bubble user">
+                Quero entender se tenho direito e o que eu preciso reunir agora.
+              </div>
+              <div class="assistant-bubble ai">
+                Posso te orientar sobre os pontos iniciais, documentos importantes e o caminho mais adequado para o seu atendimento.
+              </div>
+            </div>
+
+            <div class="prompt-chip-row">
+              <a class="prompt-chip" href="#perguntas">Posso receber benefício?</a>
+              <a class="prompt-chip" href="#perguntas">Quais documentos separar?</a>
+              <a class="prompt-chip" href="#perguntas">Tive desconto indevido</a>
+              <a class="prompt-chip" href="#perguntas">Preciso falar com a advogada</a>
+            </div>
+
+            <div class="assistant-composer">
+              <label for="pergunta">Descreva sua dúvida inicial</label>
+              <textarea id="pergunta" placeholder="Ex.: Quero entender se posso pedir aposentadoria, quais documentos devo separar e qual seria o próximo passo."></textarea>
+              <div class="assistant-composer-footer">
+                <div class="assistant-trust">Seus dados devem ser tratados com segurança e a conversa pode seguir para a equipe quando necessário.</div>
+                <a href="triagem.html?area=geral&amp;origem=noemia-painel&amp;pagina=noemia.html" class="btn-noemia btn-noemia-primary">Continuar com atendimento</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-soft" id="perguntas">
+        <div class="container">
+          <div class="section-card">
+            <div class="section-head-premium">
+              <h2>Perguntas que a NoemIA pode organizar com você.</h2>
+              <p>
+                A experiência foi pensada para parecer parte real do escritório — não um chat genérico. Use a NoemIA para ganhar clareza,
+                entender possibilidades iniciais e chegar ao atendimento com muito mais contexto.
+              </p>
+            </div>
+
+            <div class="noemia-questions">
+              <article class="question-card">
+                <strong>Direito Previdenciário</strong>
+                <p>“Quero entender se tenho direito a benefício, revisão ou aposentadoria e quais documentos preciso separar.”</p>
+                <a href="triagem.html?area=previdenciario&amp;origem=noemia-previdenciario&amp;pagina=noemia.html">Seguir por essa área</a>
+              </article>
+              <article class="question-card">
+                <strong>Consumidor e Bancário</strong>
+                <p>“Tive desconto indevido, fraude, empréstimo não reconhecido ou cobrança abusiva. O que devo fazer agora?”</p>
+                <a href="triagem.html?area=consumidor-bancario&amp;origem=noemia-consumidor&amp;pagina=noemia.html">Seguir por essa área</a>
+              </article>
+              <article class="question-card">
+                <strong>Direito de Família</strong>
+                <p>“Quero entender o que muda em caso de guarda, pensão, convivência ou divórcio e quais são os próximos passos.”</p>
+                <a href="triagem.html?area=familia&amp;origem=noemia-familia&amp;pagina=noemia.html">Seguir por essa área</a>
+              </article>
+              <article class="question-card">
+                <strong>Direito Civil</strong>
+                <p>“Tenho um problema contratual, um pedido de indenização ou uma obrigação não cumprida. Como posso começar?”</p>
+                <a href="triagem.html?area=civil&amp;origem=noemia-civil&amp;pagina=noemia.html">Seguir por essa área</a>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-soft">
+        <div class="container">
+          <div class="section-head-premium">
+            <h2>Uma experiência inteligente, elegante e conectada ao atendimento real.</h2>
+            <p>
+              A NoemIA não substitui a análise jurídica individual. Ela melhora a jornada: reduz ruído, organiza o primeiro contato e faz o cliente chegar mais preparado para o atendimento especializado.
+            </p>
+          </div>
+
+          <div class="journey-grid">
+            <article class="journey-card">
+              <span class="journey-step">Etapa 1</span>
+              <h3>Você descreve sua situação</h3>
+              <p>A conversa inicial ajuda a transformar dúvida solta em contexto mais claro, com melhor organização da informação.</p>
+            </article>
+            <article class="journey-card">
+              <span class="journey-step">Etapa 2</span>
+              <h3>A NoemIA orienta o próximo passo</h3>
+              <p>Ela indica o melhor caminho inicial, aponta documentos importantes e reduz a sensação de confusão logo no começo.</p>
+            </article>
+            <article class="journey-card">
+              <span class="journey-step">Etapa 3</span>
+              <h3>O atendimento segue com a equipe</h3>
+              <p>Quando necessário, você continua com triagem, WhatsApp, portal ou atendimento direto com a advogada.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-soft">
+        <div class="container">
+          <div class="cta-panel">
+            <div>
+              <h2>Quer dar o próximo passo com mais clareza?</h2>
+              <p>
+                Você pode começar pela NoemIA, seguir para a triagem do site ou entrar em contato com a equipe quando já quiser avançar para o atendimento jurídico individualizado.
+              </p>
+              <p class="smart-note">Luxo discreto, orientação inicial inteligente e continuidade real com o escritório.</p>
+            </div>
+
+            <div class="cta-panel-actions">
+              <a href="#painel-pergunta" class="btn-noemia btn-noemia-primary">Falar com a NoemIA</a>
+              <a href="triagem.html?area=geral&amp;origem=noemia-cta&amp;pagina=noemia.html" class="btn-noemia btn-noemia-secondary">Iniciar atendimento</a>
+              <a href="https://portal.advnoemia.com.br/portal/login" class="btn-noemia btn-noemia-secondary">Área do cliente</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-bar">
+        <div>© 2026 • Noêmia Paixão Advocacia • Todos os direitos reservados • OAB/RN 3939.</div>
+        <div class="footer-links">
+          <a href="index.html">Home</a>
+          <a href="blog.html">Blog</a>
+          <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
+          <a href="triagem.html?area=geral&amp;origem=noemia-footer&amp;pagina=noemia.html">Falar com a especialista</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <a class="floating-contact" href="triagem.html?area=geral&amp;origem=noemia-flutuante&amp;pagina=noemia.html">
+    Falar com a especialista
+  </a>
+
+  <script>
+    const toggle = document.querySelector('[data-menu-toggle]');
+    const menu = document.getElementById('siteMenu');
+
+    if (toggle && menu) {
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        menu.classList.toggle('is-open');
+      });
+    }
+  </script>
+</body>
+</html>
