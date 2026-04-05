@@ -249,6 +249,8 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   }
 
   if (!env.OPENAI_API_KEY) {
+    console.error("[noemia] OPENAI_API_KEY não encontrada no ambiente");
+    console.log("[noemia] Env disponível:", Object.keys(env).filter(k => k.includes('OPENAI')));
     throw new Error(
       "A Noemia ainda nao foi configurada neste ambiente. Defina OPENAI_API_KEY e OPENAI_MODEL no .env.local."
     );
