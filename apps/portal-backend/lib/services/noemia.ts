@@ -88,7 +88,7 @@ async function buildClientContext(profile: PortalProfile) {
       `Solicitacoes documentais abertas: ${openRequests.length}.`,
       upcomingAppointments.length
         ? `Proximos compromissos: ${upcomingAppointments
-            .map((item) => `${item.title} em ${item.starts_at} (${item.status})`)
+            .map((item) => `${item.title} em ${item.starts_at} (${item.statusLabel})`)
             .join("; ")}.`
         : "Nao ha compromissos futuros visiveis no momento.",
       latestEvents.length
@@ -99,16 +99,16 @@ async function buildClientContext(profile: PortalProfile) {
     ].join("\n");
   } catch (error) {
     console.warn("[NoemIA] Erro ao buscar contexto do cliente, usando fallback:", error);
-    // Usar fallback quando Supabase não estiver disponível
+
     const { getClientWorkspace: getClientWorkspaceFallback } = await import("./dashboard-fallback");
     const workspace = await getClientWorkspaceFallback(profile);
-    
+
     return [
       `Cliente autenticado: ${profile.full_name} (${profile.email}).`,
       `Status do cadastro: ${workspace.clientRecord.status}.`,
-      `Caso principal: ${workspace.cases[0]?.title || 'Ainda nao ha caso principal visivel no portal.'}`,
-      `Documentos disponiveis: ${workspace.documents.filter(d => d.status === 'recebido').length}.`,
-      `Documentos pendentes: ${workspace.documents.filter(d => d.status === 'pendente').length}.`,
+      `Caso principal: ${workspace.cases[0]?.title || "Ainda nao ha caso principal visivel no portal."}`,
+      `Documentos disponiveis: ${workspace.documents.filter((d: any) => d.status === "recebido").length}.`,
+      `Documentos pendentes: ${workspace.documents.filter((d: any) => d.status === "pendente").length}.`,
       `Solicitacoes documentais abertas: ${workspace.documentRequests.length}.`,
       `Proximos compromissos: ${workspace.appointments.length}.`,
       `Ultimas atualizacoes: ${workspace.events.length}.`
@@ -122,13 +122,11 @@ async function buildStaffContext(profile: PortalProfile) {
       getStaffOverview(),
       getBusinessIntelligenceOverview(30)
     ]);
+
     const topToday = overview.operationalCenter.queues.today.slice(0, 5);
     const topAwaitingClient = overview.operationalCenter.queues.awaitingClient.slice(0, 4);
     const topAwaitingTeam = overview.operationalCenter.queues.awaitingTeam.slice(0, 4);
     const recentCompleted = overview.operationalCenter.queues.recentlyCompleted.slice(0, 4);
-    const triageHighlights = overview.latestIntakeRequests
-      .filter((item) => item.status === "new" || item.status === "in_review")
-      .slice(0, 4);
     const caseHighlights = overview.latestCases.slice(0, 4);
 
     return [
@@ -151,14 +149,6 @@ async function buildStaffContext(profile: PortalProfile) {
             .map((item) => `${item.title} (${item.timingLabel})`)
             .join("; ")}.`
         : "Nao ha fila aguardando equipe com destaque agora.",
-      triageHighlights.length
-        ? `Triagens recentes: ${triageHighlights
-            .map(
-              (item) =>
-                `${item.full_name} | ${item.areaLabel} | ${item.urgencyLabel} | ${item.stageLabel}`
-            )
-            .join("; ")}.`
-        : "Nao ha triagens recentes em analise no momento.",
       caseHighlights.length
         ? `Casos recentes: ${caseHighlights
             .map(
@@ -175,26 +165,31 @@ async function buildStaffContext(profile: PortalProfile) {
     ].join("\n");
   } catch (error) {
     console.warn("[NoemIA] Erro ao buscar contexto do staff, usando fallback:", error);
-    // Usar fallback quando Supabase não estiver disponível
+
     try {
       const { getStaffOverview: getStaffOverviewFallback } = await import("./dashboard-fallback");
-      const { getBusinessIntelligenceOverview: getBusinessIntelligenceOverviewFallback } = await import("./intelligence-fallback");
+      const { getBusinessIntelligenceOverview: getBusinessIntelligenceOverviewFallback } =
+        await import("./intelligence-fallback");
+
       const [overview, intelligence] = await Promise.all([
         getStaffOverviewFallback(),
         getBusinessIntelligenceOverviewFallback(30)
       ]);
-      
+
       return [
         `Perfil interno autenticado: ${profile.full_name} (${profile.email}).`,
         `Resumo operacional atual: ${overview.operationalCenter.summary.criticalCount} item(ns) critico(s), ${overview.operationalCenter.summary.todayCount} para hoje, ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente, ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
         `Leitura de BI dos ultimos 30 dias: abandono de triagem ${formatRateValue(intelligence.summary.triageAbandonmentRate)}, triagem para cliente ${formatRateValue(intelligence.summary.triageToClientRate)}, ativacao no portal ${formatRateValue(intelligence.summary.portalActivationRate)}.`,
-        `Fila fazer hoje: ${overview.operationalCenter.queues.today.map(item => `${item.kindLabel} ${item.title}`).join("; ")}.`,
-        `Triagens recentes: ${overview.latestIntakeRequests.map(item => `${item.full_name} | ${item.areaLabel}`).join("; ")}.`,
-        `Casos recentes: ${overview.latestCases.map(item => `${item.title} | ${item.clientName}`).join("; ")}.`
+        `Fila fazer hoje: ${overview.operationalCenter.queues.today
+          .map((item) => `${item.kindLabel} ${item.title}`)
+          .join("; ")}.`,
+        `Casos recentes: ${overview.latestCases
+          .map((item) => `${item.title} | ${item.clientName}`)
+          .join("; ")}.`
       ].join("\n");
     } catch (fallbackError) {
-      console.error("[NoemIA] Erro até no fallback do staff:", fallbackError);
-      return `Perfil interno autenticado: ${profile.full_name} (${profile.email}). Sistema operacional em modo limitado. Use o painel principal para operação completa.`;
+      console.error("[NoemIA] Erro ate no fallback do staff:", fallbackError);
+      return `Perfil interno autenticado: ${profile.full_name} (${profile.email}). Sistema operacional em modo limitado. Use o painel principal para operacao completa.`;
     }
   }
 }
@@ -233,7 +228,8 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   const env = getServerEnv();
   const input = askNoemiaSchema.parse(rawInput);
   const requestedAudience = input.audience;
-  const effectiveAudience =
+
+  let effectiveAudience =
     requestedAudience === "staff" && profile && profile.role !== "cliente"
       ? "staff"
       : requestedAudience === "client" && profile?.role === "cliente"
@@ -241,22 +237,18 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
         : "visitor";
 
   if (requestedAudience === "client" && (!profile || profile.role !== "cliente")) {
-    console.log("[noemia] Cliente não autenticado, usando audience visitor");
-    // Não lançar erro - mudar para visitor
+    console.log("[noemia] Cliente nao autenticado, usando audience visitor");
     effectiveAudience = "visitor";
   }
 
   if (requestedAudience === "staff" && (!profile || profile.role === "cliente")) {
-    console.log("[noemia] Staff não autenticado, usando audience visitor");
-    // Não lançar erro - mudar para visitor
+    console.log("[noemia] Staff nao autenticado, usando audience visitor");
     effectiveAudience = "visitor";
   }
 
   if (!env.OPENAI_API_KEY) {
-    console.error("[noemia] OPENAI_API_KEY não encontrada no ambiente");
-    console.log("[noemia] Env disponível:", Object.keys(env).filter(k => k.includes('OPENAI')));
-    
-    // NÃO lançar erro - retornar resposta padrão
+    console.error("[noemia] OPENAI_API_KEY nao encontrada no ambiente");
+
     return {
       audience: effectiveAudience,
       answer: "Olá! Sou a NoemIA. No momento estou operando em modo de configuração. Como posso te ajudar hoje?"
@@ -269,18 +261,18 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
       : effectiveAudience === "client" && profile
         ? await buildClientContext(profile)
         : buildPublicContext();
+
   const systemInstructions = buildSystemInstructions(effectiveAudience, contextText);
-  const conversationHistory = input.history
-    .slice(-8)
-    .map((message) => ({
-      role: message.role,
-      content: [
-        {
-          type: "input_text",
-          text: message.content
-        }
-      ]
-    }));
+
+  const conversationHistory = input.history.slice(-8).map((message) => ({
+    role: message.role,
+    content: [
+      {
+        type: "input_text",
+        text: message.content
+      }
+    ]
+  }));
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -318,8 +310,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   if (!response.ok) {
     const details = await response.text();
     console.error("[noemia] Erro na chamada OpenAI:", details);
-      
-    // Retornar sempre resposta amigável, nunca lançar erro
+
     return {
       audience: effectiveAudience,
       answer: "Olá! Sou a NoemIA. No momento estou operando em modo de configuração. Como posso te ajudar hoje?"
@@ -331,7 +322,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
 
   if (!answer) {
     console.error("[noemia] Resposta vazia da OpenAI");
-    // Retornar sempre resposta amigável, nunca lançar erro
+
     return {
       audience: effectiveAudience,
       answer: "Olá! Sou a NoemIA. No momento estou operando em modo de configuração. Como posso te ajudar hoje?"
