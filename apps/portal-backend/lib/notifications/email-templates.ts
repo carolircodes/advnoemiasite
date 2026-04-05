@@ -5,7 +5,7 @@ import { getServerEnv } from "@/lib/config/env";
 import type { ClientTier } from "@/lib/domain/portal";
 
 // ---------------------------------------------------------------------------
-// Tipos internos
+// Tipos
 // ---------------------------------------------------------------------------
 
 type NotificationTemplateRecord = {
@@ -20,42 +20,30 @@ type RenderedEmail = {
   text: string;
 };
 
-type MetadataEntry = {
-  label: string;
-  value: string;
-};
-
-type EmailLayoutInput = {
+/**
+ * Estrutura de um e-mail de alto padrão.
+ *
+ * Filosofia: uma mensagem, uma ação, muito espaço.
+ * O cliente deve sentir que alguém escreveu para ele — não que um sistema disparou.
+ */
+type EmailInput = {
   tier: ClientTier;
+  /** Linha discreta acima do título — contexto mínimo, sem ruído. */
   eyebrow: string;
+  /** Frase principal. Deve funcionar sozinha. */
   title: string;
-  intro: string;
-  body: string;
+  /** Um ou dois parágrafos. Linguagem humana, sem jargão. */
+  paragraphs: string[];
+  /** Card de informação estruturada (documento, data) — opcional e discreto. */
+  infoCard?: {
+    heading: string;
+    lines: string[];
+  };
+  /** Texto do botão — ação única, clara. */
   ctaLabel: string;
   ctaHref: string;
-  metadata?: MetadataEntry[];
-  footer?: string;
-};
-
-type TierConfig = {
-  headerBg: string;
-  monogramBorder: string;
-  monogramColor: string;
-  officeNameColor: string;
-  subtitleColor: string;
-  hairlineColor: string;
-  badgeText: string;
-  badgeBg: string;
-  badgeBorder: string;
-  badgeColor: string;
-  eyebrowColor: string;
-  panelBorderColor: string;
-  panelBg: string;
-  ctaBg: string;
-  ctaColor: string;
-  ctaBorder: string;
-  topBand: string | null;
-  isVip: boolean;
+  /** Nota de rodapé — mínima. */
+  footerNote?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -66,8 +54,8 @@ function asString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-function escapeHtml(value: string) {
-  return value
+function escapeHtml(raw: string) {
+  return raw
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -75,276 +63,227 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-function buildPortalUrl(path: string) {
-  const env = getServerEnv();
-  return new URL(path, env.NEXT_PUBLIC_APP_URL).toString();
+function buildUrl(path: string) {
+  return new URL(path, getServerEnv().NEXT_PUBLIC_APP_URL).toString();
 }
 
-function getReplyTo() {
-  const env = getServerEnv();
-  return env.NOTIFICATIONS_REPLY_TO || "contato@advnoemia.com.br";
+function replyTo() {
+  return getServerEnv().NOTIFICATIONS_REPLY_TO || "contato@advnoemia.com.br";
 }
 
 // ---------------------------------------------------------------------------
-// Configuração visual por tier
+// Paleta por tier
+//
+// O dourado aparece em UMA posição por e-mail, não em várias.
+// O header é sempre escuro e limpo — apenas o nome do escritório.
+// A diferenciação entre tiers acontece principalmente no copy e em
+// detalhes sutis: linha decorativa, acento do eyebrow, botão.
 // ---------------------------------------------------------------------------
 
-function getTierConfig(tier: ClientTier): TierConfig {
+type Palette = {
+  /** Cor de fundo do header. */
+  headerBg: string;
+  /** Cor do nome do escritório no header. */
+  wordmarkColor: string;
+  /** Linha fina abaixo do nome — apenas um traço de 32px. */
+  rulerColor: string;
+  /** Faixa de 3px no topo do card — apenas para novo-cliente e vip. */
+  topAccent: string | null;
+  /** Cor discreta do eyebrow no corpo. */
+  eyebrowColor: string;
+  /** Linha decorativa após o título — apenas para vip. */
+  titleAccent: string | null;
+  /** Fundo do info-card (para documentos/datas). */
+  cardBg: string;
+  /** Cor do botão. */
+  ctaBg: string;
+  /** Cor do texto do botão. */
+  ctaText: string;
+};
+
+function getPalette(tier: ClientTier): Palette {
   switch (tier) {
-    // NOVO CLIENTE — Verde-floresta profundo, ouro aquecido, sensação de boas-vindas exclusivas
+    // NOVO CLIENTE
+    // Tom: acolhimento + exclusividade de entrada.
+    // O ouro aparece na faixa superior e no nome do escritório — discreto.
     case "novo-cliente":
       return {
-        headerBg: "#091a10",
-        monogramBorder: "rgba(200,169,107,0.55)",
-        monogramColor: "#c8a96b",
-        officeNameColor: "#e8d5a8",
-        subtitleColor: "rgba(248,243,234,0.38)",
-        hairlineColor: "rgba(200,169,107,0.45)",
-        badgeText: "Acesso preparado",
-        badgeBg: "rgba(200,169,107,0.12)",
-        badgeBorder: "rgba(200,169,107,0.4)",
-        badgeColor: "#c8a96b",
-        eyebrowColor: "#7a5a18",
-        panelBorderColor: "#c8a96b",
-        panelBg: "#faf7f1",
-        ctaBg: "linear-gradient(135deg,#0d2419 0%,#1a3d2e 100%)",
-        ctaColor: "#ead7af",
-        ctaBorder: "rgba(200,169,107,0.4)",
-        topBand: "linear-gradient(90deg, #7a5008 0%, #c8a96b 35%, #ead7af 50%, #c8a96b 65%, #7a5008 100%)",
-        isVip: false
+        headerBg: "#091911",
+        wordmarkColor: "#c8a96b",
+        rulerColor: "rgba(200,169,107,0.4)",
+        topAccent: "#c8a96b",
+        eyebrowColor: "#7a5c1e",
+        titleAccent: null,
+        cardBg: "#faf7f2",
+        ctaBg: "#0d2419",
+        ctaText: "#ead7af"
       };
 
-    // EM ANDAMENTO — Verde institucional, mint suave, solidez profissional
+    // EM ANDAMENTO
+    // Tom: segurança + profissionalismo.
+    // Nenhum acento excessivo — o verde já diz tudo.
     case "em-andamento":
       return {
         headerBg: "#0d2419",
-        monogramBorder: "rgba(159,206,193,0.45)",
-        monogramColor: "#9fcec1",
-        officeNameColor: "#d4ede8",
-        subtitleColor: "rgba(248,243,234,0.36)",
-        hairlineColor: "rgba(159,206,193,0.35)",
-        badgeText: "Atualização do caso",
-        badgeBg: "rgba(159,206,193,0.1)",
-        badgeBorder: "rgba(159,206,193,0.35)",
-        badgeColor: "#9fcec1",
+        wordmarkColor: "#c8d8d3",
+        rulerColor: "rgba(159,206,193,0.3)",
+        topAccent: null,
         eyebrowColor: "#3d7d6e",
-        panelBorderColor: "#9fcec1",
-        panelBg: "#f6faf9",
-        ctaBg: "linear-gradient(135deg,#0d2419 0%,#1a3d2e 100%)",
-        ctaColor: "#ead7af",
-        ctaBorder: "rgba(159,206,193,0.35)",
-        topBand: null,
-        isVip: false
+        titleAccent: null,
+        cardBg: "#f5faf8",
+        ctaBg: "#0d2419",
+        ctaText: "#ead7af"
       };
 
-    // PENDÊNCIA — Âmbar escuro, urgência elegante, foco na ação
+    // PENDÊNCIA
+    // Tom: urgência elegante — clareza sem alarme.
+    // Sem vermelho. Sem exagero. Ouro morno como lembrete.
     case "pendencia":
       return {
-        headerBg: "#1a0e00",
-        monogramBorder: "rgba(200,169,107,0.5)",
-        monogramColor: "#c8a96b",
-        officeNameColor: "#e8d5a8",
-        subtitleColor: "rgba(248,243,234,0.36)",
-        hairlineColor: "rgba(200,169,107,0.4)",
-        badgeText: "Pendência em aberto",
-        badgeBg: "rgba(200,169,107,0.12)",
-        badgeBorder: "rgba(200,169,107,0.45)",
-        badgeColor: "#c8a96b",
-        eyebrowColor: "#7a5a18",
-        panelBorderColor: "#c8a96b",
-        panelBg: "#fffdf7",
-        ctaBg: "linear-gradient(135deg,#3d2200 0%,#6b3d00 100%)",
-        ctaColor: "#ead7af",
-        ctaBorder: "rgba(200,169,107,0.5)",
-        topBand: null,
-        isVip: false
+        headerBg: "#1a1008",
+        wordmarkColor: "#c8a96b",
+        rulerColor: "rgba(200,169,107,0.35)",
+        topAccent: null,
+        eyebrowColor: "#8b6408",
+        titleAccent: null,
+        cardBg: "#fffcf5",
+        ctaBg: "#2e1e00",
+        ctaText: "#ead7af"
       };
 
-    // VIP — Preto-âmbar profundo, ouro dominante, exclusividade máxima
+    // VIP
+    // Tom: exclusividade máxima — sentir-se o único cliente do escritório.
+    // Faixa dourada discreta no topo. Linha dourada após o título.
+    // Tudo mais espaçado. O botão tem textura dourada.
     case "vip":
       return {
-        headerBg: "#0c0700",
-        monogramBorder: "rgba(234,215,175,0.6)",
-        monogramColor: "#ead7af",
-        officeNameColor: "#ead7af",
-        subtitleColor: "rgba(234,215,175,0.45)",
-        hairlineColor: "rgba(234,215,175,0.5)",
-        badgeText: "Atendimento Prioritário",
-        badgeBg: "rgba(234,215,175,0.12)",
-        badgeBorder: "rgba(234,215,175,0.5)",
-        badgeColor: "#ead7af",
-        eyebrowColor: "#8b6910",
-        panelBorderColor: "#ead7af",
-        panelBg: "#fffef9",
-        ctaBg: "linear-gradient(135deg,#8b6508 0%,#c8a96b 50%,#ead7af 100%)",
-        ctaColor: "#0c0700",
-        ctaBorder: "rgba(234,215,175,0.6)",
-        topBand: "linear-gradient(90deg, #4a3000 0%, #8b6508 20%, #c8a96b 40%, #ead7af 50%, #c8a96b 60%, #8b6508 80%, #4a3000 100%)",
-        isVip: true
+        headerBg: "#0c0900",
+        wordmarkColor: "#ead7af",
+        rulerColor: "rgba(234,215,175,0.45)",
+        topAccent: "linear-gradient(90deg,rgba(139,101,8,0) 0%,#c8a96b 30%,#ead7af 50%,#c8a96b 70%,rgba(139,101,8,0) 100%)",
+        eyebrowColor: "#8b6810",
+        titleAccent: "linear-gradient(90deg,#c8a96b,#ead7af)",
+        cardBg: "#fffef9",
+        ctaBg: "linear-gradient(135deg,#c8a96b 0%,#ead7af 100%)",
+        ctaText: "#0c0900"
       };
   }
 }
 
 // ---------------------------------------------------------------------------
-// Construtor principal do HTML premium
+// Construtor HTML
+//
+// Estrutura de luxo: header limpo → espaço → título forte → texto breve → ação.
+// Nada é decorativo por acidente. Cada px de padding tem motivo.
 // ---------------------------------------------------------------------------
 
-function buildEmailHtml(input: EmailLayoutInput): string {
-  const config = getTierConfig(input.tier);
-  const replyTo = getReplyTo();
-  const portalUrl = buildPortalUrl("/cliente");
+function buildHtml(input: EmailInput): string {
+  const p = getPalette(input.tier);
+  const footerNote = input.footerNote
+    || `Você recebe esta mensagem como cliente do escritório Adv.&nbsp;Noemia Paixão. `
+    + `<a href="${escapeHtml(buildUrl("/cliente"))}" style="color:#8fa898;text-decoration:underline;">Acessar portal</a>`
+    + ` &bull; ${escapeHtml(replyTo())}`;
 
-  // Faixa superior (tiers com destaque visual no topo)
-  const topBandRow = config.topBand
-    ? `<tr><td height="5" style="height:5px;font-size:0;line-height:0;background:${config.topBand};">&thinsp;</td></tr>`
+  // Faixa de cor no topo (3–4px) — só para novo-cliente e vip
+  const topAccentRow = p.topAccent
+    ? `<tr><td height="4" style="height:4px;line-height:4px;font-size:0;background:${p.topAccent};">&thinsp;</td></tr>`
     : "";
 
-  // Arredondamento do cabeçalho depende de haver faixa superior
-  const headerRadius = config.topBand ? "0 0 0 0" : "18px 18px 0 0";
+  // Raio de borda do header depende da faixa
+  const headerRadius = p.topAccent ? "0 0 0 0" : "20px 20px 0 0";
 
-  // Badge VIP exclusivo — aparece antes do badge de tier
-  const vipExclusiveBadge = config.isVip
-    ? `<p style="margin:0 0 10px;font-size:0;">
-         <span style="display:inline-block;padding:4px 12px;border-radius:999px;background:rgba(234,215,175,0.08);border:1px solid rgba(234,215,175,0.35);color:rgba(234,215,175,0.7);font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-           &#9733;&ensp;Prioridade M&aacute;xima&ensp;&#9733;
-         </span>
-       </p>`
+  // Parágrafos do corpo
+  const paragraphsHtml = input.paragraphs
+    .map(
+      (text, i) =>
+        `<p style="margin:0${i < input.paragraphs.length - 1 ? " 0 18px" : ""};font-size:15px;line-height:1.9;color:#3d5248;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+          ${escapeHtml(text)}
+        </p>`
+    )
+    .join("\n");
+
+  // Info-card — documento solicitado, data de compromisso, etc.
+  const infoCardHtml = input.infoCard
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
+        <tr>
+          <td style="background-color:${p.cardBg};border-radius:10px;padding:20px 24px;">
+            <p style="margin:0 0 10px;font-size:13px;font-weight:600;letter-spacing:0.01em;color:#0a1e13;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+              ${escapeHtml(input.infoCard.heading)}
+            </p>
+            ${input.infoCard.lines.map(
+              (line) =>
+                `<p style="margin:0 0 5px;font-size:13px;line-height:1.7;color:#5e7a6e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+                  ${escapeHtml(line)}
+                </p>`
+            ).join("")}
+          </td>
+        </tr>
+      </table>`
     : "";
 
-  // Separador ouro no cabeçalho
-  const hairlineDivider = `<tr>
-    <td style="padding:0 36px;">
-      <div style="height:1px;font-size:1px;line-height:1px;background:linear-gradient(90deg,${config.hairlineColor} 0%,rgba(200,169,107,0.08) 75%,transparent 100%);"></div>
-    </td>
-  </tr>`;
+  // Linha dourada após título — apenas VIP
+  const titleAccentHtml = p.titleAccent
+    ? `<div style="width:40px;height:2px;background:${p.titleAccent};margin:18px 0 24px;font-size:0;line-height:0;"></div>`
+    : `<div style="height:22px;"></div>`;
 
-  // Linhas de metadata
-  const metadataRows =
-    input.metadata?.length
-      ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;border-collapse:collapse;">
-          ${input.metadata.map((entry, i) => `
-          <tr>
-            <td style="padding:10px 0 10px;${i > 0 ? "border-top:1px solid rgba(0,0,0,0.055);" : ""}color:#8fa89e;font-size:12px;letter-spacing:0.01em;width:40%;vertical-align:top;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-              ${escapeHtml(entry.label)}
-            </td>
-            <td style="padding:10px 0 10px;${i > 0 ? "border-top:1px solid rgba(0,0,0,0.055);" : ""}color:#1c3028;font-size:13px;font-weight:600;vertical-align:top;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-              ${escapeHtml(entry.value)}
-            </td>
-          </tr>`).join("")}
-        </table>`
-      : "";
-
-  // Footer copy
-  const footerCopy = input.footer
-    ? escapeHtml(input.footer)
-    : `Voc&ecirc; est&aacute; recebendo esta mensagem porque &eacute; cliente do escrit&oacute;rio Adv.&nbsp;Noemia Paix&atilde;o. Portal: <a href="${escapeHtml(portalUrl)}" style="color:#8fa89e;">${escapeHtml(portalUrl)}</a> &bull; Contato: ${escapeHtml(replyTo)}`;
+  // Padding do corpo — VIP tem mais respiro
+  const bodyPadding = input.tier === "vip" ? "54px 48px 50px" : "46px 44px 42px";
+  const headerPadding = input.tier === "vip" ? "28px 48px 26px" : "26px 44px 24px";
 
   return `<!DOCTYPE html>
-<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
   <title>${escapeHtml(input.title)}</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 </head>
-<body style="margin:0;padding:0;background-color:#e8e2d9;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background-color:#e8e3db;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
 
-<!-- Wrapper externo -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e8e2d9;min-width:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e8e3db;">
   <tr>
-    <td align="center" valign="top" style="padding:40px 16px;">
+    <td align="center" style="padding:44px 16px 52px;">
 
-      <!-- Coluna central — max 600px -->
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
 
-        ${topBandRow}
+        ${topAccentRow}
 
-        <!-- ═══════════════════════════ CABEÇALHO ═══════════════════════════ -->
+        <!-- ─── HEADER: apenas identidade ──────────────────────────────── -->
         <tr>
-          <td style="background-color:${config.headerBg};border-radius:${headerRadius};padding:0;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-
-              <!-- Identidade: monograma + nome -->
-              <tr>
-                <td style="padding:30px 36px 22px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <!-- Monograma circular -->
-                      <td style="width:44px;padding-right:14px;vertical-align:middle;">
-                        <div style="width:40px;height:40px;border-radius:50%;border:1px solid ${config.monogramBorder};text-align:center;line-height:40px;color:${config.monogramColor};font-size:13px;font-weight:700;letter-spacing:0.06em;font-family:Georgia,'Times New Roman',serif;">NP</div>
-                      </td>
-                      <!-- Nome e subtítulo -->
-                      <td style="vertical-align:middle;">
-                        <p style="margin:0 0 3px;color:${config.officeNameColor};font-size:15px;font-weight:600;letter-spacing:0.015em;font-family:Georgia,'Times New Roman',serif;">Adv.&nbsp;Noemia Paix&atilde;o</p>
-                        <p style="margin:0;color:${config.subtitleColor};font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Portal Jur&iacute;dico</p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-
-              ${hairlineDivider}
-
-              <!-- Badge tier + VIP mark -->
-              <tr>
-                <td style="padding:16px 36px 28px;">
-                  ${vipExclusiveBadge}
-                  <p style="margin:0;font-size:0;">
-                    <span style="display:inline-block;padding:6px 16px;border-radius:999px;background:${config.badgeBg};border:1px solid ${config.badgeBorder};color:${config.badgeColor};font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-                      ${escapeHtml(config.badgeText)}
-                    </span>
-                  </p>
-                </td>
-              </tr>
-
-            </table>
+          <td style="background-color:${p.headerBg};border-radius:${headerRadius};padding:${headerPadding};">
+            <p style="margin:0 0 16px;color:${p.wordmarkColor};font-size:13px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;font-family:Georgia,'Times New Roman',serif;">
+              Adv.&nbsp;Noemia Paix&atilde;o
+            </p>
+            <div style="width:32px;height:1px;background:${p.rulerColor};font-size:0;line-height:0;"></div>
           </td>
         </tr>
 
-        <!-- ════════════════════════════ CORPO ════════════════════════════ -->
+        <!-- ─── CORPO: mensagem principal ──────────────────────────────── -->
         <tr>
-          <td style="background-color:#ffffff;padding:38px 36px 34px;">
+          <td style="background-color:#ffffff;padding:${bodyPadding};">
 
-            <!-- Eyebrow -->
-            <p style="margin:0 0 14px;color:${config.eyebrowColor};font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+            <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:${p.eyebrowColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
               ${escapeHtml(input.eyebrow)}
             </p>
 
-            <!-- Título principal -->
-            <h1 style="margin:0 0 20px;font-size:28px;line-height:1.22;letter-spacing:-0.02em;color:#0a1e13;font-family:Georgia,'Times New Roman','Palatino Linotype',serif;font-weight:600;">
+            <h1 style="margin:0;font-size:28px;line-height:1.25;letter-spacing:-0.022em;color:#091911;font-family:Georgia,'Times New Roman','Palatino Linotype',serif;font-weight:600;">
               ${escapeHtml(input.title)}
             </h1>
 
-            <!-- Separador decorativo abaixo do título (VIP only) -->
-            ${config.isVip ? `<div style="height:2px;width:48px;background:linear-gradient(90deg,#c8a96b,#ead7af);margin:0 0 22px;font-size:0;line-height:0;"></div>` : ""}
+            ${titleAccentHtml}
 
-            <!-- Introdução -->
-            <p style="margin:0 0 26px;font-size:15px;line-height:1.85;color:#4e6258;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-              ${escapeHtml(input.intro)}
-            </p>
+            ${paragraphsHtml}
 
-            <!-- Painel de conteúdo -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+            ${infoCardHtml}
+
+            <!-- CTA ──────────────────────────────────────────────────── -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:${input.infoCard ? "4px" : "36px"};">
               <tr>
-                <td style="background-color:${config.panelBg};border-radius:12px;padding:18px 22px;border-left:3px solid ${config.panelBorderColor};">
-                  <p style="margin:0;font-size:14px;line-height:1.9;color:#243830;white-space:pre-line;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-                    ${escapeHtml(input.body)}
-                  </p>
-                </td>
-              </tr>
-            </table>
-
-            ${metadataRows}
-
-            <!-- Botão CTA -->
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-              <tr>
-                <td style="border-radius:999px;background:${config.ctaBg};box-shadow:0 6px 24px rgba(0,0,0,0.18);">
+                <td style="border-radius:999px;background:${p.ctaBg};">
                   <a href="${escapeHtml(input.ctaHref)}" target="_blank" rel="noopener noreferrer"
-                     style="display:inline-block;padding:15px 34px;border-radius:999px;color:${config.ctaColor};text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.06em;border:1px solid ${config.ctaBorder};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                     style="display:inline-block;padding:14px 36px;border-radius:999px;color:${p.ctaText};text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
                     ${escapeHtml(input.ctaLabel)}
                   </a>
                 </td>
@@ -354,23 +293,14 @@ function buildEmailHtml(input: EmailLayoutInput): string {
           </td>
         </tr>
 
-        <!-- ═══════════════════════════ RODAPÉ ═══════════════════════════ -->
+        <!-- ─── RODAPÉ: mínimo ─────────────────────────────────────────── -->
         <tr>
-          <td style="background-color:#f0ebe3;border-radius:0 0 18px 18px;padding:22px 36px 28px;border-top:1px solid rgba(0,0,0,0.06);">
-            <p style="margin:0 0 10px;font-size:12px;font-style:italic;color:#6e8880;font-family:Georgia,'Times New Roman',serif;letter-spacing:0.01em;">
-              Atendimento jur&iacute;dico especializado com &eacute;tica e dedica&ccedil;&atilde;o.
+          <td style="background-color:#f0ebe3;border-radius:0 0 20px 20px;padding:20px 44px 24px;border-top:1px solid rgba(0,0,0,0.05);">
+            <p style="margin:0 0 8px;font-size:11px;font-style:italic;color:#7a9490;letter-spacing:0.01em;font-family:Georgia,'Times New Roman',serif;">
+              Atendimento jur&iacute;dico com aten&ccedil;&atilde;o, &eacute;tica e resultado.
             </p>
-            <p style="margin:0;font-size:11px;line-height:1.75;color:#9aada8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-              ${footerCopy}
-            </p>
-          </td>
-        </tr>
-
-        <!-- Crédito discreto -->
-        <tr>
-          <td align="center" style="padding:18px 0 0;">
-            <p style="margin:0;font-size:10px;color:#b0bdb9;letter-spacing:0.06em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-              PORTAL JUR&Iacute;DICO &mdash; ADV.&nbsp;NOEMIA PAIX&Atilde;O
+            <p style="margin:0;font-size:11px;line-height:1.75;color:#9fb0ab;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+              ${footerNote}
             </p>
           </td>
         </tr>
@@ -385,72 +315,55 @@ function buildEmailHtml(input: EmailLayoutInput): string {
 }
 
 // ---------------------------------------------------------------------------
-// Versão texto puro (fallback para clientes sem HTML)
+// Versão texto puro
 // ---------------------------------------------------------------------------
 
-function buildEmailText(input: Omit<EmailLayoutInput, "tier">): string {
-  const separator = "─".repeat(52);
-  const lines: string[] = [
-    "ADV. NOEMIA PAIXÃO — PORTAL JURÍDICO",
-    separator,
+function buildText(input: EmailInput): string {
+  const lines = [
+    "ADV. NOEMIA PAIXÃO",
+    "─".repeat(40),
     "",
-    `[ ${input.eyebrow.toUpperCase()} ]`,
+    input.eyebrow.toUpperCase(),
     "",
     input.title,
-    ""
+    "",
+    ...input.paragraphs.flatMap((p) => [p, ""]),
   ];
 
-  if (input.intro) {
-    lines.push(input.intro, "");
-  }
-
-  lines.push(input.body, "");
-
-  if (input.metadata?.length) {
-    lines.push(separator);
-    for (const entry of input.metadata) {
-      lines.push(`${entry.label}: ${entry.value}`);
-    }
+  if (input.infoCard) {
+    lines.push(input.infoCard.heading);
+    lines.push(...input.infoCard.lines);
     lines.push("");
   }
 
-  lines.push(`→ ${input.ctaLabel}`, `   ${input.ctaHref}`, "");
-
-  if (input.footer) {
-    lines.push(separator, input.footer);
+  lines.push(`→ ${input.ctaLabel}`, `  ${input.ctaHref}`, "");
+  if (input.footerNote) {
+    lines.push("─".repeat(40), input.footerNote);
   }
-
-  lines.push("", separator, "Atendimento jurídico especializado com ética e dedicação.");
 
   return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
-// Detecção automática de tier
+// Detecção de tier
 // ---------------------------------------------------------------------------
 
-function detectClientTier(record: NotificationTemplateRecord): ClientTier {
-  const payload = record.payload || {};
+function detectTier(record: NotificationTemplateRecord): ClientTier {
+  const p = record.payload || {};
 
-  if (
-    payload.clientTier === "vip" ||
-    payload.clientTier === "novo-cliente" ||
-    payload.clientTier === "em-andamento" ||
-    payload.clientTier === "pendencia"
-  ) {
-    return payload.clientTier as ClientTier;
+  if (p.clientTier === "vip" || p.clientTier === "novo-cliente"
+    || p.clientTier === "em-andamento" || p.clientTier === "pendencia") {
+    return p.clientTier as ClientTier;
   }
 
-  if (payload.casePriority === "urgente") return "vip";
+  if (p.casePriority === "urgente") return "vip";
 
   if (record.template_key === "client-invite" || record.template_key === "invite-reminder") {
     return "novo-cliente";
   }
 
-  if (
-    record.template_key === "document-request" ||
-    record.template_key === "document-request-reminder"
-  ) {
+  if (record.template_key === "document-request"
+    || record.template_key === "document-request-reminder") {
     return "pendencia";
   }
 
@@ -458,217 +371,213 @@ function detectClientTier(record: NotificationTemplateRecord): ClientTier {
 }
 
 // ---------------------------------------------------------------------------
-// Renderizadores por tipo de template
+// Templates por tipo
 // ---------------------------------------------------------------------------
 
-function renderInviteTrackingEmail(record: NotificationTemplateRecord): RenderedEmail {
+function renderInvite(record: NotificationTemplateRecord): RenderedEmail {
   const payload = record.payload || {};
-  const fullName = asString(payload.fullName, "Cliente");
-  const caseAreaLabel = asString(payload.caseAreaLabel, "seu atendimento");
-  const tier = detectClientTier(record);
+  const name = asString(payload.fullName, "Cliente").split(" ")[0]; // primeiro nome
+  const area = asString(payload.caseAreaLabel, "seu caso");
 
-  const layout: EmailLayoutInput = {
-    tier,
-    eyebrow: "Primeiro acesso",
-    title: `${fullName}, seu portal jurídico está pronto.`,
-    intro: `A equipe preparou seu acesso exclusivo para acompanhar o ${caseAreaLabel} com clareza, segurança e organização — em qualquer dispositivo.`,
-    body:
-      `Ao entrar pela primeira vez, você encontrará:\n\n` +
-      `• O status atualizado do seu caso\n` +
-      `• Documentos organizados e disponíveis para download\n` +
-      `• As próximas datas e compromissos importantes\n` +
-      `• O histórico de movimentações registradas pela equipe`,
-    ctaLabel: "Acessar meu portal agora",
-    ctaHref: buildPortalUrl(CLIENT_LOGIN_PATH),
-    footer:
-      `Este e-mail acompanha o processo de onboarding no portal jurídico. ` +
-      `O link de primeiro acesso foi enviado separadamente. ` +
-      `Dúvidas: ${getReplyTo()}`
+  const input: EmailInput = {
+    tier: "novo-cliente",
+    eyebrow: "Bem-vinda ao portal",
+    title: `${name}, seu espaço está pronto.`,
+    paragraphs: [
+      `Preparamos um portal exclusivo para acompanhar o ${area} com clareza e segurança. `
+      + `Do andamento às datas importantes, tudo organizado em um único lugar — acessível quando e onde você precisar.`,
+      `O primeiro acesso leva menos de dois minutos.`
+    ],
+    ctaLabel: "Acessar meu portal",
+    ctaHref: buildUrl(CLIENT_LOGIN_PATH)
   };
 
-  return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+  return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
 }
 
-function renderCaseEventEmail(record: NotificationTemplateRecord): RenderedEmail {
+function renderCaseEvent(record: NotificationTemplateRecord): RenderedEmail {
   const payload = record.payload || {};
-  const title = asString(payload.title, "Nova movimentação no portal");
-  const publicSummary = asString(
-    payload.publicSummary,
-    "A equipe registrou uma nova movimentação no seu caso."
-  );
+  const title = asString(payload.title, "Atualização no seu caso");
+  const summary = asString(payload.publicSummary, "A equipe registrou uma movimentação no seu caso.");
   const eventLabel = asString(payload.eventLabel, "Atualização");
-  const tier = detectClientTier(record);
+  const tier = detectTier(record);
 
-  const actionByTemplate: Record<string, { label: string; path: string }> = {
+  const actionMap: Record<string, { label: string; path: string }> = {
     "new-document":            { label: "Ver documento",              path: "/documentos" },
-    "document-request":        { label: "Ver pendência",              path: "/documentos#solicitacoes-abertas" },
+    "document-request":        { label: "Ver solicitação",            path: "/documentos#solicitacoes-abertas" },
     "new-appointment":         { label: "Abrir agenda",               path: "/agenda" },
-    "appointment-updated":     { label: "Ver compromisso atualizado", path: "/agenda" },
+    "appointment-updated":     { label: "Ver compromisso",            path: "/agenda" },
     "appointment-rescheduled": { label: "Ver novo horário",           path: "/agenda" },
     "appointment-cancelled":   { label: "Abrir agenda",               path: "/agenda" },
-    "status-change":           { label: "Ver status do caso",         path: "/cliente" },
+    "status-change":           { label: "Acompanhar caso",            path: "/cliente" },
     "case-update":             { label: "Ver atualização",            path: "/cliente#historico-atualizacoes" }
   };
 
-  const action = actionByTemplate[record.template_key] || { label: "Abrir meu painel", path: "/cliente" };
+  const action = actionMap[record.template_key] || { label: "Acessar portal", path: "/cliente" };
 
-  const layout: EmailLayoutInput = {
+  // Para VIP, adicionamos uma linha de fechamento que reforça o cuidado
+  const paragraphs = tier === "vip"
+    ? [summary, "Acompanhamos cada detalhe com a atenção que o seu caso merece."]
+    : [summary];
+
+  const input: EmailInput = {
     tier,
     eyebrow: eventLabel,
     title,
-    intro: "Uma nova informação foi registrada pela equipe e já está disponível no seu portal.",
-    body: publicSummary,
+    paragraphs,
     ctaLabel: action.label,
-    ctaHref: buildPortalUrl(action.path)
+    ctaHref: buildUrl(action.path)
   };
 
-  return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+  return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
 }
 
-function renderInternalTriageEmail(record: NotificationTemplateRecord): RenderedEmail {
+function renderTriage(record: NotificationTemplateRecord): RenderedEmail {
   const payload = record.payload || {};
-  const fullName = asString(payload.fullName, "Novo contato");
-  const caseAreaLabel = asString(payload.caseAreaLabel, "Atendimento jurídico");
-  const urgencyLabel = asString(payload.urgencyLabel, "Moderada");
-  const stageLabel = asString(payload.stageLabel, "Contexto inicial");
-  const submittedAtLabel = asString(payload.submittedAtLabel, "Agora");
-  const caseSummary = asString(payload.caseSummary, "Triagem registrada. Revisar no painel.");
-  const destinationPath = asString(payload.destinationPath, "/internal/advogada");
+  const name = asString(payload.fullName, "Novo contato");
+  const area = asString(payload.caseAreaLabel, "Atendimento");
+  const urgency = asString(payload.urgencyLabel, "Moderada");
+  const stage = asString(payload.stageLabel, "—");
+  const receivedAt = asString(payload.submittedAtLabel, "Agora");
+  const summary = asString(payload.caseSummary, "—");
+  const dest = asString(payload.destinationPath, "/internal/advogada");
   const isUrgent = record.template_key === "triage-urgent";
 
-  const layout: EmailLayoutInput = {
+  const input: EmailInput = {
     tier: "em-andamento",
-    eyebrow: isUrgent ? "Triagem urgente" : "Nova triagem recebida",
-    title: isUrgent ? `Prioridade alta: ${fullName}` : `Nova triagem de ${fullName}`,
-    intro: `${caseAreaLabel} — Urgência: ${urgencyLabel} — ${stageLabel}`,
-    body: `${caseSummary}\n\nRecebida em: ${submittedAtLabel}.`,
+    eyebrow: isUrgent ? "Triagem urgente" : "Nova triagem",
+    title: isUrgent ? `Prioridade alta — ${name}` : `Nova triagem recebida: ${name}`,
+    paragraphs: [`${area} · Urgência: ${urgency} · ${stage}`, summary],
+    infoCard: {
+      heading: `Recebida em ${receivedAt}`,
+      lines: [
+        `Contato: ${asString(payload.contactEmail, "—")}`,
+        `Telefone: ${asString(payload.contactPhone, "—")}`
+      ].filter((l) => !l.endsWith("—"))
+    },
     ctaLabel: "Abrir painel interno",
-    ctaHref: buildPortalUrl(destinationPath),
-    metadata: [
-      { label: "Nome", value: fullName },
-      { label: "Área", value: caseAreaLabel },
-      { label: "Urgência", value: urgencyLabel },
-      { label: "Momento atual", value: stageLabel },
-      { label: "Recebida em", value: submittedAtLabel }
-    ],
-    footer: "Notificação operacional interna. Não encaminhe esta mensagem."
+    ctaHref: buildUrl(dest),
+    footerNote: "Notificação interna. Não encaminhar."
   };
 
-  return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+  return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
 }
 
-function renderReminderEmail(record: NotificationTemplateRecord): RenderedEmail {
+function renderReminder(record: NotificationTemplateRecord): RenderedEmail {
   const payload = record.payload || {};
-  const fullName = asString(payload.fullName, "Cliente");
-  const destinationPath = asString(payload.destinationPath, CLIENT_LOGIN_PATH);
-  const tier = detectClientTier(record);
+  const firstName = asString(payload.fullName, "Cliente").split(" ")[0];
+  const dest = asString(payload.destinationPath, CLIENT_LOGIN_PATH);
+  const tier = detectTier(record);
 
+  // ── Convite não utilizado ─────────────────────────────────────────────────
   if (record.template_key === "invite-reminder") {
-    const invitedAtLabel = asString(payload.invitedAtLabel, "recentemente");
-    const isLate = asString(payload.reminderStage, "24h") === "72h";
+    const isLate = asString(payload.reminderStage) === "72h";
 
-    const layout: EmailLayoutInput = {
+    const input: EmailInput = {
       tier,
-      eyebrow: "Lembrete de acesso",
-      title: "Seu portal ainda está esperando por você.",
-      intro: isLate
-        ? `${fullName}, seu acesso foi preparado em ${invitedAtLabel} e ainda aguarda confirmação.`
-        : `${fullName}, o portal jurídico está pronto desde ${invitedAtLabel}.`,
-      body: isLate
-        ? `Qualquer dúvida para entrar, basta responder este e-mail. A equipe está disponível para apoiar o acesso.`
-        : `Ao concluir o primeiro acesso, você terá o status do caso, os documentos e as próximas datas organizados em um único lugar.`,
-      ctaLabel: "Entrar no portal",
-      ctaHref: buildPortalUrl(destinationPath)
+      eyebrow: "Acesso ao portal",
+      title: "Seu portal continua esperando por você.",
+      paragraphs: isLate
+        ? [
+            `${firstName}, seu acesso foi preparado há alguns dias e ainda está disponível. Se precisar de apoio para entrar, é só responder este e-mail — estamos à disposição.`
+          ]
+        : [
+            `${firstName}, tudo está pronto para o seu primeiro acesso. Em poucos minutos você terá o status do caso, os documentos e as próximas datas organizados em um único lugar.`
+          ],
+      ctaLabel: "Entrar agora",
+      ctaHref: buildUrl(dest)
     };
 
-    return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+    return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
   }
 
+  // ── Documento solicitado ──────────────────────────────────────────────────
   if (record.template_key === "document-request-reminder") {
-    const requestTitle = asString(payload.requestTitle, "Documento pendente");
+    const docTitle = asString(payload.requestTitle, "Documento pendente");
     const caseTitle = asString(payload.caseTitle, "seu caso");
-    const dueAtLabel = asString(payload.dueAtLabel, "sem prazo definido");
-    const reminderStage = asString(payload.reminderStage, "open");
+    const due = asString(payload.dueAtLabel, "");
     const instructions = asString(payload.instructions, "");
-    const isOverdue = reminderStage === "overdue";
+    const isOverdue = asString(payload.reminderStage) === "overdue";
 
-    const layout: EmailLayoutInput = {
+    const opening = isOverdue
+      ? `${firstName}, seu caso está aguardando um documento para seguir em frente. Assim que recebermos, retomamos imediatamente.`
+      : `${firstName}, para que o ${caseTitle} avance sem interrupções, precisamos de um documento. O envio é simples e rápido.`;
+
+    const infoLines = [due ? `Prazo: ${due}` : ""].filter(Boolean);
+    if (instructions) infoLines.push(instructions);
+
+    const input: EmailInput = {
       tier,
-      eyebrow: isOverdue ? "Pendência em aberto" : "Lembrete documental",
-      title: "Um documento aguarda envio no seu portal.",
-      intro: isOverdue
-        ? `${fullName}, ainda existe uma solicitação documental em aberto para ${caseTitle}.`
-        : `${fullName}, a equipe aguarda um documento importante para continuar o acompanhamento de ${caseTitle}.`,
-      body:
-        `Documento solicitado: ${requestTitle}\nPrazo: ${dueAtLabel}` +
-        (instructions ? `\n\nOrientações da equipe:\n${instructions}` : ""),
-      ctaLabel: "Ver solicitação no portal",
-      ctaHref: buildPortalUrl(destinationPath),
-      metadata: [
-        { label: "Documento", value: requestTitle },
-        { label: "Caso", value: caseTitle },
-        { label: "Prazo", value: dueAtLabel }
-      ]
+      eyebrow: isOverdue ? "Atenção necessária" : "Documento pendente",
+      title: "Um passo para o seu caso avançar.",
+      paragraphs: [opening],
+      infoCard: {
+        heading: docTitle,
+        lines: infoLines
+      },
+      ctaLabel: "Enviar documento",
+      ctaHref: buildUrl(dest)
     };
 
-    return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+    return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
   }
 
+  // ── Compromisso ───────────────────────────────────────────────────────────
   if (record.template_key === "appointment-reminder") {
-    const title = asString(payload.title, "Compromisso do caso");
+    const apptTitle = asString(payload.title, "Compromisso");
     const caseTitle = asString(payload.caseTitle, "seu caso");
-    const startsAtLabel = asString(payload.startsAtLabel, "em breve");
+    const startsAt = asString(payload.startsAtLabel, "—");
     const notes = asString(payload.notes, "");
 
-    const layout: EmailLayoutInput = {
+    const input: EmailInput = {
       tier,
       eyebrow: "Lembrete de compromisso",
-      title,
-      intro: `${fullName}, há um compromisso importante previsto para ${caseTitle}.`,
-      body: `Data e hora: ${startsAtLabel}` + (notes ? `\n\nObservações da equipe:\n${notes}` : ""),
-      ctaLabel: "Ver na agenda do portal",
-      ctaHref: buildPortalUrl(destinationPath),
-      metadata: [
-        { label: "Compromisso", value: title },
-        { label: "Caso", value: caseTitle },
-        { label: "Data e hora", value: startsAtLabel }
-      ]
+      title: apptTitle,
+      paragraphs: [
+        `${firstName}, há um compromisso importante marcado para ${caseTitle}.`
+        + (notes ? ` ${notes}` : "")
+      ],
+      infoCard: {
+        heading: `Data e hora`,
+        lines: [startsAt]
+      },
+      ctaLabel: "Ver na agenda",
+      ctaHref: buildUrl(dest)
     };
 
-    return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+    return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
   }
 
-  // Fallback genérico
-  const layout: EmailLayoutInput = {
+  // Fallback
+  const input: EmailInput = {
     tier,
     eyebrow: "Portal jurídico",
     title: record.subject,
-    intro: `${fullName}, há uma nova movimentação aguardando atenção no portal.`,
-    body: "Acesse o portal para ver os detalhes atualizados do seu atendimento.",
-    ctaLabel: "Abrir portal",
-    ctaHref: buildPortalUrl(destinationPath)
+    paragraphs: [`${firstName}, há uma novidade no seu portal. Acesse para ver os detalhes.`],
+    ctaLabel: "Acessar portal",
+    ctaHref: buildUrl(dest)
   };
 
-  return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+  return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
 }
 
 // ---------------------------------------------------------------------------
-// Exportação principal — despachante por template_key
+// Exportação principal
 // ---------------------------------------------------------------------------
 
 export function renderNotificationEmail(record: NotificationTemplateRecord): RenderedEmail {
   switch (record.template_key) {
     case "client-invite":
-      return renderInviteTrackingEmail(record);
+      return renderInvite(record);
 
     case "triage-submitted":
     case "triage-urgent":
-      return renderInternalTriageEmail(record);
+      return renderTriage(record);
 
     case "invite-reminder":
     case "document-request-reminder":
     case "appointment-reminder":
-      return renderReminderEmail(record);
+      return renderReminder(record);
 
     case "case-update":
     case "new-document":
@@ -678,20 +587,19 @@ export function renderNotificationEmail(record: NotificationTemplateRecord): Ren
     case "appointment-cancelled":
     case "document-request":
     case "status-change":
-      return renderCaseEventEmail(record);
+      return renderCaseEvent(record);
 
     default: {
-      const tier = detectClientTier(record);
-      const layout: EmailLayoutInput = {
+      const tier = detectTier(record);
+      const input: EmailInput = {
         tier,
         eyebrow: "Portal jurídico",
         title: record.subject,
-        intro: "Uma nova notificação foi preparada para o seu atendimento.",
-        body: "A equipe registrou uma nova movimentação. Entre no portal para ver os detalhes.",
-        ctaLabel: "Abrir portal",
-        ctaHref: buildPortalUrl("/cliente")
+        paragraphs: ["A equipe registrou uma novidade no seu atendimento. Acesse o portal para ver os detalhes."],
+        ctaLabel: "Acessar portal",
+        ctaHref: buildUrl("/cliente")
       };
-      return { subject: record.subject, html: buildEmailHtml(layout), text: buildEmailText(layout) };
+      return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
     }
   }
 }

@@ -25,6 +25,7 @@ import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
 import {
   registerCaseDocument,
   requestCaseDocument,
+  submitClientDocument,
   updateDocumentRequestStatus
 } from "@/lib/services/manage-documents";
 
@@ -60,6 +61,8 @@ function getSuccessMessage(success: string) {
       return "Pendencia documental concluida com sucesso. O portal ja refletiu essa mudanca.";
     case "solicitacao-cancelada":
       return "Solicitacao cancelada com sucesso. A equipe e o cliente passam a ver o novo estado.";
+    case "documento-enviado":
+      return "Documento enviado com sucesso. A equipe recebeu e vai analisar em breve.";
     default:
       return "";
   }
@@ -155,6 +158,32 @@ async function updateRequestStatusAction(formData: FormData) {
       status === "completed" ? "solicitacao-concluida" : "solicitacao-cancelada"
     }`
   );
+}
+
+async function submitClientDocumentAction(formData: FormData) {
+  "use server";
+
+  const profile = await requireProfile(["cliente"]);
+  const requestId = String(formData.get("requestId") || "").trim();
+  const uploadedFile = formData.get("file");
+
+  if (!requestId) {
+    redirect("/documentos?error=solicitacao-invalida");
+  }
+
+  try {
+    await submitClientDocument(
+      requestId,
+      profile.id,
+      uploadedFile instanceof File ? uploadedFile : null
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? encodeURIComponent(error.message) : "erro-ao-enviar-documento";
+    redirect(`/documentos?error=${message}`);
+  }
+
+  redirect("/documentos?success=documento-enviado");
 }
 
 export default async function DocumentsPage({
@@ -732,6 +761,8 @@ export default async function DocumentsPage({
   const params = searchParams ? await searchParams : {};
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
+  const successKey = typeof params.success === "string" ? params.success : "";
+  const success = getSuccessMessage(successKey);
   const query = getStringParam(params.q);
   const scope = getStringParam(params.scope, "all");
   const sort = getStringParam(params.sort, "recent");
@@ -811,6 +842,7 @@ export default async function DocumentsPage({
         ]}
       >
       {error ? <div className="error-notice">{error}</div> : null}
+      {success ? <div className="success-notice">{success}</div> : null}
 
       <SectionCard
         title="Encontrar documentos"
@@ -1019,6 +1051,28 @@ export default async function DocumentsPage({
                       : "Sem prazo definido"}
                   </span>
                 </div>
+                <form
+                  action={submitClientDocumentAction}
+                  className="stack"
+                  encType="multipart/form-data"
+                >
+                  <input type="hidden" name="requestId" value={request.id} />
+                  <div className="field-full">
+                    <label htmlFor={`upload-file-${request.id}`}>Enviar documento</label>
+                    <input
+                      id={`upload-file-${request.id}`}
+                      name="file"
+                      type="file"
+                      accept={documentUploadAccept}
+                      required
+                    />
+                  </div>
+                  <div className="form-actions">
+                    <FormSubmitButton pendingLabel="Enviando documento...">
+                      Enviar arquivo
+                    </FormSubmitButton>
+                  </div>
+                </form>
               </li>
             ))}
           </ul>

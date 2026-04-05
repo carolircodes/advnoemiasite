@@ -732,6 +732,137 @@ export async function updateDocumentRequestStatus(rawInput: unknown, actorProfil
   };
 }
 
+export async function submitClientDocument(
+  requestId: string,
+  clientProfileId: string,
+  uploadedFile: File | null
+) {
+  const file = validateUploadedFile(uploadedFile);
+  const supabase = createAdminSupabaseClient();
+
+  // Load request and verify it's still open
+  const { data: requestRecord, error: requestError } = await supabase
+    .from("document_requests")
+    .select("id,case_id,title,status,visible_to_client")
+    .eq("id", requestId)
+    .single();
+
+  if (requestError || !requestRecord) {
+    throw new Error("Solicitacao de documento nao encontrada.");
+  }
+
+  if (requestRecord.status !== "pending") {
+    throw new Error("Esta solicitacao ja foi respondida ou cancelada.");
+  }
+
+  // Verify the authenticated client actually owns this case
+  const { caseRecord, clientRecord } = await resolveCaseContext(requestRecord.case_id);
+
+  if (clientRecord.profile_id !== clientProfileId) {
+    throw new Error("Voce nao tem permissao para responder esta solicitacao.");
+  }
+
+  const documentId = crypto.randomUUID();
+  const storagePath = buildStoragePath({
+    clientId: clientRecord.id,
+    caseId: caseRecord.id,
+    documentId,
+    fileName: file.fileName
+  });
+
+  await uploadDocumentFile({
+    storagePath,
+    file: uploadedFile as File,
+    mimeType: file.mimeType
+  });
+
+  const { data: documentRecord, error: documentError } = await supabase
+    .from("documents")
+    .insert({
+      id: documentId,
+      case_id: caseRecord.id,
+      file_name: file.fileName,
+      storage_path: storagePath,
+      category: requestRecord.title,
+      description: `Enviado pelo cliente em resposta a solicitacao: ${requestRecord.title}`,
+      status: "recebido",
+      document_date: new Date().toISOString(),
+      visibility: "client",
+      uploaded_by: clientProfileId,
+      mime_type: file.mimeType,
+      file_size_bytes: uploadedFile?.size || null
+    })
+    .select("id")
+    .single();
+
+  if (documentError || !documentRecord) {
+    await removeDocumentFile(storagePath);
+    throw new Error(documentError?.message || "Nao foi possivel registrar o documento enviado.");
+  }
+
+  // Mark request as completed
+  const { error: requestUpdateError } = await supabase
+    .from("document_requests")
+    .update({ status: "completed" })
+    .eq("id", requestId);
+
+  if (requestUpdateError) {
+    await rollbackDocumentRecord(documentRecord.id);
+    await removeDocumentFile(storagePath);
+    throw new Error("Nao foi possivel concluir a solicitacao apos o envio.");
+  }
+
+  // Case event — visible to client + staff; no client notification (they just sent it)
+  const { error: eventError } = await supabase.from("case_events").insert({
+    case_id: caseRecord.id,
+    client_id: clientRecord.id,
+    event_type: "new_document",
+    title: `Documento enviado pelo cliente: ${file.fileName}`,
+    description: `Cliente respondeu a solicitacao "${requestRecord.title}" com o arquivo ${file.fileName}.`,
+    public_summary: `Seu documento foi recebido com sucesso. A equipe vai analisar e te informa assim que houver retorno.`,
+    triggered_by: clientProfileId,
+    visible_to_client: true,
+    should_notify_client: false,
+    occurred_at: new Date().toISOString(),
+    payload: {
+      source: "client-upload",
+      documentId: documentRecord.id,
+      requestId,
+      mimeType: file.mimeType,
+      fileSizeBytes: uploadedFile?.size || null
+    }
+  });
+
+  if (eventError) {
+    console.warn("[client-documents.submit] Falha ao registrar evento do caso:", eventError.message);
+  }
+
+  // Audit log — non-blocking
+  try {
+    await supabase.from("audit_logs").insert({
+      actor_profile_id: clientProfileId,
+      action: "documents.client_upload",
+      entity_type: "documents",
+      entity_id: documentRecord.id,
+      payload: {
+        caseId: caseRecord.id,
+        requestId,
+        storagePath,
+        mimeType: file.mimeType,
+        fileSizeBytes: uploadedFile?.size || null
+      }
+    });
+  } catch (auditError) {
+    console.warn("[client-documents.submit] Falha no audit log:", auditError instanceof Error ? auditError.message : String(auditError));
+  }
+
+  return {
+    documentId: documentRecord.id,
+    storagePath,
+    requestId
+  };
+}
+
 export async function listLatestDocuments(limit = 20) {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
