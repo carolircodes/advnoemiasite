@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { getServerEnv } from "@/lib/config/env";
+import { getServerEnv } from "../config/env";
 
 export function createAdminSupabaseClient() {
   const env = getServerEnv();

@@ -1,10 +1,10 @@
 import "server-only";
 
-import type { PortalProfile } from "@/lib/auth/guards";
-import { askNoemiaSchema, caseAreaLabels } from "@/lib/domain/portal";
-import { getServerEnv } from "@/lib/config/env";
-import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
-import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
+import type { PortalProfile } from "../auth/guards";
+import { askNoemiaSchema, caseAreaLabels } from "../domain/portal";
+import { getServerEnv } from "../config/env";
+import { getBusinessIntelligenceOverview } from "./intelligence";
+import { getClientWorkspace, getStaffOverview } from "./dashboard";
 
 function compactText(value: string) {
   return value.replace(/\s+/g, " ").trim();

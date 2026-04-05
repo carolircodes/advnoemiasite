@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { corsPreflightResponse, withPublicApiCors } from "@/lib/http/cors-public";
-import { submitPublicTriage } from "@/lib/services/public-intake";
+import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
+import { submitPublicTriage } from "../../../../lib/services/public-intake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

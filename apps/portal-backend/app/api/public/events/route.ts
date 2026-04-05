@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { corsPreflightResponse, withPublicApiCors } from "@/lib/http/cors-public";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { recordProductEvent } from "@/lib/services/public-intake";
+import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
+import { createServerSupabaseClient } from "../../../../lib/supabase/server";
+import { recordProductEvent } from "../../../../lib/services/public-intake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

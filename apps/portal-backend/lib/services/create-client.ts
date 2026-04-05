@@ -1,16 +1,16 @@
 import "server-only";
 
-import { assertStaffActor } from "@/lib/auth/guards";
-import { getServerEnv } from "@/lib/config/env";
+import { assertStaffActor } from "../auth/guards";
+import { getServerEnv } from "../config/env";
 import {
   caseAreaLabels,
   createClientSchema,
   mapClientStatusToCaseStatus
-} from "@/lib/domain/portal";
-import { queueClientInviteTracking } from "@/lib/notifications/outbox";
-import { recordProductEvent } from "@/lib/services/public-intake";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+} from "../domain/portal";
+import { queueClientInviteTracking } from "../notifications/outbox";
+import { recordProductEvent } from "./public-intake";
+import { createAdminSupabaseClient } from "../supabase/admin";
+import { createServerSupabaseClient } from "../supabase/server";
 
 function buildInviteErrorMessage(
   inviteError: {

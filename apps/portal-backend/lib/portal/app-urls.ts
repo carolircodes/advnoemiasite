@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getServerEnv } from "@/lib/config/env";
+import { getServerEnv } from "../config/env";
 
 function stripTrailingSlash(origin: string) {
   return origin.replace(/\/$/, "");

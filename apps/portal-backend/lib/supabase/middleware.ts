@@ -7,9 +7,9 @@ import {
   canAccessPortalPath,
   isInternalApiPath,
   isProtectedPortalPath
-} from "@/lib/auth/access-control";
-import { isPortalRole } from "@/lib/domain/portal";
-import { getPublicEnv } from "@/lib/config/env";
+} from "../auth/access-control";
+import { isPortalRole } from "../domain/portal";
+import { getPublicEnv } from "../config/env";
 
 export async function updateSession(request: NextRequest) {
   const env = getPublicEnv();

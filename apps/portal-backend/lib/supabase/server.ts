@@ -3,7 +3,7 @@ import "server-only";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { getPublicEnv } from "@/lib/config/env";
+import { getPublicEnv } from "../config/env";
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();

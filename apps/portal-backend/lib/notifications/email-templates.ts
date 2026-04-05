@@ -1,8 +1,8 @@
 import "server-only";
 
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
-import { getServerEnv } from "@/lib/config/env";
-import type { ClientTier } from "@/lib/domain/portal";
+import { CLIENT_LOGIN_PATH } from "../auth/access-control";
+import { getServerEnv } from "../config/env";
+import type { ClientTier } from "../domain/portal";
 
 // ---------------------------------------------------------------------------
 // Tipos
