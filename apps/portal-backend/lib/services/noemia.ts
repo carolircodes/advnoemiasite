@@ -55,105 +55,148 @@ function buildPublicContext() {
 }
 
 async function buildClientContext(profile: PortalProfile) {
-  const workspace = await getClientWorkspace(profile);
-  const mainCase = workspace.cases[0] || null;
-  const openRequests = workspace.documentRequests.filter((item) => item.status === "pending");
-  const upcomingAppointments = workspace.appointments
-    .filter(
-      (appointment) =>
-        new Date(appointment.starts_at) >= new Date() &&
-        appointment.status !== "cancelled" &&
-        appointment.status !== "completed"
-    )
-    .slice(0, 4);
-  const latestEvents = workspace.events.slice(0, 5);
+  try {
+    const workspace = await getClientWorkspace(profile);
+    const mainCase = workspace.cases[0] || null;
+    const openRequests = workspace.documentRequests.filter((item) => item.status === "pending");
+    const upcomingAppointments = workspace.appointments
+      .filter(
+        (appointment) =>
+          new Date(appointment.starts_at) >= new Date() &&
+          appointment.status !== "cancelled" &&
+          appointment.status !== "completed"
+      )
+      .slice(0, 4);
+    const latestEvents = workspace.events.slice(0, 5);
 
-  return [
-    `Cliente autenticado: ${profile.full_name} (${profile.email}).`,
-    `Status do cadastro: ${workspace.clientRecord.status}.`,
-    mainCase
-      ? `Caso principal: ${mainCase.title} | area: ${
-          caseAreaLabels[mainCase.area as keyof typeof caseAreaLabels] || mainCase.area
-        } | status: ${mainCase.statusLabel}.`
-      : "Ainda nao ha caso principal visivel no portal.",
-    `Documentos disponiveis: ${
-      workspace.documents.filter((item) => item.status === "recebido" || item.status === "revisado")
-        .length
-    }.`,
-    `Documentos pendentes: ${
-      workspace.documents.filter((item) => item.status === "pendente" || item.status === "solicitado")
-        .length
-    }.`,
-    `Solicitacoes documentais abertas: ${openRequests.length}.`,
-    upcomingAppointments.length
-      ? `Proximos compromissos: ${upcomingAppointments
-          .map((item) => `${item.title} em ${item.starts_at} (${item.statusLabel})`)
-          .join("; ")}.`
-      : "Nao ha compromissos futuros visiveis no momento.",
-    latestEvents.length
-      ? `Ultimas atualizacoes visiveis: ${latestEvents
-          .map((item) => `${item.title}: ${item.public_summary || item.eventLabel}`)
-          .join("; ")}.`
-      : "Ainda nao ha atualizacoes visiveis registradas no portal."
-  ].join("\n");
+    return [
+      `Cliente autenticado: ${profile.full_name} (${profile.email}).`,
+      `Status do cadastro: ${workspace.clientRecord.status}.`,
+      mainCase
+        ? `Caso principal: ${mainCase.title} | area: ${
+            caseAreaLabels[mainCase.area as keyof typeof caseAreaLabels] || mainCase.area
+          } | status: ${mainCase.statusLabel}.`
+        : "Ainda nao ha caso principal visivel no portal.",
+      `Documentos disponiveis: ${
+        workspace.documents.filter((item) => item.status === "recebido" || item.status === "revisado")
+          .length
+      }.`,
+      `Documentos pendentes: ${
+        workspace.documents.filter((item) => item.status === "pendente" || item.status === "solicitado")
+          .length
+      }.`,
+      `Solicitacoes documentais abertas: ${openRequests.length}.`,
+      upcomingAppointments.length
+        ? `Proximos compromissos: ${upcomingAppointments
+            .map((item) => `${item.title} em ${item.starts_at} (${item.status})`)
+            .join("; ")}.`
+        : "Nao ha compromissos futuros visiveis no momento.",
+      latestEvents.length
+        ? `Ultimas atualizacoes visiveis: ${latestEvents
+            .map((item) => `${item.title}: ${item.public_summary || item.eventLabel}`)
+            .join("; ")}.`
+        : "Ainda nao ha atualizacoes visiveis registradas no portal."
+    ].join("\n");
+  } catch (error) {
+    console.warn("[NoemIA] Erro ao buscar contexto do cliente, usando fallback:", error);
+    // Usar fallback quando Supabase não estiver disponível
+    const { getClientWorkspace: getClientWorkspaceFallback } = await import("./dashboard-fallback");
+    const workspace = await getClientWorkspaceFallback(profile);
+    
+    return [
+      `Cliente autenticado: ${profile.full_name} (${profile.email}).`,
+      `Status do cadastro: ${workspace.clientRecord.status}.`,
+      `Caso principal: ${workspace.cases[0]?.title || 'Ainda nao ha caso principal visivel no portal.'}`,
+      `Documentos disponiveis: ${workspace.documents.filter(d => d.status === 'recebido').length}.`,
+      `Documentos pendentes: ${workspace.documents.filter(d => d.status === 'pendente').length}.`,
+      `Solicitacoes documentais abertas: ${workspace.documentRequests.length}.`,
+      `Proximos compromissos: ${workspace.appointments.length}.`,
+      `Ultimas atualizacoes: ${workspace.events.length}.`
+    ].join("\n");
+  }
 }
 
 async function buildStaffContext(profile: PortalProfile) {
-  const [overview, intelligence] = await Promise.all([
-    getStaffOverview(),
-    getBusinessIntelligenceOverview(30)
-  ]);
-  const topToday = overview.operationalCenter.queues.today.slice(0, 5);
-  const topAwaitingClient = overview.operationalCenter.queues.awaitingClient.slice(0, 4);
-  const topAwaitingTeam = overview.operationalCenter.queues.awaitingTeam.slice(0, 4);
-  const recentCompleted = overview.operationalCenter.queues.recentlyCompleted.slice(0, 4);
-  const triageHighlights = overview.latestIntakeRequests
-    .filter((item) => item.status === "new" || item.status === "in_review")
-    .slice(0, 4);
-  const caseHighlights = overview.latestCases.slice(0, 4);
+  try {
+    const [overview, intelligence] = await Promise.all([
+      getStaffOverview(),
+      getBusinessIntelligenceOverview(30)
+    ]);
+    const topToday = overview.operationalCenter.queues.today.slice(0, 5);
+    const topAwaitingClient = overview.operationalCenter.queues.awaitingClient.slice(0, 4);
+    const topAwaitingTeam = overview.operationalCenter.queues.awaitingTeam.slice(0, 4);
+    const recentCompleted = overview.operationalCenter.queues.recentlyCompleted.slice(0, 4);
+    const triageHighlights = overview.latestIntakeRequests
+      .filter((item) => item.status === "new" || item.status === "in_review")
+      .slice(0, 4);
+    const caseHighlights = overview.latestCases.slice(0, 4);
 
-  return [
-    `Perfil interno autenticado: ${profile.full_name} (${profile.email}).`,
-    `Resumo operacional atual: ${overview.operationalCenter.summary.criticalCount} item(ns) critico(s), ${overview.operationalCenter.summary.todayCount} para hoje, ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente, ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
-    `Leitura de BI dos ultimos 30 dias: abandono de triagem ${formatRateValue(intelligence.summary.triageAbandonmentRate)}, triagem para cliente ${formatRateValue(intelligence.summary.triageToClientRate)}, ativacao no portal ${formatRateValue(intelligence.summary.portalActivationRate)}.`,
-    `Sinais operacionais extras: ${overview.operationalCenter.summary.agedPendingDocumentsCount} pendencia(s) documental(is) envelhecida(s), ${overview.operationalCenter.summary.inviteStalledCount} convite(s) travado(s) e ${overview.operationalCenter.summary.staleCasesCount} caso(s) sem atualizacao recente.`,
-    topToday.length
-      ? `Fila fazer hoje: ${topToday
-          .map((item) => `${item.kindLabel} ${item.title} (${item.timingLabel})`)
-          .join("; ")}.`
-      : "Fila fazer hoje sem itens abertos no momento.",
-    topAwaitingClient.length
-      ? `Fila aguardando cliente: ${topAwaitingClient
-          .map((item) => `${item.title} (${item.timingLabel})`)
-          .join("; ")}.`
-      : "Nao ha fila aguardando cliente com destaque agora.",
-    topAwaitingTeam.length
-      ? `Fila aguardando equipe: ${topAwaitingTeam
-          .map((item) => `${item.title} (${item.timingLabel})`)
-          .join("; ")}.`
-      : "Nao ha fila aguardando equipe com destaque agora.",
-    triageHighlights.length
-      ? `Triagens recentes: ${triageHighlights
-          .map(
-            (item) =>
-              `${item.full_name} | ${item.areaLabel} | ${item.urgencyLabel} | ${item.stageLabel}`
-          )
-          .join("; ")}.`
-      : "Nao ha triagens recentes em analise no momento.",
-    caseHighlights.length
-      ? `Casos recentes: ${caseHighlights
-          .map(
-            (item) =>
-              `${item.title} | cliente ${item.clientName} | status ${item.statusLabel} | prioridade ${item.priorityLabel}`
-          )
-          .join("; ")}.`
-      : "Nao ha casos recentes visiveis para resumir.",
-    recentCompleted.length
-      ? `Concluidos recentemente: ${recentCompleted
-          .map((item) => `${item.kindLabel} ${item.title}`)
-          .join("; ")}.`
-      : "Nao ha itens concluidos recentemente em destaque."
-  ].join("\n");
+    return [
+      `Perfil interno autenticado: ${profile.full_name} (${profile.email}).`,
+      `Resumo operacional atual: ${overview.operationalCenter.summary.criticalCount} item(ns) critico(s), ${overview.operationalCenter.summary.todayCount} para hoje, ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente, ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
+      `Leitura de BI dos ultimos 30 dias: abandono de triagem ${formatRateValue(intelligence.summary.triageAbandonmentRate)}, triagem para cliente ${formatRateValue(intelligence.summary.triageToClientRate)}, ativacao no portal ${formatRateValue(intelligence.summary.portalActivationRate)}.`,
+      `Sinais operacionais extras: ${overview.operationalCenter.summary.agedPendingDocumentsCount} pendencia(s) documental(is) envelhecida(s), ${overview.operationalCenter.summary.inviteStalledCount} convite(s) travado(s) e ${overview.operationalCenter.summary.staleCasesCount} caso(s) sem atualizacao recente.`,
+      topToday.length
+        ? `Fila fazer hoje: ${topToday
+            .map((item) => `${item.kindLabel} ${item.title} (${item.timingLabel})`)
+            .join("; ")}.`
+        : "Fila fazer hoje sem itens abertos no momento.",
+      topAwaitingClient.length
+        ? `Fila aguardando cliente: ${topAwaitingClient
+            .map((item) => `${item.title} (${item.timingLabel})`)
+            .join("; ")}.`
+        : "Nao ha fila aguardando cliente com destaque agora.",
+      topAwaitingTeam.length
+        ? `Fila aguardando equipe: ${topAwaitingTeam
+            .map((item) => `${item.title} (${item.timingLabel})`)
+            .join("; ")}.`
+        : "Nao ha fila aguardando equipe com destaque agora.",
+      triageHighlights.length
+        ? `Triagens recentes: ${triageHighlights
+            .map(
+              (item) =>
+                `${item.full_name} | ${item.areaLabel} | ${item.urgencyLabel} | ${item.stageLabel}`
+            )
+            .join("; ")}.`
+        : "Nao ha triagens recentes em analise no momento.",
+      caseHighlights.length
+        ? `Casos recentes: ${caseHighlights
+            .map(
+              (item) =>
+                `${item.title} | cliente ${item.clientName} | status ${item.statusLabel} | prioridade ${item.priorityLabel}`
+            )
+            .join("; ")}.`
+        : "Nao ha casos recentes visiveis para resumir.",
+      recentCompleted.length
+        ? `Concluidos recentemente: ${recentCompleted
+            .map((item) => `${item.kindLabel} ${item.title}`)
+            .join("; ")}.`
+        : "Nao ha itens concluidos recentemente em destaque."
+    ].join("\n");
+  } catch (error) {
+    console.warn("[NoemIA] Erro ao buscar contexto do staff, usando fallback:", error);
+    // Usar fallback quando Supabase não estiver disponível
+    try {
+      const { getStaffOverview: getStaffOverviewFallback } = await import("./dashboard-fallback");
+      const { getBusinessIntelligenceOverview: getBusinessIntelligenceOverviewFallback } = await import("./intelligence-fallback");
+      const [overview, intelligence] = await Promise.all([
+        getStaffOverviewFallback(),
+        getBusinessIntelligenceOverviewFallback(30)
+      ]);
+      
+      return [
+        `Perfil interno autenticado: ${profile.full_name} (${profile.email}).`,
+        `Resumo operacional atual: ${overview.operationalCenter.summary.criticalCount} item(ns) critico(s), ${overview.operationalCenter.summary.todayCount} para hoje, ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente, ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
+        `Leitura de BI dos ultimos 30 dias: abandono de triagem ${formatRateValue(intelligence.summary.triageAbandonmentRate)}, triagem para cliente ${formatRateValue(intelligence.summary.triageToClientRate)}, ativacao no portal ${formatRateValue(intelligence.summary.portalActivationRate)}.`,
+        `Fila fazer hoje: ${overview.operationalCenter.queues.today.map(item => `${item.kindLabel} ${item.title}`).join("; ")}.`,
+        `Triagens recentes: ${overview.latestIntakeRequests.map(item => `${item.full_name} | ${item.areaLabel}`).join("; ")}.`,
+        `Casos recentes: ${overview.latestCases.map(item => `${item.title} | ${item.clientName}`).join("; ")}.`
+      ].join("\n");
+    } catch (fallbackError) {
+      console.error("[NoemIA] Erro até no fallback do staff:", fallbackError);
+      return `Perfil interno autenticado: ${profile.full_name} (${profile.email}). Sistema operacional em modo limitado. Use o painel principal para operação completa.`;
+    }
+  }
 }
 
 function buildSystemInstructions(mode: "visitor" | "client" | "staff", contextText: string) {

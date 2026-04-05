@@ -96,3 +96,7 @@ export function getServerEnv(): ServerEnv {
 
   return cachedServerEnv;
 }
+
+export function getPublicEnv() {
+  return getServerEnv();
+}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import { NoemiaScript } from "@/components/noemia-script";
 
 const metadataBase = new URL(
   process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000"
@@ -42,7 +43,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        {children}
+        <NoemiaScript />
+      </body>
     </html>
   );
 }
