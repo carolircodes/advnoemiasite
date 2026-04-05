@@ -24,9 +24,10 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@/lib/*": ["./lib/*"],
+      "@/lib/config/*": ["./lib/config/*"],
+      "@/lib/config/env": ["./lib/config/env.ts"]
     }
   },
   "include": [
