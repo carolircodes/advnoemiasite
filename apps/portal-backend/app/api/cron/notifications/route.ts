@@ -2,8 +2,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
-import { getNotificationEnv, getServerEnv } from "../../../lib/config/env";
-import { processPendingNotifications } from "@/lib/services/process-notifications";
+import { getNotificationEnv, getServerEnv } from "../../../../lib/config/env";
+import { processPendingNotifications } from "../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
