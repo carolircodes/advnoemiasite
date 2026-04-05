@@ -1,0 +1,426 @@
+/* NoemIA Chat Premium - Sistema Conversacional Funcional */
+
+/* Chat Container */
+.noemia-chat-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* Chat Messages Area */
+.noemia-chat-messages {
+  min-height: 400px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 2rem;
+  background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+}
+
+.noemia-chat-message {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.noemia-chat-message.user {
+  flex-direction: row-reverse;
+}
+
+.noemia-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.noemia-avatar.ai {
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  color: white;
+}
+
+.noemia-avatar.user {
+  background: var(--ink);
+  color: white;
+}
+
+.noemia-message-content {
+  max-width: 70%;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  position: relative;
+}
+
+.noemia-chat-message.user .noemia-message-content {
+  background: var(--ink);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.noemia-chat-message.ai .noemia-message-content {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+
+.noemia-message-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.noemia-message-text p {
+  margin: 0 0 0.75rem 0;
+}
+
+.noemia-message-text p:last-child {
+  margin-bottom: 0;
+}
+
+.noemia-message-time {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 0.5rem;
+}
+
+/* Loading State */
+.noemia-loading {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.noemia-loading-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.noemia-loading-content {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  border-bottom-left-radius: 4px;
+}
+
+.noemia-loading-dots {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.noemia-loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: bounce 1.4s ease-in-out infinite both;
+}
+
+.noemia-loading-dot:nth-child(1) { animation-delay: -0.32s; }
+.noemia-loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Suggestion Chips */
+.noemia-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0 2rem 2rem;
+}
+
+.noemia-suggestion-chip {
+  padding: 0.625rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.noemia-suggestion-chip:hover {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(181, 141, 73, 0.2);
+}
+
+.noemia-suggestion-chip.primary {
+  background: var(--gold);
+  color: white;
+  border-color: var(--gold);
+}
+
+.noemia-suggestion-chip.primary:hover {
+  background: var(--gold-deep);
+  border-color: var(--gold-deep);
+}
+
+/* Input Area */
+.noemia-input-area {
+  padding: 1.5rem 2rem;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.noemia-input-wrapper {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.noemia-input {
+  flex: 1;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: white;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 120px;
+  transition: all 0.3s ease;
+}
+
+.noemia-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(181, 141, 73, 0.15);
+}
+
+.noemia-input::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+
+.noemia-send-button {
+  padding: 1rem 1.5rem;
+  background: var(--gold);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.noemia-send-button:hover:not(:disabled) {
+  background: var(--gold-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(181, 141, 73, 0.3);
+}
+
+.noemia-send-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.noemia-send-button.loading {
+  background: var(--gold-soft);
+  color: var(--ink);
+}
+
+/* Quick Actions */
+.noemia-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 0 2rem;
+}
+
+.noemia-quick-action {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.noemia-quick-action:hover {
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(181, 141, 73, 0.3);
+}
+
+/* Status Indicator */
+.noemia-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--dashboard-success);
+  margin-bottom: 1rem;
+}
+
+.noemia-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dashboard-success);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .noemia-chat-messages {
+    padding: 1rem;
+    min-height: 300px;
+    max-height: 400px;
+  }
+  
+  .noemia-message-content {
+    max-width: 85%;
+  }
+  
+  .noemia-input-area {
+    padding: 1rem;
+  }
+  
+  .noemia-input-wrapper {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .noemia-send-button {
+    width: 100%;
+  }
+  
+  .noemia-quick-actions,
+  .noemia-suggestions {
+    padding: 0 1rem 1rem;
+  }
+}
+
+/* Scrollbar Styling */
+.noemia-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.noemia-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.noemia-chat-messages::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+.noemia-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-soft);
+}
+
+/* Typing Indicator */
+.noemia-typing-indicator {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  border-bottom-left-radius: 4px;
+  margin-bottom: 1.5rem;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.noemia-typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  animation: typing 1.4s ease-in-out infinite;
+}
+
+.noemia-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.noemia-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+/* Error State */
+.noemia-error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--dashboard-danger);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Success State */
+.noemia-success-message {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--dashboard-success);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}

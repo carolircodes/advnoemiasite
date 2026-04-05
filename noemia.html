@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="assets/css/premium-system.css" />
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
   <link rel="stylesheet" href="assets/css/site-refinements.css" />
+  <link rel="stylesheet" href="assets/css/noemia-chat.css" />
   <style>
     :root {
       --bg-ivory: #f6f1e8;
@@ -752,30 +753,35 @@
             </div>
 
             <div class="assistant-chat">
-              <div class="assistant-bubble ai">
-                Olá. Sou a NoemIA, assistente inteligente do escritório Noêmia Paixão Advocacia. Posso ajudar você a entender sua situação inicial e indicar o melhor próximo passo.
-              </div>
-              <div class="assistant-bubble user">
-                Quero entender se tenho direito e o que eu preciso reunir agora.
-              </div>
-              <div class="assistant-bubble ai">
-                Posso te orientar sobre os pontos iniciais, documentos importantes e o caminho mais adequado para o seu atendimento.
-              </div>
-            </div>
+              <div class="noemia-chat-container">
+                <div class="noemia-status">
+                  <div class="noemia-status-dot"></div>
+                  <span>NoemIA Online</span>
+                </div>
+                
+                <div class="noemia-chat-messages">
+                  <!-- Messages will be dynamically added here -->
+                </div>
 
-            <div class="prompt-chip-row">
-              <a class="prompt-chip" href="#perguntas">Posso receber benefício?</a>
-              <a class="prompt-chip" href="#perguntas">Quais documentos separar?</a>
-              <a class="prompt-chip" href="#perguntas">Tive desconto indevido</a>
-              <a class="prompt-chip" href="#perguntas">Preciso falar com a advogada</a>
-            </div>
-
-            <div class="assistant-composer">
-              <label for="pergunta">Descreva sua dúvida inicial</label>
-              <textarea id="pergunta" placeholder="Ex.: Quero entender se posso pedir aposentadoria, quais documentos devo separar e qual seria o próximo passo."></textarea>
-              <div class="assistant-composer-footer">
-                <div class="assistant-trust">Seus dados devem ser tratados com segurança e a conversa pode seguir para a equipe quando necessário.</div>
-                <a href="triagem.html?area=geral&amp;origem=noemia-painel&amp;pagina=noemia.html" class="btn-noemia btn-noemia-primary">Continuar com atendimento</a>
+                <div class="noemia-input-area">
+                  <div class="noemia-quick-actions">
+                    <button class="noemia-quick-action">Posso receber benefício?</button>
+                    <button class="noemia-quick-action">Quais documentos separar?</button>
+                    <button class="noemia-quick-action">Tive desconto indevido</button>
+                    <button class="noemia-quick-action">Entender meu caso</button>
+                  </div>
+                  
+                  <div class="noemia-input-wrapper">
+                    <textarea 
+                      class="noemia-input" 
+                      placeholder="Descreva sua dúvida ou situação inicial..."
+                      rows="3"
+                    ></textarea>
+                    <button class="noemia-send-button">
+                      Enviar <span>→</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -886,14 +892,16 @@
     Falar com a especialista
   </a>
 
+  <script src="assets/js/premium-system.js"></script>
+  <script src="assets/js/contact-capture.js"></script>
+  <script src="assets/js/noemia-chat.js"></script>
   <script>
     const toggle = document.querySelector('[data-menu-toggle]');
     const menu = document.getElementById('siteMenu');
 
     if (toggle && menu) {
       toggle.addEventListener('click', () => {
-        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', String(!expanded));
+        toggle.classList.toggle('is-active');
         menu.classList.toggle('is-open');
       });
     }
