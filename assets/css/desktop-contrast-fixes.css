@@ -1,0 +1,212 @@
+/* Desktop Contrast Fixes - Melhorias de legibilidade */
+
+/* Melhorias gerais de contraste */
+@media (min-width: 1024px) {
+  
+  /* Aumentar contraste de textos em fundos claros */
+  :root {
+    --ink-soft: #4a3f2f;
+    --ink-muted: #6b5d4b;
+    --gold-deep: #8c6b30;
+    --gold-readable: #a67c2a;
+  }
+
+  /* Contraste melhorado para textos principais */
+  .hero-copy p,
+  .noemia-text,
+  .section-head p,
+  .pathway-head p,
+  .cta-copy p,
+  .experience-copy p {
+    color: #4a3f2f !important;
+    font-weight: 500;
+  }
+
+  /* Títulos e subtítulos com mais contraste */
+  .hero-copy h1,
+  .section-head h2,
+  .pathway-head h2,
+  .cta-copy h2,
+  .experience-copy h2 {
+    color: #2f2519 !important;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.1);
+  }
+
+  /* Melhorar legibilidade de textos dourados */
+  .noemia-title span,
+  .hero-copy .highlight,
+  .gold-text {
+    color: #8c6b30 !important;
+    font-weight: 700;
+  }
+
+  /* Labels e textos secundários */
+  .noemia-eyebrow,
+  .eyebrow,
+  .noemia-card-label,
+  .assistant-id span {
+    color: #6b5d4b !important;
+    font-weight: 600;
+  }
+
+  /* Melhorar contraste em cards */
+  .metric-card p,
+  .feature-card p,
+  .pathway-card p,
+  .stack-card p,
+  .noemia-point p {
+    color: #4a3f2f !important;
+    line-height: 1.7;
+  }
+
+  /* Títulos em cards */
+  .metric-card strong,
+  .feature-card h3,
+  .pathway-card h3,
+  .stack-card strong,
+  .noemia-point strong {
+    color: #2f2519 !important;
+    font-weight: 700;
+  }
+
+  /* Melhorar placeholders */
+  input::placeholder,
+  textarea::placeholder {
+    color: #8a7d6d !important;
+    font-weight: 500;
+  }
+
+  /* Botões secundários com mais contraste */
+  .btn-secondary,
+  .btn-noemia-secondary {
+    color: #2f2519 !important;
+    font-weight: 600;
+    border-color: #a8833d !important;
+  }
+
+  /* Links e textos interativos */
+  a:not(.btn):not(.btn-noemia) {
+    color: #8c6b30 !important;
+    font-weight: 600;
+  }
+
+  a:not(.btn):not(.btn-noemia):hover {
+    color: #6b5020 !important;
+  }
+
+  /* Melhorar contraste em áreas específicas */
+  .noemia-highlight p,
+  .experience-card p {
+    color: #4a3f2f !important;
+  }
+
+  .noemia-highlight strong,
+  .experience-card h3 {
+    color: #2f2519 !important;
+  }
+
+  /* Status e informações */
+  .assistant-status,
+  .noemia-microcopy,
+  .noemia-note {
+    color: #6b5d4b !important;
+    font-weight: 500;
+  }
+
+  /* Navegação */
+  .nav-menu a {
+    color: #4a3f2f !important;
+    font-weight: 600;
+  }
+
+  .nav-menu a:hover,
+  .nav-menu a:focus {
+    color: #8c6b30 !important;
+  }
+
+  /* Footer */
+  .footer,
+  .footer a,
+  .footer-bar {
+    color: #6b5d4b !important;
+  }
+
+  .footer a:hover {
+    color: #8c6b30 !important;
+  }
+
+  /* Cards com bordas mais visíveis */
+  .glass-card,
+  .metric-card,
+  .feature-card,
+  .pathway-card,
+  .stack-card {
+    border-color: rgba(163, 132, 68, 0.3) !important;
+  }
+
+  /* Melhorar contraste em áreas específicas do site */
+  .topbar {
+    color: #6b5d4b !important;
+    border-bottom-color: rgba(163, 132, 68, 0.3) !important;
+  }
+
+  /* Áreas de conteúdo */
+  .section {
+    position: relative;
+  }
+
+  .section::before {
+    background: linear-gradient(90deg, transparent, rgba(163, 132, 68, 0.2), transparent) !important;
+  }
+}
+
+/* Melhorias específicas para página NoemIA */
+@media (min-width: 1024px) {
+  .noemia-bubble.ai {
+    background: #f8f4ea !important;
+    color: #2f2519 !important;
+    border-color: rgba(140, 107, 48, 0.2) !important;
+  }
+
+  .noemia-bubble.user {
+    background: #1a3a2e !important;
+    color: #f8f3ea !important;
+  }
+
+  .assistant-composer {
+    background: rgba(250, 246, 238, 0.95) !important;
+    border-color: rgba(140, 107, 48, 0.2) !important;
+  }
+
+  .prompt-chip {
+    background: rgba(255, 255, 255, 0.8) !important;
+    color: #2f2519 !important;
+    border-color: rgba(140, 107, 48, 0.2) !important;
+    font-weight: 600;
+  }
+
+  .prompt-chip:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+}
+
+/* Melhorias para portal e áreas internas */
+@media (min-width: 1024px) {
+  .portal-dashboard {
+    --text-primary: #2f2519;
+    --text-secondary: #6b5d4b;
+    --border-color: rgba(163, 132, 68, 0.2);
+  }
+
+  .dashboard-card {
+    border-color: var(--border-color) !important;
+  }
+
+  .dashboard-title {
+    color: var(--text-primary) !important;
+  }
+
+  .dashboard-text {
+    color: var(--text-secondary) !important;
+  }
+}

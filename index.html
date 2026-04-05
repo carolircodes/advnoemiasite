@@ -31,6 +31,8 @@
   <link rel="stylesheet" href="assets/css/premium-system.css" />
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
   <link rel="stylesheet" href="assets/css/site-refinements.css" />
+  <link rel="stylesheet" href="assets/css/desktop-contrast-fixes.css" />
+  <link rel="stylesheet" href="assets/css/cta-standardization.css" />
 
   <style>
     .hero {
@@ -1189,6 +1191,21 @@
       transform: translateY(-1px);
     }
 
+    .noemia-card-link {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .noemia-card-link:hover {
+      transform: translateY(-2px);
+    }
+
+    .noemia-card-link:hover .noemia-card {
+      box-shadow: 0 32px 80px rgba(48, 33, 12, 0.14);
+    }
+
     @media (max-width: 980px) {
       .noemia-shell {
         grid-template-columns: 1fr;
@@ -1373,7 +1390,7 @@
             </div>
 
             <div class="noemia-actions">
-              <a href="triagem.html?area=geral&amp;origem=noemia-home&amp;pagina=index.html" class="btn-noemia btn-noemia-primary">Falar com a NoemIA</a>
+              <a href="noemia.html#painel-pergunta" class="btn-noemia btn-noemia-primary">Falar com a NoemIA</a>
               <a href="triagem.html?area=geral&amp;origem=noemia-home&amp;pagina=index.html" class="btn-noemia btn-noemia-secondary">Iniciar atendimento</a>
             </div>
 
@@ -1383,7 +1400,8 @@
           </div>
 
           <div class="noemia-card-wrap">
-            <div class="noemia-card" id="noemia-card">
+            <a href="noemia.html#painel-pergunta" class="noemia-card-link" aria-label="Falar com a NoemIA">
+              <div class="noemia-card" id="noemia-card">
               <div class="noemia-card-top">
                 <div class="noemia-avatar">N</div>
                 <div>
@@ -1412,6 +1430,7 @@
                 <button type="button">Falar com a advogada</button>
               </div>
             </div>
+            </a>
           </div>
         </div>
       </section>
@@ -1727,6 +1746,9 @@
   <script src="assets/js/premium-system.js"></script>
   <script src="assets/js/entry-context.js"></script>
   <script src="assets/js/contact-capture.js"></script>
+  <script src="assets/js/whatsapp-integration.js"></script>
+  <script src="assets/js/campaign-tracking.js"></script>
+  <script src="assets/js/cta-standardization.js"></script>
 </body>
 </html>
 

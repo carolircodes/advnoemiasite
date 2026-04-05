@@ -23,6 +23,8 @@
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
   <link rel="stylesheet" href="assets/css/site-refinements.css" />
   <link rel="stylesheet" href="assets/css/noemia-chat.css" />
+  <link rel="stylesheet" href="assets/css/desktop-contrast-fixes.css" />
+  <link rel="stylesheet" href="assets/css/cta-standardization.css" />
   <style>
     :root {
       --bg-ivory: #f6f1e8;
@@ -93,9 +95,11 @@
 
     .noemia-hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
-      gap: clamp(28px, 4vw, 54px);
+      grid-template-columns: minmax(0, 1fr) minmax(420px, 0.85fr);
+      gap: clamp(32px, 4vw, 64px);
       align-items: center;
+      max-width: 1400px;
+      margin: 0 auto;
     }
 
     .noemia-hero-copy {
@@ -223,12 +227,15 @@
 
     .noemia-hero-card {
       position: relative;
-      padding: 24px;
+      padding: 32px;
       border-radius: 32px;
       background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(249,246,239,0.94));
       border: 1px solid rgba(16, 38, 29, 0.08);
       box-shadow: var(--shadow);
       overflow: hidden;
+      min-height: 680px;
+      max-width: 640px;
+      margin: 0 auto;
     }
 
     .noemia-hero-card::before {
@@ -307,16 +314,17 @@
 
     .assistant-chat {
       display: grid;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 16px;
+      margin-bottom: 24px;
+      min-height: 320px;
     }
 
     .assistant-bubble {
-      max-width: 88%;
-      padding: 15px 16px;
-      border-radius: 20px;
+      max-width: 92%;
+      padding: 18px 20px;
+      border-radius: 22px;
       line-height: 1.7;
-      font-size: 0.96rem;
+      font-size: 1rem;
     }
 
     .assistant-bubble.ai {
@@ -342,15 +350,22 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 40px;
-      padding: 0 14px;
+      min-height: 44px;
+      padding: 0 18px;
       border-radius: 999px;
       border: 1px solid rgba(16,38,29,0.09);
       background: rgba(255,255,255,0.72);
       color: #17382c;
-      font-size: 0.92rem;
+      font-size: 0.96rem;
       text-decoration: none;
       box-shadow: 0 10px 24px rgba(16,38,29,0.04);
+      transition: all 0.22s ease;
+    }
+
+    .prompt-chip:hover {
+      background: rgba(255,255,255,0.88);
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(16,38,29,0.08);
     }
 
     .assistant-composer {
@@ -370,16 +385,18 @@
 
     .assistant-composer textarea {
       width: 100%;
-      min-height: 146px;
+      min-height: 180px;
       resize: vertical;
-      border-radius: 18px;
+      border-radius: 20px;
       border: 1px solid rgba(16,38,29,0.12);
       background: rgba(255,255,255,0.92);
-      padding: 16px 18px;
+      padding: 20px 22px;
       font: inherit;
       color: var(--ink);
       outline: none;
       box-sizing: border-box;
+      font-size: 1rem;
+      line-height: 1.6;
     }
 
     .assistant-composer textarea::placeholder { color: #7a8781; }
@@ -895,6 +912,9 @@
   <script src="assets/js/premium-system.js"></script>
   <script src="assets/js/contact-capture.js"></script>
   <script src="assets/js/noemia-chat.js"></script>
+  <script src="assets/js/whatsapp-integration.js"></script>
+  <script src="assets/js/campaign-tracking.js"></script>
+  <script src="assets/js/cta-standardization.js"></script>
   <script>
     const toggle = document.querySelector('[data-menu-toggle]');
     const menu = document.getElementById('siteMenu');

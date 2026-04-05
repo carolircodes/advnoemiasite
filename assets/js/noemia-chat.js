@@ -55,13 +55,15 @@ class NoemiaChat {
   addWelcomeMessage() {
     const welcomeText = `Olá! Sou a NoemIA, assistente inteligente da Noêmia Paixão Advocacia.
 
-Posso ajudar você a:
-• Entender melhor seu caso
-• Identificar documentos necessários
-• Explicar próximos passos
-• Direcionar para atendimento especializado
+Estou aqui para ajudar você a entender melhor sua situação jurídica com clareza e organização.
 
-Como posso ajudar você agora?`;
+Posso te orientar sobre:
+• Seus direitos e possibilidades em diferentes áreas do direito
+• Quais documentos são importantes para o seu caso
+• Os melhores próximos passos a seguir
+• Como se preparar para um atendimento especializado
+
+Por onde você gostaria de começar? Me conte um pouco sobre sua situação ou escolha uma das sugestões abaixo.`;
 
     this.addMessage('ai', welcomeText);
     this.showQuickSuggestions();
@@ -142,10 +144,13 @@ Como posso ajudar você agora?`;
 
   getFallbackResponse(message) {
     const responses = {
-      'beneficio': 'Para análise de benefícios previdenciários, preciso entender: qual benefício você busca? (aposentadoria, auxílio-doença, etc). Já possui algum benefício negado?',
-      'documento': 'Os documentos essenciais variam por área. Para previdenciário: RG, CPF, comprovantes de residência, carteira de trabalho e laudos médicos.',
-      'desconto': 'Descontos indevidos exigem análise rápida. Preciso saber: qual tipo de desconto? (empréstimo, tarifa, plano). Onde ocorreu?',
-      'default': 'Entendi sua dúvida. Para análise completa, sugiro iniciar triagem especializada. Posso te direcionar para atendimento humano.'
+      'beneficio': 'Para análise de benefícios previdenciários, é importante entender alguns pontos: qual tipo de benefício você busca (aposentadoria por idade, tempo de contribuição, auxílio-doença, etc)? Já possui algum benefício negado pelo INSS? Com base na sua situação, posso te orientar sobre os documentos essenciais e os próximos passos para uma análise mais completa.',
+      'documento': 'Os documentos variam conforme a área do direito. Para casos previdenciários, geralmente precisamos de: RG, CPF, comprovantes de residência, carteira de trabalho com todas as páginas, laudos médicos (se aplicável), e decisões anteriores do INSS. Para consumeristas: contratos, faturas, comprovantes de pagamento e registros de ocorrência. Posso te ajudar a montar uma lista específica para o seu caso.',
+      'desconto': 'Descontos indevidos exigem atenção rápida. Preciso entender melhor: o desconto ocorreu em conta bancária, folha de pagamento ou cartão de crédito? É um empréstimo que você não reconhece, uma tarifa abusiva ou outro tipo? Com essas informações, te orientarei sobre como proceder, quais provas reunir e se há necessidade de medida urgente.',
+      'aposentadoria': 'Aposentadoria é um direito complexo que depende de vários fatores: tempo de contribuição, idade, tipo de atividade, etc. Para te dar uma orientação inicial, preciso saber: você já consultou seu extrato do CNIS? Há quantos anos trabalha? Já teve algum benefício negado? Com base nisso, te explico as possibilidades e a melhor estratégia para o seu perfil.',
+      'divorcio': 'Divórcio envolve questões sensíveis que precisam de cuidado. Principais pontos a considerar: partilha de bens, guarda dos filhos (se houver), pensão alimentícia e regime de bens do casamento. Cada caso é único e exige análise detalhada. Posso te orientar sobre os documentos necessários e os próximos passos para proteger seus direitos durante este processo.',
+      'contrato': 'Contratos descumpridos exigem análise cuidadosa. Preciso entender: qual tipo de contrato (compra e venda, prestação de serviços, locação)? Qual foi a obrigação não cumprida? Você já tentou resolver amigavelmente? Existem cláusulas penais ou multas? Com essas informações, te orientarei sobre as possibilidades de rescisão, indenização ou cumprimento forçado.',
+      'default': 'Entendi sua situação. Para te dar uma orientação mais precisa e personalizada, sugiro iniciar nossa triagem especializada. Lá você poderá detalhar melhor seu caso e eu conseguirei te direcionar para o melhor caminho jurídico, seja ele uma consulta, uma ação específica ou outro procedimento adequado ao seu perfil.'
     };
 
     const lowerMessage = message.toLowerCase();
