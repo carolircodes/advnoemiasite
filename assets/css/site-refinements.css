@@ -1187,3 +1187,48 @@ button:hover {
   transform: translateY(-1px);
   opacity: 0.95;
 }
+/* =========================
+   CORREÇÃO FORMULÁRIO TRIAGEM (URGENTE)
+   ========================= */
+
+/* REMOVE BRANCO EXAGERADO */
+.triage-form,
+.form-container,
+.card,
+.form-card {
+  background: #FFFFFF !important;
+  opacity: 1 !important;
+}
+
+/* FORÇA TEXTO ESCURO DENTRO DO FORM */
+.triage-form *,
+.form-container *,
+.form-card * {
+  color: #0B1F1A !important;
+}
+
+/* TÍTULO DO FORM */
+.triage-form h1,
+.triage-form h2,
+.form-container h1,
+.form-container h2 {
+  color: #0B1F1A !important;
+}
+
+/* SUBTEXTO */
+.triage-form p,
+.form-container p {
+  color: #3A4A46 !important;
+}
+
+/* PLACEHOLDER VISÍVEL */
+input::placeholder,
+textarea::placeholder {
+  color: #9CA3AF !important;
+}
+
+/* SELECT */
+select {
+  color: #0B1F1A !important;
+  background: #FFFFFF !important;
+}
