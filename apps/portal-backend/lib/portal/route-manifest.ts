@@ -4,7 +4,7 @@
  * Mantemos este ficheiro como documentação executável e para futuros layouts separados.
  */
 
-import { isProtectedPortalPath } from "@/lib/auth/access-control";
+import { isProtectedPortalPath } from "../auth/access-control";
 
 /** Páginas de entrada e fluxo de credenciais (não exigem perfil de portal, só sessão Supabase quando aplicável). */
 export const PORTAL_AUTH_PATH_PREFIXES = [

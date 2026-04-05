@@ -11,18 +11,18 @@ import {
   publicIntakeStages,
   publicIntakeUrgencies,
   publicIntakeUrgencyLabels
-} from "@/lib/domain/portal";
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+} from "../lib/domain/portal";
+import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
 import {
   getProductSessionId,
   trackProductEventOncePerSession
-} from "@/lib/analytics/browser";
+} from "../lib/analytics/browser";
 import {
   appendEntryContextToPath,
   getEntryContextPayload,
   resolveEntryCaseArea,
   type EntryContext
-} from "@/lib/entry-context";
+} from "../lib/entry-context";
 
 type TriageFormState = {
   fullName: string;

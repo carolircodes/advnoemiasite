@@ -1,15 +1,15 @@
 import "server-only";
 
-import { assertStaffActor } from "@/lib/auth/guards";
+import { assertStaffActor } from "../auth/guards";
 import {
   caseAreaLabels,
   caseStatusLabels,
   createCaseSchema,
   updateCaseDetailsSchema,
   updateCaseStatusSchema
-} from "@/lib/domain/portal";
-import { queueCaseEventNotification } from "@/lib/notifications/outbox";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+} from "../domain/portal";
+import { queueCaseEventNotification } from "../notifications/outbox";
+import { createAdminSupabaseClient } from "../supabase/admin";
 
 type CaseRecord = {
   id: string;

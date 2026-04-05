@@ -1,17 +1,17 @@
 import "server-only";
 
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import { CLIENT_LOGIN_PATH } from "../auth/access-control";
 import {
   caseAreaLabels,
   formatPortalDateTime,
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels
-} from "@/lib/domain/portal";
+} from "../domain/portal";
 import {
   listStaffEmailRecipients,
   queueEmailNotification
-} from "@/lib/notifications/outbox";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+} from "../notifications/outbox";
+import { createAdminSupabaseClient } from "../supabase/admin";
 
 type AutomationDispatchInput = {
   ruleKey: string;

@@ -8,12 +8,12 @@ import {
   buildLoginRedirectPath,
   getDefaultDestinationForProfile,
   isStaffRole
-} from "@/lib/auth/access-control";
-import { isPortalRole, type PortalRole } from "@/lib/domain/portal";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+} from "./access-control";
+import { isPortalRole, type PortalRole } from "../domain/portal";
+import { createAdminSupabaseClient } from "../supabase/admin";
+import { createServerSupabaseClient } from "../supabase/server";
 
-export { getDefaultDestinationForProfile, isStaffRole } from "@/lib/auth/access-control";
+export { getDefaultDestinationForProfile, isStaffRole } from "./access-control";
 
 export type PortalProfile = {
   id: string;

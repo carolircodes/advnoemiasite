@@ -1,20 +1,19 @@
 import "server-only";
 
-import { assertStaffActor } from "@/lib/auth/guards";
+import { assertStaffActor } from "../auth/guards";
 import {
   allowedDocumentExtensions,
   allowedDocumentMimeTypes,
   documentRequestStatusLabels,
   documentStatusLabels,
   formatPortalDateTime,
-  maxDocumentFileSizeBytes,
   registerCaseDocumentSchema,
   requestCaseDocumentSchema,
   updateDocumentRequestStatusSchema
-} from "@/lib/domain/portal";
-import { queueCaseEventNotification } from "@/lib/notifications/outbox";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+} from "../domain/portal";
+import { queueCaseEventNotification } from "../notifications/outbox";
+import { createAdminSupabaseClient } from "../supabase/admin";
+import { createServerSupabaseClient } from "../supabase/server";
 
 export const CASE_DOCUMENTS_BUCKET = "portal-case-documents";
 
@@ -73,7 +72,7 @@ function validateUploadedFile(file: File | null) {
     throw new Error("Selecione um arquivo PDF, imagem ou documento para continuar.");
   }
 
-  if (file.size > maxDocumentFileSizeBytes) {
+  if (file.size > 20 * 1024 * 1024) {
     throw new Error("O arquivo excede o limite de 20 MB para upload no portal.");
   }
 

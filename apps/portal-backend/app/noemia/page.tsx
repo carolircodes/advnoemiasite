@@ -5,13 +5,13 @@ import { NoemiaAssistant } from "@/components/noemia-assistant";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
-import { getCurrentProfile } from "@/lib/auth/guards";
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import { getCurrentProfile } from "../../lib/auth/guards";
+import { CLIENT_LOGIN_PATH } from "../../lib/auth/access-control";
 import {
   appendEntryContextToPath,
   getEntryContextPayload,
   readEntryContext
-} from "@/lib/entry-context";
+} from "../../lib/entry-context";
 
 export const metadata: Metadata = {
   title: "Noemia",

@@ -1,4 +1,4 @@
-import type { PortalRole } from "@/lib/domain/portal";
+import type { PortalRole } from "../domain/portal";
 
 export type AccessProfile = {
   role: PortalRole;

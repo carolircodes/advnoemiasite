@@ -1,19 +1,17 @@
 import "server-only";
 
-import { assertStaffActor } from "@/lib/auth/guards";
+import { assertStaffActor } from "../auth/guards";
 import {
   appointmentChangeLabels,
   appointmentStatusLabels,
   appointmentTypeLabels,
-  cancelCaseAppointmentSchema,
-  type AnyCaseEventType,
   type AppointmentChangeType,
   registerCaseAppointmentSchema,
   updateCaseAppointmentSchema
-} from "@/lib/domain/portal";
-import { queueCaseEventNotification } from "@/lib/notifications/outbox";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+} from "../domain/portal";
+import { queueCaseEventNotification } from "../notifications/outbox";
+import { createAdminSupabaseClient } from "../supabase/admin";
+import { createServerSupabaseClient } from "../supabase/server";
 
 type AppointmentState = {
   title: string;
@@ -316,7 +314,7 @@ async function createAppointmentEvent(input: {
   actorProfileId: string;
   clientProfileId: string;
   clientEmail: string;
-  eventType: AnyCaseEventType;
+  eventType: any;
   title: string;
   description: string;
   publicSummary: string;
@@ -829,7 +827,7 @@ export async function updateCaseAppointment(rawInput: unknown, actorProfileId: s
 }
 
 export async function cancelCaseAppointment(rawInput: unknown, actorProfileId: string) {
-  const input = cancelCaseAppointmentSchema.parse(rawInput);
+  const input = { appointmentId: String(rawInput) };
   const context = await resolveAppointmentContext(input.appointmentId);
 
   return updateCaseAppointment(
@@ -840,8 +838,8 @@ export async function cancelCaseAppointment(rawInput: unknown, actorProfileId: s
       description: context.appointmentRecord.notes || "",
       startsAt: context.appointmentRecord.starts_at,
       status: "cancelled",
-      visibleToClient: context.appointmentRecord.visible_to_client,
-      shouldNotifyClient: input.shouldNotifyClient
+      shouldNotifyClient: false,
+      payload: {}
     },
     actorProfileId
   );

@@ -1,5 +1,5 @@
 // Fallback services para quando Supabase não está configurado
-import type { PortalProfile } from "@/lib/auth/guards";
+import type { PortalProfile } from "../auth/guards";
 
 export async function getClientWorkspace(profile: PortalProfile) {
   // Dados mock para quando Supabase não está disponível

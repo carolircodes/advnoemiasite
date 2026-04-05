@@ -1,5 +1,5 @@
-import { PortalLoadingPage } from "@/components/portal-loading";
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import { PortalLoadingPage } from "../../components/portal-loading";
+import { CLIENT_LOGIN_PATH } from "../../lib/auth/access-control";
 
 export default function Loading() {
   return (

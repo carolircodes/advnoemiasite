@@ -1,4 +1,4 @@
-import type { CaseArea } from "@/lib/domain/portal";
+import type { CaseArea } from "./domain/portal";
 
 const ENTRY_CONTEXT_QUERY_KEYS = ["origem", "tema", "campanha", "video"] as const;
 

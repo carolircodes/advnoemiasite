@@ -1,10 +1,10 @@
 import "server-only";
 
-import { assertStaffActor } from "@/lib/auth/guards";
-import { recordPortalEventSchema } from "@/lib/domain/portal";
-import { queueCaseEventNotification } from "@/lib/notifications/outbox";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { assertStaffActor } from "../auth/guards";
+import { recordPortalEventSchema } from "../domain/portal";
+import { queueCaseEventNotification } from "../notifications/outbox";
+import { createAdminSupabaseClient } from "../supabase/admin";
+import { createServerSupabaseClient } from "../supabase/server";
 
 function resolveOccurredAt(value: string) {
   if (!value) {

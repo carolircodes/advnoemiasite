@@ -4,12 +4,12 @@ import { AppFrame } from "@/components/app-frame";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
-import { CLIENT_LOGIN_PATH } from "@/lib/auth/access-control";
+import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
 import {
   appendEntryContextToPath,
   getEntryContextPayload,
   readEntryContext
-} from "@/lib/entry-context";
+} from "../lib/entry-context";
 
 export const metadata: Metadata = {
   title: "Atendimento juridico claro e portal do cliente",

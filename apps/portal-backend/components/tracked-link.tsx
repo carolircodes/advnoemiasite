@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 
-import { trackProductEvent } from "@/lib/analytics/browser";
+import { trackProductEvent } from "../lib/analytics/browser";
 
 type TrackedLinkProps = Omit<ComponentProps<typeof Link>, "href"> & {
   href: string;
