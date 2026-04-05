@@ -1,9 +1,9 @@
 import "server-only";
 
-import { routeNotificationByChannel } from "@/lib/notifications/channel-router";
-import { renderNotificationEmail } from "@/lib/notifications/email-templates";
-import { runOperationalAutomationRules } from "@/lib/services/automation-rules";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { routeNotificationByChannel } from "../notifications/channel-router";
+import { renderNotificationEmail } from "../notifications/email-templates";
+import { runOperationalAutomationRules } from "./automation-rules";
+import { createAdminSupabaseClient } from "../supabase/admin";
 
 const MAX_NOTIFICATION_ATTEMPTS = 5;
 

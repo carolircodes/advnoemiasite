@@ -3,7 +3,7 @@ import "server-only";
 import * as net from "node:net";
 import * as tls from "node:tls";
 
-import { getNotificationEnv } from "@/lib/config/env";
+import { getNotificationEnv } from "../config/env";
 
 type DeliveryInput = {
   to: string;

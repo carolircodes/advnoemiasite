@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sendNotificationEmail } from "@/lib/notifications/email-delivery";
+import { getNotificationEnv } from "../config/env"
 
 export type ChannelDeliveryInput = {
   to: string;
