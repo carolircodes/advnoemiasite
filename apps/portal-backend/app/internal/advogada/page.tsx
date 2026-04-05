@@ -487,10 +487,26 @@ export default async function InternalLawyerPage({
       >
         <div className="operational-band">
           {operationalHighlights.map((item) => (
-            <article key={item.label} className={`operational-band-card ${item.tone}`}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
+            <article key={item.label} className={`operational-band-card ${item.tone} interactive`}>
+              <div className="operational-band-header">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
               <p>{item.note}</p>
+              {item.tone === "critical" && (
+                <div className="operational-band-actions">
+                  <Link href="#central-prioridades" className="button small critical">
+                    Ver itens críticos
+                  </Link>
+                </div>
+              )}
+              {item.tone === "warning" && operationalSummary.todayCount > 0 && (
+                <div className="operational-band-actions">
+                  <Link href="#central-prioridades" className="button small secondary">
+                    Organizar fila do dia
+                  </Link>
+                </div>
+              )}
             </article>
           ))}
         </div>
@@ -516,7 +532,7 @@ export default async function InternalLawyerPage({
         >
           <OperationalList
             items={todayQueue}
-            emptyMessage="Quando algo cruzar o limite de prioridade do dia, a fila aparece aqui primeiro."
+            emptyMessage="✅ Nenhum item crítico para hoje. A rotina está organizada! Use o tempo para cadastrar novos clientes ou revisar casos ativos."
           />
         </SectionCard>
 
@@ -526,7 +542,7 @@ export default async function InternalLawyerPage({
         >
           <OperationalList
             items={thisWeekQueue}
-            emptyMessage="Sem compromissos ou prazos desta semana pedindo preparo adicional agora."
+            emptyMessage="📅 Sem compromissos próximos. Ótimo momento para organizar a base e planejar novos casos!"
           />
         </SectionCard>
       </div>

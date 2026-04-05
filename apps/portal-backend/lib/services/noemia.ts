@@ -183,7 +183,7 @@ async function buildStaffContext(profile: PortalProfile) {
         `Fila fazer hoje: ${overview.operationalCenter.queues.today
           .map((item) => `${item.kindLabel} ${item.title}`)
           .join("; ")}.`,
-        `Casos recentes: ${overview.latestCases
+        `Casos recentes: ${overview.operationalCenter.latestCases
           .map((item) => `${item.title} | ${item.clientName}`)
           .join("; ")}.`
       ].join("\n");
@@ -262,7 +262,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
         ? await buildClientContext(profile)
         : buildPublicContext();
 
-  const systemInstructions = buildSystemInstructions(effectiveAudience, contextText);
+  const systemInstructions = buildSystemInstructions(effectiveAudience as "visitor" | "client" | "staff", contextText);
 
   const conversationHistory = input.history.slice(-8).map((message) => ({
     role: message.role,

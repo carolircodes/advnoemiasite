@@ -66,18 +66,24 @@ export default async function NoemiaPage({
     ? [
         "Resuma as prioridades de hoje e diga o que devo tratar primeiro.",
         "Quais casos estao sem atualizacao ha mais tempo e qual proximo passo interno faz sentido?",
-        "Monte um texto-base curto para cobrar o cliente sobre documentos pendentes."
+        "Monte um texto-base curto para cobrar o cliente sobre documentos pendentes.",
+        "Qual triagem mais urgente precisa de minha atencao agora?",
+        "Analise a carga de trabalho desta semana e sugira como organizar melhor."
       ]
     : isClientMode
     ? [
         "Explique o status atual do meu caso em linguagem simples.",
         "Quais documentos estao pendentes no meu portal?",
-        "Qual e a proxima data importante do meu acompanhamento?"
+        "Qual e a proxima data importante do meu acompanhamento?",
+        "O que eu preciso fazer para seguir com meu caso?",
+        "Resuma o que aconteceu recentemente no meu acompanhamento."
       ]
     : [
         "Como funciona a triagem inicial do atendimento?",
         "Quando eu recebo acesso ao portal do cliente?",
-        "O que eu consigo acompanhar dentro do portal?"
+        "O que eu consigo acompanhar dentro do portal?",
+        "Quais areas juridicas sao atendidas pelo escritorio?",
+        "Como funciona o processo de acompanhamento de caso?"
       ];
   const utilityContent =
     profile && profile.is_active ? (

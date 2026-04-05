@@ -403,9 +403,14 @@ export default async function ClientPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              Neste momento nao ha pendencias documentais visiveis no seu acompanhamento.
-            </p>
+            <div className="empty-state actionable">
+              <p>📄 Neste momento não há pendências documentais visíveis no seu acompanhamento.</p>
+              <div className="empty-state-actions">
+                <Link href="/noemia" className="button secondary">
+                  Perguntar à Noemia sobre próximos passos
+                </Link>
+              </div>
+            </div>
           )}
         </SectionCard>
       </div>
@@ -437,10 +442,18 @@ export default async function ClientPage({
             ))}
           </ul>
         ) : (
-          <p className="empty-state">
-            Assim que a equipe registrar novas atualizacoes visiveis, elas aparecerao aqui.
-          </p>
-        )}
+            <div className="empty-state actionable">
+              <p>📋 Assim que a equipe registrar novas atualizações visíveis, elas aparecerão aqui.</p>
+              <div className="empty-state-actions">
+                <Link href="/noemia" className="button secondary">
+                  Perguntar à Noemia sobre o andamento
+                </Link>
+                <Link href="/documentos" className="button secondary">
+                  Ver documentos disponíveis
+                </Link>
+              </div>
+            </div>
+          )}
       </SectionCard>
       </AppFrame>
     </>

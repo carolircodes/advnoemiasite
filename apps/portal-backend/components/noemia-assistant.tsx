@@ -17,32 +17,38 @@ type NoemiaAssistantProps = {
 const audienceCopy = {
   visitor: {
     welcome:
-      "Posso orientar sobre triagem, funcionamento do portal e os proximos passos antes do atendimento.",
-    modeLabel: "Orientacao inicial",
+      "👋 Olá! Posso orientar sobre triagem, funcionamento do portal e os próximos passos antes do atendimento.",
+    modeLabel: "Orientação inicial",
     usageHint:
-      "Pergunte sobre triagem, areas atendidas, funcionamento do portal e proximos passos.",
+      "Pergunte sobre triagem, áreas atendidas, funcionamento do portal e próximos passos.",
     placeholder:
       "Ex.: Como funciona a triagem e quando recebo acesso ao portal?",
-    pendingText: "Estou organizando a resposta com base no fluxo publico e institucional."
+    pendingText: "🔍 Estou organizando a resposta com base no fluxo público e institucional...",
+    successText: "✨ Pronto! Aqui está minha orientação.",
+    errorText: "❌ Não consegui responder agora. Tente novamente em instantes."
   },
   client: {
     welcome:
-      "Posso explicar o que aparece no seu portal, resumir status, agenda, documentos e orientar o proximo passo mais pratico.",
+      "👋 Olá! Posso explicar o que aparece no seu portal, resumir status, agenda, documentos e orientar o próximo passo mais prático.",
     modeLabel: "Contexto do portal do cliente",
     usageHint:
       "Pergunte sobre status, documentos, agenda ou o que significa uma etapa do seu caso.",
     placeholder: "Ex.: O que significa o status atual do meu caso?",
-    pendingText: "Estou organizando a resposta com base no contexto disponivel do portal."
+    pendingText: "🔍 Estou organizando a resposta com base no contexto disponível do portal...",
+    successText: "✨ Pronto! Aqui está o que encontrei no seu portal.",
+    errorText: "❌ Não consegui acessar seu contexto agora. Tente novamente."
   },
   staff: {
     welcome:
-      "Posso resumir triagens, apontar prioridades, sugerir proximos passos internos e montar textos-base de retorno para a rotina da advogada.",
-    modeLabel: "Operacao interna",
+      "👋 Olá! Posso resumir triagens, apontar prioridades, sugerir próximos passos internos e montar textos-base de retorno para a rotina da advogada.",
+    modeLabel: "Operação interna",
     usageHint:
-      "Peca resumo de triagens, leitura de prioridades, proximo passo interno ou um rascunho de retorno ao cliente.",
+      "Peça resumo de triagens, leitura de prioridades, próximo passo interno ou um rascunho de retorno ao cliente.",
     placeholder:
       "Ex.: Resuma as prioridades de hoje e diga o que devo tratar primeiro.",
-    pendingText: "Estou cruzando operacao, telemetria e filas internas para responder com mais clareza."
+    pendingText: "🔍 Estou cruzando operação, telemetria e filas internas para responder com mais clareza...",
+    successText: "✨ Pronto! Aqui está minha análise operacional.",
+    errorText: "❌ Não consegui acessar os dados operacionais agora. Tente novamente."
   }
 } as const;
 
@@ -62,6 +68,7 @@ export function NoemiaAssistant({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [lastSuccess, setLastSuccess] = useState(false);
 
   function sendMessage(nextMessage: string) {
     const cleanMessage = nextMessage.trim();
@@ -72,6 +79,7 @@ export function NoemiaAssistant({
     }
 
     setError("");
+    setLastSuccess(false);
     const nextHistory = [...messages, { role: "user" as const, content: cleanMessage }];
     setMessages(nextHistory);
     setDraft("");
@@ -95,12 +103,13 @@ export function NoemiaAssistant({
         setError(
           typeof result?.error === "string"
             ? result.error
-            : "Nao consegui responder agora. Tente novamente em instantes."
+            : copy.errorText
         );
         setMessages(messages);
         return;
       }
 
+      setLastSuccess(true);
       setMessages((current) => [
         ...current,
         {
@@ -145,6 +154,9 @@ export function NoemiaAssistant({
       </div>
 
       {error ? <div className="error-notice">{error}</div> : null}
+      {lastSuccess && !error && !isPending && messages.length > 1 && (
+        <div className="success-notice subtle">{copy.successText}</div>
+      )}
 
       <div className="conversation-feed">
         {messages.map((message, index) => (
