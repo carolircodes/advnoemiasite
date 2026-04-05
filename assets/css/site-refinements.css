@@ -1115,3 +1115,75 @@ body:not(.portal-app) .footer {
     padding-bottom: 124px;
   }
 }
+/* =========================
+   AJUSTES PREMIUM – LEGIBILIDADE + UX
+   ========================= */
+
+/* CORES BASE */
+:root {
+  --color-bg: #F8F6F2;
+  --color-card: #FFFFFF;
+  --color-primary: #0F2A24;
+  --color-secondary: #6B7280;
+  --color-gold: #C6A75E;
+
+  --text-strong: #0B1F1A;
+  --text-medium: #3A4A46;
+  --text-light: #6B7280;
+}
+
+/* CORREÇÃO DE TEXTO (PROBLEMA DO FUNDO CLARO) */
+body {
+  color: var(--text-medium);
+}
+
+h1, h2, h3, h4 {
+  color: var(--text-strong);
+}
+
+p, span, label {
+  color: var(--text-medium);
+}
+
+/* HERO COM LEITURA PERFEITA */
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(248, 246, 242, 0.92);
+}
+
+/* FORMULÁRIOS PREMIUM */
+input, textarea, select {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 15px;
+  transition: all 0.25s ease;
+  color: var(--text-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-light);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(198,167,94,0.15);
+  outline: none;
+}
+
+/* BOTÃO MAIS PREMIUM */
+button {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
