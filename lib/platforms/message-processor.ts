@@ -136,17 +136,89 @@ function buildAssistantCTA(area: string, analysis: any, platform: Platform) {
   return `\n\nSe quiser, você também pode entender melhor por aqui:\n${areaLink}\nOu falar direto com a advogada: ${WHATSAPP_URL}`;
 }
 
+// Função de fallback robusta para WhatsApp
+function getWhatsAppFallbackResponse(area: string, analysis: any): string {
+  const areaLabel =
+    area === 'previdenciario'
+      ? 'direito previdenciário'
+      : area === 'bancario'
+      ? 'direito bancário'
+      : area === 'familia'
+      ? 'direito de família'
+      : 'questão jurídica';
+
+  if (analysis.wantsHuman || analysis.shouldSchedule) {
+    return `Olá! Sou a NoemIA, assistente da Advogada Noemia. Entendi que você precisa de atendimento sobre ${areaLabel}.\n\nPosso te direcionar agora para falar diretamente com a advogada:\n📱 WhatsApp: ${WHATSAPP_URL}\n🌐 Site: ${PUBLIC_SITE_URL}`;
+  }
+
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia. Recebi sua mensagem sobre ${areaLabel}.\n\nPara te dar uma orientação segura e personalizada, o ideal é conversar diretamente com a advogada Noemia.\n\n📱 WhatsApp: ${WHATSAPP_URL}\n🌐 Site: ${PUBLIC_SITE_URL}`;
+}
+
+// Função de fallback crítico (quando tudo falha)
+function getCriticalFallbackResponse(): string {
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.\n\nRecebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:\n\n📱 WhatsApp: ${WHATSAPP_URL}\n🌐 Site: ${PUBLIC_SITE_URL}\n\nEm breve entraremos em contato!`;
+}
+
+// Função de log específica para erros
+function logError(type: 'OPENAI_ERROR' | 'WHATSAPP_SEND_ERROR' | 'WEBHOOK_PARSING_ERROR', details: any) {
+  const logEntry = {
+    timestamp: nowIso(),
+    type,
+    platform: details.platform || 'unknown',
+    error: details.error,
+    userId: details.userId,
+    messageId: details.messageId,
+    context: {
+      ...details.context,
+      fallbackUsed: details.fallbackUsed || false
+    }
+  };
+
+  console.error(`🚨 ${type}:`, JSON.stringify(logEntry, null, 2));
+}
+
+// Função de log específica para sucesso
+function logSuccess(type: 'OPENAI_SUCCESS' | 'WHATSAPP_SEND_SUCCESS' | 'MESSAGE_PROCESSED' | 'OPENAI_REQUEST', details: any) {
+  const logEntry = {
+    timestamp: nowIso(),
+    type,
+    platform: details.platform || 'unknown',
+    userId: details.userId,
+    messageId: details.messageId,
+    context: details.context || {}
+  };
+
+  console.log(`✅ ${type}:`, JSON.stringify(logEntry, null, 2));
+}
+
 async function generateAIResponse(
   userText: string,
   area: any,
   analysis: any,
-  userId: string
-) {
+  userId: string,
+  platform: Platform
+): Promise<{ response: string; usedFallback: boolean; error?: string }> {
+  // Se não há OpenAI configurada, usar fallback imediatamente
   if (!openai) {
-    return fallbackResponse(area.name, analysis);
+    logError('OPENAI_ERROR', {
+      platform,
+      userId,
+      error: 'OPENAI_NOT_CONFIGURED',
+      fallbackUsed: true,
+      context: { area: area.name, analysis }
+    });
+    
+    const fallbackResponse = getWhatsAppFallbackResponse(area.name, analysis);
+    return { response: fallbackResponse, usedFallback: true };
   }
 
   try {
+    logSuccess('OPENAI_REQUEST', {
+      platform,
+      userId,
+      context: { area: area.name, model: OPENAI_MODEL }
+    });
+
     const memory = getConversationMemory(userId);
     const messages = buildConversationMessages(
       userText,
@@ -161,20 +233,75 @@ async function generateAIResponse(
       max_tokens: 300,
     });
 
-    const text =
-      completion.choices?.[0]?.message?.content?.trim() || fallbackResponse(area.name, analysis);
+    const text = completion.choices?.[0]?.message?.content?.trim();
+    
+    if (!text) {
+      logError('OPENAI_ERROR', {
+        platform,
+        userId,
+        error: 'EMPTY_RESPONSE',
+        fallbackUsed: true,
+        context: { area: area.name, completion }
+      });
+      
+      const fallbackResponse = getWhatsAppFallbackResponse(area.name, analysis);
+      return { response: fallbackResponse, usedFallback: true };
+    }
 
-    const finalResponse = `${text}${buildAssistantCTA(area.name, analysis, 'whatsapp')}`;
+    const finalResponse = `${text}${buildAssistantCTA(area.name, analysis, platform)}`;
 
     pushConversationMemory(userId, [
       { role: 'user', content: userText },
       { role: 'assistant', content: finalResponse },
     ]);
 
-    return finalResponse;
-  } catch (error) {
-    console.error('OpenAI API Error:', error);
-    return fallbackResponse(area.name, analysis);
+    logSuccess('OPENAI_SUCCESS', {
+      platform,
+      userId,
+      context: { 
+        area: area.name, 
+        responseLength: finalResponse.length,
+        tokensUsed: completion.usage?.total_tokens || 0
+      }
+    });
+
+    return { response: finalResponse, usedFallback: false };
+
+  } catch (error: any) {
+    // Detectar tipos específicos de erro da OpenAI
+    let errorType = 'OPENAI_UNKNOWN_ERROR';
+    let shouldUseFallback = true;
+
+    if (error.code === 'insufficient_quota') {
+      errorType = 'OPENAI_INSUFFICIENT_QUOTA';
+    } else if (error.code === 'rate_limit_exceeded') {
+      errorType = 'OPENAI_RATE_LIMIT';
+    } else if (error.code === 'invalid_api_key') {
+      errorType = 'OPENAI_INVALID_KEY';
+    } else if (error.code === 'model_not_found') {
+      errorType = 'OPENAI_MODEL_NOT_FOUND';
+    } else if (error.status === 429) {
+      errorType = 'OPENAI_RATE_LIMIT';
+    } else if (error.status === 401) {
+      errorType = 'OPENAI_UNAUTHORIZED';
+    }
+
+    logError('OPENAI_ERROR', {
+      platform,
+      userId,
+      error: errorType,
+      fallbackUsed: true,
+      context: { 
+        area: area.name, 
+        originalError: error.message,
+        code: error.code,
+        status: error.status
+      }
+    });
+
+    // Sempre usar fallback em caso de erro
+    const fallbackResponse = getWhatsAppFallbackResponse(area.name, analysis);
+    return { response: fallbackResponse, usedFallback: true, error: errorType };
   }
 }
 
@@ -195,13 +322,19 @@ function fallbackResponse(area: string, analysis: any) {
   return `Entendi sua mensagem. Posso te passar uma orientação inicial sobre ${areaLabel}, mas para uma análise segura do seu caso o ideal é falar diretamente com a advogada Noemia.\n\nWhatsApp: ${WHATSAPP_URL}\nPágina: ${PUBLIC_SITE_URL}`;
 }
 
-// Função principal de processamento
+// Função principal de processamento com fallback robusto
 export async function processPlatformMessage(message: PlatformMessage): Promise<{
   lead?: LeadRecord;
   conversation?: ConversationRecord;
   response?: string;
   error?: string;
+  usedFallback?: boolean;
+  fallbackReason?: string;
 }> {
+  let usedFallback = false;
+  let fallbackReason = '';
+  let aiResponse = '';
+  
   try {
     // Verificar mensagem duplicada
     if (isDuplicateMessage(message.platformMessageId)) {
@@ -214,13 +347,44 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
     // Classificar lead
     const analysis = classifyLead(message.text, legalArea.name);
     
-    // Gerar resposta da IA
-    const aiResponse = await generateAIResponse(
-      message.text,
-      legalArea,
-      analysis,
-      message.platformUserId
-    );
+    try {
+      // Tentar gerar resposta da IA
+      const aiResult = await generateAIResponse(
+        message.text,
+        legalArea,
+        analysis,
+        message.platformUserId,
+        message.platform
+      );
+      
+      aiResponse = aiResult.response;
+      usedFallback = aiResult.usedFallback;
+      fallbackReason = aiResult.error || '';
+      
+    } catch (aiError) {
+      // Fallback se falhar completamente
+      logError('OPENAI_ERROR', {
+        platform: message.platform,
+        userId: message.platformUserId,
+        error: 'CRITICAL_AI_FAILURE',
+        fallbackUsed: true,
+        context: { 
+          originalError: aiError instanceof Error ? aiError.message : 'unknown',
+          area: legalArea.name 
+        }
+      });
+      
+      aiResponse = getCriticalFallbackResponse();
+      usedFallback = true;
+      fallbackReason = 'CRITICAL_AI_FAILURE';
+    }
+
+    // Garantir que sempre temos uma resposta
+    if (!aiResponse || aiResponse.trim().length === 0) {
+      aiResponse = getCriticalFallbackResponse();
+      usedFallback = true;
+      fallbackReason = 'EMPTY_RESPONSE';
+    }
 
     // Criar registros
     const leadRecord: LeadRecord = {
@@ -243,6 +407,8 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
       metadata: {
         platform_message_id: message.platformMessageId,
         sender_name: message.senderName,
+        used_fallback: usedFallback,
+        fallback_reason: fallbackReason,
         ...message.metadata
       }
     };
@@ -263,6 +429,8 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
       should_schedule: analysis.shouldSchedule,
       metadata: {
         processed_at: nowIso(),
+        used_fallback: usedFallback,
+        fallback_reason: fallbackReason,
         ...message.metadata
       }
     };
@@ -270,21 +438,39 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
     return {
       lead: leadRecord,
       conversation: conversationRecord,
-      response: aiResponse
+      response: aiResponse,
+      usedFallback,
+      fallbackReason
     };
 
   } catch (error) {
-    console.error('Error processing platform message:', error);
-    return { error: error instanceof Error ? error.message : 'Unknown error' };
+    logError('WEBHOOK_PARSING_ERROR', {
+      platform: message.platform,
+      userId: message.platformUserId,
+      messageId: message.platformMessageId,
+      error: error instanceof Error ? error.message : 'unknown',
+      fallbackUsed: true,
+      context: { text: message.text.substring(0, 100) }
+    });
+    
+    // Mesmo em caso de erro crítico, retornar resposta fallback
+    const criticalResponse = getCriticalFallbackResponse();
+    
+    return {
+      response: criticalResponse,
+      usedFallback: true,
+      fallbackReason: 'CRITICAL_PROCESSING_ERROR',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }
 
-// Função para enviar resposta via plataforma
+// Função para enviar resposta via plataforma com fallback robusto
 export async function sendPlatformResponse(
   platform: Platform,
   recipientId: string,
   messageText: string
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string; usedFallback?: boolean }> {
   try {
     const config = platformConfigs[platform];
     
@@ -304,21 +490,44 @@ export async function sendPlatformResponse(
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Instagram API Error:', response.status, errorText);
-        return false;
+        const errorMsg = `Instagram API Error: ${response.status} - ${errorText}`;
+        
+        logError('WHATSAPP_SEND_ERROR', {
+          platform: 'instagram',
+          userId: recipientId,
+          error: 'INSTAGRAM_SEND_FAILED',
+          fallbackUsed: false,
+          context: { status: response.status, errorText }
+        });
+        
+        return { success: false, error: errorMsg };
       }
 
-      console.log('Instagram message sent successfully');
-      return true;
+      logSuccess('WHATSAPP_SEND_SUCCESS', {
+        platform: 'instagram',
+        userId: recipientId,
+        context: { messageLength: messageText.length }
+      });
+      
+      return { success: true };
 
     } else if (platform === 'whatsapp') {
-      // WhatsApp Cloud API - CORREÇÃO AQUI
+      // WhatsApp Cloud API
       const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
       const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
       
       if (!phoneNumberId || !accessToken) {
-        console.error('WhatsApp API Error: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN');
-        return false;
+        const errorMsg = 'WhatsApp API Error: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN';
+        
+        logError('WHATSAPP_SEND_ERROR', {
+          platform: 'whatsapp',
+          userId: recipientId,
+          error: 'MISSING_CONFIG',
+          fallbackUsed: false,
+          context: { hasPhoneNumberId: !!phoneNumberId, hasAccessToken: !!accessToken }
+        });
+        
+        return { success: false, error: errorMsg };
       }
 
       const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
@@ -339,19 +548,42 @@ export async function sendPlatformResponse(
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('WhatsApp API Error:', response.status, errorText);
-        return false;
+        const errorMsg = `WhatsApp API Error: ${response.status} - ${errorText}`;
+        
+        logError('WHATSAPP_SEND_ERROR', {
+          platform: 'whatsapp',
+          userId: recipientId,
+          error: 'WHATSAPP_SEND_FAILED',
+          fallbackUsed: false,
+          context: { status: response.status, errorText, messageLength: messageText.length }
+        });
+        
+        return { success: false, error: errorMsg };
       }
 
-      console.log('WhatsApp message sent successfully');
-      return true;
+      logSuccess('WHATSAPP_SEND_SUCCESS', {
+        platform: 'whatsapp',
+        userId: recipientId,
+        context: { messageLength: messageText.length, phoneNumberId }
+      });
+      
+      return { success: true };
     }
 
-    return false;
+    return { success: false, error: 'Platform not supported' };
 
   } catch (error) {
-    console.error('Error sending platform response:', error);
-    return false;
+    logError('WHATSAPP_SEND_ERROR', {
+      platform,
+      userId: recipientId,
+      error: 'NETWORK_ERROR',
+      fallbackUsed: false,
+      context: { 
+        originalError: error instanceof Error ? error.message : 'unknown',
+        stack: error instanceof Error ? error.stack : undefined
+      }
+    });
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 

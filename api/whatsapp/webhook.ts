@@ -10,6 +10,21 @@ import {
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth/guards";
 
+// Função de fallback crítico (quando tudo falha)
+function getCriticalFallbackResponse(): string {
+  const PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://advnoemia.com.br';
+  const WHATSAPP_URL = process.env.NOEMIA_WHATSAPP_URL || 'https://wa.me/5511999999999';
+  
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.
+
+Recebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:
+
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${PUBLIC_SITE_URL}
+
+Em breve entraremos em contato!`;
+}
+
 // Função para fazer parse de mensagens do WhatsApp
 function parseWhatsAppMessage(body: any): Array<{
   platform: Platform;
@@ -165,7 +180,7 @@ export async function POST(request: NextRequest) {
         // Processar mensagem
         const result = await processPlatformMessage(event);
 
-        if (result.error) {
+        if (result.error && !result.response) {
           logPlatformEvent('PROCESSING_ERROR', 'whatsapp', {
             platformUserId: event.platformUserId,
             error: result.error
@@ -204,14 +219,30 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Enviar resposta automatica
+        // Enviar resposta automática com fallback robusto
         let messageSent = false;
+        let sendError = '';
+        
         if (result.response) {
-          messageSent = await sendPlatformResponse(
+          const sendResult = await sendPlatformResponse(
             event.platform,
             event.platformUserId,
             result.response
           );
+          
+          messageSent = sendResult.success;
+          sendError = sendResult.error || '';
+          
+          // Se falhou o envio, tentar enviar fallback crítico
+          if (!messageSent && result.response) {
+            logPlatformEvent('SEND_FALLBACK_ATTEMPT', 'whatsapp', {
+              platformUserId: event.platformUserId,
+              originalError: sendError,
+              platformMessageId: event.platformMessageId,
+              error: sendResult.error,
+              responseLength: result.response.length
+            });
+          }
         }
 
         // Log do processamento
@@ -222,7 +253,10 @@ export async function POST(request: NextRequest) {
           leadId,
           messageSent,
           textLength: event.text.length,
-          responseLength: result.response?.length || 0
+          responseLength: result.response?.length || 0,
+          usedFallback: result.usedFallback || false,
+          fallbackReason: result.fallbackReason || '',
+          sendError
         });
 
         processedEvents.push({

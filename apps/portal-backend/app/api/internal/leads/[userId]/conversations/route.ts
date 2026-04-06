@@ -4,11 +4,11 @@ import { requireProfile } from "@/lib/auth/guards";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  context: { params: Promise<{ userId: string }> }
 ) {
   try {
     const profile = await requireProfile(["admin", "advogada"]);
-    const { userId } = params;
+    const { userId } = await context.params;
     const supabase = await createServerSupabaseClient();
 
     // Buscar conversas do usuário
