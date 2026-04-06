@@ -573,17 +573,17 @@ export async function sendPlatformResponse(
     return { success: false, error: 'Platform not supported' };
 
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    
     logError('WHATSAPP_SEND_ERROR', {
       platform,
       userId: recipientId,
       error: 'NETWORK_ERROR',
       fallbackUsed: false,
-      context: { 
-        originalError: error instanceof Error ? error.message : 'unknown',
-        stack: error instanceof Error ? error.stack : undefined
-      }
+      context: { originalError: errorMsg }
     });
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    
+    return { success: false, error: errorMsg };
   }
 }
 
