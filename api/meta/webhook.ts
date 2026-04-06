@@ -937,9 +937,37 @@ function buildCommentReplyText(area: LegalAreaName) {
 }
 
 async function processMessageEvent(event: ProcessedEvent) {
+  logEvent('WEBHOOK_RECEIVED', {
+    platform: 'instagram',
+    sender: event.sender,
+    messageId: event.messageId,
+    textLength: event.text.length,
+    textPreview: event.text.substring(0, 100),
+    eventType: event.type
+  });
+
   const area = detectLegalArea(event.text);
   const analysis = classifyLead(event.text, area.name);
+  
+  logEvent('LEAD_CLASSIFIED', {
+    platform: 'instagram',
+    sender: event.sender,
+    legalArea: area.name,
+    leadStatus: analysis.leadStatus,
+    funnelStage: analysis.funnelStage,
+    urgency: analysis.urgency,
+    wantsHuman: analysis.wantsHuman,
+    shouldSchedule: analysis.shouldSchedule
+  });
+  
   const responseText = await generateAIResponse(event.text, area, analysis, event.sender);
+  
+  logEvent('INSTAGRAM_SEND_ATTEMPT', {
+    sender: event.sender,
+    responseLength: responseText.length,
+    responsePreview: responseText.substring(0, 100)
+  });
+  
   const sent = await sendInstagramMessage(event.sender, responseText);
 
   await upsertLead(event.sender, event.senderName || null, analysis, event.text, responseText);
@@ -965,7 +993,8 @@ async function processMessageEvent(event: ProcessedEvent) {
     },
   });
 
-  logEvent('MESSAGE_PROCESSED', {
+  logEvent('PROCESSING_COMPLETE', {
+    platform: 'instagram',
     sender: event.sender,
     area: analysis.legalArea,
     leadStatus: analysis.leadStatus,
@@ -974,6 +1003,7 @@ async function processMessageEvent(event: ProcessedEvent) {
     wantsHuman: analysis.wantsHuman,
     shouldSchedule: analysis.shouldSchedule,
     sent,
+    responseLength: responseText.length
   });
 
   return {
@@ -1047,25 +1077,48 @@ async function processCommentEvent(event: ProcessedEvent) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  logEvent('WEBHOOK_RECEIVED', {
+    method: req.method,
+    url: req.url,
+    headers: req.headers,
+    userAgent: req.headers['user-agent']
+  });
+
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
+    logEvent('WEBHOOK_VERIFICATION_ATTEMPT', {
+      mode,
+      token: token === VERIFY_TOKEN ? 'VALID' : 'INVALID',
+      tokenMatch: token === VERIFY_TOKEN,
+      hasChallenge: !!challenge
+    });
+
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      logEvent('WEBHOOK_VERIFIED');
+      logEvent('WEBHOOK_VERIFIED', {
+        mode,
+        token,
+        challenge
+      });
       return res.status(200).send(challenge);
     }
 
     logEvent('WEBHOOK_VERIFY_FAILED', {
       mode,
+      token,
       tokenMatch: token === VERIFY_TOKEN,
+      expectedToken: VERIFY_TOKEN
     });
 
     return res.status(403).send('Forbidden');
   }
 
   if (req.method !== 'POST') {
+    logEvent('WEBHOOK_METHOD_NOT_ALLOWED', {
+      method: req.method
+    });
     return res.status(405).end();
   }
 
@@ -1075,24 +1128,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (ENABLE_SIGNATURE_VALIDATION && !validateSignature(req)) {
-    logEvent('INVALID_SIGNATURE');
+    logEvent('INVALID_SIGNATURE', {
+      hasSignature: !!req.headers['x-hub-signature-256'],
+      hasAppSecret: !!APP_SECRET,
+      headers: req.headers
+    });
     return res.status(403).json({ error: 'Invalid signature' });
   }
 
   try {
     const body = req.body as MetaWebhookBody;
+    
+    logEvent('WEBHOOK_BODY_PARSED', {
+      object: body.object,
+      entryCount: body.entry?.length || 0,
+      hasBody: !!body
+    });
+
     const events = parseMetaEvents(body);
 
     if (!events.length) {
-      logEvent('NO_EVENTS');
+      logEvent('NO_EVENTS', {
+        body: JSON.stringify(body).substring(0, 500)
+      });
       return res.status(200).json({ received: true, events: [] });
     }
+
+    logEvent('EVENTS_PARSED', {
+      eventCount: events.length,
+      eventTypes: events.map(e => e.type),
+      senders: events.map(e => e.sender)
+    });
 
     const results: unknown[] = [];
 
     for (const event of events) {
       if (isDuplicateMessage(event.messageId)) {
-        logEvent('DUPLICATE_MESSAGE_SKIPPED', { messageId: event.messageId });
+        logEvent('DUPLICATE_MESSAGE_SKIPPED', { 
+          messageId: event.messageId,
+          sender: event.sender
+        });
         continue;
       }
 
@@ -1102,6 +1177,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else if (event.type === 'comment') {
           results.push(await processCommentEvent(event));
         } else if (event.type === 'postback') {
+          logEvent('POSTBACK_RECEIVED', {
+            sender: event.sender,
+            text: event.text,
+            messageId: event.messageId
+          });
+
           const area = detectLegalArea(event.text);
           const analysis = classifyLead(event.text, area.name);
 
@@ -1119,7 +1200,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (eventError) {
         logEvent('EVENT_PROCESSING_ERROR', {
           messageId: event.messageId,
+          sender: event.sender,
+          eventType: event.type,
           error: eventError instanceof Error ? eventError.message : 'unknown',
+          errorStack: eventError instanceof Error ? eventError.stack : undefined
         });
 
         results.push({
@@ -1129,14 +1213,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    const successCount = results.filter(r => !(r as any).error).length;
+    const errorCount = results.filter(r => (r as any).error).length;
+
+    logEvent('WEBHOOK_PROCESSING_COMPLETE', {
+      totalEvents: events.length,
+      successCount,
+      errorCount,
+      results: results.map(r => ({
+        messageId: (r as any).messageId,
+        sender: (r as any).sender,
+        hasError: !!(r as any).error,
+        area: (r as any).area,
+        sent: (r as any).sent
+      }))
+    });
+
     return res.status(200).json({
       received: true,
       processed: results.length,
+      successCount,
+      errorCount,
       results,
     });
   } catch (error) {
     logEvent('FATAL_HANDLER_ERROR', {
       error: error instanceof Error ? error.message : 'unknown',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      method: req.method,
+      url: req.url
     });
 
     return res.status(500).json({

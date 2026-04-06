@@ -204,16 +204,16 @@ function logSuccess(type: 'OPENAI_SUCCESS' | 'WHATSAPP_SEND_SUCCESS' | 'MESSAGE_
 // Verificar se deve usar OpenAI
 function shouldUseOpenAI(): boolean {
   if (!ENABLE_OPENAI) {
-    console.log('🚫 OPENAI_DISABLED: ENABLE_OPENAI=false');
+    logPlatformEvent('OPENAI_SKIPPED', 'unknown', { reason: 'ENABLE_OPENAI=false' });
     return false;
   }
   
   if (!openai) {
-    console.log('🚫 OPENAI_SKIPPED: OPENAI_API_KEY não configurada');
+    logPlatformEvent('OPENAI_SKIPPED', 'unknown', { reason: 'OPENAI_API_KEY não configurada' });
     return false;
   }
   
-  console.log('✅ OPENAI_ENABLED: Configurada e pronta para uso');
+  logPlatformEvent('OPENAI_ENABLED', 'unknown', { model: OPENAI_MODEL });
   return true;
 }
 
@@ -225,14 +225,19 @@ async function generateAIResponse(
   userId: string,
   platform: Platform
 ): Promise<{ response: string; usedFallback: boolean; error?: string }> {
+  logPlatformEvent('OPENAI_CALLED', platform, {
+    userId,
+    area: area.name,
+    textLength: userText.length,
+    model: OPENAI_MODEL
+  });
+
   if (!shouldUseOpenAI()) {
     const fallbackResponse = generateFallbackResponse(area.name, analysis, platform);
     return { response: fallbackResponse, usedFallback: true, error: 'OPENAI_DISABLED' };
   }
 
   try {
-    console.log('🤖 OPENAI_REQUEST: Processando com IA');
-
     const memory = getConversationMemory(userId);
     const messages = buildConversationMessages(
       userText,
@@ -250,7 +255,11 @@ async function generateAIResponse(
     const text = completion.choices?.[0]?.message?.content?.trim();
     
     if (!text) {
-      console.log('⚠️ OPENAI_FAILED: Resposta vazia, usando fallback');
+      logPlatformEvent('OPENAI_ERROR', platform, {
+        userId,
+        error: 'EMPTY_RESPONSE',
+        completion: JSON.stringify(completion)
+      });
       const fallbackResponse = generateFallbackResponse(area.name, analysis, platform);
       return { response: fallbackResponse, usedFallback: true, error: 'EMPTY_RESPONSE' };
     }
@@ -262,7 +271,13 @@ async function generateAIResponse(
       { role: 'assistant', content: finalResponse },
     ]);
 
-    console.log('✅ OPENAI_SUCCESS: Resposta gerada com sucesso');
+    logPlatformEvent('OPENAI_SUCCESS', platform, {
+      userId,
+      area: area.name,
+      responseLength: finalResponse.length,
+      tokensUsed: completion.usage?.total_tokens || 0
+    });
+
     return { response: finalResponse, usedFallback: false };
 
   } catch (error: any) {
@@ -283,7 +298,14 @@ async function generateAIResponse(
       errorType = 'OPENAI_UNAUTHORIZED';
     }
 
-    console.log(`🚨 OPENAI_FAILED: ${errorType} - ${error.message}`);
+    logPlatformEvent('OPENAI_ERROR', platform, {
+      userId,
+      errorType,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      area: area.name,
+      originalError: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    });
 
     // Sempre usar fallback em caso de erro
     const fallbackResponse = generateFallbackResponse(area.name, analysis, platform);
@@ -293,7 +315,13 @@ async function generateAIResponse(
 
 // Gerar resposta de fallback inteligente
 function generateFallbackResponse(area: string, analysis: any, platform: Platform): string {
-  console.log(`🛡️ FALLBACK_USED: Área=${area}, Plataforma=${platform}`);
+  logPlatformEvent('FALLBACK_USED', platform, {
+    area,
+    urgency: analysis.urgency,
+    wantsHuman: analysis.wantsHuman,
+    shouldSchedule: analysis.shouldSchedule,
+    leadStatus: analysis.leadStatus
+  });
   
   const areaLabel =
     area === 'previdenciario'
@@ -326,6 +354,22 @@ Para te dar uma orientação segura e personalizada, o ideal é conversar direta
 Estamos aguardando seu contato!`;
 }
 
+// Função de fallback crítico (quando tudo falha)
+function getCriticalFallbackResponse(): string {
+  logPlatformEvent('CRITICAL_FALLBACK', 'unknown', {
+    reason: 'Todos os sistemas falharam'
+  });
+  
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.
+
+Recebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:
+
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${PUBLIC_SITE_URL}
+
+Em breve entraremos em contato!`;
+}
+
 function fallbackResponse(area: string, analysis: any) {
   const areaLabel =
     area === 'previdenciario'
@@ -356,9 +400,22 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
   let fallbackReason = '';
   let aiResponse = '';
   
+  logPlatformEvent('WEBHOOK_RECEIVED', message.platform, {
+    platformUserId: message.platformUserId,
+    platformMessageId: message.platformMessageId,
+    textLength: message.text.length,
+    textPreview: message.text.substring(0, 100),
+    senderName: message.senderName,
+    metadata: message.metadata
+  });
+  
   try {
     // Verificar mensagem duplicada
     if (isDuplicateMessage(message.platformMessageId)) {
+      logPlatformEvent('MESSAGE_DUPLICATE', message.platform, {
+        platformUserId: message.platformUserId,
+        platformMessageId: message.platformMessageId
+      });
       return { error: 'Mensagem duplicada' };
     }
 
@@ -367,6 +424,17 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
     
     // Classificar lead
     const analysis = classifyLead(message.text, legalArea.name);
+    
+    logPlatformEvent('LEAD_CLASSIFIED', message.platform, {
+      platformUserId: message.platformUserId,
+      legalArea: legalArea.name,
+      leadStatus: analysis.leadStatus,
+      funnelStage: analysis.funnelStage,
+      urgency: analysis.urgency,
+      wantsHuman: analysis.wantsHuman,
+      shouldSchedule: analysis.shouldSchedule,
+      summary: analysis.summary
+    });
     
     try {
       // Tentar gerar resposta da IA
@@ -384,15 +452,12 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
       
     } catch (aiError) {
       // Fallback se falhar completamente
-      logError('OPENAI_ERROR', {
-        platform: message.platform,
-        userId: message.platformUserId,
+      logPlatformEvent('OPENAI_ERROR', message.platform, {
+        platformUserId: message.platformUserId,
         error: 'CRITICAL_AI_FAILURE',
-        fallbackUsed: true,
-        context: { 
-          originalError: aiError instanceof Error ? aiError.message : 'unknown',
-          area: legalArea.name 
-        }
+        originalError: aiError instanceof Error ? aiError.message : 'unknown',
+        errorStack: aiError instanceof Error ? aiError.stack : undefined,
+        area: legalArea.name 
       });
       
       aiResponse = getCriticalFallbackResponse();
@@ -402,6 +467,11 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
 
     // Garantir que sempre temos uma resposta
     if (!aiResponse || aiResponse.trim().length === 0) {
+      logPlatformEvent('CRITICAL_FALLBACK', message.platform, {
+        platformUserId: message.platformUserId,
+        reason: 'EMPTY_RESPONSE_AFTER_AI'
+      });
+      
       aiResponse = getCriticalFallbackResponse();
       usedFallback = true;
       fallbackReason = 'EMPTY_RESPONSE';
@@ -456,6 +526,15 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
       }
     };
 
+    logPlatformEvent('PROCESSING_COMPLETE', message.platform, {
+      platformUserId: message.platformUserId,
+      responseLength: aiResponse.length,
+      usedFallback,
+      fallbackReason,
+      leadStatus: analysis.leadStatus,
+      legalArea: analysis.legalArea
+    });
+
     return {
       lead: leadRecord,
       conversation: conversationRecord,
@@ -465,13 +544,12 @@ export async function processPlatformMessage(message: PlatformMessage): Promise<
     };
 
   } catch (error) {
-    logError('WEBHOOK_PARSING_ERROR', {
-      platform: message.platform,
-      userId: message.platformUserId,
-      messageId: message.platformMessageId,
+    logPlatformEvent('CRITICAL_FALLBACK', message.platform, {
+      platformUserId: message.platformUserId,
+      platformMessageId: message.platformMessageId,
       error: error instanceof Error ? error.message : 'unknown',
-      fallbackUsed: true,
-      context: { text: message.text.substring(0, 100) }
+      errorStack: error instanceof Error ? error.stack : undefined,
+      text: message.text.substring(0, 100)
     });
     
     // Mesmo em caso de erro crítico, retornar resposta fallback
@@ -492,6 +570,12 @@ export async function sendPlatformResponse(
   recipientId: string,
   messageText: string
 ): Promise<{ success: boolean; error?: string; usedFallback?: boolean }> {
+  logPlatformEvent(`${platform.toUpperCase()}_SEND_ATTEMPT`, platform, {
+    recipientId,
+    messageLength: messageText.length,
+    messagePreview: messageText.substring(0, 100)
+  });
+
   try {
     const config = platformConfigs[platform];
     
@@ -513,19 +597,28 @@ export async function sendPlatformResponse(
         const errorText = await response.text();
         const errorMsg = `Instagram API Error: ${response.status} - ${errorText}`;
         
-        logPlatformEvent('INSTAGRAM_SEND_FAIL', 'instagram', {
-          userId: recipientId,
-          error: errorMsg,
+        logPlatformEvent('INSTAGRAM_SEND_ERROR', 'instagram', {
+          recipientId,
           status: response.status,
-          errorText
+          statusText: response.statusText,
+          errorText,
+          responseHeaders: Object.fromEntries(response.headers.entries()),
+          requestBody: {
+            recipient: { id: recipientId },
+            message: { text: messageText.substring(0, 50) + '...' },
+            access_token: config.accessToken ? 'PRESENT' : 'MISSING'
+          }
         });
         
         return { success: false, error: errorMsg };
       }
 
+      const responseData = await response.json();
       logPlatformEvent('INSTAGRAM_SEND_SUCCESS', 'instagram', {
-        userId: recipientId,
-        messageLength: messageText.length
+        recipientId,
+        messageLength: messageText.length,
+        responseId: responseData.message_id || 'UNKNOWN',
+        responseData
       });
       
       return { success: true };
@@ -538,11 +631,15 @@ export async function sendPlatformResponse(
       if (!phoneNumberId || !accessToken) {
         const errorMsg = 'WhatsApp API Error: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN';
         
-        logPlatformEvent('WHATSAPP_SEND_FAIL', 'whatsapp', {
-          userId: recipientId,
+        logPlatformEvent('WHATSAPP_SEND_ERROR', 'whatsapp', {
+          recipientId,
           error: errorMsg,
           hasPhoneNumberId: !!phoneNumberId,
-          hasAccessToken: !!accessToken
+          hasAccessToken: !!accessToken,
+          envVars: {
+            WHATSAPP_PHONE_NUMBER_ID: phoneNumberId ? 'SET' : 'MISSING',
+            WHATSAPP_ACCESS_TOKEN: accessToken ? 'SET' : 'MISSING'
+          }
         });
         
         return { success: false, error: errorMsg };
@@ -568,43 +665,61 @@ export async function sendPlatformResponse(
         const errorText = await response.text();
         const errorMsg = `WhatsApp API Error: ${response.status} - ${errorText}`;
         
-        logPlatformEvent('WHATSAPP_SEND_FAIL', 'whatsapp', {
-          userId: recipientId,
-          error: errorMsg,
+        logPlatformEvent('WHATSAPP_SEND_ERROR', 'whatsapp', {
+          recipientId,
           status: response.status,
+          statusText: response.statusText,
           errorText,
-          messageLength: messageText.length
+          responseHeaders: Object.fromEntries(response.headers.entries()),
+          requestBody: {
+            messaging_product: 'whatsapp',
+            to: recipientId,
+            text: { body: messageText.substring(0, 50) + '...' },
+            recipient_type: 'individual',
+            phoneNumberId,
+            hasAccessToken: !!accessToken
+          }
         });
         
         return { success: false, error: errorMsg };
       }
 
+      const responseData = await response.json();
       logPlatformEvent('WHATSAPP_SEND_SUCCESS', 'whatsapp', {
-        userId: recipientId,
+        recipientId,
         messageLength: messageText.length,
-        phoneNumberId
+        messageId: responseData.messages?.[0]?.id || 'UNKNOWN',
+        phoneNumberId,
+        responseData
       });
       
       return { success: true };
     }
 
-    return { success: false, error: 'Platform not supported' };
+    const errorMsg = `Platform not supported: ${platform}`;
+    logPlatformEvent('WHATSAPP_SEND_ERROR', platform, {
+      recipientId,
+      error: errorMsg
+    });
+    
+    return { success: false, error: errorMsg };
 
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     
-    logError('WHATSAPP_SEND_ERROR', {
-      platform,
-      userId: recipientId,
+    logPlatformEvent('WHATSAPP_SEND_ERROR', platform, {
+      recipientId,
       error: 'NETWORK_ERROR',
-      fallbackUsed: false,
-      context: { originalError: errorMsg }
+      originalError: errorMsg,
+      errorStack: error instanceof Error ? error.stack : undefined,
+      messageLength: messageText.length
     });
     
     return { success: false, error: errorMsg };
   }
 }
 
+// ...
 // Validação de assinatura (compartilhada)
 export function validateSignature(req: any, platform: Platform): boolean {
   const config = platformConfigs[platform];
@@ -625,7 +740,7 @@ export function validateSignature(req: any, platform: Platform): boolean {
   }
 }
 
-// Logs estruturados
+// Logs estruturados com DEBUG COMPLETO
 export function logPlatformEvent(eventType: string, platform: Platform, data?: any) {
   const log = {
     timestamp: nowIso(),
@@ -637,26 +752,56 @@ export function logPlatformEvent(eventType: string, platform: Platform, data?: a
   
   // Logs específicos com emojis para fácil visualização
   switch (eventType) {
+    case 'WEBHOOK_RECEIVED':
+      console.log('🔥 WEBHOOK_RECEIVED:', JSON.stringify(log, null, 2));
+      break;
+    case 'MESSAGE_PARSED':
+      console.log('📝 MESSAGE_PARSED:', JSON.stringify(log, null, 2));
+      break;
+    case 'LEAD_CLASSIFIED':
+      console.log('🎯 LEAD_CLASSIFIED:', JSON.stringify(log, null, 2));
+      break;
     case 'OPENAI_ENABLED':
       console.log('✅ OPENAI_ENABLED:', JSON.stringify(log, null, 2));
       break;
     case 'OPENAI_SKIPPED':
       console.log('🚫 OPENAI_SKIPPED:', JSON.stringify(log, null, 2));
       break;
-    case 'OPENAI_FAILED_FALLBACK_USED':
-      console.log('🛡️ OPENAI_FAILED_FALLBACK_USED:', JSON.stringify(log, null, 2));
+    case 'OPENAI_CALLED':
+      console.log('🤖 OPENAI_CALLED:', JSON.stringify(log, null, 2));
+      break;
+    case 'OPENAI_ERROR':
+      console.log('🚨 OPENAI_ERROR:', JSON.stringify(log, null, 2));
+      break;
+    case 'OPENAI_SUCCESS':
+      console.log('✅ OPENAI_SUCCESS:', JSON.stringify(log, null, 2));
+      break;
+    case 'FALLBACK_USED':
+      console.log('🛡️ FALLBACK_USED:', JSON.stringify(log, null, 2));
+      break;
+    case 'WHATSAPP_SEND_ATTEMPT':
+      console.log('📤 WHATSAPP_SEND_ATTEMPT:', JSON.stringify(log, null, 2));
       break;
     case 'WHATSAPP_SEND_SUCCESS':
-      console.log('📤 WHATSAPP_SEND_SUCCESS:', JSON.stringify(log, null, 2));
+      console.log('✅ WHATSAPP_SEND_SUCCESS:', JSON.stringify(log, null, 2));
       break;
-    case 'WHATSAPP_SEND_FAIL':
-      console.log('❌ WHATSAPP_SEND_FAIL:', JSON.stringify(log, null, 2));
+    case 'WHATSAPP_SEND_ERROR':
+      console.log('❌ WHATSAPP_SEND_ERROR:', JSON.stringify(log, null, 2));
+      break;
+    case 'INSTAGRAM_SEND_ATTEMPT':
+      console.log('📤 INSTAGRAM_SEND_ATTEMPT:', JSON.stringify(log, null, 2));
       break;
     case 'INSTAGRAM_SEND_SUCCESS':
-      console.log('📤 INSTAGRAM_SEND_SUCCESS:', JSON.stringify(log, null, 2));
+      console.log('✅ INSTAGRAM_SEND_SUCCESS:', JSON.stringify(log, null, 2));
       break;
-    case 'INSTAGRAM_SEND_FAIL':
-      console.log('❌ INSTAGRAM_SEND_FAIL:', JSON.stringify(log, null, 2));
+    case 'INSTAGRAM_SEND_ERROR':
+      console.log('❌ INSTAGRAM_SEND_ERROR:', JSON.stringify(log, null, 2));
+      break;
+    case 'CRITICAL_FALLBACK':
+      console.log('🚨 CRITICAL_FALLBACK:', JSON.stringify(log, null, 2));
+      break;
+    case 'PROCESSING_COMPLETE':
+      console.log('🏁 PROCESSING_COMPLETE:', JSON.stringify(log, null, 2));
       break;
     default:
       console.log('PLATFORM_EVENT:', JSON.stringify(log, null, 2));
