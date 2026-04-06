@@ -43,7 +43,7 @@ interface Conversation {
 }
 
 // Configurações de visual
-const legalAreaConfig = {
+const legalAreaConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
   previdenciario: {
     label: "Previdenciário",
     color: "#8B5CF6",
@@ -70,7 +70,7 @@ const legalAreaConfig = {
   }
 };
 
-const leadStatusConfig = {
+const leadStatusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   frio: { label: "Frio", color: "#9CA3AF", bgColor: "#F9FAFB" },
   curioso: { label: "Curioso", color: "#F59E0B", bgColor: "#FEF3C7" },
   interessado: { label: "Interessado", color: "#3B82F6", bgColor: "#EFF6FF" },
@@ -86,7 +86,7 @@ const urgencyConfig: Record<string, { label: string; color: string; bgColor: str
   alta: { label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" }
 };
 
-const funnelStageConfig = {
+const funnelStageConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   contato_inicial: { label: "Contato Inicial", color: "#9CA3AF", bgColor: "#F9FAFB" },
   qualificacao: { label: "Qualificação", color: "#F59E0B", bgColor: "#FEF3C7" },
   triagem: { label: "Triagem", color: "#3B82F6", bgColor: "#EFF6FF" },
@@ -126,7 +126,7 @@ function MetricCard({ title, value, subtitle, color, icon, trend }: {
   );
 }
 
-function StatusBadge({ config }: { config: any }) {
+function StatusBadge({ config }: { config: { label: string; color: string; bgColor: string } }) {
   return (
     <span
       className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
@@ -140,7 +140,7 @@ function StatusBadge({ config }: { config: any }) {
 function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) => void }) {
   const areaConfig = legalAreaConfig[lead.legal_area];
   const statusConfig = leadStatusConfig[lead.lead_status];
-  const urgencyConfig = urgencyConfig[lead.urgency];
+  const urgencyStyle = urgencyConfig[lead.urgency];
   const funnelConfig = funnelStageConfig[lead.funnel_stage];
 
   return (
@@ -169,7 +169,7 @@ function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) =
         <StatusBadge config={funnelConfig} />
       </td>
       <td className="px-6 py-4">
-        <StatusBadge config={urgencyConfig} />
+        <StatusBadge config={urgencyStyle} />
       </td>
       <td className="px-6 py-4">
         <div className="max-w-xs">
@@ -271,7 +271,11 @@ export default function LeadsDashboard() {
 
   if (loading) {
     return (
-      <AppFrame>
+      <AppFrame
+        eyebrow="Dashboard"
+        title="Leads da NoemIA"
+        description="Gerencie os leads capturados pelo assistente virtual"
+      >
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
@@ -280,16 +284,18 @@ export default function LeadsDashboard() {
   }
 
   return (
-    <AppFrame>
-      <PortalSessionBanner />
+    <AppFrame
+      eyebrow="Dashboard"
+      title="Leads da NoemIA"
+      description="Gerencie os leads capturados pelo assistente virtual"
+    >
+      <PortalSessionBanner
+        role="advogada"
+        fullName="Advogada Noemia"
+        email="noemia@advnoemia.com.br"
+      />
       
       <div className="space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Leads da NoemIA</h1>
-          <p className="text-gray-600 mt-2">Gerencie os leads capturados pelo assistente virtual</p>
-        </div>
-
         {/* Prioridades do Dia */}
         <PrioridadesDoDia leads={leads} />
 
