@@ -3,6 +3,52 @@
   font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Estilos para validação de formulário */
+.form-input.is-invalid,
+.form-textarea.is-invalid,
+.form-select.is-invalid {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+  background-color: #fff5f5 !important;
+}
+
+.field-error {
+  color: #dc3545;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-status.is-error {
+  background-color: #fff5f5;
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.form-status.is-success {
+  background-color: #f0fff4;
+  border-color: #28a745;
+  color: #28a745;
+}
+
+.form-status.is-loading {
+  background-color: #fff3cd;
+  border-color: #ffc107;
+  color: #856404;
+}
+
 .contact-floating-widget {
   position: fixed;
   right: 18px;

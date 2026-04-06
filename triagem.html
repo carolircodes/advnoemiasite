@@ -3,28 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Triagem Inicial | Noêmia Paixão Advocacia</title>
+  <title>Agendar Consulta | Noêmia Paixão Advocacia</title>
   <meta
     name="description"
-    content="Formulário de triagem inicial para organizar seu atendimento jurídico antes do contato com a equipe."
+    content="Preencha a triagem inicial para agendar sua consulta jurídica com mais clareza, organização e direcionamento."
   />
   <meta name="robots" content="noindex,follow" />
   <meta name="theme-color" content="#f6f1e8" />
   <link rel="canonical" href="https://advnoemia.com.br/triagem.html" />
   <meta property="og:locale" content="pt_BR" />
-  <meta property="og:title" content="Triagem Inicial | Noêmia Paixão Advocacia" />
+  <meta property="og:title" content="Agendar Consulta | Noêmia Paixão Advocacia" />
   <meta
     property="og:description"
-    content="Envie as informações iniciais do caso e organize o primeiro contato com a equipe jurídica."
+    content="Envie as informações iniciais do seu caso para agendar sua consulta com mais contexto e direcionamento."
   />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://advnoemia.com.br/mae.jpeg" />
   <meta property="og:url" content="https://advnoemia.com.br/triagem.html" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Triagem Inicial | Noêmia Paixão Advocacia" />
+  <meta name="twitter:title" content="Agendar Consulta | Noêmia Paixão Advocacia" />
   <meta
     name="twitter:description"
-    content="Envie as informações iniciais do caso e organize o primeiro contato com a equipe jurídica."
+    content="Preencha a triagem inicial para agendar sua consulta jurídica com mais contexto e direcionamento."
   />
   <meta name="twitter:image" content="https://advnoemia.com.br/mae.jpeg" />
   <link rel="icon" href="logo.png" type="image/png" />
@@ -34,7 +34,6 @@
   <link rel="stylesheet" href="assets/css/internal-pages.css" />
 
   <style>
-    /* Especificidades da página de triagem */
     .triage-hero::before {
       background:
         radial-gradient(circle at 12% 18%, rgba(234, 215, 175, 0.20), transparent 0 24%),
@@ -153,8 +152,24 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       color: var(--ink-soft);
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       text-align: center;
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .form-status.is-error {
+      border-color: rgba(176, 95, 95, 0.25);
+      background: rgba(176, 95, 95, 0.06);
+      color: #7c2d2d;
+    }
+
+    .form-status.is-success {
+      border-color: rgba(181, 141, 73, 0.28);
+      background: rgba(181, 141, 73, 0.08);
+      color: #5f4721;
     }
 
     .mini-note {
@@ -169,17 +184,63 @@
       text-align: center;
     }
 
+    .field-error {
+      display: block;
+      margin-top: 0.55rem;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: #8a3b3b;
+      min-height: 1.2em;
+    }
+
+    .form-group.has-error .form-input,
+    .form-group.has-error .form-select,
+    .form-group.has-error .form-textarea {
+      border: 2px solid #c9a96e !important;
+      box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.18);
+      background: rgba(255, 251, 244, 0.98);
+    }
+
+    .form-input.is-valid,
+    .form-select.is-valid,
+    .form-textarea.is-valid {
+      border: 1.5px solid rgba(181, 141, 73, 0.55);
+      box-shadow: 0 0 0 2px rgba(181, 141, 73, 0.08);
+    }
+
+    .form-group label .label-hint {
+      display: inline-block;
+      margin-left: 0.35rem;
+      color: var(--ink-soft);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .consult-highlight {
+      margin-top: 1rem;
+      padding: 1rem 1.1rem;
+      background: linear-gradient(135deg, rgba(181,141,73,0.12), rgba(255,255,255,0.72));
+      border: 1px solid rgba(181, 141, 73, 0.22);
+      border-radius: var(--radius-md);
+      color: var(--ink);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .consult-highlight strong {
+      color: var(--ink);
+    }
+
     @media (max-width: 980px) {
       .triage-layout {
         grid-template-columns: 1fr;
       }
-      
+
       .form-grid {
         grid-template-columns: 1fr;
       }
     }
 
-    /* Topbar específico */
     .topbar {
       background: linear-gradient(90deg, rgba(255,251,244,.98) 0%, rgba(245,237,224,.96) 100%);
       border-bottom: 1px solid var(--line);
@@ -195,6 +256,7 @@
       justify-content: space-between;
       align-items: center;
       font-size: 0.9rem;
+      gap: 1rem;
     }
 
     .pill-row {
@@ -212,7 +274,6 @@
       color: var(--ink-soft);
     }
 
-    /* Header específico */
     .header {
       background: rgba(246, 241, 232, 0.92);
       backdrop-filter: blur(16px);
@@ -270,6 +331,12 @@
     }
 
     @media (max-width: 768px) {
+      .topbar-inner {
+        padding: 0.85rem 1rem;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
       .nav-menu {
         display: none;
         position: absolute;
@@ -280,17 +347,17 @@
         border-bottom: 1px solid var(--line);
         padding: 1rem;
       }
-      
+
       .nav-menu.active {
         display: flex;
         flex-direction: column;
         gap: 1rem;
       }
-      
+
       .menu-toggle {
         display: flex;
       }
-      
+
       .nav-actions {
         display: none;
       }
@@ -301,11 +368,11 @@
   <div class="page-shell">
     <div class="topbar">
       <div class="container topbar-inner">
-        <span id="topbarCopy">Triagem inicial para organizar o atendimento antes do contato com a equipe jurídica.</span>
+        <span id="topbarCopy">Preencha a triagem para agendar sua consulta com mais clareza antes de falar no WhatsApp.</span>
         <div class="pill-row">
-          <span>Pré-atendimento</span>
-          <span>WhatsApp estruturado</span>
-          <span>Resposta com mais contexto</span>
+          <span>Triagem inicial</span>
+          <span>Consulta jurídica</span>
+          <span>WhatsApp com contexto</span>
         </div>
       </div>
     </div>
@@ -318,7 +385,7 @@
           </div>
           <div class="brand-copy">
             <strong>Noêmia Paixão Advocacia</strong>
-            <small>Triagem Inicial</small>
+            <small>Agendamento de consulta</small>
           </div>
         </a>
 
@@ -337,7 +404,7 @@
 
         <div class="nav-actions">
           <a class="btn btn-secondary" href="index.html">Página inicial</a>
-          <a class="btn btn-primary" href="#formulario-triagem">Falar com a especialista</a>
+          <a class="btn btn-primary" href="#formulario-triagem">Agendar consulta</a>
         </div>
       </div>
     </header>
@@ -346,43 +413,42 @@
       <section class="internal-hero triage-hero">
         <div class="internal-hero-grid">
           <div class="internal-hero-copy">
-            <span class="eyebrow" id="triageEyebrow">Análise Jurídica Estratégica</span>
-            <h1 id="triageTitle">Organize informações estratégicas do seu caso para atendimento otimizado.</h1>
+            <span class="eyebrow" id="triageEyebrow">Agendamento jurídico estratégico</span>
+            <h1 id="triageTitle">Preencha sua triagem para agendar sua consulta com a advogada</h1>
             <p id="triageIntro">
-              Este protocolo de qualificação permite análise preliminar avançada, direcionamento preciso para área jurídica especializada 
-              e otimização do tempo de resposta pela equipe jurídica sênior.
+              Envie as informações iniciais do seu caso para que o primeiro contato no WhatsApp aconteça com mais contexto, organização e clareza.
             </p>
 
             <div class="trust-badges" aria-label="Compromissos do escritório">
               <span class="trust-badge"><strong>OAB/RN 3939</strong> — atuação jurídica especializada</span>
-              <span class="trust-badge"><strong>Análise preliminar</strong> — sem custo para qualificação inicial</span>
-              <span class="trust-badge"><strong>Atendimento diferenciado</strong> — equipe sênior analisa contexto antes do contato</span>
+              <span class="trust-badge"><strong>Triagem inicial</strong> — organização prévia do seu caso</span>
+              <span class="trust-badge"><strong>Atendimento estruturado</strong> — consulta com mais contexto desde o início</span>
             </div>
 
             <div class="timeline">
               <article class="timeline-item">
-                <strong>1. Qualificação do caso</strong>
-                <p id="timelineStep1">Coleta de informações essenciais para análise preliminar e enquadramento jurídico estratégico.</p>
+                <strong>1. Você preenche a triagem</strong>
+                <p id="timelineStep1">Você informa os pontos principais do seu caso para facilitar a análise inicial e o direcionamento do atendimento.</p>
               </article>
 
               <article class="timeline-item">
-                <strong>2. Direcionamento especializado</strong>
-                <p id="timelineStep2">Protocolo gera comunicação estruturada com classificação jurídica, nível de urgência e recomendações iniciais.</p>
+                <strong>2. O sistema organiza sua mensagem</strong>
+                <p id="timelineStep2">Ao enviar, você é direcionado para o WhatsApp com sua solicitação já estruturada para agendamento de consulta.</p>
               </article>
 
               <article class="timeline-item">
-                <strong>3. Atendimento estratégico</strong>
-                <p id="timelineStep3">Equipe jurídica sênior recebe análise preliminar para condução otimizada do seu caso.</p>
+                <strong>3. A conversa começa com mais clareza</strong>
+                <p id="timelineStep3">A equipe recebe o contexto essencial do seu caso e o atendimento começa de forma mais objetiva e estratégica.</p>
               </article>
             </div>
 
             <div class="stack-card">
-              <h3>Classificação jurídica automatizada</h3>
+              <h3>Consulta mais organizada desde o primeiro contato</h3>
               <p id="stackCardCopy">
-                Sistema inteligente identifica área jurídica específica com base em seu contexto, otimizando o direcionamento estratégico.
+                Esta triagem não substitui a consulta jurídica, mas ajuda a estruturar as informações principais para que o atendimento no WhatsApp comece com mais precisão.
               </p>
               <div class="pill-row">
-                <span class="badge" id="triageAreaBadge">Análise geral</span>
+                <span class="badge" id="triageAreaBadge">Atendimento geral</span>
                 <span class="badge" id="triageOriginBadge">Origem qualificada</span>
               </div>
             </div>
@@ -390,67 +456,102 @@
 
           <div class="internal-hero-visual">
             <div class="card" id="formulario-triagem">
-              <span class="eyebrow">Protocolo de Qualificação Jurídica</span>
-              <h2 id="formTitle">Iniciar análise estratégica do seu caso</h2>
+              <span class="eyebrow">Solicitação de consulta</span>
+              <h2 id="formTitle">Solicite sua análise inicial para agendar a consulta</h2>
               <p id="formIntro">
-                Preencha as informações estratégicas com precisão. O sistema gerará comunicação estruturada para 
-                análise preliminar pela equipe jurídica especializada.
+                Preencha os dados abaixo. Ao finalizar, você será direcionado para o WhatsApp com a mensagem pronta para continuar seu atendimento.
               </p>
 
-              <form class="triage-form" data-triage-form>
+              <div class="consult-highlight">
+                <strong>Importante:</strong> este formulário existe para organizar o seu atendimento e facilitar o
+                <strong>agendamento da consulta</strong>. Depois do envio, você seguirá para o WhatsApp.
+              </div>
+
+              <form class="triage-form" id="triageForm" novalidate>
                 <div class="form-grid">
-                  <div class="form-group">
+                  <div class="form-group" data-field="name">
                     <label for="leadName">Nome completo</label>
-                    <input class="form-input" id="leadName" name="name" type="text" placeholder="Seu nome completo para registro profissional" required />
+                    <input
+                      class="form-input"
+                      id="leadName"
+                      name="name"
+                      type="text"
+                      placeholder="Seu nome completo"
+                      autocomplete="name"
+                      required
+                    />
+                    <span class="field-error" id="error-leadName"></span>
                   </div>
 
-                  <div class="form-group">
-                    <label for="leadPhone">Telefone para contato estratégico</label>
-                    <input class="form-input" id="leadPhone" name="phone" type="tel" placeholder="(84) 99999-9999" required />
+                  <div class="form-group" data-field="phone">
+                    <label for="leadPhone">Telefone para agendar sua consulta</label>
+                    <input
+                      class="form-input"
+                      id="leadPhone"
+                      name="phone"
+                      type="tel"
+                      placeholder="(84) 99999-9999"
+                      autocomplete="tel"
+                      inputmode="numeric"
+                      required
+                    />
+                    <span class="field-error" id="error-leadPhone"></span>
                   </div>
                 </div>
 
                 <div class="form-grid">
-                  <div class="form-group">
-                    <label for="leadCity">Localidade do caso</label>
-                    <input class="form-input" id="leadCity" name="city" type="text" placeholder="Cidade e estado para análise jurisdicional" required />
+                  <div class="form-group" data-field="city">
+                    <label for="leadCity">Cidade e estado do caso <span class="label-hint">(ou onde você mora)</span></label>
+                    <input
+                      class="form-input"
+                      id="leadCity"
+                      name="city"
+                      type="text"
+                      placeholder="Ex.: Natal/RN"
+                      autocomplete="address-level2"
+                      required
+                    />
+                    <span class="field-error" id="error-leadCity"></span>
                   </div>
 
-                  <div class="form-group">
-                    <label for="leadProblemType">Classificação jurídica preliminar</label>
+                  <div class="form-group" data-field="problem_type">
+                    <label for="leadProblemType">Qual o tipo do seu caso?</label>
                     <select class="form-select" id="leadProblemType" name="problem_type" required>
-                      <option value="">Selecione área jurídica</option>
-                      <option value="previdenciario">Direito Previdenciário - INSS e Benefícios</option>
+                      <option value="">Selecione a área jurídica</option>
+                      <option value="previdenciario">Direito Previdenciário - INSS e benefícios</option>
                       <option value="consumidor-bancario">Direito do Consumidor e Bancário</option>
-                      <option value="consumidor">Direito do Consumidor - Relações de Consumo</option>
-                      <option value="bancario">Direito Bancário - Operações Financeiras</option>
-                      <option value="familia">Direito de Família - Relações Familiares</option>
-                      <option value="civil">Direito Civil - Obrigações e Contratos</option>
-                      <option value="outro">Outra matéria jurídica específica</option>
+                      <option value="consumidor">Direito do Consumidor</option>
+                      <option value="bancario">Direito Bancário</option>
+                      <option value="familia">Direito de Família</option>
+                      <option value="civil">Direito Civil</option>
+                      <option value="outro">Outra questão jurídica</option>
                     </select>
+                    <span class="field-error" id="error-leadProblemType"></span>
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label for="leadDescription" id="descriptionLabel">Descrição estratégica do caso</label>
+                <div class="form-group" data-field="description">
+                  <label for="leadDescription">Descreva o seu caso</label>
                   <textarea
                     class="form-textarea"
                     id="leadDescription"
                     name="description"
                     rows="6"
-                    placeholder="Descreva detalhadamente os fatos relevantes, fundamentos jurídicos preliminares, objetivos pretendidos e informações que considere estratégicas para análise inicial."
+                    placeholder="Conte o que aconteceu, quando começou, qual é sua maior dúvida e o que você precisa resolver neste momento."
                     required
                   ></textarea>
+                  <span class="field-error" id="error-leadDescription"></span>
                 </div>
 
-                <div class="form-group">
-                  <label for="leadUrgency">Nível de prioridade jurídica</label>
+                <div class="form-group" data-field="urgency">
+                  <label for="leadUrgency">Qual a urgência do seu caso?</label>
                   <select class="form-select" id="leadUrgency" name="urgency" required>
-                    <option value="">Selecione nível de prioridade</option>
-                    <option value="alta">Alta: existem prazos processuais, risco de prescrição, decisões liminares ou situações de emergência jurídica</option>
-                    <option value="media">Média: necessita análise em prazo razoável para evitar prejuízos ou perdas de oportunidades</option>
-                    <option value="baixa">Baixa: consulta preventiva, planejamento jurídico ou análise de direitos e obrigações</option>
+                    <option value="">Selecione o nível de urgência</option>
+                    <option value="alta">Alta — existe prazo, bloqueio, risco imediato ou situação urgente</option>
+                    <option value="media">Média — preciso de orientação em breve para evitar prejuízo</option>
+                    <option value="baixa">Baixa — quero entender meu caso e planejar os próximos passos</option>
                   </select>
+                  <span class="field-error" id="error-leadUrgency"></span>
                 </div>
 
                 <input type="hidden" name="area" value="geral" data-triage-area-input />
@@ -459,13 +560,17 @@
                 <input type="hidden" name="campaign" value="" data-triage-campaign-input />
                 <input type="hidden" name="video" value="" data-triage-video-input />
 
-                <button class="btn btn-primary btn-full" type="submit" id="submitButton">Enviar para análise jurídica especializada</button>
-                <div class="form-status" data-triage-status role="status" aria-live="polite"></div>
+                <button class="btn btn-primary btn-full" type="submit" id="submitButton">
+                  Quero agendar minha consulta no WhatsApp
+                </button>
+
+                <div class="form-status" data-triage-status role="status" aria-live="polite">
+                  Preencha os dados acima para continuar seu atendimento.
+                </div>
               </form>
 
               <p class="mini-note" id="miniNote">
-                Este protocolo constitui pré-análise e não substitui consulta jurídica formal. A análise preliminar otimiza o atendimento 
-                especializado, mas cada caso requer avaliação individualizada pela equipe jurídica.
+                Esta triagem é uma etapa inicial de organização do atendimento e do agendamento da consulta. A análise jurídica completa depende da avaliação individual do caso pela advogada.
               </p>
             </div>
           </div>
@@ -479,7 +584,7 @@
           <h3>Noêmia Paixão Advocacia</h3>
           <p>Atendimento jurídico estratégico com clareza, técnica e organização para casos previdenciários, bancários, familiares e cíveis.</p>
         </div>
-        
+
         <div class="footer-section">
           <h3>Áreas de Atuação</h3>
           <p><a href="direito-previdenciario.html">Direito Previdenciário</a></p>
@@ -487,7 +592,7 @@
           <p><a href="direito-familia.html">Direito de Família</a></p>
           <p><a href="direito-civil.html">Direito Civil</a></p>
         </div>
-        
+
         <div class="footer-section">
           <h3>Links Úteis</h3>
           <p><a href="blog.html">Blog Jurídico</a></p>
@@ -495,15 +600,15 @@
           <p><a href="https://portal.advnoemia.com.br/portal/login">Área do Cliente</a></p>
           <p><a href="https://portal.advnoemia.com.br/documentos">Documentos</a></p>
         </div>
-        
+
         <div class="footer-section">
           <h3>Contato</h3>
           <p>Natal/RN - Atendimento Online</p>
           <p>OAB/RN 3939</p>
-          <p><a href="triagem.html">Agende sua triagem</a></p>
+          <p><a href="triagem.html">Agendar consulta</a></p>
         </div>
       </div>
-      
+
       <div class="footer-bottom">
         <div>© 2026 • Noêmia Paixão Advocacia • Todos os direitos reservados • OAB/RN 3939.</div>
         <div class="footer-links">
@@ -518,26 +623,24 @@
 
   <script src="assets/js/premium-system.js"></script>
   <script src="assets/js/entry-context.js"></script>
-  <script src="assets/js/contact-capture.js"></script>
 
   <script>
     (function () {
       const params = new URLSearchParams(window.location.search);
       const entryContext = window.EntryContext
         ? window.EntryContext.readFromSearch(window.location.search, {
-            defaults: {
-              origem: "site"
-            },
-            aliases: {
-              tema: ["tema", "theme", "area"]
-            }
-          })
-        : {
-            tema: (params.get("tema") || params.get("area") || "").toLowerCase().trim(),
-            origem: (params.get("origem") || params.get("source") || "site").toLowerCase().trim(),
-            campanha: (params.get("campanha") || params.get("campaign") || "").toLowerCase().trim(),
-            video: (params.get("video") || "").toLowerCase().trim()
-          };
+            defaults: {            origem: "site"
+          },
+          aliases: {
+            tema: ["tema", "theme", "area"]
+          }
+        })
+      : {
+          tema: (params.get("tema") || params.get("area") || "").toLowerCase().trim(),
+          origem: (params.get("origem") || params.get("source") || "site").toLowerCase().trim(),
+          campanha: (params.get("campanha") || params.get("campaign") || "").toLowerCase().trim(),
+          video: (params.get("video") || "").toLowerCase().trim()
+        };
 
       const tema = entryContext.tema || "";
       const origem = entryContext.origem || "site";
@@ -582,16 +685,30 @@
       const themeMap = {
         aposentadoria: {
           label: "Direito Previdenciário",
-          badge: "Aposentadoria",
+          badge: "Previdenciário",
           value: "previdenciario",
-          eyebrow: "Pré-atendimento previdenciário",
-          title: "Conte o essencial do seu caso sobre aposentadoria antes de falar com a equipe.",
-          intro: "Se você veio de um conteúdo sobre aposentadoria, esta triagem ajuda a organizar sua situação inicial para que o atendimento comece com mais contexto, clareza e direcionamento.",
+          eyebrow: "Pré-atendimento em aposentadoria",
+          title: "Organize seu caso previdenciário antes de falar com a equipe.",
+          intro: "Se você chegou aqui por um conteúdo sobre aposentadoria, revisão, benefício negado ou INSS, esta triagem ajuda a deixar seu atendimento mais rápido e direcionado.",
           formTitleText: "Iniciar análise inicial sobre aposentadoria",
-          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento previdenciário.",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para análise previdenciária.",
           descriptionLabelText: "Explique sua situação previdenciária",
-          descriptionPlaceholder: "Exemplo: já dei entrada, tive negativa, estou aguardando análise, recebo benefício com valor errado ou quero entender se já posso pedir aposentadoria.",
+          descriptionPlaceholder: "Exemplo: pedido negado, benefício cortado, revisão, aposentadoria por idade, aposentadoria rural, benefício por incapacidade ou outra situação com o INSS.",
           buttonText: "Enviar triagem previdenciária para o WhatsApp",
+          topbar: "Triagem inicial para organizar seu atendimento sobre aposentadoria antes do contato com a equipe jurídica."
+        },
+        inss: {
+          label: "Direito Previdenciário",
+          badge: "Previdenciário",
+          value: "previdenciario",
+          eyebrow: "Pré-atendimento em INSS",
+          title: "Conte o essencial do seu caso com o INSS antes de falar com a equipe.",
+          intro: "Esta triagem ajuda a reunir o contexto inicial da sua situação previdenciária para que o atendimento comece com mais clareza.",
+          formTitleText: "Iniciar análise inicial do caso previdenciário",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento previdenciário.",
+          descriptionLabelText: "Explique sua situação com o INSS",
+          descriptionPlaceholder: "Explique de forma resumida o que aconteceu com o benefício, pedido, negativa, corte, revisão ou dúvida principal.",
+          buttonText: "Enviar triagem do INSS para o WhatsApp",
           topbar: "Triagem inicial para organizar seu atendimento previdenciário antes do contato com a equipe jurídica."
         },
         previdenciario: {
@@ -600,25 +717,25 @@
           value: "previdenciario",
           eyebrow: "Pré-atendimento previdenciário",
           title: "Conte o essencial do seu caso previdenciário antes de falar com a equipe.",
-          intro: "Esta triagem ajuda a organizar as informações iniciais do seu caso previdenciário para que o primeiro contato pelo WhatsApp seja mais produtivo.",
-          formTitleText: "Iniciar atendimento previdenciário",
-          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada.",
-          descriptionLabelText: "Explique sua situação previdenciária",
-          descriptionPlaceholder: "Explique de forma resumida o benefício, pedido, negativa, revisão, atraso ou dúvida principal.",
-          buttonText: "Enviar triagem para o WhatsApp",
+          intro: "Esta triagem ajuda a organizar benefícios, aposentadorias, revisões, negativas, BPC/LOAS e outras demandas previdenciárias.",
+          formTitleText: "Iniciar análise inicial do caso previdenciário",
+          formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento previdenciário.",
+          descriptionLabelText: "Explique seu caso previdenciário",
+          descriptionPlaceholder: "Explique de forma resumida o benefício envolvido, se houve negativa, suspensão, revisão ou dúvida, e o que você busca neste momento.",
+          buttonText: "Enviar triagem previdenciária para o WhatsApp",
           topbar: "Triagem inicial para organizar seu atendimento previdenciário antes do contato com a equipe jurídica."
         },
-        banco: {
+        bancario: {
           label: "Direito Bancário",
           badge: "Direito Bancário",
           value: "bancario",
           eyebrow: "Pré-atendimento bancário",
           title: "Conte o essencial do seu problema bancário antes de falar com a equipe.",
-          intro: "Se você chegou por um conteúdo sobre descontos, cobranças ou problemas com banco, esta triagem ajuda a organizar seu caso desde o início.",
+          intro: "Se o seu caso envolve empréstimo, financiamento, desconto indevido, cartão, fraude ou relação com banco, esta triagem ajuda a organizar seu atendimento inicial.",
           formTitleText: "Iniciar análise inicial do problema bancário",
           formIntroText: "Preencha as informações abaixo. Ao enviar, você será direcionado para o WhatsApp com a mensagem da triagem já organizada para atendimento bancário.",
-          descriptionLabelText: "Explique o problema com o banco",
-          descriptionPlaceholder: "Exemplo: desconto indevido, empréstimo não reconhecido, cobrança abusiva, cartão, tarifa, bloqueio ou outro problema bancário.",
+          descriptionLabelText: "Explique o problema bancário",
+          descriptionPlaceholder: "Exemplo: empréstimo consignado não reconhecido, desconto indevido, fraude bancária, cartão, financiamento ou outra situação com banco.",
           buttonText: "Enviar triagem bancária para o WhatsApp",
           topbar: "Triagem inicial para organizar seu atendimento bancário antes do contato com a equipe jurídica."
         },
@@ -747,4 +864,3 @@
   </script>
 </body>
 </html>
-
