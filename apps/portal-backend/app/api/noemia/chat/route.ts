@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     
     // Tentar usar a API principal (agora não vai lançar erro se não tiver chave)
     try {
-      const result = await answerNoemia(payload, profile);
+      const result = await answerNoemia(payload, profile, request.url);
 
       try {
         await recordProductEvent({

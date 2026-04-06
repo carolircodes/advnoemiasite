@@ -18,6 +18,119 @@ function formatRateValue(value: number | null) {
   return `${value.toFixed(1)}%`;
 }
 
+// Sugestões dinâmicas por tema
+function getThemeSuggestions(tema?: string): string[] {
+  const suggestions: Record<string, string[]> = {
+    'aposentadoria': [
+      'Posso me aposentar?',
+      'Quanto tempo falta?',
+      'Quais documentos preciso?',
+      'Como funciona o cálculo?'
+    ],
+    'desconto-indevido': [
+      'Como parar o desconto?',
+      'Posso recuperar o dinheiro?',
+      'O banco pode fazer isso?',
+      'Quais meus direitos?'
+    ],
+    'pensao': [
+      'Meu marido não paga pensão',
+      'Como calcular o valor?',
+      'Como pedir revisão?',
+      'O que fazer se não paga?'
+    ],
+    'divorcio': [
+      'Como funciona o divórcio?',
+      'Quanto tempo demora?',
+      'Como dividir bens?',
+      'E se tiver filhos?'
+    ],
+    'trabalhista': [
+      'Fui demitido injustamente',
+      'Como calcular as verbas?',
+      'O que é aviso prévio?',
+      'Posso processar?'
+    ],
+    'familia': [
+      'Como funciona guarda?',
+      'O que é pensão alimentícia?',
+      'Como fazer guarda compartilhada?',
+      'E se não concordarmos?'
+    ]
+  };
+  
+  return suggestions[tema || ''] || [
+    'Olá! Bom dia',
+    'Como agendar consulta?',
+    'Quanto custa uma consulta?',
+    'Quais áreas atendem?'
+  ];
+}
+
+// Mensagem inicial contextual
+function getInitialMessage(tema?: string): string {
+  const messages: Record<string, string> = {
+    'aposentadoria': 'Vi que você chegou por um conteúdo sobre aposentadoria. Posso te ajudar a entender os primeiros pontos, documentos necessários e o melhor próximo passo.',
+    'desconto-indevido': 'Se a sua dúvida é sobre desconto indevido ou cobrança irregular, posso organizar sua situação inicial e te orientar sobre o caminho mais adequado.',
+    'pensao': 'Sobre pensão alimentícia, posso te explicar como funciona, como calcular e quais são os seus direitos e deveres.',
+    'divorcio': 'Sobre divórcio, posso te orientar sobre os tipos, procedimentos e o que precisa ser considerado para cada caso.',
+    'trabalhista': 'Para questões trabalhistas, posso te explicar sobre direitos trabalhistas, verbas rescisórias e como proceder.',
+    'familia': 'Em direito de família, posso te ajudar a entender sobre guarda, pensão, divórcio e outros procedimentos familiares.'
+  };
+  
+  return messages[tema || ''] || 'Olá! Que bom ter você aqui. Sou a NoemIA, sua assistente inteligente para jornada jurídica. Posso ajudar com agendamentos, processos, documentos ou orientar sobre próximos passos.';
+}
+
+// Respostas com valor controlado para conversão
+function generateControlledResponse(intent: string, tema?: string, isFollowUp: boolean = false): NoemiaResponse {
+  const responses: Record<string, { main: string; factors: string[] }> = {
+    'aposentadoria': {
+      main: 'Sobre aposentadoria, é importante analisar vários fatores específicos do seu caso.',
+      factors: ['tempo de contribuição', 'idade mínima', 'tipo de aposentadoria', 'valor do benefício']
+    },
+    'desconto-indevido': {
+      main: 'Para descontos indevidos, é necessário verificar a origem e a legalidade da cobrança.',
+      factors: ['origem do débito', 'contrato firmado', 'previsão legal', 'valor cobrado']
+    },
+    'pensao': {
+      main: 'Em casos de pensão, são analisados os direitos e deveres das partes envolvidas.',
+      factors: ['necessidade do alimentado', 'possibilidade do alimentante', 'proporcionalidade', 'capacidade financeira']
+    },
+    'divorcio': {
+      main: 'O divórcio envolve várias etapas que precisam ser bem organizadas.',
+      factors: ['tipo de divórcio', 'partilha de bens', 'guarda dos filhos', 'pensão alimentícia']
+    },
+    'trabalhista': {
+      main: 'Questões trabalhistas exigem análise detalhada do contrato e das circunstâncias.',
+      factors: ['motivo da demissão', 'tempo de serviço', 'verbas devidas', 'documentação']
+    },
+    'familia': {
+      main: 'Direito de família requer cuidado especial com as relações pessoais envolvidas.',
+      factors: ['interesse dos filhos', 'capacidade dos pais', 'condições financeiras', 'convivência familiar']
+    }
+  };
+  
+  const defaultResponse = {
+    main: 'Para te ajudar corretamente, preciso entender melhor sua situação.',
+    factors: ['detalhes do caso', 'documentação disponível', 'objetivo desejado', 'prazos importantes']
+  };
+  
+  const response = responses[tema || ''] || responses[intent] || defaultResponse;
+  
+  const message = isFollowUp
+    ? `Complementando o que expliquei, em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
+    : `${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+  
+  return {
+    message,
+    actions: [
+      { label: "Agendar consulta", href: "/triagem.html?origem=noemia-consulta" },
+      { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
+    ],
+    meta: { intent, profile: 'visitor', source: 'fallback' }
+  };
+}
+
 // Observabilidade e métricas da NoemIA
 type NoemiaMetrics = {
   question: string;
@@ -29,6 +142,8 @@ type NoemiaMetrics = {
   error?: string;
   sessionId?: string;
   responseTime?: number;
+  tema?: string;  // Novo campo para tracking
+  origem?: string; // Novo campo para tracking
 };
 
 // Armazenamento simples para métricas (em produção usar banco de dados)
@@ -96,6 +211,28 @@ type NoemiaResponse = {
     source: "openai" | "fallback";
   };
 };
+
+// Contexto de URL para personalização
+type URLContext = {
+  tema?: string;
+  origem?: string;
+};
+
+function getContextFromURL(url?: string): URLContext {
+  if (!url) return {};
+  
+  try {
+    const urlObj = new URL(url);
+    const params = new URLSearchParams(urlObj.search);
+    
+    return {
+      tema: params.get('tema') || undefined,
+      origem: params.get('origem') || undefined
+    };
+  } catch {
+    return {};
+  }
+}
 
 // Contexto de sessão para memória curta
 type SessionContext = {
@@ -205,23 +342,16 @@ function detectUserIntent(message: string): string {
   return 'geral';
 }
 
-async function generateIntelligentResponse(intent: string, profile: PortalProfile | null, audience: string, sessionId?: string): Promise<NoemiaResponse> {
+async function generateIntelligentResponse(intent: string, profile: PortalProfile | null, audience: string, sessionId?: string, urlContext?: URLContext): Promise<NoemiaResponse> {
   try {
     const context = sessionId ? getSessionContext(sessionId) : { history: [] };
     const isFollowUp = context.lastIntent === intent && context.history.length > 1;
     
     // BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
     if (intent === 'legal_advice_request' && audience === 'visitor') {
-      return {
-        message: isFollowUp
-          ? 'Entendo que você precisa de orientação específica. Para te ajudar com precisão e segurança jurídica, é necessário analisar seu caso em detalhes. Esse tipo de análise é feito na consulta com a advogada.'
-          : 'Entendi sua situação. Para te orientar com precisão e segurança jurídica, é necessário analisar seu caso em detalhes. Esse tipo de análise é feito na consulta com a advogada, onde ela avalia seu cenário completo e te orienta com a melhor estratégia.',
-        actions: [
-          { label: "Agendar consulta (R$150)", href: "/consulta" },
-          { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
-        ],
-        meta: { intent, profile: audience, source: "fallback" }
-      };
+      // Usar resposta controlada com valor parcial
+      const controlledResponse = generateControlledResponse(intent, urlContext?.tema, isFollowUp);
+      return controlledResponse;
     }
     
     // Clientes nunca são bloqueados - sempre ajudam
@@ -286,6 +416,18 @@ async function generateIntelligentResponse(intent: string, profile: PortalProfil
           };
           
         case 'saudacao':
+          // Se tiver tema, usar mensagem contextual
+          if (urlContext?.tema) {
+            return {
+              message: getInitialMessage(urlContext.tema),
+              actions: [
+                { label: "Agendar consulta", href: "/triagem.html?origem=noemia-consulta" },
+                { label: "Ver meus processos", href: "/cases" }
+              ],
+              meta: { intent, profile: audience, source: "fallback" }
+            };
+          }
+          
           return {
             message: `Olá, ${profile.full_name}! Que bom ter você aqui. Sou a NoemIA e estou aqui para ajudar com sua jornada jurídica. Vejo que seu cadastro está "${workspace.clientRecord.status}" com ${workspace.cases.length} processo(s) em andamento. Como posso apoiar você hoje?`,
             actions: [
@@ -756,11 +898,14 @@ function buildSystemInstructions(mode: "visitor" | "client" | "staff", contextTe
     .join("\n");
 }
 
-export async function answerNoemia(rawInput: unknown, profile: PortalProfile | null) {
+export async function answerNoemia(rawInput: unknown, profile: PortalProfile | null, currentPath?: string) {
   const startTime = Date.now();
   const env = getServerEnv();
   const input = askNoemiaSchema.parse(rawInput);
   const requestedAudience = input.audience;
+  
+  // Extrair contexto da URL
+  const urlContext = getContextFromURL(currentPath);
   
   // Gerar ID de sessão simples (em produção usar algo mais robusto)
   const sessionId = profile?.id || 'visitor-' + Math.random().toString(36).substr(2, 9);
@@ -789,7 +934,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   if (!env.OPENAI_API_KEY) {
     console.error("[noemia] OPENAI_API_KEY nao encontrada no ambiente");
     
-    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId);
+    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
     recordNoemiaMetrics({
       question: input.message,
       intent,
@@ -799,7 +944,9 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
       actions: fallbackResponse.actions || [],
       error: "OPENAI_API_KEY não encontrada",
       sessionId,
-      responseTime: Date.now() - startTime
+      responseTime: Date.now() - startTime,
+      tema: urlContext.tema,
+      origem: urlContext.origem
     });
 
     return {
@@ -858,7 +1005,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     console.error("[noemia] Erro na chamada OpenAI:", details);
 
     // Usar fallback inteligente em vez de mensagem genérica
-    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId);
+    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
     
     recordNoemiaMetrics({
       question: input.message,
@@ -869,7 +1016,9 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
       actions: fallbackResponse.actions || [],
       error: details,
       sessionId,
-      responseTime: Date.now() - startTime
+      responseTime: Date.now() - startTime,
+      tema: urlContext.tema,
+      origem: urlContext.origem
     });
 
     return {
@@ -885,7 +1034,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     console.error("[noemia] Resposta vazia da OpenAI");
 
     // Usar fallback inteligente mesmo com resposta vazia
-    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId);
+    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
     
     recordNoemiaMetrics({
       question: input.message,
@@ -896,7 +1045,9 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
       actions: fallbackResponse.actions || [],
       error: "Resposta vazia da OpenAI",
       sessionId,
-      responseTime: Date.now() - startTime
+      responseTime: Date.now() - startTime,
+      tema: urlContext.tema,
+      origem: urlContext.origem
     });
 
     return {
@@ -914,7 +1065,9 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     timestamp: new Date(),
     actions: [], // OpenAI não gera CTAs ainda
     sessionId,
-    responseTime: Date.now() - startTime
+    responseTime: Date.now() - startTime,
+    tema: urlContext.tema,
+    origem: urlContext.origem
   });
 
   return {
