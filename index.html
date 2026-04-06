@@ -939,9 +939,9 @@
   <style id="noemia-home-section">
     .noemia-section {
       position: relative;
-      padding: 96px 20px;
+      padding: 112px 20px 108px;
       background:
-        radial-gradient(circle at top left, rgba(199, 164, 93, 0.12), transparent 28%),
+        radial-gradient(circle at top left, rgba(199, 164, 93, 0.14), transparent 28%),
         linear-gradient(180deg, #fffdf8 0%, #f5efe4 100%);
       overflow: hidden;
     }
@@ -959,24 +959,28 @@
     .noemia-shell {
       position: relative;
       z-index: 1;
-      max-width: 1280px;
+      max-width: 1160px;
       margin: 0 auto;
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-      gap: 48px;
-      align-items: center;
+      gap: 42px;
+      justify-items: center;
+      text-align: center;
     }
 
     .noemia-copy {
-      max-width: 680px;
+      max-width: 880px;
+      display: grid;
+      justify-items: center;
+      gap: 0;
     }
 
     .noemia-eyebrow {
       display: inline-flex;
       align-items: center;
-      min-height: 2.35rem;
-      margin-bottom: 18px;
-      padding: 8px 14px;
+      justify-content: center;
+      min-height: 2.5rem;
+      margin-bottom: 20px;
+      padding: 10px 16px;
       border-radius: 999px;
       border: 1px solid rgba(163, 132, 68, 0.24);
       background: rgba(255, 251, 243, 0.92);
@@ -989,35 +993,112 @@
     }
 
     .noemia-title {
-      margin: 0 0 20px;
-      font-size: clamp(2.25rem, 4vw, 4.2rem);
-      line-height: 0.98;
+      margin: 0 0 18px;
+      max-width: 12ch;
+      font-size: clamp(2.9rem, 6vw, 5.6rem);
+      line-height: 0.92;
       color: #a8833d;
-      letter-spacing: -0.045em;
+      letter-spacing: -0.055em;
       text-wrap: balance;
+      text-shadow: 0 10px 36px rgba(199, 164, 93, 0.12);
     }
 
     .noemia-title span {
       color: #10261d;
+      display: inline-block;
     }
 
     .noemia-text {
-      margin: 0 0 28px;
-      max-width: 60ch;
-      font-size: 1.05rem;
-      line-height: 1.78;
+      margin: 0 0 24px;
+      max-width: 64ch;
+      font-size: 1.08rem;
+      line-height: 1.82;
       color: #655847;
+      text-wrap: pretty;
+    }
+
+    .noemia-highlight {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(16, 38, 29, 0.06);
+      border: 1px solid rgba(16, 38, 29, 0.08);
+      color: #17382c;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .noemia-highlight::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #c7a15e 0%, #8a6a2f 100%);
+      box-shadow: 0 0 0 6px rgba(199, 161, 94, 0.14);
+    }
+
+    .noemia-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin: 0 0 14px;
+    }
+
+    .btn-noemia {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      padding: 0 24px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+    }
+
+    .btn-noemia:hover,
+    .btn-noemia:focus-visible {
+      transform: translateY(-1px);
+    }
+
+    .btn-noemia-primary {
+      background: linear-gradient(135deg, #0f241c 0%, #17382c 100%);
+      color: #f7f3ea;
+      box-shadow: 0 18px 34px rgba(15, 36, 28, 0.16);
+    }
+
+    .btn-noemia-secondary {
+      background: linear-gradient(135deg, #c7a15e 0%, #e4c98d 100%);
+      color: #10261d;
+      box-shadow: 0 14px 28px rgba(138, 106, 47, 0.12);
+    }
+
+    .noemia-note {
+      margin: 0;
+      max-width: 58ch;
+      color: #6c7b74;
+      font-size: 0.95rem;
+      line-height: 1.6;
     }
 
     .noemia-points {
+      width: 100%;
       display: grid;
-      gap: 16px;
-      margin-bottom: 30px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin: 10px 0 0;
     }
 
     .noemia-point {
-      padding: 18px 20px;
-      border-radius: 20px;
+      padding: 20px 22px;
+      border-radius: 22px;
+      text-align: left;
       background: linear-gradient(135deg, rgba(255,255,255,0.94) 0%, rgba(247,241,230,0.94) 100%);
       border: 1px solid rgba(163, 132, 68, 0.16);
       box-shadow: 0 14px 34px rgba(48, 33, 12, 0.06);
@@ -1036,65 +1117,35 @@
       line-height: 1.62;
     }
 
-    .noemia-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin-bottom: 14px;
-    }
-
-    .btn-noemia {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 52px;
-      padding: 0 24px;
-      border-radius: 999px;
-      text-decoration: none;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-      transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
-    }
-
-    .btn-noemia:hover,
-    .btn-noemia:focus-visible {
-      transform: translateY(-1px);
-    }
-
-    .btn-noemia-primary {
-      background: linear-gradient(135deg, #0f241c 0%, #17382c 100%);
-      color: #f7f3ea;
-      box-shadow: 0 14px 28px rgba(15, 36, 28, 0.16);
-    }
-
-    .btn-noemia-secondary {
-      background: linear-gradient(135deg, #c7a15e 0%, #e4c98d 100%);
-      color: #10261d;
-      box-shadow: 0 14px 28px rgba(138, 106, 47, 0.12);
-    }
-
-    .noemia-note {
-      margin: 0;
-      color: #6c7b74;
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-
     .noemia-card-wrap {
       display: flex;
       justify-content: center;
+      width: 100%;
+    }
+
+    .noemia-card-link {
+      width: 100%;
+      max-width: 760px;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .noemia-card-link:hover {
+      transform: translateY(-3px);
     }
 
     .noemia-card {
       width: 100%;
-      max-width: 520px;
-      padding: 28px;
-      border-radius: 30px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,244,236,0.98) 100%);
-      border: 1px solid rgba(163, 132, 68, 0.16);
-      box-shadow: 0 24px 70px rgba(48, 33, 12, 0.10);
+      padding: 34px;
+      border-radius: 34px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,244,236,0.99) 100%);
+      border: 1px solid rgba(163, 132, 68, 0.18);
+      box-shadow: 0 34px 90px rgba(48, 33, 12, 0.12);
       position: relative;
       overflow: hidden;
+      text-align: left;
     }
 
     .noemia-card::before {
@@ -1106,16 +1157,43 @@
       background: linear-gradient(90deg, #8a6a2f 0%, #d6bc81 50%, #8a6a2f 100%);
     }
 
+    .noemia-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(199, 164, 93, 0.10), transparent 24%);
+      pointer-events: none;
+    }
+
+    .noemia-card-link:hover .noemia-card {
+      box-shadow: 0 40px 110px rgba(48, 33, 12, 0.16);
+    }
+
+    .noemia-card-top,
+    .noemia-chat,
+    .noemia-mini-actions,
+    .noemia-card-note {
+      position: relative;
+      z-index: 1;
+    }
+
     .noemia-card-top {
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 26px;
+    }
+
+    .noemia-card-brand {
+      display: flex;
+      align-items: center;
       gap: 14px;
-      margin-bottom: 24px;
     }
 
     .noemia-avatar {
-      width: 52px;
-      height: 52px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       display: grid;
       place-items: center;
@@ -1138,22 +1216,45 @@
 
     .noemia-card-top h3 {
       margin: 0;
-      font-size: 1.55rem;
+      font-size: 1.7rem;
       color: #2f2519;
+    }
+
+    .noemia-card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 14px;
+      border-radius: 999px;
+      background: rgba(16, 38, 29, 0.06);
+      color: #17382c;
+      font-size: 0.88rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .noemia-card-badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2d6d54;
+      box-shadow: 0 0 0 5px rgba(45, 109, 84, 0.12);
     }
 
     .noemia-chat {
       display: grid;
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 14px;
+      margin-bottom: 18px;
     }
 
     .bubble {
-      max-width: 88%;
-      padding: 14px 16px;
-      border-radius: 18px;
-      font-size: 0.96rem;
-      line-height: 1.65;
+      max-width: 86%;
+      padding: 15px 17px;
+      border-radius: 20px;
+      font-size: 0.98rem;
+      line-height: 1.68;
+      box-shadow: 0 12px 30px rgba(48, 33, 12, 0.05);
     }
 
     .bubble-ai {
@@ -1171,13 +1272,14 @@
     .noemia-mini-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
     .noemia-mini-actions button {
       border: none;
       border-radius: 999px;
-      padding: 11px 16px;
+      padding: 12px 17px;
       background: rgba(16, 38, 29, 0.06);
       color: #17382c;
       font-weight: 600;
@@ -1191,32 +1293,40 @@
       transform: translateY(-1px);
     }
 
-    .noemia-card-link {
-      text-decoration: none;
-      color: inherit;
-      display: block;
-      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    .noemia-card-note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(163, 132, 68, 0.14);
+      color: #6c7b74;
+      font-size: 0.93rem;
+      line-height: 1.55;
     }
 
-    .noemia-card-link:hover {
-      transform: translateY(-2px);
-    }
-
-    .noemia-card-link:hover .noemia-card {
-      box-shadow: 0 32px 80px rgba(48, 33, 12, 0.14);
+    .noemia-card-note strong {
+      color: #2f2519;
     }
 
     @media (max-width: 980px) {
+      .noemia-section {
+        padding: 92px 20px;
+      }
+
       .noemia-shell {
+        gap: 34px;
+      }
+
+      .noemia-points {
         grid-template-columns: 1fr;
-        gap: 36px;
       }
 
-      .noemia-copy {
-        max-width: 100%;
+      .noemia-title {
+        max-width: 13ch;
       }
 
-      .noemia-card {
+      .noemia-card-link {
         max-width: 100%;
       }
     }
@@ -1227,15 +1337,21 @@
       }
 
       .noemia-title {
-        font-size: 2.15rem;
+        font-size: clamp(2.25rem, 11vw, 3.2rem);
       }
 
       .noemia-text {
         font-size: 1rem;
       }
 
+      .noemia-highlight {
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+
       .noemia-actions {
         flex-direction: column;
+        width: 100%;
       }
 
       .btn-noemia {
@@ -1243,8 +1359,17 @@
       }
 
       .noemia-card {
-        padding: 22px;
-        border-radius: 24px;
+        padding: 24px 20px;
+        border-radius: 26px;
+      }
+
+      .noemia-card-top {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .noemia-card-badge {
+        white-space: normal;
       }
 
       .bubble {
@@ -1254,6 +1379,11 @@
 
       .noemia-mini-actions button {
         width: 100%;
+      }
+
+      .noemia-card-note {
+        flex-direction: column;
+        align-items: flex-start;
       }
     }
   </style>
@@ -1364,72 +1494,83 @@
             <span class="noemia-eyebrow">Atendimento inteligente 24h</span>
 
             <h2 class="noemia-title">
-              Fale com a <span>NoemIA</span> e entenda seu caso com mais clareza.
+              Entenda seu caso com <span>clareza estratégica</span>.
             </h2>
 
             <p class="noemia-text">
-              Tire dúvidas iniciais, receba uma orientação mais rápida e descubra qual é o melhor próximo passo para o seu atendimento.
-              Uma experiência mais ágil, organizada e inteligente — sem abrir mão do cuidado humano do escritório.
+              A NoemIA é a assistente inteligente do escritório. Ela organiza sua situação inicial, identifica o melhor caminho
+              e te direciona com mais precisão — de forma rápida, sofisticada e segura.
             </p>
 
-            <div class="noemia-points">
-              <div class="noemia-point">
-                <strong>Respostas rápidas</strong>
-                <p>Entenda sua situação inicial com mais clareza antes mesmo do atendimento com a equipe.</p>
-              </div>
-
-              <div class="noemia-point">
-                <strong>Direcionamento inteligente</strong>
-                <p>A NoemIA ajuda a identificar o caminho mais adequado para o seu caso e organizar o primeiro contato.</p>
-              </div>
-
-              <div class="noemia-point">
-                <strong>Atendimento com continuidade</strong>
-                <p>Quando necessário, você segue para a triagem ou para o atendimento da advogada com mais contexto e agilidade.</p>
-              </div>
-            </div>
+            <p class="noemia-highlight">Faça uma pergunta agora e descubra o melhor próximo passo para o seu atendimento.</p>
 
             <div class="noemia-actions">
-              <a href="noemia.html#painel-pergunta" class="btn-noemia btn-noemia-primary">Falar com a NoemIA</a>
+              <a href="noemia.html#painel-pergunta" class="btn-noemia btn-noemia-primary">Fazer uma pergunta agora</a>
               <a href="triagem.html?area=geral&amp;origem=noemia-home&amp;pagina=index.html" class="btn-noemia btn-noemia-secondary">Iniciar atendimento</a>
             </div>
 
             <p class="noemia-note">
-              Atendimento inicial inteligente para orientar, organizar o primeiro contato e acelerar o seu próximo passo.
+              Atendimento inicial inteligente para orientar, organizar o primeiro contato e acelerar seu encaminhamento com mais objetividade.
             </p>
+
+            <div class="noemia-points">
+              <div class="noemia-point">
+                <strong>Respostas iniciais com clareza</strong>
+                <p>Entenda melhor sua situação antes de falar com a equipe e chegue ao atendimento com mais direção.</p>
+              </div>
+
+              <div class="noemia-point">
+                <strong>Direcionamento inteligente</strong>
+                <p>A NoemIA ajuda a identificar o melhor caminho para o seu caso e organizar o primeiro passo com mais precisão.</p>
+              </div>
+
+              <div class="noemia-point">
+                <strong>Experiência premium e contínua</strong>
+                <p>Quando necessário, você segue para a triagem ou para o atendimento da advogada com mais contexto e agilidade.</p>
+              </div>
+            </div>
           </div>
 
           <div class="noemia-card-wrap">
             <a href="noemia.html#painel-pergunta" class="noemia-card-link" aria-label="Falar com a NoemIA">
               <div class="noemia-card" id="noemia-card">
-              <div class="noemia-card-top">
-                <div class="noemia-avatar">N</div>
-                <div>
-                  <span class="noemia-card-label">Assistente do escritório</span>
-                  <h3>NoemIA</h3>
+                <div class="noemia-card-top">
+                  <div class="noemia-card-brand">
+                    <div class="noemia-avatar">N</div>
+                    <div>
+                      <span class="noemia-card-label">Assistente do escritório</span>
+                      <h3>NoemIA</h3>
+                    </div>
+                  </div>
+
+                  <span class="noemia-card-badge">Pergunte agora mesmo</span>
+                </div>
+
+                <div class="noemia-chat">
+                  <div class="bubble bubble-ai">
+                    Olá! Sou a NoemIA, assistente inteligente do escritório. Posso te ajudar a entender sua situação inicial e indicar o melhor próximo passo.
+                  </div>
+
+                  <div class="bubble bubble-user">
+                    Quero entender melhor meu caso e saber o que preciso fazer agora.
+                  </div>
+
+                  <div class="bubble bubble-ai">
+                    Posso te orientar nos primeiros passos, organizar seu atendimento e te direcionar para a triagem adequada ou para a equipe do escritório.
+                  </div>
+                </div>
+
+                <div class="noemia-mini-actions" aria-label="Sugestões de perguntas para a NoemIA">
+                  <button type="button">Entender meu caso</button>
+                  <button type="button">Enviar documentos</button>
+                  <button type="button">Falar com a advogada</button>
+                </div>
+
+                <div class="noemia-card-note">
+                  <span><strong>Visível, central e interativa:</strong> a NoemIA agora aparece como protagonista da experiência.</span>
+                  <span>Toque para abrir o painel completo</span>
                 </div>
               </div>
-
-              <div class="noemia-chat">
-                <div class="bubble bubble-ai">
-                  Olá. Sou a NoemIA, assistente inteligente do escritório. Posso te ajudar a entender sua situação inicial e indicar o melhor próximo passo.
-                </div>
-
-                <div class="bubble bubble-user">
-                  Quero entender melhor meu caso e saber o que preciso fazer agora.
-                </div>
-
-                <div class="bubble bubble-ai">
-                  Posso te orientar nos primeiros passos, organizar seu atendimento e te direcionar para a triagem adequada ou para a equipe do escritório.
-                </div>
-              </div>
-
-              <div class="noemia-mini-actions" aria-label="Sugestões de perguntas para a NoemIA">
-                <button type="button">Entender meu caso</button>
-                <button type="button">Enviar documentos</button>
-                <button type="button">Falar com a advogada</button>
-              </div>
-            </div>
             </a>
           </div>
         </div>
