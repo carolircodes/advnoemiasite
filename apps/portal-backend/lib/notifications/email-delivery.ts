@@ -30,11 +30,8 @@ function extractAddress(value: string) {
 }
 
 function encodeHeader(value: string) {
-  return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
-}
-
-function escapeSmtpContent(value: string) {
-  return value.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
+  const needsEncoding = /[\x00-\x1F\x7F-\xFF]/.test(value) || /[\r\n]/.test(value) || value.startsWith('.');
+  return needsEncoding ? `=?utf-8?B?${Buffer.from(value, "utf8").toString("base64")}?=` : value;
 }
 
 function buildMimeMessage(input: {
@@ -73,13 +70,16 @@ function buildMimeMessage(input: {
   return headers.join("\r\n");
 }
 
+function escapeSmtpContent(value: string) {
+  return value.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
+}
+
 function consumeSmtpResponse(buffer: string) {
   let cursor = 0;
   const lines: string[] = [];
 
   while (cursor < buffer.length) {
     const lineBreak = buffer.indexOf("\r\n", cursor);
-
     if (lineBreak === -1) {
       return null;
     }
@@ -140,7 +140,6 @@ async function createSmtpSession(input: {
     }
 
     const parsed = consumeSmtpResponse(buffer);
-
     if (!parsed) {
       return;
     }
@@ -186,9 +185,7 @@ async function createSmtpSession(input: {
 
     if (!expectedCodes.includes(response.code)) {
       throw new Error(
-        `Servidor SMTP respondeu ${response.code} quando o esperado era ${expectedCodes.join(
-          ", "
-        )}: ${response.raw}`
+        `Servidor SMTP respondeu ${response.code} quando o esperado era ${expectedCodes.join(", ")}: ${response.raw}`
       );
     }
 
@@ -211,7 +208,7 @@ async function createSmtpSession(input: {
 
 async function sendViaSmtp(input: DeliveryInput) {
   const config = getNotificationEnv();
-
+  
   if (!config.emailFrom) {
     throw new Error("Defina EMAIL_FROM para enviar notificacoes por SMTP.");
   }
@@ -230,7 +227,7 @@ async function sendViaSmtp(input: DeliveryInput) {
 
   const fromAddress = extractAddress(config.emailFrom);
   const toAddress = extractAddress(input.to);
-
+  
   try {
     await session.read([220]);
     session.writeLine("EHLO localhost");
@@ -274,7 +271,7 @@ async function sendViaSmtp(input: DeliveryInput) {
 
 async function sendViaResend(input: DeliveryInput) {
   const config = getNotificationEnv();
-
+  
   if (!config.resendApiKey) {
     throw new Error("Defina RESEND_API_KEY para enviar notificacoes com Resend.");
   }
@@ -307,7 +304,7 @@ async function sendViaResend(input: DeliveryInput) {
 
 export async function sendNotificationEmail(input: DeliveryInput) {
   const config = getNotificationEnv();
-
+  
   if (config.provider === "resend") {
     await sendViaResend(input);
     return;
