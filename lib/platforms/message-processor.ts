@@ -312,11 +312,19 @@ export async function sendPlatformResponse(
       return true;
 
     } else if (platform === 'whatsapp') {
-      // WhatsApp Cloud API
-      const response = await fetch(`https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+      // WhatsApp Cloud API - CORREÇÃO AQUI
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+      
+      if (!phoneNumberId || !accessToken) {
+        console.error('WhatsApp API Error: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN');
+        return false;
+      }
+
+      const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -324,7 +332,8 @@ export async function sendPlatformResponse(
           to: recipientId,
           text: {
             body: messageText
-          }
+          },
+          recipient_type: 'individual'
         }),
       });
 

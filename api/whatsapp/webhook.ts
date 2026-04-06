@@ -30,19 +30,21 @@ function parseWhatsAppMessage(body: any): Array<{
           for (const change of entry.changes) {
             if (change.field === 'messages' && change.value?.messages) {
               for (const message of change.value.messages) {
-                // Apenas processar mensagens de texto enviadas pelo usuário
-                if (message.type === 'text' && message.direction === 'inbound') {
+                // CORREÇÃO: Mensagens do usuário não têm 'direction' property
+                // Verificar se a mensagem é do usuário (tem campo 'from')
+                if (message.type === 'text' && message.from) {
                   events.push({
                     platform: 'whatsapp' as Platform,
-                    platformUserId: message.from || message.from_number,
+                    platformUserId: message.from, // CORREÇÃO: Extrair corretamente do campo 'from'
                     platformMessageId: message.id,
-                    senderName: message.contact?.name?.formatted_name || change.value.contacts?.[0]?.name?.formatted_name,
+                    senderName: change.value.contacts?.[0]?.name?.formatted_name || message.contact?.name?.formatted_name,
                     text: message.text?.body || '',
                     timestamp: message.timestamp || Date.now(),
                     metadata: {
                       phone_number_id: change.value.metadata?.phone_number_id,
                       display_phone_number: change.value.metadata?.display_phone_number,
-                      contact_name: message.contact?.name?.formatted_name
+                      contact_name: change.value.contacts?.[0]?.name?.formatted_name,
+                      wa_id: change.value.contacts?.[0]?.wa_id
                     }
                   });
                 }
@@ -175,7 +177,7 @@ export async function POST(request: NextRequest) {
         const { existing, leadId } = await findOrCreateLead(
           event.platform,
           event.platformUserId,
-          event.senderName,
+          event.senderName || null,
           supabase
         );
 
@@ -229,7 +231,7 @@ export async function POST(request: NextRequest) {
           leadId,
           messageSent,
           processed: true
-        });
+        } as any);
 
       } catch (eventError) {
         logPlatformEvent('EVENT_PROCESSING_ERROR', 'whatsapp', {
