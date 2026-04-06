@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export async function GET(request) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   const mode = searchParams.get("hub.mode");
@@ -17,7 +17,7 @@ export async function GET(request) {
   return new NextResponse("Forbidden", { status: 403 });
 }
 
-export async function POST(request) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     console.log("META WEBHOOK EVENT:", body);

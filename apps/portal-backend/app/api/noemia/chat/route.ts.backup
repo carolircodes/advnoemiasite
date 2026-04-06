@@ -122,3 +122,33 @@ interface MetaContext {
   sessionId: string;
   timestamp: number;
 }
+  } catch (error) {
+    // Tratamento de erro premium - logs técnicos no servidor, mensagem amigável para usuário
+    console.error("[noemia.chat] Erro geral na API:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+
+    // Mensagens amigáveis premium para erros comuns
+    const friendlyMessages: Record<string, string> = {
+      "Faca login como cliente para receber respostas baseadas no seu portal.": 
+        "Para usar a NoemIA com contexto do seu caso, faça login como cliente no portal.",
+      "Faca login com um perfil interno para receber apoio operacional da Noemia.": 
+        "Para usar a NoemIA operacional, faça login com um perfil interno autorizado.",
+      "A Noemia ainda nao foi configurada neste ambiente. Defina OPENAI_API_KEY e OPENAI_MODEL no .env.local.": 
+        "A NoemIA está em modo de configuração. Tente novamente em instantes ou contate o suporte técnico.",
+      "Nao foi possivel gerar a resposta da Noemia agora.": 
+        "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes."
+    };
+
+    const friendlyMessage = friendlyMessages[errorMessage] || 
+      "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes.";
+
+    return NextResponse.json(
+      {
+        ok: true, // Mantém ok:true para não quebrar fluxo do frontend
+        audience: "visitor",
+        answer: friendlyMessage
+      },
+      { status: 200 }
+    );
+  }
+}
