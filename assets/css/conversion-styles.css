@@ -1,0 +1,313 @@
+/**
+ * Estilos de Conversão - Fase 1.5
+ * Estilos para CTAs estratégicos, formulários e elementos de conversão
+ */
+
+/* Bloco de CTAs estratégicos */
+.cta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.cta-block[data-contextual="true"] {
+  position: relative;
+}
+
+.cta-block[data-contextual="true"]::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: linear-gradient(135deg, rgba(181, 141, 73, 0.1), rgba(255, 255, 255, 0.05));
+  border-radius: var(--radius-lg);
+  z-index: -1;
+}
+
+.cta-primary {
+  text-align: center;
+}
+
+.cta-secondary {
+  text-align: center;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.cta-tertiary {
+  text-align: center;
+}
+
+.cta-intro {
+  margin: 0 0 1rem 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.cta-note {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Estados de CTAs */
+.btn-primary[data-cta-contextual="true"] {
+  background: linear-gradient(135deg, #b58d49, #8b6f3a);
+  box-shadow: 0 4px 12px rgba(181, 141, 73, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-primary[data-cta-contextual="true"]:hover {
+  background: linear-gradient(135deg, #a17d42, #7d6234);
+  box-shadow: 0 6px 20px rgba(181, 141, 73, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Indicadores visuais de contexto */
+.context-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: rgba(181, 141, 73, 0.1);
+  border: 1px solid rgba(181, 141, 73, 0.2);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+
+.context-indicator::before {
+  content: "🎯";
+  font-size: 0.9rem;
+}
+
+/* Badges de conversão */
+.conversion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  background: linear-gradient(135deg, rgba(181, 141, 73, 0.15), rgba(255, 255, 255, 0.8));
+  border: 1px solid rgba(181, 141, 73, 0.3);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.conversion-badge.high-priority {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(255, 255, 255, 0.8));
+  border-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+}
+
+.conversion-badge.medium-priority {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 255, 255, 0.8));
+  border-color: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+/* Animações de conversão */
+@keyframes pulse-cta {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(181, 141, 73, 0.3);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(181, 141, 73, 0.4);
+  }
+}
+
+.btn-primary[data-cta-priority="1"] {
+  animation: pulse-cta 3s ease-in-out infinite;
+}
+
+/* Estados de formulário melhorados */
+.form-group.has-error {
+  position: relative;
+}
+
+.form-group.has-error::after {
+  content: "⚠️";
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  opacity: 0.7;
+}
+
+.form-input.is-valid,
+.form-select.is-valid,
+.form-textarea.is-valid {
+  border-color: rgba(40, 167, 69, 0.5);
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1);
+}
+
+.form-input.is-valid:focus,
+.form-select.is-valid:focus,
+.form-textarea.is-valid:focus {
+  border-color: rgba(40, 167, 69, 0.7);
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+}
+
+/* Feedback visual de status */
+.form-status {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.form-status.is-loading::before {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 193, 7, 0.3);
+  border-top-color: #ffc107;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.form-status.is-loading {
+  padding-left: 3rem;
+}
+
+.form-status.is-success::before {
+  content: "✅";
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1rem;
+}
+
+.form-status.is-success {
+  padding-left: 3rem;
+}
+
+.form-status.is-error::before {
+  content: "❌";
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1rem;
+}
+
+.form-status.is-error {
+  padding-left: 3rem;
+}
+
+@keyframes spin {
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+/* Contexto visual em páginas */
+.context-banner {
+  background: linear-gradient(135deg, rgba(181, 141, 73, 0.1), rgba(255, 255, 255, 0.95));
+  border: 1px solid rgba(181, 141, 73, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.5rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.context-banner-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+
+.context-banner-text {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .cta-block {
+    gap: 1rem;
+  }
+  
+  .cta-secondary {
+    padding: 1rem;
+  }
+  
+  .context-indicator {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+  }
+  
+  .conversion-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+  }
+}
+
+/* Estados de hover para CTAs contextuais */
+.btn[data-cta-theme="aposentadoria"]:hover {
+  background: linear-gradient(135deg, #2c5aa0, #1e3d6f);
+}
+
+.btn[data-cta-theme="bancario"]:hover {
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+}
+
+.btn[data-cta-theme="familia"]:hover {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+}
+
+.btn[data-cta-theme="consumidor"]:hover {
+  background: linear-gradient(135deg, #fd7e14, #e8590c);
+}
+
+.btn[data-cta-theme="civil"]:hover {
+  background: linear-gradient(135deg, #20c997, #17a2b8);
+}
+
+/* Indicadores de prioridade */
+.priority-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-left: 0.5rem;
+}
+
+.priority-indicator.high {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+.priority-indicator.medium {
+  background: rgba(255, 193, 7, 0.1);
+  color: #ffc107;
+}
+
+.priority-indicator.low {
+  background: rgba(40, 167, 69, 0.1);
+  color: #28a745;
+}

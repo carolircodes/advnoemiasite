@@ -32,6 +32,7 @@
   <link rel="stylesheet" href="assets/css/design-system.css" />
   <link rel="stylesheet" href="assets/css/contact-capture.css" />
   <link rel="stylesheet" href="assets/css/internal-pages.css" />
+  <link rel="stylesheet" href="assets/css/conversion-styles.css" />
 
   <style>
     .triage-hero::before {
@@ -623,49 +624,36 @@
 
   <script src="assets/js/premium-system.js"></script>
   <script src="assets/js/entry-context.js"></script>
+  <script src="assets/js/context-capture.js"></script>
+  <script src="assets/js/conversion-ctas.js"></script>
+  <script src="assets/js/triage-form.js"></script>
 
   <script>
     (function () {
-      const params = new URLSearchParams(window.location.search);
-      const entryContext = window.EntryContext
-        ? window.EntryContext.readFromSearch(window.location.search, {
-            defaults: {            origem: "site"
-          },
-          aliases: {
-            tema: ["tema", "theme", "area"]
-          }
-        })
-      : {
-          tema: (params.get("tema") || params.get("area") || "").toLowerCase().trim(),
-          origem: (params.get("origem") || params.get("source") || "site").toLowerCase().trim(),
-          campanha: (params.get("campanha") || params.get("campaign") || "").toLowerCase().trim(),
-          video: (params.get("video") || "").toLowerCase().trim()
-        };
+      // Usa o novo sistema de contexto unificado
+      const context = window.AdvContext?.capture() || {
+        tema: (new URLSearchParams(window.location.search).get("tema") || "").toLowerCase().trim(),
+        origem: (new URLSearchParams(window.location.search).get("origem") || "site").toLowerCase().trim(),
+        campanha: (new URLSearchParams(window.location.search).get("campanha") || "").toLowerCase().trim(),
+        video: (new URLSearchParams(window.location.search).get("video") || "").toLowerCase().trim()
+      };
 
-      const tema = entryContext.tema || "";
-      const origem = entryContext.origem || "site";
-      const campanha = entryContext.campanha || "";
-      const video = entryContext.video || "";
-      const pageParam = (params.get("page") || params.get("pagina") || "").trim();
+      const tema = context.tema || "";
+      const origem = context.origem || "site";
 
+      // Elementos do DOM
       const areaInput = document.querySelector("[data-triage-area-input]");
       const sourceInput = document.querySelector("[data-triage-source-input]");
       const pageInput = document.querySelector("[data-triage-page-input]");
       const campaignInput = document.querySelector("[data-triage-campaign-input]");
       const videoInput = document.querySelector("[data-triage-video-input]");
-      const problemTypeSelect = document.getElementById("leadProblemType");
 
-      const areaBadge = document.getElementById("triageAreaBadge");
-      const originBadge = document.getElementById("triageOriginBadge");
-
-      const topbarCopy = document.getElementById("topbarCopy");
-      const triageEyebrow = document.getElementById("triageEyebrow");
       const triageTitle = document.getElementById("triageTitle");
       const triageIntro = document.getElementById("triageIntro");
       const stackCardCopy = document.getElementById("stackCardCopy");
       const formTitle = document.getElementById("formTitle");
       const formIntro = document.getElementById("formIntro");
-      const descriptionLabel = document.getElementById("descriptionLabel");
+      const descriptionLabel = document.getElementById("leadDescription");
       const descriptionField = document.getElementById("leadDescription");
       const submitButton = document.getElementById("submitButton");
       const miniNote = document.getElementById("miniNote");
@@ -713,7 +701,7 @@
         },
         previdenciario: {
           label: "Direito Previdenciário",
-          badge: "Direito Previdenciário",
+          badge: "Previdenciário",
           value: "previdenciario",
           eyebrow: "Pré-atendimento previdenciário",
           title: "Conte o essencial do seu caso previdenciário antes de falar com a equipe.",
@@ -800,6 +788,7 @@
       const selectedTheme = themeMap[tema] || null;
       const originLabel = originMap[origem] || (origem ? origem.charAt(0).toUpperCase() + origem.slice(1) : "Site");
 
+      // Aplica contextualização se houver tema
       if (selectedTheme) {
         triageEyebrow.textContent = selectedTheme.eyebrow;
         triageTitle.textContent = selectedTheme.title;
@@ -812,10 +801,6 @@
         topbarCopy.textContent = selectedTheme.topbar;
         areaBadge.textContent = selectedTheme.badge;
         stackCardCopy.textContent = "Identificamos automaticamente uma área provável com base no conteúdo de origem para agilizar sua triagem e direcionar melhor o atendimento inicial.";
-
-        if (problemTypeSelect) {
-          problemTypeSelect.value = selectedTheme.value;
-        }
 
         if (areaInput) {
           areaInput.value = selectedTheme.value;
@@ -834,26 +819,40 @@
       }
 
       if (pageInput) {
-        pageInput.value = pageParam || "triagem.html";
+        pageInput.value = context.pagina || "triagem.html";
       }
 
       if (campaignInput) {
-        campaignInput.value = campanha;
+        campaignInput.value = context.campanha || "";
       }
 
       if (videoInput) {
-        videoInput.value = video;
+        videoInput.value = context.video || "";
       }
 
-      const timelineStep1 = document.getElementById("timelineStep1");
-      const timelineStep2 = document.getElementById("timelineStep2");
-      const timelineStep3 = document.getElementById("timelineStep3");
-
+      // Ajustes específicos para tema aposentadoria
       if (selectedTheme && tema === "aposentadoria") {
-        timelineStep1.textContent = "Você informa o estágio atual do benefício, pedido, negativa, revisão ou dúvida principal.";
-        timelineStep2.textContent = "A triagem é convertida em uma mensagem organizada no WhatsApp, com foco previdenciário e mais contexto para análise inicial.";
-        timelineStep3.textContent = "A equipe recebe sua situação de forma mais clara e consegue orientar os próximos passos com mais precisão.";
-        miniNote.textContent = "A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba sua situação previdenciária com mais contexto.";
+        const timelineStep1 = document.getElementById("timelineStep1");
+        const timelineStep2 = document.getElementById("timelineStep2");
+        const timelineStep3 = document.getElementById("timelineStep3");
+
+        if (timelineStep1) timelineStep1.textContent = "Você informa o estágio atual do benefício, pedido, negativa, revisão ou dúvida principal.";
+        if (timelineStep2) timelineStep2.textContent = "A triagem é convertida em uma mensagem organizada no WhatsApp, com foco previdenciário e mais contexto para análise inicial.";
+        if (timelineStep3) timelineStep3.textContent = "A equipe recebe sua situação de forma mais clara e consegue orientar os próximos passos com mais precisão.";
+        
+        if (miniNote) {
+          miniNote.textContent = "A triagem não substitui a análise jurídica individual. Ela organiza o primeiro contato para que a equipe receba sua situação previdenciária com mais contexto.";
+        }
+      }
+
+      // Tracking de contextualização
+      if (selectedTheme) {
+        window.AdvContext?.track('triage_contextualized', {
+          theme: tema,
+          origin: origem,
+          campaign: context.campanha,
+          video: context.video
+        });
       }
     })();
 
