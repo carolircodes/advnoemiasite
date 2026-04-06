@@ -2,34 +2,47 @@
 
 import { Lead, PrioridadesProps } from "./types";
 
-// Constantes para evitar comparações diretas
-const LEAD_STATUS = {
-  QUENTE: "quente" as const,
-  PRONTO_PARA_AGENDAR: "pronto_para_agendar" as const,
-  CLIENTE_ATIVO: "cliente_ativo" as const,
-  ALTA: "alta" as const
-} as const;
+// Type guards para validação
+function isValidLeadStatus(status: string): status is Lead["lead_status"] {
+  return ["frio", "curioso", "interessado", "quente", "pronto_para_agendar", "cliente_ativo", "sem_aderencia"].includes(status);
+}
+
+function isValidUrgency(urgency: string): urgency is Lead["urgency"] {
+  return ["baixa", "media", "alta"].includes(urgency);
+}
+
+// Funções de validação para evitar erros de narrowing
+function isUrgentLead(lead: Lead): boolean {
+  return isValidUrgency(lead.urgency) && 
+         lead.urgency === "alta" && 
+         isValidLeadStatus(lead.lead_status) && 
+         lead.lead_status !== "cliente_ativo";
+}
+
+function isHotLeadNeedingHuman(lead: Lead): boolean {
+  return isValidLeadStatus(lead.lead_status) && 
+         lead.lead_status === "quente" && 
+         lead.wants_human === true && 
+         lead.lead_status !== "cliente_ativo";
+}
+
+function isReadyToSchedule(lead: Lead): boolean {
+  return isValidLeadStatus(lead.lead_status) && 
+         isValidUrgency(lead.urgency) &&
+         lead.lead_status === "pronto_para_agendar" && 
+         lead.urgency !== "alta" && 
+         lead.lead_status !== "cliente_ativo";
+}
 
 export function PrioridadesDoDia({ leads }: PrioridadesProps) {
-  // Leads urgentes (urgência alta)
-  const urgentes = leads.filter((lead: Lead) => 
-    lead.urgency === LEAD_STATUS.ALTA && 
-    lead.lead_status !== LEAD_STATUS.CLIENTE_ATIVO
-  );
+  // Leads urgentes (urgência alta) - excluindo clientes ativos
+  const urgentes = leads.filter(isUrgentLead);
   
-  // Leads quentes que precisam de atenção humana
-  const quentesSemHumano = leads.filter((lead: Lead) => 
-    lead.lead_status === LEAD_STATUS.QUENTE && 
-    lead.wants_human === true && 
-    lead.lead_status !== LEAD_STATUS.CLIENTE_ATIVO
-  );
+  // Leads quentes que precisam de atenção humana - excluindo clientes ativos
+  const quentesSemHumano = leads.filter(isHotLeadNeedingHuman);
   
-  // Leads prontos para agendar
-  const prontosParaAgendar = leads.filter((lead: Lead) => 
-    lead.lead_status === LEAD_STATUS.PRONTO_PARA_AGENDAR && 
-    lead.urgency !== LEAD_STATUS.ALTA && 
-    lead.lead_status !== LEAD_STATUS.CLIENTE_ATIVO
-  );
+  // Leads prontos para agendar - excluindo urgentes e clientes ativos
+  const prontosParaAgendar = leads.filter(isReadyToSchedule);
 
   const PriorityCard = ({ 
     title, 
@@ -100,10 +113,10 @@ export function PrioridadesDoDia({ leads }: PrioridadesProps) {
       {leads.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="flex items-center justify-between">
-            <span className={`text-sm font-medium`} style={{ color }}>
+            <span className="text-sm font-medium" style={{ color }}>
               {leads.length} lead{leads.length !== 1 ? 's' : ''} {leads.length === 1 ? 'prioritário' : 'prioritários'}
             </span>
-            <button className={`text-sm font-medium hover:opacity-80 transition-opacity`} style={{ color }}>
+            <button className="text-sm font-medium hover:opacity-80 transition-opacity" style={{ color }}>
               Ver todos →
             </button>
           </div>
