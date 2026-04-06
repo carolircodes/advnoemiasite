@@ -1,7 +1,4 @@
 {
-  "buildCommand": "cd apps/portal-backend && npm run build",
-  "outputDirectory": "apps/portal-backend/.next",
-  "installCommand": "cd apps/portal-backend && npm install",
   "framework": "nextjs",
   "crons": [
     {
