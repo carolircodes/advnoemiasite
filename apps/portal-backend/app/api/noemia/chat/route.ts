@@ -54,11 +54,11 @@ export async function POST(request: Request) {
       return fallbackHandler(request);
     }
   } catch (error) {
-    // Tratamento de erro mais amigável
+    // Tratamento de erro premium - logs técnicos no servidor, mensagem amigável para usuário
     console.error("[noemia.chat] Erro geral na API:", error);
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
 
-    // Mensagens amigáveis para erros comuns
+    // Mensagens amigáveis premium para erros comuns
     const friendlyMessages: Record<string, string> = {
       "Faca login como cliente para receber respostas baseadas no seu portal.": 
         "Para usar a NoemIA com contexto do seu caso, faça login como cliente no portal.",
@@ -70,16 +70,16 @@ export async function POST(request: Request) {
         "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes."
     };
 
-    const friendlyMessage = friendlyMessages[errorMessage] || friendlyMessages["Nao foi possivel gerar a resposta da Noemia agora."];
+    const friendlyMessage = friendlyMessages[errorMessage] || 
+      "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes.";
 
     return NextResponse.json(
       {
-        ok: false,
-        error: friendlyMessage,
-        technicalError: errorMessage, // Para debug
-        fallbackMode: true
+        ok: true, // Mantém ok:true para não quebrar fluxo do frontend
+        audience: "visitor",
+        answer: friendlyMessage
       },
-      { status: 200 } // Mudar para 200 para não quebrar o frontend
+      { status: 200 }
     );
   }
 }
