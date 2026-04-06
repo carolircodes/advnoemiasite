@@ -8,25 +8,9 @@ import {
   platformConfigs 
 } from "@/lib/platforms/message-processor";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireProfile } from "@/lib/auth/guards";
 
-// Função de fallback crítico (quando tudo falha)
-function getCriticalFallbackResponse(): string {
-  const PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://advnoemia.com.br';
-  const WHATSAPP_URL = process.env.NOEMIA_WHATSAPP_URL || 'https://wa.me/5511999999999';
-  
-  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.
-
-Recebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:
-
-📱 WhatsApp: ${WHATSAPP_URL}
-🌐 Site: ${PUBLIC_SITE_URL}
-
-Em breve entraremos em contato!`;
-}
-
-// Função para fazer parse de mensagens do WhatsApp
-function parseWhatsAppMessage(body: any): Array<{
+// Função unificada para parse de mensagens (Instagram + WhatsApp)
+function parsePlatformMessages(body: any): Array<{
   platform: Platform;
   platformUserId: string;
   platformMessageId: string;
@@ -37,7 +21,7 @@ function parseWhatsAppMessage(body: any): Array<{
 }> {
   const events = [];
 
-  logPlatformEvent('WEBHOOK_BODY_PARSED', 'whatsapp', {
+  logPlatformEvent('WEBHOOK_BODY_PARSED', 'unknown', {
     object: body.object,
     entryCount: body.entry?.length || 0,
     hasBody: !!body,
@@ -45,8 +29,34 @@ function parseWhatsAppMessage(body: any): Array<{
   });
 
   try {
+    // Instagram Graph API structure
+    if (body.object === 'instagram' && body.entry) {
+      logPlatformEvent('PLATFORM_DETECTED', 'instagram', { platform: 'instagram' });
+      
+      for (const entry of body.entry) {
+        if (entry.messaging) {
+          for (const messaging of entry.messaging) {
+            if (messaging.message?.text) {
+              events.push({
+                platform: 'instagram' as Platform,
+                platformUserId: messaging.sender.id,
+                platformMessageId: messaging.message.mid,
+                senderName: messaging.sender.name || null,
+                text: messaging.message.text,
+                timestamp: messaging.timestamp,
+                metadata: {
+                  recipient: messaging.recipient,
+                  platform: 'instagram'
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+    
     // WhatsApp Cloud API structure
-    if (body.object === 'whatsapp_business_account' && body.entry) {
+    else if (body.object === 'whatsapp_business_account' && body.entry) {
       logPlatformEvent('PLATFORM_DETECTED', 'whatsapp', { platform: 'whatsapp' });
       
       for (const entry of body.entry) {
@@ -56,13 +66,6 @@ function parseWhatsAppMessage(body: any): Array<{
               for (const message of change.value.messages) {
                 // Mensagem do usuário (tem campo 'from')
                 if (message.type === 'text' && message.from) {
-                  logPlatformEvent('MESSAGE_EXTRACTED', 'whatsapp', {
-                    messageId: message.id,
-                    from: message.from,
-                    text: message.text?.body || '',
-                    contactName: change.value.contacts?.[0]?.name?.formatted_name
-                  });
-
                   events.push({
                     platform: 'whatsapp' as Platform,
                     platformUserId: message.from,
@@ -78,51 +81,34 @@ function parseWhatsAppMessage(body: any): Array<{
                       platform: 'whatsapp'
                     }
                   });
-                } else {
-                  logPlatformEvent('MESSAGE_SKIPPED', 'whatsapp', {
-                    messageId: message.id,
-                    type: message.type,
-                    hasFrom: !!message.from,
-                    hasText: !!message.text?.body,
-                    reason: message.type !== 'text' ? 'Not text message' : 'No from field'
-                  });
                 }
               }
-            } else {
-              logPlatformEvent('CHANGE_SKIPPED', 'whatsapp', {
-                field: change.field,
-                hasMessages: !!change.value?.messages,
-                changeType: typeof change
-              });
             }
           }
-        } else {
-          logPlatformEvent('ENTRY_SKIPPED', 'whatsapp', {
-            entryId: entry.id,
-            hasChanges: !!entry.changes,
-            entryKeys: Object.keys(entry)
-          });
         }
       }
-    } else {
-      logPlatformEvent('UNKNOWN_PLATFORM', 'whatsapp', {
+    }
+    
+    else {
+      logPlatformEvent('UNKNOWN_PLATFORM', 'unknown', {
         object: body.object,
         hasEntry: !!body.entry,
-        expectedObject: 'whatsapp_business_account'
+        hasChanges: !!body.entry?.[0]?.changes
       });
     }
+
   } catch (error) {
-    logPlatformEvent('PARSE_ERROR', 'whatsapp', {
+    logPlatformEvent('PARSE_ERROR', 'unknown', {
       error: error instanceof Error ? error.message : 'unknown',
       errorStack: error instanceof Error ? error.stack : undefined,
       body: JSON.stringify(body).substring(0, 1000)
     });
   }
 
-  logPlatformEvent('MESSAGE_PARSED', 'whatsapp', {
+  logPlatformEvent('MESSAGE_PARSED', 'unknown', {
     eventCount: events.length,
-    userIds: events.map(e => e.platformUserId),
-    messageIds: events.map(e => e.platformMessageId)
+    platforms: events.map(e => e.platform),
+    userIds: events.map(e => e.platformUserId)
   });
 
   return events;
@@ -172,7 +158,7 @@ async function findOrCreateLead(
           last_response: '',
           wants_human: false,
           should_schedule: false,
-          summary: 'Novo lead via WhatsApp',
+          summary: 'Novo lead via webhook',
           suggested_action: 'Aguardar primeira interação para qualificar',
           first_contact_at: new Date().toISOString(),
           last_contact_at: new Date().toISOString(),
@@ -184,78 +170,103 @@ async function findOrCreateLead(
       return { existing: false, leadId: newLead.id };
     }
   } catch (error) {
-    console.error('Error in findOrCreateLead:', error);
+    logPlatformEvent('LEAD_CREATE_ERROR', platform, {
+      platformUserId,
+      error: error instanceof Error ? error.message : 'unknown'
+    });
     throw error;
   }
 }
 
-// Handler principal do webhook
+// Handler principal do webhook unificado
 export async function GET(request: NextRequest) {
-  const config = platformConfigs.whatsapp;
-  const mode = request.query["hub.mode"] as string;
-  const token = request.query["hub.verify_token"] as string;
-  const challenge = request.query["hub.challenge"] as string;
+  const url = new URL(request.url);
+  const mode = url.searchParams.get("hub.mode");
+  const token = url.searchParams.get("hub.verify_token");
+  const challenge = url.searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === config.verifyToken) {
-    logPlatformEvent('WEBHOOK_VERIFIED', 'whatsapp', { mode, token, challenge });
+  // Detectar plataforma pelo token
+  let platform: Platform = 'instagram';
+  if (token === platformConfigs.whatsapp.verifyToken) {
+    platform = 'whatsapp';
+  }
+
+  logPlatformEvent('WEBHOOK_VERIFICATION_ATTEMPT', platform, {
+    mode,
+    token: token === platformConfigs[platform].verifyToken ? 'VALID' : 'INVALID',
+    tokenMatch: token === platformConfigs[platform].verifyToken,
+    hasChallenge: !!challenge,
+    detectedPlatform: platform
+  });
+
+  if (mode === "subscribe" && token === platformConfigs[platform].verifyToken) {
+    logPlatformEvent('WEBHOOK_VERIFIED', platform, {
+      mode,
+      token,
+      challenge,
+      platform
+    });
     return new Response(challenge);
   }
 
-  logPlatformEvent('WEBHOOK_VERIFY_FAILED', 'whatsapp', { mode, token });
+  logPlatformEvent('WEBHOOK_VERIFY_FAILED', platform, {
+    mode,
+    token,
+    tokenMatch: token === platformConfigs[platform].verifyToken,
+    expectedToken: platformConfigs[platform].verifyToken,
+    detectedPlatform: platform
+  });
+
   return new Response("Forbidden", { status: 403 });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    logPlatformEvent('WEBHOOK_RECEIVED', 'whatsapp', {
+    const body = await request.json();
+    
+    // Detectar plataforma pelo objeto
+    let detectedPlatform: Platform = 'instagram';
+    if (body.object === 'whatsapp_business_account') {
+      detectedPlatform = 'whatsapp';
+    }
+
+    logPlatformEvent('WEBHOOK_RECEIVED', detectedPlatform, {
       method: 'POST',
       url: request.url,
       headers: Object.fromEntries(request.headers.entries()),
-      userAgent: request.headers.get('user-agent')
+      userAgent: request.headers.get('user-agent'),
+      detectedPlatform,
+      object: body.object
     });
 
     // Validar assinatura
-    if (!validateSignature(request, 'whatsapp')) {
-      logPlatformEvent('INVALID_SIGNATURE', 'whatsapp', {
-        headers: request.headers,
-        bodyPreview: JSON.stringify(request.body).substring(0, 200)
+    if (!validateSignature(request, detectedPlatform)) {
+      logPlatformEvent('INVALID_SIGNATURE', detectedPlatform, {
+        hasSignature: !!request.headers.get('x-hub-signature-256'),
+        hasAppSecret: !!platformConfigs[detectedPlatform].appSecret,
+        headers: Object.fromEntries(request.headers.entries())
       });
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }
 
-    const body = await request.json();
-    
-    logPlatformEvent('WEBHOOK_BODY_PARSED', 'whatsapp', {
-      object: body.object,
-      entryCount: body.entry?.length || 0,
-      hasBody: !!body,
-      bodyPreview: JSON.stringify(body).substring(0, 500)
-    });
-
-    const events = parseWhatsAppMessage(body);
+    // Parse mensagens da plataforma detectada
+    const events = parsePlatformMessages(body);
 
     if (!events.length) {
-      logPlatformEvent('NO_EVENTS_FOUND', 'whatsapp', { 
+      logPlatformEvent('NO_EVENTS_FOUND', detectedPlatform, {
         body: JSON.stringify(body).substring(0, 1000),
-        object: body.object,
-        hasEntry: !!body.entry
+        detectedPlatform,
+        object: body.object
       });
       return NextResponse.json({ received: true, events: [] });
     }
-
-    logPlatformEvent('EVENTS_PARSED', 'whatsapp', {
-      eventCount: events.length,
-      userIds: events.map(e => e.platformUserId),
-      messageIds: events.map(e => e.platformMessageId),
-      platforms: events.map(e => e.platform)
-    });
 
     const supabase = await createServerSupabaseClient();
     const processedEvents = [];
 
     for (const event of events) {
       try {
-        logPlatformEvent('PROCESSING_EVENT', 'whatsapp', {
+        logPlatformEvent('PROCESSING_EVENT', event.platform, {
           platformUserId: event.platformUserId,
           platformMessageId: event.platformMessageId,
           textLength: event.text.length,
@@ -266,39 +277,11 @@ export async function POST(request: NextRequest) {
         // Processar mensagem
         const result = await processPlatformMessage(event);
 
-        logPlatformEvent('PROCESSING_RESULT', 'whatsapp', {
-          platformUserId: event.platformUserId,
-          platformMessageId: event.platformMessageId,
-          hasError: !!result.error,
-          hasResponse: !!result.response,
-          usedFallback: result.usedFallback,
-          fallbackReason: result.fallbackReason,
-          legalArea: result.lead?.legal_area,
-          leadStatus: result.lead?.lead_status
-        });
-
         if (result.error && !result.response) {
-          logPlatformEvent('PROCESSING_ERROR', 'whatsapp', {
+          logPlatformEvent('PROCESSING_ERROR', event.platform, {
             platformUserId: event.platformUserId,
             platformMessageId: event.platformMessageId,
             error: result.error
-          });
-          
-          // Mesmo com erro, tentar enviar fallback crítico
-          const criticalResponse = getCriticalFallbackResponse();
-          const sendResult = await sendPlatformResponse(
-            'whatsapp',
-            event.platformUserId,
-            criticalResponse
-          );
-          
-          processedEvents.push({
-            ...event,
-            error: true,
-            processed: false,
-            messageSent: sendResult.success,
-            usedFallback: true,
-            fallbackReason: 'CRITICAL_ERROR'
           });
           continue;
         }
@@ -334,19 +317,11 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Enviar resposta automática com fallback robusto
+        // Enviar resposta automática
         let messageSent = false;
         let sendError = '';
         
         if (result.response) {
-          logPlatformEvent('WHATSAPP_SEND_ATTEMPT', 'whatsapp', {
-            platformUserId: event.platformUserId,
-            platformMessageId: event.platformMessageId,
-            responseLength: result.response.length,
-            responsePreview: result.response.substring(0, 100),
-            usedFallback: result.usedFallback
-          });
-
           const sendResult = await sendPlatformResponse(
             event.platform,
             event.platformUserId,
@@ -355,21 +330,10 @@ export async function POST(request: NextRequest) {
           
           messageSent = sendResult.success;
           sendError = sendResult.error || '';
-          
-          // Se falhou o envio, tentar enviar fallback crítico
-          if (!messageSent && result.response) {
-            logPlatformEvent('SEND_FALLBACK_ATTEMPT', 'whatsapp', {
-              platformUserId: event.platformUserId,
-              originalError: sendError,
-              platformMessageId: event.platformMessageId,
-              error: sendResult.error,
-              responseLength: result.response.length
-            });
-          }
         }
 
         // Log do processamento completo
-        logPlatformEvent('PROCESSING_COMPLETE', 'whatsapp', {
+        logPlatformEvent('PROCESSING_COMPLETE', event.platform, {
           platformUserId: event.platformUserId,
           platformMessageId: event.platformMessageId,
           existing,
@@ -396,7 +360,7 @@ export async function POST(request: NextRequest) {
         });
 
       } catch (eventError) {
-        logPlatformEvent('EVENT_PROCESSING_ERROR', 'whatsapp', {
+        logPlatformEvent('EVENT_PROCESSING_ERROR', event.platform, {
           platformUserId: event.platformUserId,
           platformMessageId: event.platformMessageId,
           error: eventError instanceof Error ? eventError.message : 'unknown',
@@ -412,27 +376,29 @@ export async function POST(request: NextRequest) {
     }
 
     const successCount = processedEvents.filter(r => r.processed).length;
-    const errorCount = processedEvents.filter(r => (r as any).error).length;
-    const sentCount = processedEvents.filter(r => (r as any).messageSent).length;
+    const errorCount = processedEvents.filter(r => r.error).length;
+    const sentCount = processedEvents.filter(r => r.messageSent).length;
 
-    logPlatformEvent('WEBHOOK_PROCESSING_COMPLETE', 'whatsapp', {
+    logPlatformEvent('WEBHOOK_PROCESSING_COMPLETE', detectedPlatform, {
       totalEvents: events.length,
       successCount,
       errorCount,
       sentCount,
+      detectedPlatform,
       results: processedEvents.map(r => ({
         platformUserId: r.platformUserId,
         platformMessageId: r.platformMessageId,
         hasError: !!(r as any).error,
         processed: r.processed,
-        messageSent: (r as any).messageSent,
-        usedFallback: (r as any).usedFallback,
-        legalArea: (r as any).legalArea
+        messageSent: r.messageSent,
+        usedFallback: r.usedFallback,
+        legalArea: r.legalArea
       }))
     });
 
     return NextResponse.json({
       received: true,
+      platform: detectedPlatform,
       processed: processedEvents.length,
       successCount,
       errorCount,
@@ -447,7 +413,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    logPlatformEvent('FATAL_HANDLER_ERROR', 'whatsapp', {
+    logPlatformEvent('FATAL_HANDLER_ERROR', 'unknown', {
       error: error instanceof Error ? error.message : 'unknown',
       errorStack: error instanceof Error ? error.stack : undefined,
       method: 'POST',
