@@ -8,6 +8,7 @@ const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'noeminha_verify_2026';
 const APP_SECRET = process.env.META_APP_SECRET || '';
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const ENABLE_OPENAI = process.env.ENABLE_OPENAI === 'true';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -20,7 +21,7 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const ENABLE_COMMENT_AUTOREPLY = process.env.ENABLE_COMMENT_AUTOREPLY === 'true';
 const ENABLE_SIGNATURE_VALIDATION = process.env.ENABLE_SIGNATURE_VALIDATION !== 'false';
 
-const openai = OPENAI_API_KEY
+const openai = OPENAI_API_KEY && ENABLE_OPENAI
   ? new OpenAI({
       apiKey: OPENAI_API_KEY,
     })
@@ -502,17 +503,37 @@ function buildConversationMessages(
   ];
 }
 
+// Verificar se deve usar OpenAI
+function shouldUseOpenAI(): boolean {
+  if (!ENABLE_OPENAI) {
+    logEvent('OPENAI_DISABLED', { reason: 'ENABLE_OPENAI=false' });
+    return false;
+  }
+  
+  if (!openai) {
+    logEvent('OPENAI_SKIPPED', { reason: 'OPENAI_API_KEY não configurada' });
+    return false;
+  }
+  
+  logEvent('OPENAI_ENABLED', { model: OPENAI_MODEL });
+  return true;
+}
+
+// Gerar resposta com IA
 async function generateAIResponse(
   userText: string,
   area: LegalArea,
   analysis: LeadAnalysis,
   userId: string
 ) {
-  if (!openai) {
-    return fallbackResponse(area.name, analysis);
+  if (!shouldUseOpenAI()) {
+    const fallbackResponse = generateFallbackResponse(area.name, analysis);
+    return fallbackResponse;
   }
 
   try {
+    logEvent('OPENAI_REQUEST', { userId, area: area.name });
+
     const memory = getConversationMemory(userId);
     const messages = buildConversationMessages(
       userText,
@@ -520,15 +541,19 @@ async function generateAIResponse(
       memory
     );
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openai!.chat.completions.create({
       model: OPENAI_MODEL,
       messages,
       temperature: 0.5,
       max_tokens: 300,
     });
 
-    const text =
-      completion.choices?.[0]?.message?.content?.trim() || fallbackResponse(area.name, analysis);
+    const text = completion.choices?.[0]?.message?.content?.trim();
+    
+    if (!text) {
+      logEvent('OPENAI_FAILED_FALLBACK_USED', { userId, reason: 'EMPTY_RESPONSE' });
+      return generateFallbackResponse(area.name, analysis);
+    }
 
     const finalResponse = `${text}${buildAssistantCTA(area.name, analysis)}`;
 
@@ -537,13 +562,77 @@ async function generateAIResponse(
       { role: 'assistant', content: finalResponse },
     ]);
 
-    return finalResponse;
-  } catch (error) {
-    logEvent('OPENAI_ERROR', {
-      message: error instanceof Error ? error.message : 'unknown',
+    logEvent('OPENAI_SUCCESS', { 
+      userId, 
+      area: area.name, 
+      responseLength: finalResponse.length,
+      tokensUsed: completion.usage?.total_tokens || 0
     });
-    return fallbackResponse(area.name, analysis);
+
+    return finalResponse;
+
+  } catch (error: any) {
+    // Detectar tipos específicos de erro da OpenAI
+    let errorType = 'OPENAI_UNKNOWN_ERROR';
+
+    if (error.code === 'insufficient_quota') {
+      errorType = 'OPENAI_INSUFFICIENT_QUOTA';
+    } else if (error.code === 'rate_limit_exceeded') {
+      errorType = 'OPENAI_RATE_LIMIT';
+    } else if (error.code === 'invalid_api_key') {
+      errorType = 'OPENAI_INVALID_KEY';
+    } else if (error.code === 'model_not_found') {
+      errorType = 'OPENAI_MODEL_NOT_FOUND';
+    } else if (error.status === 429) {
+      errorType = 'OPENAI_RATE_LIMIT';
+    } else if (error.status === 401) {
+      errorType = 'OPENAI_UNAUTHORIZED';
+    }
+
+    logEvent('OPENAI_FAILED_FALLBACK_USED', { 
+      userId, 
+      errorType, 
+      errorMessage: error.message,
+      area: area.name 
+    });
+
+    return generateFallbackResponse(area.name, analysis);
   }
+}
+
+// Gerar resposta de fallback inteligente
+function generateFallbackResponse(area: LegalAreaName, analysis: LeadAnalysis): string {
+  logEvent('FALLBACK_USED', { area, urgency: analysis.urgency, wantsHuman: analysis.wantsHuman });
+  
+  const areaLabel =
+    area === 'previdenciario'
+      ? 'direito previdenciário'
+      : area === 'bancario'
+      ? 'direito bancário e consumidor'
+      : area === 'familia'
+      ? 'direito de família'
+      : 'questão jurídica';
+
+  const isHighIntent = analysis.wantsHuman || analysis.shouldSchedule || analysis.urgency === 'alta';
+  
+  if (isHighIntent) {
+    return `Olá! Sou a NoemIA, assistente da Advogada Noemia. Entendi que você precisa de atendimento sobre ${areaLabel} e já estou direcionando seu caso.
+
+Para atendimento imediato e personalizado, fale diretamente com a advogada:
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${getAreaLink(area)}
+
+Em breve entraremos em contato!`;
+  }
+
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia. Recebi sua mensagem sobre ${areaLabel}.
+
+Para te dar uma orientação segura e personalizada, o ideal é conversar diretamente com a advogada Noemia. Cada caso tem suas particularidades e merece atenção individual.
+
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${getAreaLink(area)}
+
+Estamos aguardando seu contato!`;
 }
 
 function fallbackResponse(area: LegalAreaName, analysis: LeadAnalysis) {
@@ -579,17 +668,26 @@ async function sendInstagramMessage(recipientId: string, messageText: string): P
 
     if (!response.ok) {
       const errorText = await response.text();
-      logEvent('GRAPH_API_SEND_ERROR', {
+      logEvent('INSTAGRAM_SEND_FAIL', {
+        recipientId,
         status: response.status,
-        body: errorText,
+        errorText,
+        messageLength: messageText.length
       });
       return false;
     }
 
+    logEvent('INSTAGRAM_SEND_SUCCESS', {
+      recipientId,
+      messageLength: messageText.length
+    });
+
     return true;
   } catch (error) {
-    logEvent('GRAPH_API_SEND_EXCEPTION', {
-      message: error instanceof Error ? error.message : 'unknown',
+    logEvent('INSTAGRAM_SEND_FAIL', {
+      recipientId,
+      error: error instanceof Error ? error.message : 'unknown',
+      messageLength: messageText.length
     });
     return false;
   }

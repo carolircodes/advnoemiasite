@@ -14,10 +14,11 @@ import {
 // Configurações
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const ENABLE_OPENAI = process.env.ENABLE_OPENAI === 'true';
 const PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://advnoemia.com.br';
 const WHATSAPP_URL = process.env.NOEMIA_WHATSAPP_URL || 'https://wa.me/5511999999999';
 
-const openai = OPENAI_API_KEY
+const openai = OPENAI_API_KEY && ENABLE_OPENAI
   ? new OpenAI({
       apiKey: OPENAI_API_KEY,
     })
@@ -156,7 +157,16 @@ function getWhatsAppFallbackResponse(area: string, analysis: any): string {
 
 // Função de fallback crítico (quando tudo falha)
 function getCriticalFallbackResponse(): string {
-  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.\n\nRecebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:\n\n📱 WhatsApp: ${WHATSAPP_URL}\n🌐 Site: ${PUBLIC_SITE_URL}\n\nEm breve entraremos em contato!`;
+  console.log('🚨 CRITICAL_FALLBACK: Usando resposta de emergência');
+  
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.
+
+Recebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:
+
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${PUBLIC_SITE_URL}
+
+Em breve entraremos em contato!`;
 }
 
 // Função de log específica para erros
@@ -191,6 +201,23 @@ function logSuccess(type: 'OPENAI_SUCCESS' | 'WHATSAPP_SEND_SUCCESS' | 'MESSAGE_
   console.log(`✅ ${type}:`, JSON.stringify(logEntry, null, 2));
 }
 
+// Verificar se deve usar OpenAI
+function shouldUseOpenAI(): boolean {
+  if (!ENABLE_OPENAI) {
+    console.log('🚫 OPENAI_DISABLED: ENABLE_OPENAI=false');
+    return false;
+  }
+  
+  if (!openai) {
+    console.log('🚫 OPENAI_SKIPPED: OPENAI_API_KEY não configurada');
+    return false;
+  }
+  
+  console.log('✅ OPENAI_ENABLED: Configurada e pronta para uso');
+  return true;
+}
+
+// Gerar resposta com IA
 async function generateAIResponse(
   userText: string,
   area: any,
@@ -198,26 +225,13 @@ async function generateAIResponse(
   userId: string,
   platform: Platform
 ): Promise<{ response: string; usedFallback: boolean; error?: string }> {
-  // Se não há OpenAI configurada, usar fallback imediatamente
-  if (!openai) {
-    logError('OPENAI_ERROR', {
-      platform,
-      userId,
-      error: 'OPENAI_NOT_CONFIGURED',
-      fallbackUsed: true,
-      context: { area: area.name, analysis }
-    });
-    
-    const fallbackResponse = getWhatsAppFallbackResponse(area.name, analysis);
-    return { response: fallbackResponse, usedFallback: true };
+  if (!shouldUseOpenAI()) {
+    const fallbackResponse = generateFallbackResponse(area.name, analysis, platform);
+    return { response: fallbackResponse, usedFallback: true, error: 'OPENAI_DISABLED' };
   }
 
   try {
-    logSuccess('OPENAI_REQUEST', {
-      platform,
-      userId,
-      context: { area: area.name, model: OPENAI_MODEL }
-    });
+    console.log('🤖 OPENAI_REQUEST: Processando com IA');
 
     const memory = getConversationMemory(userId);
     const messages = buildConversationMessages(
@@ -226,7 +240,7 @@ async function generateAIResponse(
       memory
     );
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openai!.chat.completions.create({
       model: OPENAI_MODEL,
       messages,
       temperature: 0.5,
@@ -236,16 +250,9 @@ async function generateAIResponse(
     const text = completion.choices?.[0]?.message?.content?.trim();
     
     if (!text) {
-      logError('OPENAI_ERROR', {
-        platform,
-        userId,
-        error: 'EMPTY_RESPONSE',
-        fallbackUsed: true,
-        context: { area: area.name, completion }
-      });
-      
-      const fallbackResponse = getWhatsAppFallbackResponse(area.name, analysis);
-      return { response: fallbackResponse, usedFallback: true };
+      console.log('⚠️ OPENAI_FAILED: Resposta vazia, usando fallback');
+      const fallbackResponse = generateFallbackResponse(area.name, analysis, platform);
+      return { response: fallbackResponse, usedFallback: true, error: 'EMPTY_RESPONSE' };
     }
 
     const finalResponse = `${text}${buildAssistantCTA(area.name, analysis, platform)}`;
@@ -255,22 +262,12 @@ async function generateAIResponse(
       { role: 'assistant', content: finalResponse },
     ]);
 
-    logSuccess('OPENAI_SUCCESS', {
-      platform,
-      userId,
-      context: { 
-        area: area.name, 
-        responseLength: finalResponse.length,
-        tokensUsed: completion.usage?.total_tokens || 0
-      }
-    });
-
+    console.log('✅ OPENAI_SUCCESS: Resposta gerada com sucesso');
     return { response: finalResponse, usedFallback: false };
 
   } catch (error: any) {
     // Detectar tipos específicos de erro da OpenAI
     let errorType = 'OPENAI_UNKNOWN_ERROR';
-    let shouldUseFallback = true;
 
     if (error.code === 'insufficient_quota') {
       errorType = 'OPENAI_INSUFFICIENT_QUOTA';
@@ -286,23 +283,47 @@ async function generateAIResponse(
       errorType = 'OPENAI_UNAUTHORIZED';
     }
 
-    logError('OPENAI_ERROR', {
-      platform,
-      userId,
-      error: errorType,
-      fallbackUsed: true,
-      context: { 
-        area: area.name, 
-        originalError: error.message,
-        code: error.code,
-        status: error.status
-      }
-    });
+    console.log(`🚨 OPENAI_FAILED: ${errorType} - ${error.message}`);
 
     // Sempre usar fallback em caso de erro
-    const fallbackResponse = getWhatsAppFallbackResponse(area.name, analysis);
+    const fallbackResponse = generateFallbackResponse(area.name, analysis, platform);
     return { response: fallbackResponse, usedFallback: true, error: errorType };
   }
+}
+
+// Gerar resposta de fallback inteligente
+function generateFallbackResponse(area: string, analysis: any, platform: Platform): string {
+  console.log(`🛡️ FALLBACK_USED: Área=${area}, Plataforma=${platform}`);
+  
+  const areaLabel =
+    area === 'previdenciario'
+      ? 'direito previdenciário'
+      : area === 'bancario'
+      ? 'direito bancário e consumidor'
+      : area === 'familia'
+      ? 'direito de família'
+      : 'questão jurídica';
+
+  const isHighIntent = analysis.wantsHuman || analysis.shouldSchedule || analysis.urgency === 'alta';
+  
+  if (isHighIntent) {
+    return `Olá! Sou a NoemIA, assistente da Advogada Noemia. Entendi que você precisa de atendimento sobre ${areaLabel} e já estou direcionando seu caso.
+
+Para atendimento imediato e personalizado, fale diretamente com a advogada:
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${PUBLIC_SITE_URL}
+
+Em breve entraremos em contato!`;
+  }
+
+  return `Olá! Sou a NoemIA, assistente da Advogada Noemia. Recebi sua mensagem sobre ${areaLabel}.
+
+Para te dar uma orientação segura e personalizada, o ideal é conversar diretamente com a advogada Noemia. Cada caso tem suas particularidades e merece atenção individual.
+
+📱 WhatsApp: ${WHATSAPP_URL}
+🌐 Site: ${PUBLIC_SITE_URL}
+
+Estamos aguardando seu contato!`;
 }
 
 function fallbackResponse(area: string, analysis: any) {
@@ -492,21 +513,19 @@ export async function sendPlatformResponse(
         const errorText = await response.text();
         const errorMsg = `Instagram API Error: ${response.status} - ${errorText}`;
         
-        logError('WHATSAPP_SEND_ERROR', {
-          platform: 'instagram',
+        logPlatformEvent('INSTAGRAM_SEND_FAIL', 'instagram', {
           userId: recipientId,
-          error: 'INSTAGRAM_SEND_FAILED',
-          fallbackUsed: false,
-          context: { status: response.status, errorText }
+          error: errorMsg,
+          status: response.status,
+          errorText
         });
         
         return { success: false, error: errorMsg };
       }
 
-      logSuccess('WHATSAPP_SEND_SUCCESS', {
-        platform: 'instagram',
+      logPlatformEvent('INSTAGRAM_SEND_SUCCESS', 'instagram', {
         userId: recipientId,
-        context: { messageLength: messageText.length }
+        messageLength: messageText.length
       });
       
       return { success: true };
@@ -519,12 +538,11 @@ export async function sendPlatformResponse(
       if (!phoneNumberId || !accessToken) {
         const errorMsg = 'WhatsApp API Error: Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN';
         
-        logError('WHATSAPP_SEND_ERROR', {
-          platform: 'whatsapp',
+        logPlatformEvent('WHATSAPP_SEND_FAIL', 'whatsapp', {
           userId: recipientId,
-          error: 'MISSING_CONFIG',
-          fallbackUsed: false,
-          context: { hasPhoneNumberId: !!phoneNumberId, hasAccessToken: !!accessToken }
+          error: errorMsg,
+          hasPhoneNumberId: !!phoneNumberId,
+          hasAccessToken: !!accessToken
         });
         
         return { success: false, error: errorMsg };
@@ -550,21 +568,21 @@ export async function sendPlatformResponse(
         const errorText = await response.text();
         const errorMsg = `WhatsApp API Error: ${response.status} - ${errorText}`;
         
-        logError('WHATSAPP_SEND_ERROR', {
-          platform: 'whatsapp',
+        logPlatformEvent('WHATSAPP_SEND_FAIL', 'whatsapp', {
           userId: recipientId,
-          error: 'WHATSAPP_SEND_FAILED',
-          fallbackUsed: false,
-          context: { status: response.status, errorText, messageLength: messageText.length }
+          error: errorMsg,
+          status: response.status,
+          errorText,
+          messageLength: messageText.length
         });
         
         return { success: false, error: errorMsg };
       }
 
-      logSuccess('WHATSAPP_SEND_SUCCESS', {
-        platform: 'whatsapp',
+      logPlatformEvent('WHATSAPP_SEND_SUCCESS', 'whatsapp', {
         userId: recipientId,
-        context: { messageLength: messageText.length, phoneNumberId }
+        messageLength: messageText.length,
+        phoneNumberId
       });
       
       return { success: true };
@@ -617,5 +635,30 @@ export function logPlatformEvent(eventType: string, platform: Platform, data?: a
     ...data
   };
   
-  console.log('PLATFORM_EVENT:', JSON.stringify(log, null, 2));
+  // Logs específicos com emojis para fácil visualização
+  switch (eventType) {
+    case 'OPENAI_ENABLED':
+      console.log('✅ OPENAI_ENABLED:', JSON.stringify(log, null, 2));
+      break;
+    case 'OPENAI_SKIPPED':
+      console.log('🚫 OPENAI_SKIPPED:', JSON.stringify(log, null, 2));
+      break;
+    case 'OPENAI_FAILED_FALLBACK_USED':
+      console.log('🛡️ OPENAI_FAILED_FALLBACK_USED:', JSON.stringify(log, null, 2));
+      break;
+    case 'WHATSAPP_SEND_SUCCESS':
+      console.log('📤 WHATSAPP_SEND_SUCCESS:', JSON.stringify(log, null, 2));
+      break;
+    case 'WHATSAPP_SEND_FAIL':
+      console.log('❌ WHATSAPP_SEND_FAIL:', JSON.stringify(log, null, 2));
+      break;
+    case 'INSTAGRAM_SEND_SUCCESS':
+      console.log('📤 INSTAGRAM_SEND_SUCCESS:', JSON.stringify(log, null, 2));
+      break;
+    case 'INSTAGRAM_SEND_FAIL':
+      console.log('❌ INSTAGRAM_SEND_FAIL:', JSON.stringify(log, null, 2));
+      break;
+    default:
+      console.log('PLATFORM_EVENT:', JSON.stringify(log, null, 2));
+  }
 }
