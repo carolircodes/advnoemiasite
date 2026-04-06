@@ -191,18 +191,53 @@ async function findOrCreateLead(
 
 // Handler principal do webhook
 export async function GET(request: NextRequest) {
-  const config = platformConfigs.whatsapp;
-  const mode = request.query["hub.mode"] as string;
-  const token = request.query["hub.verify_token"] as string;
-  const challenge = request.query["hub.challenge"] as string;
+  const url = new URL(request.url);
+  const mode = url.searchParams.get("hub.mode");
+  const token = url.searchParams.get("hub.verify_token");
+  const challenge = url.searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === config.verifyToken) {
-    logPlatformEvent('WEBHOOK_VERIFIED', 'whatsapp', { mode, token, challenge });
-    return new Response(challenge);
+  logPlatformEvent('WEBHOOK_VERIFICATION_ATTEMPT', 'whatsapp', {
+    mode,
+    token: token === process.env.WHATSAPP_VERIFY_TOKEN ? 'VALID' : 'INVALID',
+    tokenMatch: token === process.env.WHATSAPP_VERIFY_TOKEN,
+    hasChallenge: !!challenge,
+    url: request.url,
+    userAgent: request.headers.get('user-agent')
+  });
+
+  // Validar usando WHATSAPP_VERIFY_TOKEN
+  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    logPlatformEvent('WEBHOOK_VERIFICATION_SUCCESS', 'whatsapp', {
+      mode,
+      token: 'VALID',
+      challenge,
+      verifyToken: process.env.WHATSAPP_VERIFY_TOKEN ? 'SET' : 'MISSING'
+    });
+    
+    // Retornar o challenge como texto puro com status 200
+    return new Response(challenge, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain'
+      }
+    });
   }
 
-  logPlatformEvent('WEBHOOK_VERIFY_FAILED', 'whatsapp', { mode, token });
-  return new Response("Forbidden", { status: 403 });
+  logPlatformEvent('WEBHOOK_VERIFICATION_FAILED', 'whatsapp', {
+    mode,
+    token,
+    tokenMatch: token === process.env.WHATSAPP_VERIFY_TOKEN,
+    expectedToken: process.env.WHATSAPP_VERIFY_TOKEN,
+    hasChallenge: !!challenge,
+    reason: mode !== 'subscribe' ? 'Invalid mode' : 'Invalid token'
+  });
+
+  return new Response("Forbidden", { 
+    status: 403,
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  });
 }
 
 export async function POST(request: NextRequest) {
