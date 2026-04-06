@@ -19,11 +19,11 @@ function isUrgentLead(lead: Lead): boolean {
          lead.lead_status !== "cliente_ativo";
 }
 
-function isHotLeadNeedingHuman(lead: Lead): boolean {
-  return isValidLeadStatus(lead.lead_status) && 
-         lead.lead_status === "quente" && 
-         lead.wants_human === true && 
-         lead.lead_status !== "cliente_ativo";
+function isHotLead(lead: Lead): boolean {
+  return (
+    lead.lead_status === "quente" &&
+    lead.wants_human === true
+  );
 }
 
 function isReadyToSchedule(lead: Lead): boolean {
@@ -39,7 +39,9 @@ export function PrioridadesDoDia({ leads }: PrioridadesProps) {
   const urgentes = leads.filter(isUrgentLead);
   
   // Leads quentes que precisam de atenção humana - excluindo clientes ativos
-  const quentesSemHumano = leads.filter(isHotLeadNeedingHuman);
+  const quentesSemHumano = leads.filter(lead => 
+    isHotLead(lead) && lead.lead_status !== "cliente_ativo"
+  );
   
   // Leads prontos para agendar - excluindo urgentes e clientes ativos
   const prontosParaAgendar = leads.filter(isReadyToSchedule);
