@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 
 import { getNotificationEnv } from "../../../../../lib/config/env";
@@ -28,7 +30,8 @@ export async function POST(request: Request) {
   }
 
   const headerSecret =
-    request.headers.get("x-worker-secret") || getBearerToken(request.headers.get("authorization"));
+    request.headers.get("x-worker-secret") ||
+    getBearerToken(request.headers.get("authorization"));
 
   if (headerSecret !== notificationEnv.workerSecret) {
     return NextResponse.json(
