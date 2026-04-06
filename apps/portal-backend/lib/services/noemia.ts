@@ -19,6 +19,12 @@ function formatRateValue(value: number | null) {
 }
 
 function extractResponseText(payload: any) {
+  // Para API chat/completions
+  if (payload?.choices?.[0]?.message?.content) {
+    return payload.choices[0].message.content.trim();
+  }
+
+  // Para API responses (legado)
   if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
   }
@@ -274,36 +280,29 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     ]
   }));
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-4.1-mini",
-      input: [
+      model: env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [
         {
           role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: systemInstructions
-            }
-          ]
+          content: systemInstructions
         },
-        ...conversationHistory,
+        ...conversationHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content[0].text
+        })),
         {
           role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: input.message
-            }
-          ]
+          content: input.message
         }
       ],
-      max_output_tokens: effectiveAudience === "staff" ? 900 : 600
+      max_tokens: effectiveAudience === "staff" ? 900 : 600
     })
   });
 
