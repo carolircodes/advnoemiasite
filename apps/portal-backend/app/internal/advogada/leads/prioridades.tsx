@@ -27,11 +27,10 @@ function isHotLead(lead: Lead): boolean {
 }
 
 function isReadyToSchedule(lead: Lead): boolean {
-  return isValidLeadStatus(lead.lead_status) && 
-         isValidUrgency(lead.urgency) &&
-         lead.lead_status === "pronto_para_agendar" && 
-         lead.urgency !== "alta" && 
-         lead.lead_status !== "cliente_ativo";
+  return (
+    lead.lead_status === "pronto_para_agendar" &&
+    lead.urgency !== "alta"
+  );
 }
 
 export function PrioridadesDoDia({ leads }: PrioridadesProps) {
@@ -43,7 +42,7 @@ export function PrioridadesDoDia({ leads }: PrioridadesProps) {
     isHotLead(lead) && lead.lead_status !== "cliente_ativo"
   );
   
-  // Leads prontos para agendar - excluindo urgentes e clientes ativos
+  // Leads prontos para agendar - excluindo urgentes
   const prontosParaAgendar = leads.filter(isReadyToSchedule);
 
   const PriorityCard = ({ 
