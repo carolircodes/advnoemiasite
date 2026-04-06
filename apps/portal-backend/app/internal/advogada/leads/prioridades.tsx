@@ -1,26 +1,34 @@
 "use client";
 
-import { Lead } from "./page";
+import { Lead, PrioridadesProps } from "./types";
 
-interface PrioridadesProps {
-  leads: Lead[];
-}
+// Constantes para evitar comparações diretas
+const LEAD_STATUS = {
+  QUENTE: "quente" as const,
+  PRONTO_PARA_AGENDAR: "pronto_para_agendar" as const,
+  CLIENTE_ATIVO: "cliente_ativo" as const,
+  ALTA: "alta" as const
+} as const;
 
 export function PrioridadesDoDia({ leads }: PrioridadesProps) {
   // Leads urgentes (urgência alta)
-  const urgentes = leads.filter(lead => lead.urgency === "alta" && lead.lead_status !== "cliente_ativo");
+  const urgentes = leads.filter((lead: Lead) => 
+    lead.urgency === LEAD_STATUS.ALTA && 
+    lead.lead_status !== LEAD_STATUS.CLIENTE_ATIVO
+  );
   
   // Leads quentes que precisam de atenção humana
-  const quentesSemHumano = leads.filter(lead => 
-    lead.lead_status === "quente" && 
-    lead.wants_human && 
-    lead.lead_status !== "cliente_ativo"
+  const quentesSemHumano = leads.filter((lead: Lead) => 
+    lead.lead_status === LEAD_STATUS.QUENTE && 
+    lead.wants_human === true && 
+    lead.lead_status !== LEAD_STATUS.CLIENTE_ATIVO
   );
   
   // Leads prontos para agendar
-  const prontosParaAgendar = leads.filter(lead => 
-    lead.lead_status === "pronto_para_agendar" && 
-    lead.lead_status !== "cliente_ativo"
+  const prontosParaAgendar = leads.filter((lead: Lead) => 
+    lead.lead_status === LEAD_STATUS.PRONTO_PARA_AGENDAR && 
+    lead.urgency !== LEAD_STATUS.ALTA && 
+    lead.lead_status !== LEAD_STATUS.CLIENTE_ATIVO
   );
 
   const PriorityCard = ({ 

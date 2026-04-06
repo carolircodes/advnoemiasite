@@ -5,45 +5,19 @@ import Link from "next/link";
 import { AppFrame } from "@/components/app-frame";
 import { SectionCard } from "@/components/section-card";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
+import { 
+  Lead, 
+  Conversation, 
+  VisualConfig, 
+  AreaConfig, 
+  MetricCardProps, 
+  StatusBadgeProps, 
+  LeadTableRowProps 
+} from "./types";
 import { PrioridadesDoDia } from "./prioridades";
 
-// Tipos para os dados dos leads
-interface Lead {
-  id: string;
-  platform_user_id: string;
-  username: string | null;
-  legal_area: "previdenciario" | "bancario" | "familia" | "geral";
-  lead_status: "frio" | "curioso" | "interessado" | "quente" | "pronto_para_agendar" | "cliente_ativo" | "sem_aderencia";
-  funnel_stage: "contato_inicial" | "qualificacao" | "triagem" | "interesse" | "agendamento" | "cliente";
-  urgency: "baixa" | "media" | "alta";
-  last_message: string;
-  last_response: string;
-  wants_human: boolean;
-  should_schedule: boolean;
-  summary: string;
-  suggested_action: string;
-  first_contact_at: string;
-  last_contact_at: string;
-  conversation_count: number;
-  metadata?: Record<string, any>;
-}
-
-interface Conversation {
-  id: string;
-  platform_user_id: string;
-  username: string | null;
-  event_type: "message" | "comment" | "postback";
-  user_text: string;
-  ai_response: string;
-  legal_area: string;
-  lead_status: string;
-  funnel_stage: string;
-  urgency: string;
-  created_at: string;
-}
-
 // Configurações de visual
-const legalAreaConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
+const legalAreaConfig: Record<string, AreaConfig> = {
   previdenciario: {
     label: "Previdenciário",
     color: "#8B5CF6",
@@ -70,7 +44,7 @@ const legalAreaConfig: Record<string, { label: string; color: string; bgColor: s
   }
 };
 
-const leadStatusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+const leadStatusConfig: Record<string, VisualConfig> = {
   frio: { label: "Frio", color: "#9CA3AF", bgColor: "#F9FAFB" },
   curioso: { label: "Curioso", color: "#F59E0B", bgColor: "#FEF3C7" },
   interessado: { label: "Interessado", color: "#3B82F6", bgColor: "#EFF6FF" },
@@ -80,13 +54,13 @@ const leadStatusConfig: Record<string, { label: string; color: string; bgColor: 
   sem_aderencia: { label: "Sem Aderência", color: "#6B7280", bgColor: "#F9FAFB" }
 };
 
-const urgencyConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+const urgencyConfig: Record<string, VisualConfig> = {
   baixa: { label: "Baixa", color: "#10B981", bgColor: "#D1FAE5" },
   media: { label: "Média", color: "#F59E0B", bgColor: "#FEF3C7" },
   alta: { label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" }
 };
 
-const funnelStageConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+const funnelStageConfig: Record<string, VisualConfig> = {
   contato_inicial: { label: "Contato Inicial", color: "#9CA3AF", bgColor: "#F9FAFB" },
   qualificacao: { label: "Qualificação", color: "#F59E0B", bgColor: "#FEF3C7" },
   triagem: { label: "Triagem", color: "#3B82F6", bgColor: "#EFF6FF" },
@@ -96,14 +70,7 @@ const funnelStageConfig: Record<string, { label: string; color: string; bgColor:
 };
 
 // Componentes de UI Premium
-function MetricCard({ title, value, subtitle, color, icon, trend }: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  color: string;
-  icon: string;
-  trend?: { value: number; label: string };
-}) {
+function MetricCard({ title, value, subtitle, color, icon, trend }: MetricCardProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
       <div className="flex items-start justify-between">
@@ -126,7 +93,7 @@ function MetricCard({ title, value, subtitle, color, icon, trend }: {
   );
 }
 
-function StatusBadge({ config }: { config: { label: string; color: string; bgColor: string } }) {
+function StatusBadge({ config }: StatusBadgeProps) {
   return (
     <span
       className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
@@ -137,7 +104,7 @@ function StatusBadge({ config }: { config: { label: string; color: string; bgCol
   );
 }
 
-function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) => void }) {
+function LeadTableRow({ lead, onSelect }: LeadTableRowProps) {
   const areaConfig = legalAreaConfig[lead.legal_area];
   const statusConfig = leadStatusConfig[lead.lead_status];
   const urgencyStyle = urgencyConfig[lead.urgency];
