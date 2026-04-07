@@ -307,6 +307,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("=== WHATSAPP WEBHOOK POST RECEIVED ===");
   
+  const signature = request.headers.get("x-hub-signature-256");
+  const body = await request.text();
+  
+  // Registrar log temporário para debug
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/debug/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'WHATSAPP_POST_RECEIVED',
+        headers: Object.fromEntries(request.headers.entries()),
+        body: body.substring(0, 1000),
+        timestamp: new Date().toISOString()
+      })
+    });
+  } catch (e) {
+    console.log('Failed to log to debug endpoint:', e);
+  }
+  
   // Log de ambiente para debug
   logEvent('ENVIRONMENT_DEBUG', {
     WHATSAPP_VERIFY_TOKEN: !!VERIFY_TOKEN,
@@ -323,9 +342,6 @@ export async function POST(request: NextRequest) {
       META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN ? 'SET' : 'MISSING'
     }
   });
-
-  const signature = request.headers.get("x-hub-signature-256");
-  const body = await request.text();
 
   // LOG TEMPORÁRIO - Debug completo do POST
   console.log("=== WHATSAPP POST DEBUG ===");
