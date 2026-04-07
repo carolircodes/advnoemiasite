@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("🔥🔥🔥 NOVA VERSÃO DO WEBHOOK ATIVA 🔥🔥🔥");
   console.log("\n" + "=".repeat(80));
   console.log("🚀 INSTAGRAM WEBHOOK HIT - POST REQUEST RECEIVED");
   console.log("=".repeat(80));
@@ -144,11 +145,12 @@ export async function POST(request: NextRequest) {
 
   console.log("=== VALIDATING META SIGNATURE ===");
 
+  // NUNCA RETORNAR 403 NO POST - SEMPRE PROCESSAR
   if (!verifySignature(body, signature || "")) {
-    console.log("=== META SIGNATURE INVALID (IGNORED) ===");
+    console.log("=== META SIGNATURE INVALID (CONTINUANDO MESMO ASSIM) ===");
 
     logEvent(
-      "META_SIGNATURE_INVALID_BUT_IGNORED",
+      "META_SIGNATURE_INVALID_BUT_CONTINUE",
       {
         signature: signature ? `${signature.substring(0, 20)}...` : null,
       },
