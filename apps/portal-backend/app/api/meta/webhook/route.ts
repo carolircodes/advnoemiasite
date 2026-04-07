@@ -80,24 +80,17 @@ export async function GET(request: Request) {
   return new NextResponse("Forbidden", { status: 403 });
 }
 
-export async function POST(request: Request) {
-  console.log("=== META WEBHOOK POST RECEIVED ===");
-  
-  const signature = request.headers.get("x-hub-signature-256");
-  const body = await request.text();
-  
-  // LOG DIRETO PARA RASTREAMENTO
-  console.log("WEBHOOK_DEBUG_META_POST_RECEIVED", {
-    timestamp: new Date().toISOString(),
-    headers: Object.fromEntries(request.headers.entries()),
-    bodyLength: body.length,
-    bodyPreview: body.substring(0, 500),
-    signature: signature?.substring(0, 50) + '...'
-  });
-  
-  // Log de ambiente
-  logEvent('META_ENVIRONMENT_DEBUG', {
-    META_VERIFY_TOKEN: !!VERIFY_TOKEN,
+export async function POST(request: NextRequest) {
+  // LOGS MUITO VISÍVEIS NO INÍCIO - ANTES DE QUALQUER PARSING
+  console.log('\n' + '='.repeat(80));
+  console.log('🚀 INSTAGRAM WEBHOOK HIT - POST REQUEST RECEIVED');
+  console.log('='.repeat(80));
+  console.log('📅 Timestamp:', new Date().toISOString());
+  console.log('🌐 URL:', request.url);
+  console.log('🔑 Headers:', JSON.stringify(Object.fromEntries(request.headers.entries()), null, 2));
+  console.log('👤 User-Agent:', request.headers.get('user-agent'));
+  console.log('📍 IP Origin:', request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown');
+  console.log('='.repeat(80) + '\n');
     META_APP_SECRET: !!APP_SECRET,
     ALL_ENVS: {
       META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN ? 'SET' : 'MISSING',
