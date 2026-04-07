@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Configurações - usa META_VERIFY_TOKEN para unificar
-const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || "noeminha_verify_2026";
+// Configurações
+const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminha_verify_2026";
 
-// Função de log simples para debug
+// Função de log
 function logEvent(event: string, data?: any) {
-  console.log(`[${new Date().toISOString()}] WHATSAPP_WEBHOOK ${event}:`, data || '');
+  console.log(`[${new Date().toISOString()}] META_WEBHOOK ${event}:`, data || '');
 }
 
-// Handler GET para verificação do webhook WhatsApp
+// Handler GET para verificação do webhook
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("hub.mode");
@@ -23,17 +23,14 @@ export async function GET(request: NextRequest) {
     verifyToken: VERIFY_TOKEN ? 'SET' : 'MISSING'
   });
 
-  // Validar usando WHATSAPP_VERIFY_TOKEN
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
     logEvent('VERIFICATION_SUCCESS', {
       mode,
       token: 'VALID',
-      challenge,
-      verifyToken: VERIFY_TOKEN ? 'SET' : 'MISSING'
+      challenge
     });
     
-    // Retornar o challenge como texto puro com status 200
-    // EXATAMENTE como a Meta exige
+    // Retornar SOMENTE hub.challenge como texto puro
     return new Response(challenge, {
       status: 200,
       headers: {
@@ -77,40 +74,55 @@ export async function POST(request: NextRequest) {
       bodyPreview: JSON.stringify(body).substring(0, 500)
     });
 
-    // Verificar se é webhook do WhatsApp
-    if (body.object !== 'whatsapp_business_account') {
-      logEvent('INVALID_OBJECT', { object: body.object });
-      return NextResponse.json({ error: 'Invalid object' }, { status: 400 });
+    // Detectar plataforma
+    let platform = 'unknown';
+    if (body.object === 'instagram') {
+      platform = 'instagram';
+    } else if (body.object === 'whatsapp_business_account') {
+      platform = 'whatsapp';
     }
 
-    // Processar mensagens
+    logEvent('PLATFORM_DETECTED', { platform, object: body.object });
+
+    // Processar eventos
     const events = [];
     
-    for (const entry of body.entry || []) {
-      for (const change of entry.changes || []) {
-        if (change.field === 'messages' && change.value?.messages) {
-          for (const message of change.value.messages) {
-            // Mensagem do usuário (tem campo 'from')
-            if (message.type === 'text' && message.from) {
-              logEvent('MESSAGE_EXTRACTED', {
-                messageId: message.id,
-                from: message.from,
-                text: message.text?.body || '',
-                contactName: change.value.contacts?.[0]?.name?.formatted_name
-              });
-
+    if (platform === 'instagram' && body.entry) {
+      for (const entry of body.entry) {
+        if (entry.messaging) {
+          for (const messaging of entry.messaging) {
+            if (messaging.message?.text) {
               events.push({
-                platform: 'whatsapp',
-                platformUserId: message.from,
-                platformMessageId: message.id,
-                senderName: change.value.contacts?.[0]?.name?.formatted_name,
-                text: message.text?.body || '',
-                timestamp: message.timestamp || Date.now(),
-                metadata: {
-                  phone_number_id: change.value.metadata?.phone_number_id,
-                  display_phone_number: change.value.metadata?.display_phone_number
-                }
+                type: 'message',
+                platform: 'instagram',
+                sender: messaging.sender.id,
+                senderName: messaging.sender.name || null,
+                text: messaging.message.text,
+                messageId: messaging.message.mid,
+                timestamp: messaging.timestamp
               });
+            }
+          }
+        }
+      }
+    } else if (platform === 'whatsapp' && body.entry) {
+      for (const entry of body.entry) {
+        if (entry.changes) {
+          for (const change of entry.changes) {
+            if (change.field === 'messages' && change.value?.messages) {
+              for (const message of change.value.messages) {
+                if (message.type === 'text' && message.from) {
+                  events.push({
+                    type: 'message',
+                    platform: 'whatsapp',
+                    sender: message.from,
+                    senderName: change.value.contacts?.[0]?.name?.formatted_name || null,
+                    text: message.text?.body || '',
+                    messageId: message.id,
+                    timestamp: message.timestamp || Date.now()
+                  });
+                }
+              }
             }
           }
         }
@@ -119,12 +131,13 @@ export async function POST(request: NextRequest) {
 
     logEvent('EVENTS_PARSED', {
       eventCount: events.length,
-      userIds: events.map(e => e.platformUserId),
-      messageIds: events.map(e => e.platformMessageId)
+      platforms: [...new Set(events.map(e => e.platform))],
+      senders: events.map(e => e.sender)
     });
 
     if (!events.length) {
       logEvent('NO_EVENTS_FOUND', { 
+        object: body.object,
         body: JSON.stringify(body).substring(0, 1000)
       });
       return NextResponse.json({ received: true, events: [] });
@@ -136,32 +149,35 @@ export async function POST(request: NextRequest) {
     for (const event of events) {
       try {
         logEvent('PROCESSING_EVENT', {
-          platformUserId: event.platformUserId,
-          platformMessageId: event.platformMessageId,
+          platform: event.platform,
+          sender: event.sender,
+          messageId: event.messageId,
           textLength: event.text.length,
-          textPreview: event.text.substring(0, 100),
-          senderName: event.senderName
+          textPreview: event.text.substring(0, 100)
         });
 
-        // Gerar resposta simples por enquanto
+        // Gerar resposta simples
         const responseText = `Olá! Recebi sua mensagem: "${event.text}". Em breve entrarei em contato!`;
         
         logEvent('RESPONSE_GENERATED', {
-          platformUserId: event.platformUserId,
+          platform: event.platform,
+          sender: event.sender,
           responseLength: responseText.length,
           responsePreview: responseText.substring(0, 100)
         });
 
-        // TODO: Implementar envio real para WhatsApp API
+        // TODO: Implementar envio real
         logEvent('SEND_ATTEMPT', {
-          platformUserId: event.platformUserId,
+          platform: event.platform,
+          sender: event.sender,
           responseLength: responseText.length
         });
 
-        const messageSent = true; // Simulado por enquanto
+        const messageSent = true; // Simulado
         
         logEvent('SEND_SUCCESS', {
-          platformUserId: event.platformUserId,
+          platform: event.platform,
+          sender: event.sender,
           messageSent
         });
 
@@ -174,8 +190,9 @@ export async function POST(request: NextRequest) {
 
       } catch (eventError) {
         logEvent('EVENT_PROCESSING_ERROR', {
-          platformUserId: event.platformUserId,
-          platformMessageId: event.platformMessageId,
+          platform: event.platform,
+          sender: event.sender,
+          messageId: event.messageId,
           error: eventError instanceof Error ? eventError.message : 'unknown'
         });
 
