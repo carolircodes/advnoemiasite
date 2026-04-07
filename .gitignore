@@ -32,6 +32,19 @@ coverage/
 # Vercel
 .vercel
 
+# TypeScript cache
+*.tsbuildinfo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
 # Apps specific
 apps/portal-backend/node_modules/
 apps/portal-backend/.next/
