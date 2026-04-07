@@ -173,12 +173,24 @@ export async function POST(request: Request) {
                 timestamp: message.timestamp
               });
 
-              // TODO: Implementar resposta para Instagram
-              console.log("=== TODO: IMPLEMENT INSTAGRAM RESPONSE ===");
-              logEvent('INSTAGRAM_RESPONSE_NOT_IMPLEMENTED', {
+              // Resposta FIXA sem dependência de IA
+              const fixedResponse = "Olá! Recebi sua mensagem e já vou te ajudar.";
+              
+              console.log("=== SENDING FIXED INSTAGRAM RESPONSE ===");
+              console.log("RESPONSE TEXT:", fixedResponse);
+              console.log("=== TODO: IMPLEMENT INSTAGRAM API SEND ===");
+              
+              logEvent('INSTAGRAM_SENDING_FIXED_RESPONSE', {
                 messageId: message.id,
-                from: message.from?.id
+                from: message.from?.id,
+                fixedResponse: fixedResponse,
+                status: 'NOT_IMPLEMENTED_YET'
               });
+
+              // TODO: Implementar envio via Instagram Graph API
+              // Por agora, apenas log que a resposta foi preparada
+              console.log("=== INSTAGRAM RESPONSE PREPARED (NOT SENT) ===");
+              console.log("REASON: Instagram API send not implemented yet");
             }
           }
         }

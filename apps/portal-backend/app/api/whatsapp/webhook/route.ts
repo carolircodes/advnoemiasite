@@ -512,89 +512,41 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Gerar resposta inteligente com NoemIA
-async function generateIntelligentResponse(userMessage: string, phoneNumber: string): Promise<string> {
-  try {
-    // Tentar resposta com NoemIA primeiro
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/noemia/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'WhatsApp-Webhook/1.0'
-      },
-      body: JSON.stringify({
-        message: userMessage,
-        context: {
-          platform: 'whatsapp',
-          phoneNumber: phoneNumber,
-          source: 'webhook'
-        }
-      })
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const aiResponse = data.response || data.message;
-      
-      if (aiResponse) {
-        logEvent('NOEMIA_RESPONSE_SUCCESS', {
-          phoneNumber,
-          originalMessage: userMessage,
-          aiResponse: aiResponse.substring(0, 100) + '...'
-        });
-        return aiResponse;
-      }
-    }
-  } catch (error) {
-    logEvent('NOEMIA_RESPONSE_ERROR', {
-      phoneNumber,
-      error: error instanceof Error ? error.message : String(error)
-    }, 'warn');
-  }
-  
-  // Fallback inteligente baseado em contexto
-  const message = userMessage.toLowerCase().trim();
-  
-  // Detecção de intenções jurídicas
-  if (message.includes('aposentar') || message.includes('inss') || message.includes('benefício')) {
-    return `Entendo sua dúvida sobre aposentadoria/benefícios! 📋\n\nA Dra. Noemia Rosa é especialista em Direito Previdenciário e pode ajudar você a:\n\n✅ Analisar seu direito à aposentadoria\n✅ Revisar benefícios negados\n✅ Auxiliar em pedidos administrativos\n\n📞 Agende sua consulta: (85) 99999-9999\n🌐 Saiba mais: advnoemia.com.br/previdenciario`;
-  }
-  
-  if (message.includes('banco') || message.includes('empreéstimo') || message.includes('cobrança')) {
-    return `Problemas com banco? 🏦\n\nA Dra. Noemia Rosa atua em Direito Bancário para te ajudar com:\n\n✅ Negociação de dívidas\n✅ Revisão de contratos\n✅ Combate a cobranças abusivas\n✅ Cancelamento de serviços\n\n📞 Fale conosco: (85) 99999-9999\n🌐 Saiba mais: advnoemia.com.br/bancario`;
-  }
-  
-  if (message.includes('divórcio') || message.includes('pensão') || message.includes('guarda')) {
-    return `Questões de família? 👨‍👩‍👧‍👦\n\nA Dra. Noemia Rosa oferece acompanhamento em Direito de Família:\n\n✅ Divórcio consensual e litigioso\n✅ Guarda de menores\n✅ Pensão alimentícia\n✅ Partilha de bens\n\n📞 Agende sua consulta: (85) 99999-9999\n🌐 Saiba mais: advnoemia.com.br/familia`;
-  }
-  
-  // Resposta padrão com CTAs
-  return `Olá! Sou o assistente virtual da Advnoemia 🤖\n\nComo posso ajudar você hoje?\n\n🔹 Aposentadorias e benefícios\n🔹 Direito bancário\n🔹 Direito de família\n\n📞 Para consulta: (85) 99999-9999\n🌐 Site: advnoemia.com.br`;
-}
-
 // Processar mensagem de texto
 async function processTextMessage(messageInfo: any) {
+  console.log("=== PROCESSING TEXT MESSAGE (FIXED RESPONSE) ===");
+  console.log("FROM:", messageInfo.from);
+  console.log("CONTENT:", messageInfo.content);
+  console.log("TYPE:", messageInfo.type);
+
+  // Resposta automática FIXA sem dependência de IA
+  const fixedResponse = "Olá! Recebi sua mensagem e já vou te ajudar.";
+  
+  console.log("=== SENDING FIXED RESPONSE ===");
+  console.log("RESPONSE TEXT:", fixedResponse);
+  
   logEvent('PROCESS_TEXT_MESSAGE_START_DEBUG', {
     from: messageInfo.from,
     content: messageInfo.content,
-    type: messageInfo.type
+    type: messageInfo.type,
+    responseType: 'FIXED_NO_AI'
   });
-
-  // Resposta automática simples para teste
-  const simpleResponse = "Olá! Recebi sua mensagem e já vou te ajudar. 🤖\n\nEste é um teste automático do sistema.";
   
-  logEvent('PROCESS_TEXT_MESSAGE_RESPONSE_DEBUG', {
+  logEvent('SENDING_FIXED_RESPONSE', {
     from: messageInfo.from,
     originalContent: messageInfo.content,
-    simpleResponse: simpleResponse
+    fixedResponse: fixedResponse
   });
   
-  const sent = await sendWhatsAppResponse(messageInfo.from, simpleResponse);
+  const sent = await sendWhatsAppResponse(messageInfo.from, fixedResponse);
+  
+  console.log("=== FIXED RESPONSE RESULT ===");
+  console.log("SENT:", sent);
   
   logEvent('PROCESS_TEXT_MESSAGE_COMPLETE_DEBUG', {
     from: messageInfo.from,
     originalContent: messageInfo.content,
-    simpleResponse: simpleResponse,
+    fixedResponse: fixedResponse,
     responseSent: sent,
     timestamp: new Date().toISOString()
   });
