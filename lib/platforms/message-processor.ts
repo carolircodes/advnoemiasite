@@ -204,16 +204,16 @@ function logSuccess(type: 'OPENAI_SUCCESS' | 'WHATSAPP_SEND_SUCCESS' | 'MESSAGE_
 // Verificar se deve usar OpenAI
 function shouldUseOpenAI(): boolean {
   if (!ENABLE_OPENAI) {
-    logPlatformEvent('OPENAI_SKIPPED', 'unknown', { reason: 'ENABLE_OPENAI=false' });
+    logPlatformEvent('OPENAI_SKIPPED', 'unknown' as any, { reason: 'ENABLE_OPENAI=false' });
     return false;
   }
   
   if (!openai) {
-    logPlatformEvent('OPENAI_SKIPPED', 'unknown', { reason: 'OPENAI_API_KEY não configurada' });
+    logPlatformEvent('OPENAI_SKIPPED', 'unknown' as any, { reason: 'OPENAI_API_KEY não configurada' });
     return false;
   }
   
-  logPlatformEvent('OPENAI_ENABLED', 'unknown', { model: OPENAI_MODEL });
+  logPlatformEvent('OPENAI_ENABLED', 'unknown' as any, { model: OPENAI_MODEL });
   return true;
 }
 
@@ -355,8 +355,8 @@ Estamos aguardando seu contato!`;
 }
 
 // Função de fallback crítico (quando tudo falha)
-function getCriticalFallbackResponse(): string {
-  logPlatformEvent('CRITICAL_FALLBACK', 'unknown', {
+function getCriticalFallbackResponseV2(): string {
+  logPlatformEvent('CRITICAL_FALLBACK', 'unknown' as any, {
     reason: 'Todos os sistemas falharam'
   });
   

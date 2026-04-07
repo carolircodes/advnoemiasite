@@ -1,3 +1,5 @@
+import { ReactNode } from 'react';
+
 export const metadata = {
   title: 'Advnoemia',
   description: 'Advocacia especializada',
@@ -6,7 +8,7 @@ export const metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="pt-BR">
