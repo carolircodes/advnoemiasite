@@ -69,6 +69,7 @@ async function sendInstagramMessage(
     console.log("GRAPH_API_RESPONSE_TEXT:", responseText);
 
     if (!response.ok) {
+      console.log("INSTAGRAM_SEND_ERROR");
       logEvent(
         "INSTAGRAM_SEND_ERROR",
         {
@@ -82,6 +83,7 @@ async function sendInstagramMessage(
       return false;
     }
 
+    console.log("INSTAGRAM_MESSAGE_SENT");
     logEvent("INSTAGRAM_MESSAGE_SENT", {
       senderId,
       httpStatus: response.status,
@@ -116,7 +118,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔥 INSTAGRAM WEBHOOK POST RECEIVED");
+  console.log("INSTAGRAM_WEBHOOK_POST_RECEIVED");
 
   const body = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
@@ -124,9 +126,9 @@ export async function POST(request: NextRequest) {
   console.log("=== VALIDATING META SIGNATURE ===");
 
   if (!verifySignature(body, signature || "")) {
-    console.log("=== META SIGNATURE INVALID (IGNORED) ===");
+    console.log("SIGNATURE_INVALID_BUT_IGNORED");
     logEvent(
-      "META_SIGNATURE_INVALID_BUT_IGNORED",
+      "SIGNATURE_INVALID_BUT_IGNORED",
       {
         signature: signature ? `${signature.substring(0, 20)}...` : null,
       },
@@ -144,8 +146,12 @@ export async function POST(request: NextRequest) {
 
     if (data.object === "instagram") {
       for (const entry of data.entry || []) {
+        // Process entry.messaging format
         for (const messaging of entry.messaging || []) {
           if (messaging.message?.text && messaging.sender?.id) {
+            console.log("SENDER_ID_EXTRACTED:", messaging.sender.id);
+            console.log("MESSAGE_TEXT_EXTRACTED:", messaging.message.text);
+            
             await sendInstagramMessage(
               messaging.sender.id,
               "Olá! Recebi sua mensagem e já vou te ajudar."
@@ -153,12 +159,16 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Process entry.changes format
         for (const change of entry.changes || []) {
           if (change.field === "messages") {
             const messages = change.value?.messages || [];
 
             for (const message of messages) {
               if (message.text && message.from?.id) {
+                console.log("SENDER_ID_EXTRACTED:", message.from.id);
+                console.log("MESSAGE_TEXT_EXTRACTED:", message.text);
+                
                 await sendInstagramMessage(
                   message.from.id,
                   "Olá! Recebi sua mensagem e já vou te ajudar."
