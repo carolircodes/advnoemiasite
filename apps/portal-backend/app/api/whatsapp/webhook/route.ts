@@ -21,13 +21,30 @@ function logEvent(event: string, data?: any, level: 'info' | 'warn' | 'error' = 
 
 // Validar assinatura HMAC-SHA256
 function verifySignature(body: string, signature: string): boolean {
-  if (!signature) return false;
+  if (!signature) {
+    logEvent('SIGNATURE_MISSING', { 
+      hasAppSecret: !!APP_SECRET,
+      appSecretLength: APP_SECRET?.length || 0
+    }, 'error');
+    return false;
+  }
   
   const expectedSignature = `sha256=${createHmac('sha256', APP_SECRET)
     .update(body, 'utf8')
     .digest('hex')}`;
   
-  return signature === expectedSignature;
+  const isValid = signature === expectedSignature;
+  
+  logEvent('SIGNATURE_VALIDATION_DEBUG', {
+    received: signature?.substring(0, 50) + '...',
+    expected: expectedSignature?.substring(0, 50) + '...',
+    isValid,
+    appSecretSet: !!APP_SECRET,
+    appSecretLength: APP_SECRET?.length || 0,
+    bodyLength: body.length
+  });
+  
+  return isValid;
 }
 
 // Extrair informações da mensagem
@@ -42,7 +59,7 @@ function extractMessageInfo(message: any) {
     messageId: message.id || null,
     timestamp: message.timestamp || null,
     type: message.type || 'unknown',
-    content: null,
+    content: null as string | null,
     metadata: {}
   };
 
@@ -249,6 +266,23 @@ export async function GET(request: NextRequest) {
 
 // Handler POST para processamento de mensagens
 export async function POST(request: NextRequest) {
+  // Log de ambiente para debug
+  logEvent('ENVIRONMENT_DEBUG', {
+    WHATSAPP_VERIFY_TOKEN: !!VERIFY_TOKEN,
+    WHATSAPP_APP_SECRET: !!APP_SECRET,
+    WHATSAPP_ACCESS_TOKEN: !!ACCESS_TOKEN,
+    WHATSAPP_PHONE_NUMBER_ID: !!PHONE_NUMBER_ID,
+    NEXT_PUBLIC_APP_URL: !!process.env.NEXT_PUBLIC_APP_URL,
+    ALL_ENVS: {
+      WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ? 'SET' : 'MISSING',
+      WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET ? 'SET' : 'MISSING',
+      WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN ? 'SET' : 'MISSING',
+      WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID ? 'SET' : 'MISSING',
+      META_APP_SECRET: process.env.META_APP_SECRET ? 'SET' : 'MISSING',
+      META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN ? 'SET' : 'MISSING'
+    }
+  });
+
   const signature = request.headers.get("x-hub-signature-256");
   const body = await request.text();
 

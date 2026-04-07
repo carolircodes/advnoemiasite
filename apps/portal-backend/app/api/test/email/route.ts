@@ -1,4 +1,4 @@
-# TESTE DE EMAIL DIRETO - VALIDAÇÃO RESEND
+// TESTE DE EMAIL DIRETO - VALIDAÇÃO RESEND
 import { sendNotificationEmail } from "../../../../lib/notifications/email-delivery";
 
 export async function GET() {

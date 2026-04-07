@@ -33,7 +33,7 @@ async function callNoemiaAI(userMessage: string, phoneNumber: string) {
 }
 
 // Função de resposta inteligente
-export async function generateIntelligentResponse(userMessage: string, phoneNumber: string): Promise<string> {
+async function generateIntelligentResponse(userMessage: string, phoneNumber: string): Promise<string> {
   // Tentar resposta com NoemIA primeiro
   const aiResponse = await callNoemiaAI(userMessage, phoneNumber);
   
