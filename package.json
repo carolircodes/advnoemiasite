@@ -1,9 +1,13 @@
 {
-  "name": "advnoemia-site-estatico",
+  "name": "advnoemia-monorepo",
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "echo 'Site estático - não precisa de build'",
-    "start": "echo 'Site estático - pronto para deploy'"
-  }
+    "build": "cd apps/portal-backend && npm run build",
+    "start": "cd apps/portal-backend && npm start",
+    "dev": "cd apps/portal-backend && npm run dev"
+  },
+  "workspaces": [
+    "apps/portal-backend"
+  ]
 }

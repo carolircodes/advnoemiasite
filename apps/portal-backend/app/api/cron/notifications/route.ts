@@ -35,8 +35,13 @@ export async function GET(request: Request) {
 
   if (!notificationEnv.emailFrom) {
     return NextResponse.json(
-      { error: "EMAIL_FROM nao configurado. Defina a variavel de ambiente antes de processar notificacoes." },
-      { status: 500 }
+      { 
+        ok: false,
+        error: "EMAIL_FROM não configurado. Defina a variável de ambiente antes de processar notificações.",
+        provider: notificationEnv.provider,
+        recommendation: "Configure EMAIL_FROM e RESEND_API_KEY ou variáveis SMTP no painel do Vercel"
+      },
+      { status: 200 } // Mudar para 200 para não quebrar o cron
     );
   }
 
@@ -48,12 +53,15 @@ export async function GET(request: Request) {
   if (!providerReady) {
     return NextResponse.json(
       {
+        ok: false,
         error:
           notificationEnv.provider === "resend"
-            ? "RESEND_API_KEY nao configurado."
-            : "NOTIFICATIONS_SMTP_HOST ou NOTIFICATIONS_SMTP_PORT nao configurados."
+            ? "RESEND_API_KEY não configurado."
+            : "NOTIFICATIONS_SMTP_HOST ou NOTIFICATIONS_SMTP_PORT não configurados.",
+        provider: notificationEnv.provider,
+        recommendation: "Configure as variáveis de ambiente do provedor de email no painel do Vercel"
       },
-      { status: 500 }
+      { status: 200 } // Mudar para 200 para não quebrar o cron
     );
   }
 

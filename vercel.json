@@ -1,4 +1,9 @@
 {
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": "apps/portal-backend/.next",
+  "installCommand": "npm install",
+  "rootDirectory": "apps/portal-backend",
   "rewrites": [
     {
       "source": "/api/(.*)",
