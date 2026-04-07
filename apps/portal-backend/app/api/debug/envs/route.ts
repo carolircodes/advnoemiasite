@@ -22,11 +22,20 @@ export async function GET() {
       SUPABASE_SECRET_KEY: serverEnv.SUPABASE_SECRET_KEY ? 'CONFIGURED' : 'MISSING'
     };
 
+    // Verificar WhatsApp
+    const whatsappEnvs = {
+      WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN ? 'CONFIGURED' : 'MISSING',
+      WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID ? 'CONFIGURED' : 'MISSING',
+      WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ? 'CONFIGURED' : 'MISSING',
+      WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET ? 'CONFIGURED' : 'MISSING'
+    };
+
     return NextResponse.json({
       status: "debug",
       timestamp: new Date().toISOString(),
       critical: criticalEnvs,
       supabase: supabaseEnvs,
+      whatsapp: whatsappEnvs,
       notificationConfig: {
         provider: notificationEnv.provider,
         emailFrom: notificationEnv.emailFrom,
