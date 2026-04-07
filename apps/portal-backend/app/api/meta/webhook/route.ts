@@ -86,21 +86,14 @@ export async function POST(request: Request) {
   const signature = request.headers.get("x-hub-signature-256");
   const body = await request.text();
   
-  // Registrar log temporário para debug
-  try {
-    await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/debug/logs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: 'META_POST_RECEIVED',
-        headers: Object.fromEntries(request.headers.entries()),
-        body: body.substring(0, 1000),
-        timestamp: new Date().toISOString()
-      })
-    });
-  } catch (e) {
-    console.log('Failed to log to debug endpoint:', e);
-  }
+  // LOG DIRETO PARA RASTREAMENTO
+  console.log("WEBHOOK_DEBUG_META_POST_RECEIVED", {
+    timestamp: new Date().toISOString(),
+    headers: Object.fromEntries(request.headers.entries()),
+    bodyLength: body.length,
+    bodyPreview: body.substring(0, 500),
+    signature: signature?.substring(0, 50) + '...'
+  });
   
   // Log de ambiente
   logEvent('META_ENVIRONMENT_DEBUG', {
