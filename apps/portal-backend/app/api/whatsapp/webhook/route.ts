@@ -139,42 +139,32 @@ function extractMessageInfo(message: any) {
 
 // Enviar resposta via WhatsApp API
 async function sendWhatsAppResponse(to: string, message: string) {
-  console.log("=== SENDING WHATSAPP RESPONSE ===");
+  console.log("=== RESPONSE_ATTEMPT ===");
   console.log("TO:", to);
-  console.log("MESSAGE:", message.substring(0, 100) + '...');
+  console.log("MESSAGE:", message);
   
   logEvent('RESPONSE_ATTEMPT', {
     to,
-    message: message.substring(0, 100) + '...',
+    message,
     hasAccessToken: !!ACCESS_TOKEN,
     hasPhoneNumberId: !!PHONE_NUMBER_ID
   });
 
-  logEvent('SEND_RESPONSE_START_DEBUG', {
+  logEvent('RESPONSE_PAYLOAD', {
     to,
-    message: message.substring(0, 100) + '...',
-    hasAccessToken: !!ACCESS_TOKEN,
-    hasPhoneNumberId: !!PHONE_NUMBER_ID,
-    accessTokenPreview: ACCESS_TOKEN?.substring(0, 20) + '...',
-    phoneNumberId: PHONE_NUMBER_ID
+    message,
+    messageType: 'text'
   });
 
   if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-    console.log("=== MISSING CREDENTIALS ===");
+    console.log("=== RESPONSE_ERROR - MISSING CREDENTIALS ===");
     console.log("ACCESS TOKEN EXISTS:", !!ACCESS_TOKEN);
     console.log("PHONE NUMBER ID EXISTS:", !!PHONE_NUMBER_ID);
     
-    logEvent('SEND_RESPONSE_CREDS_ERROR', { 
+    logEvent('RESPONSE_ERROR', { 
       error: 'WhatsApp API credentials not configured',
       hasAccessToken: !!ACCESS_TOKEN,
-      hasPhoneNumberId: !!PHONE_NUMBER_ID,
-      allEnvs: {
-        WHATSAPP_ACCESS_TOKEN: !!process.env.WHATSAPP_ACCESS_TOKEN,
-        WHATSAPP_PHONE_NUMBER_ID: !!process.env.WHATSAPP_PHONE_NUMBER_ID,
-        WHATSAPP_VERIFY_TOKEN: !!process.env.WHATSAPP_VERIFY_TOKEN,
-        WHATSAPP_APP_SECRET: !!process.env.WHATSAPP_APP_SECRET,
-        NEXT_PUBLIC_APP_URL: !!process.env.NEXT_PUBLIC_APP_URL
-      }
+      hasPhoneNumberId: !!PHONE_NUMBER_ID
     }, 'error');
     return false;
   }
@@ -182,13 +172,14 @@ async function sendWhatsAppResponse(to: string, message: string) {
   try {
     const sendUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
     
-    console.log("=== SENDING TO META API ===");
+    console.log("=== RESPONSE_META_REQUEST ===");
     console.log("URL:", sendUrl);
     console.log("PHONE NUMBER ID:", PHONE_NUMBER_ID);
     
-    logEvent('SEND_RESPONSE_URL_DEBUG', {
+    logEvent('RESPONSE_META_REQUEST', {
       url: sendUrl,
-      phoneNumberId: PHONE_NUMBER_ID
+      phoneNumberId: PHONE_NUMBER_ID,
+      accessTokenPreview: ACCESS_TOKEN?.substring(0, 20) + '...'
     });
     
     const payload = {
@@ -200,16 +191,16 @@ async function sendWhatsAppResponse(to: string, message: string) {
       }
     };
 
-    console.log("=== PAYLOAD ===");
+    console.log("=== RESPONSE_PAYLOAD_SENT ===");
     console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
 
-    logEvent('SEND_RESPONSE_PAYLOAD_DEBUG', {
+    logEvent('RESPONSE_PAYLOAD_SENT', {
       payload,
       to,
       messageLength: message.length
     });
 
-    console.log("=== MAKING HTTP REQUEST ===");
+    console.log("=== RESPONSE_HTTP_CALL ===");
     const response = await fetch(sendUrl, {
       method: "POST",
       headers: {
@@ -219,60 +210,61 @@ async function sendWhatsAppResponse(to: string, message: string) {
       body: JSON.stringify(payload)
     });
 
-    console.log("=== HTTP RESPONSE ===");
-    console.log("STATUS:", response.status);
-    console.log("OK:", response.ok);
-    console.log("STATUS TEXT:", response.statusText);
+    console.log("=== RESPONSE_META_STATUS ===");
+    console.log("HTTP STATUS:", response.status);
+    console.log("HTTP OK:", response.ok);
+    console.log("HTTP STATUS TEXT:", response.statusText);
 
-    logEvent('SEND_RESPONSE_API_DEBUG', {
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
+    logEvent('RESPONSE_META_STATUS', {
+      httpStatus: response.status,
+      httpOk: response.ok,
+      httpStatusText: response.statusText
     });
 
     const data = await response.json();
 
-    console.log("=== RESPONSE DATA ===");
-    console.log("RESPONSE:", JSON.stringify(data, null, 2));
+    console.log("=== RESPONSE_META_BODY ===");
+    console.log("META RESPONSE:", JSON.stringify(data, null, 2));
 
-    logEvent('SEND_RESPONSE_DATA_DEBUG', {
-      responseData: data,
-      success: response.ok
+    logEvent('RESPONSE_META_BODY', {
+      metaResponse: data,
+      httpStatus: response.status
     });
 
     if (!response.ok) {
-      console.log("=== SEND RESPONSE ERROR ===");
-      logEvent('SEND_RESPONSE_ERROR', { 
-        error: data,
+      console.log("=== RESPONSE_ERROR - META REJECTED ===");
+      logEvent('RESPONSE_ERROR', { 
+        error: 'Meta API rejected request',
+        metaResponse: data,
+        httpStatus: response.status,
         to,
-        message,
-        httpStatus: response.status
+        message
       }, 'error');
       return false;
     }
 
-    console.log("=== SEND RESPONSE SUCCESS ===");
+    console.log("=== RESPONSE_SUCCESS ===");
     console.log("MESSAGE ID:", data.messages?.[0]?.id);
     
     logEvent('RESPONSE_SUCCESS', { 
       messageId: data.messages?.[0]?.id,
       to,
-      message: message.substring(0, 50) + '...'
+      message,
+      metaResponse: data
     });
 
     return true;
   } catch (error) {
-    console.log("=== SEND RESPONSE EXCEPTION ===");
+    console.log("=== RESPONSE_EXCEPTION ===");
     console.log("ERROR:", error instanceof Error ? error.message : String(error));
-    console.log("STACK:", error instanceof Error ? error.stack : null);
     
-    logEvent('RESPONSE_ERROR', { 
+    logEvent('RESPONSE_EXCEPTION', { 
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : null,
       to,
-      message: message.substring(0, 50) + '...'
+      message
     }, 'error');
+    
     return false;
   }
 }
