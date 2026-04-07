@@ -1,15 +1,21 @@
+import Header from '@/components/site/header';
+import Hero from '@/components/site/hero';
+import QuickAccess from '@/components/site/quick-access';
+import About from '@/components/site/about';
+import PracticeAreas from '@/components/site/practice-areas';
+import ProcessFlow from '@/components/site/process-flow';
+import Footer from '@/components/site/footer';
+
 export default function Home() {
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>🚀 Advnoemia Site</h1>
-      <p>Next.js App Router is working!</p>
-      <div style={{ marginTop: '20px' }}>
-        <h3>API Test Links:</h3>
-        <ul>
-          <li><a href="/api/test" target="_blank">/api/test</a></li>
-          <li><a href="/api/whatsapp/webhook" target="_blank">/api/whatsapp/webhook</a></li>
-        </ul>
-      </div>
+    <div className="min-h-screen bg-white">
+      <Header />
+      <Hero />
+      <QuickAccess />
+      <About />
+      <PracticeAreas />
+      <ProcessFlow />
+      <Footer />
     </div>
   );
 }

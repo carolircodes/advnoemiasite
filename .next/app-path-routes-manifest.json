@@ -1,0 +1,8 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/test/route": "/api/test",
+  "/api/whatsapp/webhook/route": "/api/whatsapp/webhook",
+  "/api/meta/webhook/route": "/api/meta/webhook",
+  "/api/cron/notifications/route": "/api/cron/notifications",
+  "/page": "/"
+}

@@ -1,1 +1,8 @@
-{}
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/test/route": "app/api/test/route.js",
+  "/api/whatsapp/webhook/route": "app/api/whatsapp/webhook/route.js",
+  "/api/meta/webhook/route": "app/api/meta/webhook/route.js",
+  "/api/cron/notifications/route": "app/api/cron/notifications/route.js",
+  "/page": "app/page.js"
+}
