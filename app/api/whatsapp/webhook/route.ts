@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Função de fallback crítico (quando tudo falha)
-function getCriticalFallbackResponse(): string {
-  const PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://advnoemia.com.br';
-  const WHATSAPP_URL = process.env.NOEMIA_WHATSAPP_URL || 'https://wa.me/5511999999999';
-  
-  return `Olá! Sou a NoemIA, assistente da Advogada Noemia.
-
-Recebi sua mensagem e já estou encaminhando para análise. Para atendimento imediato, fale diretamente com a advogada:
-
-📱 WhatsApp: ${WHATSAPP_URL}
-🌐 Site: ${PUBLIC_SITE_URL}
-
-Em breve entraremos em contato!`;
-}
-
 // Função de log simples para debug
 function logEvent(event: string, data?: any) {
   console.log(`[${new Date().toISOString()}] WHATSAPP_WEBHOOK ${event}:`, data || '');
@@ -159,8 +144,8 @@ export async function POST(request: NextRequest) {
           senderName: event.senderName
         });
 
-        // Gerar resposta (usando fallback por enquanto)
-        const responseText = getCriticalFallbackResponse();
+        // Gerar resposta simples por enquanto
+        const responseText = `Olá! Recebi sua mensagem: "${event.text}". Em breve entrarei em contato!`;
         
         logEvent('RESPONSE_GENERATED', {
           platformUserId: event.platformUserId,
@@ -168,13 +153,12 @@ export async function POST(request: NextRequest) {
           responsePreview: responseText.substring(0, 100)
         });
 
-        // Enviar resposta para WhatsApp
+        // TODO: Implementar envio real para WhatsApp API
         logEvent('SEND_ATTEMPT', {
           platformUserId: event.platformUserId,
           responseLength: responseText.length
         });
 
-        // TODO: Implementar envio real para WhatsApp API
         const messageSent = true; // Simulado por enquanto
         
         logEvent('SEND_SUCCESS', {
