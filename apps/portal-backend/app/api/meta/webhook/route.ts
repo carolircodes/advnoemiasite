@@ -4,6 +4,7 @@ import { createHmac } from "crypto";
 // Configurações
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminha_verify_2026";
 const APP_SECRET = process.env.META_APP_SECRET || "noeminha_app_secret_2026";
+const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 
 // Função de log estruturado
 function logEvent(
@@ -51,6 +52,80 @@ function verifySignature(body: string, signature: string): boolean {
   });
 
   return isValid;
+}
+
+// Função para enviar mensagem para Instagram Direct
+async function sendInstagramMessage(senderId: string, messageText: string): Promise<boolean> {
+  try {
+    if (!INSTAGRAM_ACCESS_TOKEN) {
+      console.log("❌ INSTAGRAM_ACCESS_TOKEN não configurado");
+      logEvent("INSTAGRAM_TOKEN_MISSING", { senderId }, "error");
+      return false;
+    }
+
+    console.log("📩 Respondendo usuário:", senderId);
+    console.log("📝 Mensagem:", messageText);
+    
+    const apiUrl = `https://graph.facebook.com/v19.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
+    
+    const payload = {
+      recipient: { id: senderId },
+      message: { text: messageText }
+    };
+
+    console.log("🌐 Enviando para Graph API:", apiUrl);
+    console.log("📦 Payload:", JSON.stringify(payload, null, 2));
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseText = await response.text();
+    let responseData;
+    
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      responseData = { rawResponse: responseText };
+    }
+
+    console.log("📊 Resposta Graph API:", {
+      status: response.status,
+      statusText: response.statusText,
+      data: responseData
+    });
+
+    if (response.ok) {
+      console.log("✅ Mensagem enviada com sucesso para:", senderId);
+      logEvent("INSTAGRAM_MESSAGE_SENT", {
+        senderId,
+        messageId: responseData.message_id,
+        responseStatus: response.status
+      });
+      return true;
+    } else {
+      console.log("❌ Erro ao enviar mensagem:", responseData);
+      logEvent("INSTAGRAM_SEND_ERROR", {
+        senderId,
+        error: responseData.error?.message || "Unknown error",
+        errorCode: responseData.error?.code,
+        responseStatus: response.status
+      }, "error");
+      return false;
+    }
+  } catch (error) {
+    console.log("💥 Exceção ao enviar mensagem:", error);
+    logEvent("INSTAGRAM_SEND_EXCEPTION", {
+      senderId,
+      error: error instanceof Error ? error.message : "unknown",
+      stack: error instanceof Error ? error.stack : undefined
+    }, "error");
+    return false;
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -190,7 +265,50 @@ export async function POST(request: NextRequest) {
         console.log("=== PROCESSING INSTAGRAM ENTRY ===");
         console.log("ENTRY ID:", entry.id);
         console.log("CHANGES COUNT:", entry.changes?.length || 0);
+        console.log("MESSAGING COUNT:", entry.messaging?.length || 0);
 
+        // Processar formato entry.messaging (estrutura clássica)
+        for (const messaging of entry.messaging || []) {
+          console.log("=== PROCESSING INSTAGRAM MESSAGING ===");
+          console.log("SENDER:", messaging.sender?.id);
+          console.log("MESSAGE TEXT:", messaging.message?.text);
+
+          if (messaging.message?.text && messaging.sender?.id) {
+            console.log("=== INSTAGRAM MESSAGING MESSAGE FOUND ===");
+            
+            logEvent("INSTAGRAM_MESSAGING_MESSAGE_PARSED", {
+              from: messaging.sender.id,
+              messageId: messaging.message.mid,
+              content: messaging.message.text,
+              timestamp: messaging.timestamp,
+            });
+
+            const fixedResponse = "Olá! Recebi sua mensagem e já vou te ajudar.";
+            
+            console.log(" Respondendo usuário (messaging):", messaging.sender.id);
+            const messageSent = await sendInstagramMessage(messaging.sender.id, fixedResponse);
+            
+            if (messageSent) {
+              console.log(" Resposta automática enviada com sucesso (messaging)");
+              logEvent("INSTAGRAM_AUTO_REPLY_SUCCESS", {
+                messageId: messaging.message.mid,
+                senderId: messaging.sender.id,
+                responseText: fixedResponse,
+                source: "messaging"
+              });
+            } else {
+              console.log(" Falha ao enviar resposta automática (messaging)");
+              logEvent("INSTAGRAM_AUTO_REPLY_FAILED", {
+                messageId: messaging.message.mid,
+                senderId: messaging.sender.id,
+                responseText: fixedResponse,
+                source: "messaging"
+              }, "error");
+            }
+          }
+        }
+
+        // Processar formato entry.changes (estrutura mais comum)
         for (const change of entry.changes || []) {
           console.log("=== PROCESSING INSTAGRAM CHANGE ===");
           console.log("FIELD:", change.field);
@@ -216,20 +334,33 @@ export async function POST(request: NextRequest) {
 
               const fixedResponse =
                 "Olá! Recebi sua mensagem e já vou te ajudar.";
-
-              console.log("=== SENDING FIXED INSTAGRAM RESPONSE ===");
-              console.log("RESPONSE TEXT:", fixedResponse);
-              console.log("=== TODO: IMPLEMENT INSTAGRAM API SEND ===");
-
-              logEvent("INSTAGRAM_SENDING_FIXED_RESPONSE", {
-                messageId: message.id,
-                from: message.from?.id,
-                fixedResponse,
-                status: "NOT_IMPLEMENTED_YET",
-              });
-
-              console.log("=== INSTAGRAM RESPONSE PREPARED (NOT SENT) ===");
-              console.log("REASON: Instagram API send not implemented yet");
+              
+              // Enviar resposta automática via Graph API
+              if (message.from?.id) {
+                const messageSent = await sendInstagramMessage(message.from.id, fixedResponse);
+                
+                if (messageSent) {
+                  console.log("✅ Resposta automática enviada com sucesso");
+                  logEvent("INSTAGRAM_AUTO_REPLY_SUCCESS", {
+                    messageId: message.id,
+                    senderId: message.from.id,
+                    responseText: fixedResponse
+                  });
+                } else {
+                  console.log("❌ Falha ao enviar resposta automática");
+                  logEvent("INSTAGRAM_AUTO_REPLY_FAILED", {
+                    messageId: message.id,
+                    senderId: message.from.id,
+                    responseText: fixedResponse
+                  }, "error");
+                }
+              } else {
+                console.log("⚠️ Mensagem sem sender.id - não foi possível responder");
+                logEvent("INSTAGRAM_NO_SENDER_ID", {
+                  messageId: message.id,
+                  messageData: message
+                }, "warn");
+              }
             }
           }
         }
