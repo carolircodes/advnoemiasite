@@ -11,5 +11,6 @@
       "path": "/api/cron/notifications",
       "schedule": "*/5 * * * *"
     }
-  ]
+  ],
+  "domains": ["advnoemia.com.br"]
 }

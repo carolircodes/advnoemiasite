@@ -1,0 +1,13 @@
+{
+  "name": "advnoemia-site-estatico",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'Site estático - não precisa de build'",
+    "start": "npx serve -s . -l 3000",
+    "dev": "npx serve -s . -l 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.6"
+  }
+}
