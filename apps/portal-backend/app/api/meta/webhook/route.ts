@@ -64,6 +64,7 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
   try {
     // 🔍 VERIFICAÇÃO DE TOKEN
     console.log("🔍 VERIFICANDO INSTAGRAM_ACCESS_TOKEN:");
+    console.log("TOKEN_EXISTS:", !!INSTAGRAM_ACCESS_TOKEN);
     console.log("   - Token existe:", !!INSTAGRAM_ACCESS_TOKEN);
     console.log("   - Token length:", INSTAGRAM_ACCESS_TOKEN?.length || 0);
     console.log("   - Token prefix:", INSTAGRAM_ACCESS_TOKEN?.substring(0, 10) + "...");
@@ -91,6 +92,8 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
 
     // 🔍 DADOS DO ENVIO
     console.log("🔍 DADOS DO ENVIO:");
+    console.log("SENDER_ID_EXTRACTED:", senderId);
+    console.log("MESSAGE_TEXT_EXTRACTED:", messageText);
     console.log("   - Sender ID:", senderId);
     console.log("   - Message Text:", messageText);
     console.log("   - Message Length:", messageText.length);
@@ -112,6 +115,7 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
     console.log("   - Body:", JSON.stringify(payload, null, 2));
 
     console.log("🚀 EXECUTANDO FETCH PARA GRAPH API...");
+    console.log("ABOUT_TO_SEND_INSTAGRAM_MESSAGE: true");
     const startTime = Date.now();
 
     const response = await fetch(apiUrl, {
@@ -126,6 +130,7 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
     const duration = endTime - startTime;
 
     console.log("🔍 RESPOSTA HTTP RECEBIDA:");
+    console.log("GRAPH_API_STATUS:", response.status);
     console.log("   - Status:", response.status);
     console.log("   - Status Text:", response.statusText);
     console.log("   - OK:", response.ok);
@@ -134,6 +139,7 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
 
     console.log("🔍 LENDO BODY DA RESPOSTA...");
     const responseText = await response.text();
+    console.log("GRAPH_API_RESPONSE_TEXT:", responseText);
     console.log("   - Response Text Length:", responseText.length);
     console.log("   - Response Text (raw):", responseText);
 
@@ -382,6 +388,8 @@ export async function POST(request: NextRequest) {
 
           if (messaging.message?.text && messaging.sender?.id) {
             console.log("\n MENSAGEM DETECTADA (MESSAGING) ");
+            console.log("SENDER_ID_EXTRACTED (messaging):", messaging.sender.id);
+            console.log("MESSAGE_TEXT_EXTRACTED (messaging):", messaging.message.text);
             console.log(" DADOS COMPLETS DA MENSAGEM:");
             console.log("   - Sender ID:", messaging.sender.id);
             console.log("   - Message Text:", messaging.message.text);
@@ -446,15 +454,17 @@ export async function POST(request: NextRequest) {
               console.log("CONTENT:", message.text || "NO TEXT");
 
               if (message.text && message.from?.id) {
-                console.log("\n🎯🎯🎯 MENSAGEM DETECTADA (CHANGES) 🎯🎯🎯");
-                console.log("🔍 DADOS COMPLETOS DA MENSAGEM:");
+                console.log("\n MENSAGEM DETECTADA (CHANGES) ");
+                console.log("SENDER_ID_EXTRACTED (changes):", message.from.id);
+                console.log("MESSAGE_TEXT_EXTRACTED (changes):", message.text);
+                console.log(" DADOS COMPLETOS DA MENSAGEM:");
                 console.log("   - From ID:", message.from.id);
                 console.log("   - From Username:", message.from.username || 'No username');
                 console.log("   - Message Text:", message.text);
                 console.log("   - Message ID:", message.id);
                 console.log("   - Timestamp:", message.timestamp);
                 console.log("   - Message Type:", message.type);
-                console.log("🎯 INICIANDO PROCESSAMENTO PARA RESPOSTA AUTOMÁTICA...\n");
+                console.log(" INICIANDO PROCESSAMENTO PARA RESPOSTA AUTOMÁTICA...\n");
                 
                 logEvent("INSTAGRAM_MESSAGE_PARSED", {
                   from: message.from.id,
