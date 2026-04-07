@@ -15,23 +15,37 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
     logEvent('SEND_INSTAGRAM_START', {
       senderId,
       messageLength: messageText.length,
-      hasToken: !!INSTAGRAM_ACCESS_TOKEN
+      hasToken: !!INSTAGRAM_ACCESS_TOKEN,
+      tokenLength: INSTAGRAM_ACCESS_TOKEN?.length || 0,
+      tokenPrefix: INSTAGRAM_ACCESS_TOKEN?.substring(0, 10) + '...'
     });
 
     if (!INSTAGRAM_ACCESS_TOKEN) {
       logEvent('SEND_INSTAGRAM_ERROR', {
         error: 'INSTAGRAM_ACCESS_TOKEN missing',
-        senderId
+        senderId,
+        envVars: Object.keys(process.env).filter(k => k.includes('INSTAGRAM'))
       });
       return false;
     }
 
+    // Endpoint correto para Instagram Messaging API
     const apiUrl = 'https://graph.facebook.com/v18.0/me/messages';
     
     const payload = {
       recipient: { id: senderId },
       message: { text: messageText }
     };
+
+    logEvent('SEND_INSTAGRAM_API_CALL', {
+      apiUrl,
+      method: 'POST',
+      payload,
+      headers: {
+        'Authorization': `Bearer ${INSTAGRAM_ACCESS_TOKEN.substring(0, 10)}...`,
+        'Content-Type': 'application/json'
+      }
+    });
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -42,13 +56,30 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
       body: JSON.stringify(payload)
     });
 
-    const responseData = await response.json();
+    const responseText = await response.text();
+    let responseData;
+
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      responseData = { rawResponse: responseText };
+    }
+
+    logEvent('SEND_INSTAGRAM_RESPONSE', {
+      senderId,
+      httpStatus: response.status,
+      httpStatusText: response.statusText,
+      responseHeaders: Object.fromEntries(response.headers.entries()),
+      responseData,
+      responseText: responseText.substring(0, 500)
+    });
 
     if (response.ok) {
       logEvent('SEND_INSTAGRAM_SUCCESS', {
         senderId,
         messageId: responseData.message_id,
-        responseStatus: response.status
+        responseStatus: response.status,
+        responseData
       });
       return true;
     } else {
@@ -56,8 +87,11 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
         senderId,
         error: responseData.error?.message || 'Unknown error',
         errorCode: responseData.error?.code,
+        errorType: responseData.error?.type,
         responseStatus: response.status,
-        responseData
+        responseStatusText: response.statusText,
+        responseData,
+        fullResponse: responseText
       });
       return false;
     }
@@ -66,7 +100,8 @@ async function sendInstagramMessage(senderId: string, messageText: string): Prom
     logEvent('SEND_INSTAGRAM_EXCEPTION', {
       senderId,
       error: error instanceof Error ? error.message : 'unknown',
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      errorType: typeof error
     });
     return false;
   }
@@ -138,6 +173,13 @@ export async function POST(request: NextRequest) {
       bodyPreview: JSON.stringify(body).substring(0, 500)
     });
 
+    // Log completo do payload para debug
+    logEvent('FULL_PAYLOAD_DEBUG', {
+      fullBody: body,
+      bodyString: JSON.stringify(body, null, 2),
+      headers: Object.fromEntries(request.headers.entries())
+    });
+
     // Detectar plataforma
     let platform = 'unknown';
     if (body.object === 'instagram') {
@@ -152,9 +194,57 @@ export async function POST(request: NextRequest) {
     const events = [];
     
     if (platform === 'instagram' && body.entry) {
+      logEvent('PROCESSING_INSTAGRAM_ENTRIES', {
+        entryCount: body.entry.length,
+        entries: body.entry.map(entry => ({
+          id: entry.id,
+          time: entry.time,
+          hasMessaging: !!entry.messaging,
+          hasChanges: !!entry.changes,
+          hasStandby: !!entry.standby,
+          entryKeys: Object.keys(entry)
+        }))
+      });
+
       for (const entry of body.entry) {
+        logEvent('PROCESSING_INSTAGRAM_ENTRY', {
+          entryId: entry.id,
+          entryTime: entry.time,
+          entryStructure: Object.keys(entry),
+          hasMessaging: !!entry.messaging,
+          messagingCount: entry.messaging?.length || 0,
+          hasChanges: !!entry.changes,
+          changesCount: entry.changes?.length || 0
+        });
+
         if (entry.messaging) {
+          logEvent('FOUND_MESSAGING_OBJECT', {
+            messagingCount: entry.messaging.length,
+            messagingStructure: entry.messaging.map(m => ({
+              sender: m.sender,
+              recipient: m.recipient,
+              timestamp: m.timestamp,
+              hasMessage: !!m.message,
+              hasPostback: !!m.postback,
+              hasRead: !!m.read,
+              hasDelivery: !!m.delivery,
+              messageKeys: m.message ? Object.keys(m.message) : []
+            }))
+          });
+
           for (const messaging of entry.messaging) {
+            logEvent('PROCESSING_MESSAGING_ITEM', {
+              senderId: messaging.sender?.id,
+              senderName: messaging.sender?.name,
+              recipientId: messaging.recipient?.id,
+              timestamp: messaging.timestamp,
+              hasMessageText: !!messaging.message?.text,
+              messageText: messaging.message?.text,
+              messageId: messaging.message?.mid,
+              messageType: messaging.message?.type,
+              fullMessaging: messaging
+            });
+
             if (messaging.message?.text) {
               events.push({
                 type: 'message',
@@ -165,8 +255,94 @@ export async function POST(request: NextRequest) {
                 messageId: messaging.message.mid,
                 timestamp: messaging.timestamp
               });
+
+              logEvent('INSTAGRAM_MESSAGE_EXTRACTED', {
+                senderId: messaging.sender.id,
+                text: messaging.message.text,
+                messageId: messaging.message.mid
+              });
             }
           }
+        } else if (entry.changes) {
+          logEvent('FOUND_CHANGES_OBJECT', {
+            changesCount: entry.changes.length,
+            changesStructure: entry.changes.map((c: any) => ({
+              field: c.field,
+              value: c.value,
+              hasMessages: !!c.value?.messages,
+              hasContacts: !!c.value?.contacts
+            }))
+          });
+
+          // Processar estrutura CHANGES (mais comum recentemente)
+          for (const change of entry.changes) {
+            logEvent('PROCESSING_CHANGE', {
+              field: change.field,
+              hasMessages: !!change.value?.messages,
+              messagesCount: change.value?.messages?.length || 0
+            });
+
+            if (change.field === 'messages' && change.value?.messages) {
+              for (const message of change.value.messages) {
+                if (message.type === 'text' && message.from) {
+                  events.push({
+                    type: 'message',
+                    platform: 'instagram',
+                    sender: message.from.id,
+                    senderName: change.value.contacts?.[0]?.display_name || message.from.username || null,
+                    text: message.text || '',
+                    messageId: message.id,
+                    timestamp: message.timestamp || Date.now()
+                  });
+
+                  logEvent('INSTAGRAM_MESSAGE_FROM_CHANGES', {
+                    senderId: message.from.id,
+                    senderName: change.value.contacts?.[0]?.display_name || message.from.username,
+                    text: message.text,
+                    messageId: message.id
+                  });
+                }
+              }
+            }
+          }
+        } else if (entry.standby) {
+          logEvent('FOUND_STANDBY_OBJECT', {
+            standbyCount: entry.standby.length,
+            standbyStructure: entry.standby.map((s: any) => ({
+              sender: s.sender,
+              recipient: s.recipient,
+              timestamp: s.timestamp,
+              hasMessage: !!s.message
+            }))
+          });
+
+          // Processar estrutura STANDBY
+          for (const standby of entry.standby) {
+            if (standby.message?.text && standby.sender?.id) {
+              events.push({
+                type: 'message',
+                platform: 'instagram',
+                sender: standby.sender.id,
+                senderName: standby.sender.name || null,
+                text: standby.message.text,
+                messageId: standby.message.mid,
+                timestamp: standby.timestamp
+              });
+
+              logEvent('INSTAGRAM_MESSAGE_FROM_STANDBY', {
+                senderId: standby.sender.id,
+                senderName: standby.sender.name,
+                text: standby.message.text,
+                messageId: standby.message.mid
+              });
+            }
+          }
+        } else {
+          logEvent('NO_RECOGNIZED_STRUCTURE', {
+            entryId: entry.id,
+            entryKeys: Object.keys(entry),
+            availableStructures: ['messaging', 'changes', 'standby']
+          });
         }
       }
     } else if (platform === 'whatsapp' && body.entry) {
