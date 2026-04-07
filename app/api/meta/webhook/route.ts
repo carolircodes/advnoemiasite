@@ -2,10 +2,74 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Configurações
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminha_verify_2026";
+const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 
 // Função de log
 function logEvent(event: string, data?: any) {
   console.log(`[${new Date().toISOString()}] META_WEBHOOK ${event}:`, data || '');
+}
+
+// Função para enviar mensagem para Instagram Direct
+async function sendInstagramMessage(senderId: string, messageText: string): Promise<boolean> {
+  try {
+    logEvent('SEND_INSTAGRAM_START', {
+      senderId,
+      messageLength: messageText.length,
+      hasToken: !!INSTAGRAM_ACCESS_TOKEN
+    });
+
+    if (!INSTAGRAM_ACCESS_TOKEN) {
+      logEvent('SEND_INSTAGRAM_ERROR', {
+        error: 'INSTAGRAM_ACCESS_TOKEN missing',
+        senderId
+      });
+      return false;
+    }
+
+    const apiUrl = 'https://graph.facebook.com/v18.0/me/messages';
+    
+    const payload = {
+      recipient: { id: senderId },
+      message: { text: messageText }
+    };
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${INSTAGRAM_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseData = await response.json();
+
+    if (response.ok) {
+      logEvent('SEND_INSTAGRAM_SUCCESS', {
+        senderId,
+        messageId: responseData.message_id,
+        responseStatus: response.status
+      });
+      return true;
+    } else {
+      logEvent('SEND_INSTAGRAM_ERROR', {
+        senderId,
+        error: responseData.error?.message || 'Unknown error',
+        errorCode: responseData.error?.code,
+        responseStatus: response.status,
+        responseData
+      });
+      return false;
+    }
+
+  } catch (error) {
+    logEvent('SEND_INSTAGRAM_EXCEPTION', {
+      senderId,
+      error: error instanceof Error ? error.message : 'unknown',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    return false;
+  }
 }
 
 // Handler GET para verificação do webhook
@@ -166,20 +230,31 @@ export async function POST(request: NextRequest) {
           responsePreview: responseText.substring(0, 100)
         });
 
-        // TODO: Implementar envio real
-        logEvent('SEND_ATTEMPT', {
-          platform: event.platform,
-          sender: event.sender,
-          responseLength: responseText.length
-        });
-
-        const messageSent = true; // Simulado
+        // Enviar resposta real para Instagram
+        let messageSent = false;
         
-        logEvent('SEND_SUCCESS', {
-          platform: event.platform,
-          sender: event.sender,
-          messageSent
-        });
+        if (event.platform === 'instagram') {
+          messageSent = await sendInstagramMessage(event.sender, responseText);
+        } else {
+          logEvent('SEND_SKIP', {
+            platform: event.platform,
+            reason: 'Only Instagram auto-reply implemented'
+          });
+        }
+
+        if (messageSent) {
+          logEvent('SEND_SUCCESS', {
+            platform: event.platform,
+            sender: event.sender,
+            messageSent
+          });
+        } else {
+          logEvent('SEND_FAILED', {
+            platform: event.platform,
+            sender: event.sender,
+            messageSent
+          });
+        }
 
         processedEvents.push({
           ...event,
