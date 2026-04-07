@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog Jurídico | Noêmia Paixão Advocacia</title>
+  <meta name="description" content="Conteúdo jurídico com clareza e responsabilidade para orientar decisões em temas previdenciários, bancários, familiares e cíveis." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta name="theme-color" content="#f6f1e8" />
+  <link rel="canonical" href="https://advnoemia.com.br/blog.html" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:title" content="Blog Jurídico | Noêmia Paixão Advocacia" />
+  <meta property="og:description" content="Artigos jurídicos para orientar com clareza, estratégia e responsabilidade antes de decisões importantes." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://advnoemia.com.br/mae.jpeg" />
+  <meta property="og:url" content="https://advnoemia.com.br/blog.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Blog Jurídico | Noêmia Paixão Advocacia" />
+  <meta name="twitter:description" content="Artigos jurídicos para orientar com clareza, estratégia e responsabilidade antes de decisões importantes." />
+  <meta name="twitter:image" content="https://advnoemia.com.br/mae.jpeg" />
+  <link rel="icon" href="logo.png" type="image/png" />
+  <link rel="stylesheet" href="assets/css/internal-pages.css" />
+  <link rel="stylesheet" href="assets/css/design-system.css" />
+  <link rel="stylesheet" href="assets/css/contact-capture.css" />
+  <link rel="stylesheet" href="assets/css/premium-system.css" />
+
+  <style>
+    /* Especificidades da página de blog */
+    .blog-hero::before {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(234, 215, 175, 0.15), transparent 0 24%),
+        radial-gradient(circle at 82% 14%, rgba(181, 141, 73, 0.18), transparent 0 18%),
+        linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0));
+    }
+
+    .blog-hero::after {
+      background: radial-gradient(circle, rgba(181,141,73,0.15) 0%, rgba(181,141,73,0) 68%);
+    }
+
+    .blog-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    .blog-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .blog-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+    }
+
+    .blog-card-image {
+      height: 200px;
+      background: linear-gradient(135deg, var(--gold-soft), var(--surface));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--gold);
+    }
+
+    .blog-card-content {
+      padding: 1.5rem;
+    }
+
+    .blog-card-category {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: var(--gold-soft);
+      color: var(--ink);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+
+    .blog-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      line-height: 1.3;
+      color: var(--ink);
+      margin-bottom: 0.75rem;
+    }
+
+    .blog-card p {
+      color: var(--ink-soft);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .blog-card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+    }
+
+    .blog-card-date {
+      font-weight: 500;
+    }
+
+    .blog-card-read-time {
+      opacity: 0.7;
+    }
+
+    .blog-categories {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 2rem 0;
+    }
+
+    .category-filter {
+      padding: 0.5rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .category-filter:hover,
+    .category-filter.active {
+      background: var(--gold);
+      color: white;
+      border-color: var(--gold);
+    }
+
+    .blog-search {
+      max-width: 500px;
+      margin: 0 auto 3rem;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 1rem 1.5rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(181, 141, 73, 0.1);
+    }
+
+    .blog-featured {
+      margin-bottom: 4rem;
+    }
+
+    .featured-card {
+      background: var(--surface-strong);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      min-height: 400px;
+    }
+
+    .featured-image {
+      background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: var(--font-display);
+      font-size: 3rem;
+    }
+
+    .featured-content {
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .featured-content .eyebrow {
+      margin-bottom: 1rem;
+    }
+
+    .featured-content h2 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      line-height: 1.2;
+      color: var(--ink);
+      margin-bottom: 1rem;
+    }
+
+    .featured-content p {
+      color: var(--ink-soft);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .blog-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      
+      .featured-card {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+      
+      .featured-image {
+        height: 200px;
+      }
+      
+      .featured-content {
+        padding: 2rem;
+      }
+      
+      .featured-content h2 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="header">
+      <div class="header-content">
+        <a class="brand" href="index.html" aria-label="Página inicial">
+          <div class="brand-mark">
+            <img src="logo.png" alt="Logo Noêmia Paixão Advocacia" />
+          </div>
+          <div class="brand-copy">
+            <strong>Noêmia Paixão Advocacia</strong>
+            <small>Blog Jurídico</small>
+          </div>
+        </a>
+
+        <button class="menu-toggle" type="button" aria-label="Abrir menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <nav class="nav-menu" id="blogMenu">
+          <a href="index.html">Home</a>
+          <a href="blog.html" class="is-active">Blog</a>
+          <a href="triagem.html">Triagem</a>
+          <a href="https://portal.advnoemia.com.br/portal/login">Área reservada</a>
+        </nav>
+
+        <div class="nav-actions">
+          <a class="btn btn-secondary" href="index.html">Página inicial</a>
+          <a class="btn btn-primary" href="triagem.html">Falar com especialista</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="internal-hero blog-hero">
+        <div class="internal-hero-grid">
+          <div class="internal-hero-copy">
+            <span class="eyebrow">Conteúdo Jurídico</span>
+            <h1>Artigos para orientar suas decisões jurídicas com clareza e responsabilidade.</h1>
+            <p>
+              Conteúdo elaborado pela Dra. Noêmia Paixão para ajudar você a entender melhor seus direitos 
+              e tomar decisões mais informadas em temas previdenciários, de consumo, família e civis.
+            </p>
+          </div>
+          <div class="internal-hero-visual">
+            <div class="card">
+              <h3>Navegue por área</h3>
+              <div class="blog-categories">
+                <button class="category-filter active">Todos</button>
+                <button class="category-filter">Previdenciário</button>
+                <button class="category-filter">Consumidor</button>
+                <button class="category-filter">Família</button>
+                <button class="category-filter">Civil</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container">
+          <div class="blog-search">
+            <input type="search" class="search-input" placeholder="Buscar artigos..." />
+          </div>
+
+          <div class="blog-featured">
+            <div class="featured-card">
+              <div class="featured-image">
+                📋
+              </div>
+              <div class="featured-content">
+                <span class="eyebrow">Artigo em Destaque</span>
+                <h2>Como funciona a revisão da aposentadoria por INSS</h2>
+                <p>
+                  Entenda os critérios, prazos e documentos necessários para solicitar a revisão do seu benefício 
+                  e garantir que você receba o valor correto a que tem direito.
+                </p>
+                <div class="btn-group">
+                  <a href="#" class="btn btn-primary">Ler artigo completo</a>
+                  <a href="triagem.html?area=previdenciario" class="btn btn-secondary">Falar com especialista</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="blog-grid">
+            <article class="blog-card">
+              <div class="blog-card-image">
+                👵
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Previdenciário</span>
+                <h3>Aposentadoria especial: quem tem direito e como solicitar</h3>
+                <p>
+                  Trabalhadores expostos a agentes nocivos podem ter direito à aposentadoria com tempo reduzido. 
+                  Veja os requisitos e o passo a passo para solicitar.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">15 de março de 2026</span>
+                  <span class="blog-card-read-time">5 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                💳
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Consumidor</span>
+                <h3>Desconto indevido em conta: o que fazer e como reaver</h3>
+                <p>
+                  Cobranças não autorizadas no seu extrato bancário? Saiba como identificar, contestar 
+                  e reaver valores descontados indevidamente.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">12 de março de 2026</span>
+                  <span class="blog-card-read-time">4 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                👨‍👩‍👧‍👦
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Família</span>
+                <h3>Guarda compartilhada: direitos e deveres dos pais</h3>
+                <p>
+                  A guarda compartilhada vem se tornando a regra no Brasil. Entenda como funciona, 
+                  quais são os critérios e os direitos e deveres envolvidos.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">10 de março de 2026</span>
+                  <span class="blog-card-read-time">6 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                📝
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Civil</span>
+                <h3>Contrato de aluguel: principais cláusulas e cuidados</h3>
+                <p>
+                  Antes de assinar um contrato de locação, conheça os pontos essenciais que merecem 
+                  atenção para evitar problemas futuros.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">8 de março de 2026</span>
+                  <span class="blog-card-read-time">5 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                🏦
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Consumidor</span>
+                <h3>Negativação indevida: como limpar o nome</h3>
+                <p>
+                  Ser negativado injustamente pode causar grandes prejuízos. Saiba como identificar 
+                  a irregularidade e os procedimentos para limpar seu nome.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">5 de março de 2026</span>
+                  <span class="blog-card-read-time">7 min de leitura</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="blog-card">
+              <div class="blog-card-image">
+                💰
+              </div>
+              <div class="blog-card-content">
+                <span class="blog-card-category">Previdenciário</span>
+                <h3>BPC/LOAS: quem tem direito e como solicitar</h3>
+                <p>
+                  O Benefício de Prestação Continuada é um direito fundamental para pessoas em situação 
+                  de vulnerabilidade. Entenda os requisitos e o processo de solicitação.
+                </p>
+                <div class="blog-card-meta">
+                  <span class="blog-card-date">3 de março de 2026</span>
+                  <span class="blog-card-read-time">6 min de leitura</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>Noêmia Paixão Advocacia</h3>
+          <p>Atendimento jurídico estratégico com clareza, técnica e organização para casos previdenciários, bancários, familiares e cíveis.</p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Áreas de Atuação</h3>
+          <p><a href="direito-previdenciario.html">Direito Previdenciário</a></p>
+          <p><a href="direito-consumidor-bancario.html">Direito do Consumidor e Bancário</a></p>
+          <p><a href="direito-familia.html">Direito de Família</a></p>
+          <p><a href="direito-civil.html">Direito Civil</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Links Úteis</h3>
+          <p><a href="blog.html">Blog Jurídico</a></p>
+          <p><a href="triagem.html">Triagem Inicial</a></p>
+          <p><a href="https://portal.advnoemia.com.br/portal/login">Área do Cliente</a></p>
+          <p><a href="https://portal.advnoemia.com.br/documentos">Documentos</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h3>Contato</h3>
+          <p>Natal/RN - Atendimento Online</p>
+          <p>OAB/RN 3939</p>
+          <p><a href="triagem.html">Agende sua triagem</a></p>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <div>© 2026 • Noêmia Paixão Advocacia • Todos os direitos reservados • OAB/RN 3939.</div>
+        <div class="footer-links">
+          <a href="blog.html">Blog</a>
+          <a href="https://portal.advnoemia.com.br/portal/login">Área do cliente</a>
+          <a href="https://portal.advnoemia.com.br/documentos">Documentos</a>
+          <a href="https://portal.advnoemia.com.br/agenda">Agenda</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="assets/js/premium-system.js"></script>
+  <script src="assets/js/contact-capture.js"></script>
+
+  <script>
+    // Menu toggle functionality
+    document.querySelector('.menu-toggle').addEventListener('click', function() {
+      document.querySelector('.nav-menu').classList.toggle('active');
+    });
+
+    // Category filter functionality
+    document.querySelectorAll('.category-filter').forEach(filter => {
+      filter.addEventListener('click', function() {
+        document.querySelectorAll('.category-filter').forEach(f => f.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

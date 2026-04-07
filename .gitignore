@@ -4,4 +4,3 @@ apps/portal-backend/.env.local
 apps/portal-backend/.env
 npm-debug.log*
 
-node_modules
