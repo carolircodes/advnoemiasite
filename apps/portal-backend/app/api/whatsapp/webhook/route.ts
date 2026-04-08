@@ -379,6 +379,15 @@ async function processTextMessage(messageInfo: any) {
     console.log('CONTENT:', messageInfo.content);
     console.log('LENGTH:', messageInfo.content?.length || 0);
     
+    // Detectar padrão específico da mensagem
+    const isAposentadoriaAutismo = messageInfo.content?.toLowerCase().includes('aposentadoria') && 
+                                      messageInfo.content?.toLowerCase().includes('autismo');
+    const isSegundaMensagem = messageInfo.content?.toLowerCase().includes('entendi') && 
+                                messageInfo.content?.toLowerCase().includes('começou');
+    
+    console.log('WHATSAPP_FLOW_BRANCH: ', isAposentadoriaAutismo ? 'aposentadoria_autismo_pattern' : 
+                                   isSegundaMensagem ? 'follow_up_pattern' : 'general_pattern');
+    
     logEvent('WHATSAPP_CALLING_NOEMIA', {
       from: messageInfo.from,
       message: messageInfo.content
@@ -391,6 +400,7 @@ async function processTextMessage(messageInfo: any) {
     console.log('WHATSAPP_OPENAI_ELIGIBLE: true');
     console.log('WHATSAPP_OPENAI_KEY_EXISTS:', hasOpenAIKey);
     console.log('WHATSAPP_OPENAI_MODEL:', openAIModel);
+    console.log('WHATSAPP_OPENAI_ATTEMPTED: true');
 
     // Usar a lógica centralizada da NoemIA
     const response = await answerNoemia({
@@ -402,6 +412,19 @@ async function processTextMessage(messageInfo: any) {
     console.log('WHATSAPP_NOEMIA_RESPONSE_RECEIVED');
     console.log('RESPONSE_LENGTH:', response.answer?.length || 0);
     console.log('RESPONSE_SOURCE:', response.meta?.source || 'unknown');
+    
+    // Detectar tipo de resposta
+    const isTemplateResponse = response.answer?.includes('Olá! Sou a NoemIA');
+    const isTriageResponse = response.answer?.includes('posso me aposentar') || 
+                           response.answer?.includes('área de atuação') ||
+                           response.answer?.includes('posso ajudar');
+    
+    console.log('WHATSAPP_TEMPLATE_USED:', isTemplateResponse);
+    console.log('WHATSAPP_TRIAGE_USED:', isTriageResponse);
+    console.log('WHATSAPP_OPENAI_RESULT:', response.meta?.source || 'unknown');
+    console.log('WHATSAPP_FINAL_RESPONSE_SOURCE:', isTemplateResponse ? 'template' : 
+                                               isTriageResponse ? 'triage' : 
+                                               response.meta?.source || 'unknown');
     
     logEvent('WHATSAPP_NOEMIA_RESPONSE', {
       from: messageInfo.from,

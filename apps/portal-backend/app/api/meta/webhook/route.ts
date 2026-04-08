@@ -24,76 +24,86 @@ function logEvent(
 }
 
 function verifySignature(body: string, signature: string): boolean {
-  // LOGS DE DIAGNÓSTICO SEGURO E DETALHADO
-  console.log("=== SIGNATURE_VALIDATION_DEBUG ===");
-  console.log("ENV_VAR_USED: META_APP_SECRET");
-  console.log("SIGNATURE_HEADER_PRESENT:", !!signature);
-  console.log("SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : null);
-  console.log("META_APP_SECRET_PRESENT:", !!APP_SECRET);
-  console.log("META_APP_SECRET_LENGTH:", APP_SECRET?.length || 0);
-  console.log("RAW_BODY_LENGTH:", body.length);
-  
-  // Log do nome exato da variável sendo usada
-  console.log("APP_SECRET_VAR_NAME: META_APP_SECRET");
-  
-  // Verificar se há valores alternativos ou fallbacks
-  const altSecret1 = process.env.META_APP_SECRET;
-  const altSecret2 = process.env.APP_SECRET;
-  const altSecret3 = process.env.INSTAGRAM_APP_SECRET;
-  
-  console.log("ALT_META_APP_SECRET_PRESENT:", !!altSecret1);
-  console.log("ALT_APP_SECRET_PRESENT:", !!altSecret2);
-  console.log("ALT_INSTAGRAM_APP_SECRET_PRESENT:", !!altSecret3);
-  
-  // Hash do body para diagnóstico (sem expor conteúdo)
-  const bodyHash = createHmac("sha256", "debug").update(body, "utf8").digest("hex").substring(0, 16);
-  console.log("RAW_BODY_HASH_SHA256:", bodyHash);
-  
+  console.log("=== META_SIGNATURE_AUDIT_START ===");
+
+  const envCandidates = [
+    { name: 'META_APP_SECRET', value: process.env.META_APP_SECRET },
+    { name: 'APP_SECRET', value: process.env.APP_SECRET },
+    { name: 'INSTAGRAM_APP_SECRET', value: process.env.INSTAGRAM_APP_SECRET },
+    { name: 'META_INSTAGRAM_APP_SECRET', value: process.env.META_INSTAGRAM_APP_SECRET }
+  ];
+
+  console.log("META_SECRET_RESOLUTION_ORDER: 1.META_APP_SECRET 2.APP_SECRET 3.INSTAGRAM_APP_SECRET 4.META_INSTAGRAM_APP_SECRET");
+
+  let selectedSecret = null;
+  let selectedEnvName = null;
+
+  if (process.env.META_APP_SECRET) {
+    selectedSecret = process.env.META_APP_SECRET;
+    selectedEnvName = 'META_APP_SECRET';
+  } else if (process.env.APP_SECRET) {
+    selectedSecret = process.env.APP_SECRET;
+    selectedEnvName = 'APP_SECRET';
+  } else if (process.env.INSTAGRAM_APP_SECRET) {
+    selectedSecret = process.env.INSTAGRAM_APP_SECRET;
+    selectedEnvName = 'INSTAGRAM_APP_SECRET';
+  } else if (process.env.META_INSTAGRAM_APP_SECRET) {
+    selectedSecret = process.env.META_INSTAGRAM_APP_SECRET;
+    selectedEnvName = 'META_INSTAGRAM_APP_SECRET';
+  } else {
+    selectedSecret = "noeminia_app_secret_2026"; // fallback hardcoded
+    selectedEnvName = 'FALLBACK_HARDCODED';
+  }
+
+  console.log("META_SECRET_SELECTED_ENV_NAME:", selectedEnvName);
+  console.log("META_SECRET_SELECTED_LENGTH:", selectedSecret?.length || 0);
+
+  envCandidates.forEach((env, index) => {
+    console.log(`META_SECRET_CANDIDATE_${index + 1}:`, {
+      name: env.name,
+      present: !!env.value,
+      length: env.value?.length || 0,
+      selected: env.name === selectedEnvName
+    });
+  });
+
+  console.log("META_SIGNATURE_HEADER_PRESENT:", !!signature);
+  console.log("META_SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : 'MISSING');
+  console.log("META_RAW_BODY_LENGTH:", body.length);
+  console.log("META_RAW_BODY_TYPE:", typeof body);
+
   if (!signature) {
-    console.log("SIGNATURE_DIAGNOSIS: No signature header found");
+    console.log("META_WEBHOOK_ABORT_REASON: No signature header");
     return false;
   }
 
-  // Verificar se o body está intacto (antes de qualquer parse)
-  console.log("BODY_IS_STRING:", typeof body === 'string');
-  console.log("BODY_HAS_CONTENT:", body.length > 0);
-  
-  // Calcular assinatura esperada
-  const expectedSignature = `sha256=${createHmac("sha256", APP_SECRET)
-    .update(body, "utf8")
-    .digest("hex")}`;
-    
-  console.log("EXPECTED_SIGNATURE_PREFIX:", expectedSignature.substring(0, 20));
-  console.log("RECEIVED_SIGNATURE_PREFIX:", signature.substring(0, 20));
-  console.log("SIGNATURE_MATCH:", signature === expectedSignature);
-  
-  // Log adicional para diagnóstico
-  if (signature !== expectedSignature) {
-    console.log("SIGNATURE_DIAGNOSIS: Signature mismatch - possible causes:");
-    console.log("1. META_APP_SECRET incorrect in Vercel env vars");
-    console.log("2. Body mutated before signature calculation");
-    console.log("3. Different app configured in Meta Developers");
-    console.log("4. Encoding issue with body text");
-    
-    // Tentar com secrets alternativos se existirem
-    if (altSecret2 && altSecret2 !== APP_SECRET) {
-      const altSignature = `sha256=${createHmac("sha256", altSecret2)
-        .update(body, "utf8")
-        .digest("hex")}`;
-      console.log("ALT_APP_SECRET_MATCH:", signature === altSignature);
-    }
-    
-    if (altSecret3 && altSecret3 !== APP_SECRET) {
-      const altSignature = `sha256=${createHmac("sha256", altSecret3)
-        .update(body, "utf8")
-        .digest("hex")}`;
-      console.log("ALT_INSTAGRAM_APP_SECRET_MATCH:", signature === altSignature);
-    }
-  } else {
-    console.log("SIGNATURE_DIAGNOSIS: Signature valid");
-  }
+  console.log("META_HMAC_ALGORITHM: SHA256");
+  console.log("META_HEADER_EXPECTED: x-hub-signature-256");
+  console.log("META_BODY_BEFORE_HMAC: RAW_UNMODIFIED_STRING");
 
-  return signature === expectedSignature;
+  const hmac = createHmac("sha256", selectedSecret);
+  hmac.update(body, "utf8");
+  const computedHash = hmac.digest("hex");
+  const expectedSignature = `sha256=${computedHash}`;
+
+  console.log("META_HMAC_COMPUTED_PREFIX:", expectedSignature.substring(0, 20));
+  console.log("META_SIGNATURE_RECEIVED_PREFIX:", signature.substring(0, 20));
+  console.log("META_SIGNATURE_MATCH:", signature === expectedSignature);
+
+  if (signature !== expectedSignature) {
+    console.log("META_WEBHOOK_ABORT_REASON: Signature mismatch");
+    console.log("META_DEBUG_INFO:", {
+      selectedEnvName,
+      secretLength: selectedSecret?.length || 0,
+      bodyLength: body.length,
+      signatureLength: signature.length,
+      computedHashLength: computedHash.length
+    });
+    return false;
+  } else {
+    console.log("META_WEBHOOK_DIAGNOSIS: Signature VALID");
+    return true;
+  }
 }
 
 async function sendInstagramMessage(
@@ -323,7 +333,7 @@ export async function POST(request: NextRequest) {
   console.log("INSTAGRAM_SIGNATURE_VALIDATION_RESULT:", isValid ? "VALID" : "INVALID");
   
   if (!isValid) {
-    console.log("INSTAGRAM_SIGNATURE_INVALID");
+    console.log("INSTAGRAM_SIGNATURE_INVALID - ABORTING FLOW");
     logEvent(
       "INSTAGRAM_SIGNATURE_INVALID",
       {
@@ -331,8 +341,9 @@ export async function POST(request: NextRequest) {
       },
       "warn"
     );
+    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   } else {
-    console.log("INSTAGRAM_SIGNATURE_VALID");
+    console.log("INSTAGRAM_SIGNATURE_VALID - CONTINUING FLOW");
   }
 
   try {
