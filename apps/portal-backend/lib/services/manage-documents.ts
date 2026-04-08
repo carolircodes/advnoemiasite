@@ -264,14 +264,18 @@ async function createCaseEventForDocumentFlow(input: {
   try {
     if (input.shouldNotifyClient && input.clientEmail) {
       // Usar novo fluxo unificado de notificações
-      notificationResults = await sendCaseUpdateNotification({
+      const { supabase, caseRecord, clientRecord, profileRecord } = await resolveCaseContext(
+    input.caseId
+  );
+
+  notificationResults = await sendCaseUpdateNotification({
         clientProfileId: input.clientProfileId,
         clientEmail: input.clientEmail,
         clientId: input.clientId,
-        clientName: input.clientName,
+        clientName: profileRecord.full_name || "Cliente",
         caseId: input.caseId,
         caseTitle: input.title,
-        eventType: input.eventType,
+        eventType: input.eventType === "document_request" ? "new_document" : input.eventType,
         title: input.title,
         publicSummary: input.publicSummary,
         shouldNotifyEmail: true,
@@ -479,7 +483,7 @@ export async function registerCaseDocument(
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     const { error: auditError } = await supabase.from("audit_logs").insert({
@@ -590,7 +594,7 @@ export async function requestCaseDocument(rawInput: unknown, actorProfileId: str
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     const { error: auditError } = await supabase.from("audit_logs").insert({
@@ -701,7 +705,7 @@ export async function updateDocumentRequestStatus(rawInput: unknown, actorProfil
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     const { error: auditError } = await supabase.from("audit_logs").insert({

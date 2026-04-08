@@ -100,7 +100,8 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
         clientName: profileRecord.full_name || "Cliente",
         caseId: caseRecord.id,
         caseTitle: input.title,
-        eventType: input.eventType,
+        eventType: input.eventType === "new_appointment" ? "appointment_updated" : 
+              input.eventType === "document_request" ? "new_document" : input.eventType,
         title: input.title,
         publicSummary: publicSummary || "Nova atualização registrada no portal.",
         shouldNotifyEmail: true,

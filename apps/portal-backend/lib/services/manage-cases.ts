@@ -345,7 +345,7 @@ export async function createCaseForClient(rawInput: unknown, actorProfileId: str
       });
 
       eventId = activity.eventId;
-      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     await logCaseUpdate(
@@ -487,7 +487,7 @@ export async function updateCaseDetails(rawInput: unknown, actorProfileId: strin
       });
 
       eventId = activity.eventId;
-      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     await createAuditLog({
@@ -599,7 +599,7 @@ export async function updateCaseStatus(rawInput: unknown, actorProfileId: string
       });
 
       eventId = activity.eventId;
-      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     await createAuditLog({

@@ -2,24 +2,12 @@ import "server-only";
 
 import { OpenAI } from "openai";
 import { createServerSupabaseClient } from "../supabase/server";
-import { 
-  getInitialMessage, 
-  getThemeSuggestions, 
-  generateControlledResponse,
-  detectLegalTheme,
-  looksLikeLegalHelpRequest,
-  extractRelativeTime,
-  inferUrgency,
-  detectLeadTemperature,
-  detectUrgencyLevel,
-  buildSmartCTA,
-  adaptMessageByLeadTemperature,
-  detectHumanHandoffNeed,
-  buildLeadSummary,
-  adaptPriorityResponse,
-  buildPriorityCTA
-} from "./noemia-helpers";
 import { logger, logNoemia } from "../logging/structured-logger";
+import { PortalProfile } from "../auth/guards";
+import { getClientWorkspace } from "./dashboard";
+import { caseAreaLabels, askNoemiaSchema } from "../domain/portal";
+import { getStaffOverview } from "./dashboard";
+import { getBusinessIntelligenceOverview } from "./intelligence";
 
 function compactText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -894,7 +882,6 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     
     // Clientes nunca são bloqueados - sempre ajudam
     if (audience === 'client' && profile) {
-      const { getClientWorkspace } = await import("./dashboard");
       const workspace = await getClientWorkspace(profile);
       
       switch (intent) {
@@ -989,7 +976,6 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     
     // Staff - operação com dados reais do banco
     if (audience === 'staff' && profile) {
-      const { getStaffOverview } = await import("./dashboard");
       const overview = await getStaffOverview();
       
       // Dados operacionais reais
@@ -997,6 +983,7 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
       const awaitingClientItems = overview.operationalCenter.queues.awaitingClient.slice(0, 3);
       const topCases = overview.latestCases.slice(0, 3);
       const pendingDocs = overview.latestDocumentRequests.filter(doc => doc.status === 'pending').slice(0, 3);
+      const overdueDocs = overview.operationalCenter.summary.agedPendingDocumentsCount;
       
       switch (intent) {
         case 'legal_advice_request':
@@ -1028,12 +1015,12 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
           
         case 'clientes':
           const clientsAwaiting = awaitingClientItems.map(item => `${item.title} (${item.timingLabel})`).join('; ');
-          const urgentClients = overview.latestClients.filter(c => c.status === 'aguardando_documento').slice(0, 3);
+          const urgentClients = overview.latestClients.filter(c => c.statusLabel === 'Aguardando documentos').slice(0, 3);
           
           return {
             message: isFollowUp
               ? `Situação dos clientes: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento. Pendências principais: ${clientsAwaiting || 'Nenhuma pendência crítica'}`
-              : `Tenho ${overview.latestClients.length} clientes no sistema. Destaque para: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos${overview.operationalCenter.summary.waitingTeamCount > 0 ? ` e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento` : ''}. Pendências urgentes: ${clientsAwaiting || 'Nenhuma pendência crítica'}. ${urgentClients.length > 0 ? `Clientes precisando de atenção: ${urgentClients.map(c => c.full_name).join(', ')}.` : ''}`,
+              : `Tenho ${overview.latestClients.length} clientes no sistema. Destaque para: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos${overview.operationalCenter.summary.waitingTeamCount > 0 ? ` e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento` : ''}. Pendências urgentes: ${clientsAwaiting || 'Nenhuma pendência crítica'}. ${urgentClients.length > 0 ? `Clientes precisando de atenção: ${urgentClients.map(c => c.fullName).join(', ')}.` : ''}`,
             actions: [
               { label: "Ver todos os clientes", href: "/internal/clientes" },
               { label: "Pendências documentais", href: "/internal/documentos" }
@@ -1057,8 +1044,7 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
           };
           
         case 'documentos':
-          const overdueDocs = overview.operationalCenter.summary.agedPendingDocumentsCount;
-          const pendingDocsList = pendingDocs.map(doc => `${doc.title} (${doc.timingLabel})`).join('; ');
+          const pendingDocsList = pendingDocs.map(doc => `${doc.title} (${doc.statusLabel})`).join('; ');
           
           return {
             message: isFollowUp
@@ -1426,13 +1412,9 @@ async function buildStaffContext(profile: PortalProfile) {
     console.warn("[NoemIA] Erro ao buscar contexto do staff, usando fallback:", error);
 
     try {
-      const { getStaffOverview: getStaffOverviewFallback } = await import("./dashboard-fallback");
-      const { getBusinessIntelligenceOverview: getBusinessIntelligenceOverviewFallback } =
-        await import("./intelligence-fallback");
-
       const [overview, intelligence] = await Promise.all([
-        getStaffOverviewFallback(),
-        getBusinessIntelligenceOverviewFallback(30)
+        getStaffOverview(),
+        getBusinessIntelligenceOverview(30)
       ]);
 
       return [
@@ -1442,7 +1424,7 @@ async function buildStaffContext(profile: PortalProfile) {
         `Fila fazer hoje: ${overview.operationalCenter.queues.today
           .map((item) => `${item.kindLabel} ${item.title}`)
           .join("; ")}.`,
-        `Casos recentes: ${overview.operationalCenter.latestCases
+        `Casos recentes: ${overview.latestCases
           .map((item) => `${item.title} | ${item.clientName}`)
           .join("; ")}.`
       ].join("\n");

@@ -677,7 +677,7 @@ export async function registerCaseAppointment(rawInput: unknown, actorProfileId:
       });
 
       eventId = activity.eventId;
-      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     await createAuditLog({
@@ -793,7 +793,7 @@ export async function updateCaseAppointment(rawInput: unknown, actorProfileId: s
       });
 
       eventId = activity.eventId;
-      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
+      notificationId = activity.emailNotificationId ?? activity.whatsappNotificationId ?? null;
     }
 
     await createAuditLog({
