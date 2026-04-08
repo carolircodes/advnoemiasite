@@ -170,7 +170,7 @@ async function sendInstagramMessage(
     };
 
     console.log("ABOUT_TO_SEND_INSTAGRAM_MESSAGE");
-    console.log("INSTAGRAM_GRAPH_API_URL:", apiUrl);
+    console.log("INSTAGRAM_GRAPH_API_URL_FINAL:", apiUrl);
     console.log("INSTAGRAM_GRAPH_API_PAYLOAD:", JSON.stringify(payload, null, 2));
 
     const response = await fetch(apiUrl, {
