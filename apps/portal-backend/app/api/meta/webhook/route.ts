@@ -351,7 +351,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const data = JSON.parse(body);
+    const bodyText = rawBuffer.toString('utf8');
+    const data = JSON.parse(bodyText);
 
     // LOGS SEGUROS DA ESTRUTURA REAL
     console.log("ENTRY_COUNT:", data.entry?.length || 0);
