@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 
-const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminha_verify_2026";
-const APP_SECRET = process.env.META_APP_SECRET || "noeminha_app_secret_2026";
+const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
+const APP_SECRET = process.env.META_APP_SECRET || "noeminia_app_secret_2026";
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
+const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
 function logEvent(
   event: string,
@@ -58,25 +59,39 @@ async function sendInstagramMessage(
   messageText: string
 ): Promise<boolean> {
   try {
-    console.log("TOKEN_EXISTS:", !!INSTAGRAM_ACCESS_TOKEN);
-    console.log("SENDER_ID_EXTRACTED:", senderId);
-    console.log("MESSAGE_TEXT_EXTRACTED:", messageText);
+    // VALIDAÇÃO DAS VARIÁVEIS CRÍTICAS
+    console.log("INSTAGRAM_BUSINESS_ACCOUNT_ID_PRESENT:", !!INSTAGRAM_BUSINESS_ACCOUNT_ID);
+    console.log("INSTAGRAM_BUSINESS_ACCOUNT_ID_LENGTH:", INSTAGRAM_BUSINESS_ACCOUNT_ID?.length || 0);
+    console.log("INSTAGRAM_ACCESS_TOKEN_PRESENT:", !!INSTAGRAM_ACCESS_TOKEN);
+    console.log("INSTAGRAM_ACCESS_TOKEN_LENGTH:", INSTAGRAM_ACCESS_TOKEN?.length || 0);
+    console.log("INSTAGRAM_SENDER_ID_EXTRACTED:", senderId);
+    console.log("INSTAGRAM_MESSAGE_TEXT_EXTRACTED:", messageText);
 
     if (!INSTAGRAM_ACCESS_TOKEN) {
-      logEvent("INSTAGRAM_TOKEN_MISSING", { senderId }, "error");
+      console.log("INSTAGRAM_SEND_MESSAGE_FAILED: ACCESS_TOKEN missing");
+      logEvent("INSTAGRAM_SEND_MESSAGE_FAILED", { 
+        reason: "ACCESS_TOKEN_MISSING", 
+        senderId 
+      }, "error");
       return false;
     }
 
+    // ENDPOINT CORRETO - usa /me/messages para Instagram Direct
     const apiUrl = `https://graph.facebook.com/v19.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
-
+    
+    // PAYLOAD OTIMIZADO - estrutura correta para Instagram
     const payload = {
-      recipient: { id: senderId },
-      message: { text: messageText },
+      recipient: { 
+        id: senderId 
+      },
+      message: { 
+        text: messageText 
+      },
+      messaging_type: "RESPONSE"
     };
 
-    console.log("INSTAGRAM_ABOUT_TO_SEND");
-    console.log("GRAPH_API_URL:", apiUrl);
-    console.log("GRAPH_API_PAYLOAD:", JSON.stringify(payload));
+    console.log("INSTAGRAM_GRAPH_API_URL:", apiUrl);
+    console.log("INSTAGRAM_GRAPH_API_PAYLOAD:", JSON.stringify(payload, null, 2));
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -89,35 +104,38 @@ async function sendInstagramMessage(
     const responseText = await response.text();
 
     console.log("INSTAGRAM_GRAPH_API_STATUS:", response.status);
-    console.log("INSTAGRAM_GRAPH_API_RESPONSE:", responseText);
+    console.log("INSTAGRAM_GRAPH_API_RESPONSE_BODY:", responseText);
 
     if (!response.ok) {
-      console.log("INSTAGRAM_RESPONSE_FAILED");
+      console.log("INSTAGRAM_SEND_MESSAGE_FAILED: API error");
       logEvent(
-        "INSTAGRAM_RESPONSE_FAILED",
+        "INSTAGRAM_SEND_MESSAGE_FAILED",
         {
+          reason: "API_ERROR",
           senderId,
           httpStatus: response.status,
-          responseText,
-          payload,
+          responseBody: responseText,
+          requestPayload: payload,
         },
         "error"
       );
       return false;
     }
 
-    console.log("INSTAGRAM_RESPONSE_SENT");
-    logEvent("INSTAGRAM_RESPONSE_SENT", {
+    console.log("INSTAGRAM_SEND_MESSAGE_SUCCESS: Message sent successfully");
+    logEvent("INSTAGRAM_SEND_MESSAGE_SUCCESS", {
       senderId,
       httpStatus: response.status,
-      responseText,
+      responseBody: responseText,
     });
 
     return true;
   } catch (error) {
+    console.log("INSTAGRAM_SEND_MESSAGE_FAILED: Exception occurred");
     logEvent(
-      "INSTAGRAM_SEND_EXCEPTION",
+      "INSTAGRAM_SEND_MESSAGE_FAILED",
       {
+        reason: "EXCEPTION",
         senderId,
         error: error instanceof Error ? error.message : String(error),
       },
@@ -141,15 +159,23 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("INSTAGRAM_POST_RECEIVED");
+  console.log("INSTAGRAM_WEBHOOK_POST_RECEIVED");
+
+  // VALIDAÇÃO DAS VARIÁVEIS DE AMBIENTE
+  console.log("META_APP_SECRET_PRESENT:", !!APP_SECRET);
+  console.log("META_APP_SECRET_LENGTH:", APP_SECRET?.length || 0);
+  console.log("META_VERIFY_TOKEN_PRESENT:", !!VERIFY_TOKEN);
+  console.log("META_VERIFY_TOKEN_LENGTH:", VERIFY_TOKEN?.length || 0);
 
   const body = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
   
-  console.log("SIGNATURE_HEADER_NAME: x-hub-signature-256");
-  console.log("SIGNATURE_HEADER_VALUE:", signature ? "[PRESENT]" : "[MISSING]");
+  console.log("INSTAGRAM_SIGNATURE_HEADER_RECEIVED:", signature ? "[PRESENT]" : "[MISSING]");
+  console.log("INSTAGRAM_SIGNATURE_HEADER_VALUE:", signature ? `${signature.substring(0, 20)}...` : "[MISSING]");
   
   const isValid = verifySignature(body, signature || "");
+  
+  console.log("INSTAGRAM_SIGNATURE_VALIDATION_RESULT:", isValid ? "VALID" : "INVALID");
   
   if (!isValid) {
     console.log("INSTAGRAM_SIGNATURE_INVALID");
