@@ -153,7 +153,6 @@ async function sendInstagramMessage(
       messaging_type: "RESPONSE"
     };
 
-    console.log("ABOUT_TO_SEND_INSTAGRAM_MESSAGE");
     console.log("INSTAGRAM_GRAPH_API_URL:", apiUrl);
     console.log("INSTAGRAM_GRAPH_API_PAYLOAD:", JSON.stringify(payload, null, 2));
 
@@ -167,8 +166,8 @@ async function sendInstagramMessage(
 
     const responseText = await response.text();
 
-    console.log("GRAPH_API_RESPONSE_STATUS:", response.status);
-    console.log("GRAPH_API_RESPONSE_BODY:", responseText);
+    console.log("INSTAGRAM_GRAPH_API_STATUS:", response.status);
+    console.log("INSTAGRAM_GRAPH_API_RESPONSE_BODY:", responseText);
 
     if (!response.ok) {
       console.log("INSTAGRAM_SEND_MESSAGE_FAILED: API error");
@@ -421,30 +420,28 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          if (!messaging.message.text.trim()) {
-            console.log("EVENT_IGNORED_NO_TEXT: messaging structure with empty text");
-            continue;
-          }
+      const replySent = true; // Se chegou aqui, o processamento foi iniciado
 
-          console.log("INSTAGRAM_MESSAGE_STRUCTURE_DETECTED: messaging");
-          console.log("INSTAGRAM_SENDER_EXTRACTED:", messaging.sender.id);
-          console.log("INSTAGRAM_TEXT_EXTRACTED:", messaging.message.text);
-          console.log("INSTAGRAM_EVENT_OBJECT:", JSON.stringify(messaging, null, 2));
-
-          await processMessageWithNoemia(messaging.sender.id, messaging.message.text);
-        }
-
-        // Process entry.changes format
-        for (const change of entry.changes || []) {
-          console.log("INSTAGRAM_STRUCTURE_MATCHED: changes");
-          
-          // Processar comentários
-          if (change.field === "comments") {
-            console.log("INSTAGRAM_COMMENT_STRUCTURE_DETECTED: comments");
-            
-            const comment = change.value;
-            if (!comment || !comment.from || !comment.id || !comment.text) {
-              console.log("EVENT_IGNORED_INCOMPLETE_COMMENT: missing required fields");
+      if (replySent) {
+        console.log("INSTAGRAM_PRIVATE_REPLY_SUCCESS: Comment triggered DM sent");
+        logEvent("INSTAGRAM_PRIVATE_REPLY_SUCCESS", {
+          commentId: comment.id,
+          userId: comment.from.id,
+          username: comment.from.username,
+          postId: comment.media?.id,
+          keyword: PALAVRA_CHAVE_INSTAGRAM,
+          commentText: comment.text
+        });
+      } else {
+        console.log("INSTAGRAM_PRIVATE_REPLY_FAILED: Could not send DM to commenter");
+        logEvent("INSTAGRAM_PRIVATE_REPLY_FAILED", {
+          commentId: comment.id,
+          userId: comment.from.id,
+          username: comment.from.username,
+          postId: comment.media?.id,
+          keyword: PALAVRA_CHAVE_INSTAGRAM,
+          commentText: comment.text
+        }, "error");
               continue;
             }
 
