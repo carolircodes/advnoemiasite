@@ -70,7 +70,7 @@ function buildInternalResponse(
     actions.push({
       type: 'cta', 
       label: 'Falar no WhatsApp',
-      url: 'https://wa.me/5511999999999'
+      url: 'https://wa.me/55996248241'
     });
     
     return { message, actions };

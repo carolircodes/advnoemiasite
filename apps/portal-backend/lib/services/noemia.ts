@@ -6,58 +6,6 @@ import { getServerEnv } from "../config/env";
 import { getBusinessIntelligenceOverview } from "./intelligence";
 import { getClientWorkspace, getStaffOverview } from "./dashboard";
 
-// PERSONALIDADE CENTRALIZADA DA NOEMIA - USAR EM TODOS OS CANAIS
-export const NOEMIA_SYSTEM_PROMPT = `Você é a NoemIA, assistente virtual do escritório Noemia Paixão Advocacia.
-
-Sua função é fazer o primeiro atendimento com clareza, empatia, organização e autoridade, ajudando a pessoa a entender de forma inicial o que pode estar acontecendo e conduzindo com naturalidade para o próximo passo adequado.
-
-FORMA DE ATUAR:
-- acolha a dúvida ou situação da pessoa com humanidade
-- explique de forma simples e acessível o que pode estar acontecendo
-- demonstre segurança e autoridade sem usar juridiquês em excesso
-- organize a resposta para que a pessoa se sinta compreendida e orientada
-- quando fizer sentido, convide para continuar o atendimento com a advogada
-
-TOM DE VOZ:
-- profissional, humano e confiável
-- acolhedor, mas sem exagero
-- seguro, sem arrogância
-- claro, direto e bem escrito
-- nunca robótico
-- nunca seco
-- nunca com cara de resposta automática engessada
-
-REGRAS DE RESPOSTA:
-- nunca dar diagnóstico jurídico definitivo
-- nunca prometer resultado
-- nunca inventar fatos, documentos, prazos ou estratégias
-- nunca agir como se já tivesse analisado completamente o caso
-- nunca usar linguagem excessivamente técnica sem necessidade
-- sempre deixar claro, quando necessário, que uma análise individual pode mudar a orientação
-
-ESTRUTURA IDEAL DAS RESPOSTAS:
-1. acolher o relato ou a dúvida
-2. explicar de forma simples o cenário possível
-3. mostrar que pode existir um direito, uma possibilidade ou um caminho
-4. indicar o próximo passo mais útil
-
-CONTEXTO DO ESCRITÓRIO:
-- áreas principais: previdenciário, consumidor/bancário, civil e família
-- público: pessoas com dúvidas, problemas ou direitos possivelmente não reconhecidos
-- objetivo da IA: triagem inicial, organização da conversa, orientação inicial e condução para atendimento
-
-ESTILO DE CONVERSÃO:
-- conduzir para atendimento de forma natural
-- evitar pressão comercial
-- soar como atendimento premium e humano
-- passar confiança
-- fazer a pessoa sentir que está sendo bem direcionada`;
-
-// Personalidade base da NoemIA - centralizada para todos os canais
-function getBasePersonalityPrompt(): string {
-  return NOEMIA_SYSTEM_PROMPT;
-}
-
 function compactText(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -906,227 +854,226 @@ async function buildStaffContext(profile: PortalProfile) {
         `Perfil interno autenticado: ${profile.full_name} (${profile.email}).`,
         `Resumo operacional atual: ${overview.operationalCenter.summary.criticalCount} item(ns) critico(s), ${overview.operationalCenter.summary.todayCount} para hoje, ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente, ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
         `Leitura de BI dos ultimos 30 dias: abandono de triagem ${formatRateValue(intelligence.summary.triageAbandonmentRate)}, triagem para cliente ${formatRateValue(intelligence.summary.triageToClientRate)}, ativacao no portal ${formatRateValue(intelligence.summary.portalActivationRate)}.`,
+        `Fila fazer hoje: ${overview.operationalCenter.queues.today
+          .map((item) => `${item.kindLabel} ${item.title}`)
+          .join("; ")}.`,
+        `Casos recentes: ${overview.operationalCenter.latestCases
+          .map((item) => `${item.title} | ${item.clientName}`)
+          .join("; ")}.`
       ].join("\n");
+    } catch (fallbackError) {
+      console.error("[NoemIA] Erro ate no fallback do staff:", fallbackError);
+      return `Perfil interno autenticado: ${profile.full_name} (${profile.email}). Sistema operacional em modo limitado. Use o painel principal para operacao completa.`;
     }
-  } catch (fallbackError) {
-    console.error("[NoemIA] Erro ate no fallback do staff:", fallbackError);
-    return `Perfil interno autenticado: ${profile.full_name} (${profile.email}). Sistema operacional em modo limitado. Use o painel principal para operacao completa.`;
+  }
+}
 
 function buildSystemInstructions(mode: "visitor" | "client" | "staff", contextText: string) {
-  const basePersonality = getBasePersonalityPrompt();
-  
-  const modeSpecificInstructions = {
-    staff: `
-PARA EQUIPE INTERNA:
-- Priorize utilidade operacional: resuma sinais, destaque urgência, sugira próximo passo interno
-- Se pedido, rascunhe um texto-base curto para retorno ao cliente
-- Ao priorizar, organize: o que tratar primeiro, por que isso importa e próximo passo sugerido
-- Ao redigir mensagem para cliente, deixe claro que é um rascunho base e não envio automático
-- Use contexto operacional interno sem expor dados fora do recebido`,
-    
-    client: `
-PARA CLIENTE AUTENTICADO:
-- Use apenas o contexto do próprio cliente autenticado
-- Nunca fale de outros clientes ou casos
-- Referencie dados específicos do portal quando disponível
-- Mantenha tom acolhedor mas profissional`,
-    
-    visitor: `
-PARA VISITANTES:
-- Responda apenas sobre fluxo de atendimento, triagem, portal e dúvidas iniciais
-- Conduza para preenchimento de triagem quando houver caso concreto
-- Não acesse dados de clientes ou informações internas`
-  };
-
   return [
-    basePersonality,
+    "Voce e Noemia, assistente do portal juridico.",
+    "Responda em portugues do Brasil, com tom claro, humano e objetivo.",
+    "Nao invente fatos, prazos, movimentacoes, documentos ou acessos que nao estejam no contexto recebido.",
+    "Explique o status e o funcionamento do portal com linguagem simples.",
+    "Se a pergunta exigir analise juridica profunda, estrategia, probabilidade de ganho ou decisao tecnica do caso, reconheca o limite e oriente falar com a equipe responsavel.",
+    mode === "staff"
+      ? "Para a advogada, priorize utilidade operacional: resuma sinais, destaque urgencia, sugira proximo passo interno e, se pedido, rascunhe um texto-base curto para retorno ao cliente."
+      : "",
+    mode === "client"
+      ? "Voce pode usar apenas o contexto do proprio cliente autenticado. Nunca fale de outros clientes."
+      : mode === "staff"
+        ? "Voce pode usar o contexto operacional interno do escritorio para ajudar na rotina da equipe, sem expor dados fora do que ja esta no contexto."
+        : "Para visitantes, responda apenas sobre o fluxo de atendimento, triagem, portal e duvidas iniciais.",
+    mode === "staff"
+      ? "Quando a pergunta pedir priorizacao, organize a resposta em: o que tratar primeiro, por que isso importa e proximo passo sugerido."
+      : "",
+    mode === "staff"
+      ? "Quando a pergunta pedir mensagem ao cliente, deixe claro que e um rascunho base e nao um envio automatico."
+      : "",
+    "Sempre que fizer sentido, indique o proximo passo mais pratico.",
     "",
-    "Responda em português do Brasil.",
-    "Não invente fatos, prazos, movimentações, documentos ou acessos que não estejam no contexto recebido.",
-    "Se a pergunta exigir análise jurídica profunda, estratégia ou decisão técnica do caso, reconheça o limite e orientar falar com a equipe responsável.",
-    "Sempre que fizer sentido, indique o próximo passo mais prático.",
-    "",
-    modeSpecificInstructions[mode],
-    "",
-    "CONTEXTO DISPONÍVEL:",
+    "Contexto disponivel:",
     contextText
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
-// Funções auxiliares para motor interno
-function detectLegalTheme(message: string): string {
-  const msg = message.toLowerCase();
-  // ... restante do código ...
-  if (msg.includes('aposentador') || msg.includes('inss') || msg.includes('benefício') || msg.includes('auxílio')) {
-    return 'previdenciario';
-  }
-  if (msg.includes('banco') || msg.includes('empréstimo') || msg.includes('juros') || msg.includes('cobrança') || msg.includes('financiamento')) {
-    return 'bancario';
-  }
-  if (msg.includes('divórcio') || msg.includes('pensão') || msg.includes('guarda') || msg.includes('filhos') || msg.includes('casamento') || msg.includes('separação')) {
-    return 'familia';
-  }
-  if (msg.includes('contrato') || msg.includes('indenização') || msg.includes('dano') || msg.includes('responsabilidade')) {
-    return 'civil';
-  }
+export async function answerNoemia(rawInput: unknown, profile: PortalProfile | null, currentPath?: string) {
+  const startTime = Date.now();
+  const env = getServerEnv();
+  const input = askNoemiaSchema.parse(rawInput);
+  const requestedAudience = input.audience;
   
-  return 'geral';
-}
+  // Extrair contexto da URL
+  const urlContext = getContextFromURL(currentPath);
+  
+  // Gerar ID de sessão simples (em produção usar algo mais robusto)
+  const sessionId = profile?.id || 'visitor-' + Math.random().toString(36).substr(2, 9);
 
-function detectConversationStage(sessionContext: any, intent: string): string {
-  const history = sessionContext.history;
-  
-  // Primeira mensagem
-  if (history.length === 0) {
-    return 'welcome';
-  }
-  
-  // Follow-up da mesma intenção
-  if (history.length > 0 && sessionContext.lastIntent === intent) {
-    return 'followup';
-  }
-  
-  // Mudança de tema
-  if (history.length > 0 && sessionContext.lastIntent !== intent) {
-    return 'topic_change';
-  }
-  
-  return 'continuation';
-}
+  let effectiveAudience =
+    requestedAudience === "staff" && profile && profile.role !== "cliente"
+      ? "staff"
+      : requestedAudience === "client" && profile?.role === "cliente"
+        ? "client"
+        : "visitor";
 
-function buildInternalResponse(
-  intent: string, 
-  theme: string, 
-  stage: string, 
-  audience: string, 
-  profile: PortalProfile | null,
-  sessionContext: any
-): { message: string; actions: any[] } {
-  const actions: any[] = [];
-  let message = '';
-  
-  // BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
-  if (audience === 'visitor' && intent === 'legal_advice_request') {
-    message = `Entendi sua situação. Para te orientar com precisão e segurança jurídica, é necessário analisar seu caso em detalhes.\n\nPosso te ajudar de duas formas:\n\n1. **Agendar consulta** (R$150) - Análise completa com a advogada\n2. **Falar no WhatsApp** - Triagem inicial gratuita\n\nQual prefere?`;
+  if (requestedAudience === "client" && (!profile || profile.role !== "cliente")) {
+    console.log("[noemia] Cliente nao autenticado, usando audience visitor");
+    effectiveAudience = "visitor";
+  }
+
+  if (requestedAudience === "staff" && (!profile || profile.role === "cliente")) {
+    console.log("[noemia] Staff nao autenticado, usando audience visitor");
+    effectiveAudience = "visitor";
+  }
+
+  // Detectar intenção e atualizar contexto
+  const intent = detectUserIntent(input.message);
+  updateSessionContext(sessionId, input.message, intent, effectiveAudience);
+
+  if (!env.OPENAI_API_KEY) {
+    console.error("[noemia] OPENAI_API_KEY nao encontrada no ambiente");
     
-    actions.push({
-      type: 'cta',
-      label: 'Agendar consulta (R$150)',
-      url: '/consulta'
+    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
+    recordNoemiaMetrics({
+      question: input.message,
+      intent,
+      profile: effectiveAudience,
+      source: "fallback",
+      timestamp: new Date(),
+      actions: fallbackResponse.actions || [],
+      error: "OPENAI_API_KEY não encontrada",
+      sessionId,
+      responseTime: Date.now() - startTime,
+      tema: urlContext.tema,
+      origem: urlContext.origem
     });
-    actions.push({
-      type: 'cta', 
-      label: 'Falar no WhatsApp',
-      url: 'https://wa.me/5511999999999'
-    });
+
+    return {
+      audience: effectiveAudience,
+      answer: fallbackResponse.message
+    };
+  }
+
+  const contextText =
+    effectiveAudience === "staff" && profile
+      ? await buildStaffContext(profile)
+      : effectiveAudience === "client" && profile
+        ? await buildClientContext(profile)
+        : buildPublicContext();
+
+  const systemInstructions = buildSystemInstructions(effectiveAudience as "visitor" | "client" | "staff", contextText);
+
+  const conversationHistory = input.history.slice(-8).map((message) => ({
+    role: message.role,
+    content: [
+      {
+        type: "input_text",
+        text: message.content
+      }
+    ]
+  }));
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemInstructions
+        },
+        ...conversationHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content[0].text
+        })),
+        {
+          role: "user",
+          content: input.message
+        }
+      ],
+      max_tokens: effectiveAudience === "staff" ? 900 : 600
+    })
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    console.error("[noemia] Erro na chamada OpenAI:", details);
+
+    // Usar fallback inteligente em vez de mensagem genérica
+    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
     
-    return { message, actions };
+    recordNoemiaMetrics({
+      question: input.message,
+      intent,
+      profile: effectiveAudience,
+      source: "fallback",
+      timestamp: new Date(),
+      actions: fallbackResponse.actions || [],
+      error: details,
+      sessionId,
+      responseTime: Date.now() - startTime,
+      tema: urlContext.tema,
+      origem: urlContext.origem
+    });
+
+    return {
+      audience: effectiveAudience,
+      answer: fallbackResponse.message
+    };
+  }
+
+  const payload = await response.json();
+  const answer = extractResponseText(payload);
+
+  if (!answer) {
+    console.error("[noemia] Resposta vazia da OpenAI");
+
+    // Usar fallback inteligente mesmo com resposta vazia
+    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
+    
+    recordNoemiaMetrics({
+      question: input.message,
+      intent,
+      profile: effectiveAudience,
+      source: "fallback",
+      timestamp: new Date(),
+      actions: fallbackResponse.actions || [],
+      error: "Resposta vazia da OpenAI",
+      sessionId,
+      responseTime: Date.now() - startTime,
+      tema: urlContext.tema,
+      origem: urlContext.origem
+    });
+
+    return {
+      audience: effectiveAudience,
+      answer: fallbackResponse.message
+    };
   }
   
-  // RESPOSTAS POR INTENÇÃO E AUDIÊNCIA
-  switch (intent) {
-    case 'greeting':
-      if (audience === 'staff') {
-        message = `Olá! Como posso ajudar com suas tarefas hoje?`;
-        actions.push({ type: 'quick_reply', label: 'Ver agenda' });
-        actions.push({ type: 'quick_reply', label: 'Prioridades' });
-      } else if (audience === 'client') {
-        message = `Olá ${profile?.full_name || ''}! Como posso ajudar com seu caso hoje?`;
-        actions.push({ type: 'quick_reply', label: 'Ver meu processo' });
-        actions.push({ type: 'quick_reply', label: 'Falar com advogada' });
-      } else {
-        message = `Olá! Sou a NoemIA, assistente virtual do escritório Noemia Paixão Advocacia.\n\nPosso te ajudar com:\n\n1. **Triagem inicial** - Entender seu caso\n2. **Agendar consulta** - Atendimento com advogada\n3. **Dúvidas gerais** - Como funciona\n\nSobre o que precisa?`;
-        actions.push({ type: 'cta', label: 'Fazer triagem', url: '/triagem' });
-        actions.push({ type: 'cta', label: 'Agendar consulta', url: '/consulta' });
-      }
-      break;
-      
-    case 'agenda_request':
-      if (audience === 'staff') {
-        message = `Sua agenda está organizada. Você tem pendências importantes hoje. Quer ver os detalhes?`;
-        actions.push({ type: 'quick_reply', label: 'Ver detalhes' });
-      } else {
-        message = `Para agendar atendimento, você pode:\n\n1. **Consulta presencial** (R$150)\n2. **Atendimento online** (R$150)\n3. **Triagem gratuita** - Primeira análise\n\nQual prefere?`;
-        actions.push({ type: 'cta', label: 'Agendar consulta', url: '/consulta' });
-        actions.push({ type: 'cta', label: 'Fazer triagem', url: '/triagem' });
-      }
-      break;
-      
-    case 'documents_request':
-      if (audience === 'client') {
-        message = `Você pode enviar documentos pelo portal do cliente. Acesse sua área para fazer upload dos arquivos necessários ao seu caso.`;
-        actions.push({ type: 'cta', label: 'Acessar portal', url: '/portal' });
-      } else if (audience === 'staff') {
-        message = `Você tem documentos pendentes para análise. Quer verificar a lista?`;
-        actions.push({ type: 'quick_reply', label: 'Ver pendências' });
-      } else {
-        message = `Para análise de documentos, é necessário fazer o cadastro inicial. Posso te ajudar a iniciar o processo?`;
-        actions.push({ type: 'cta', label: 'Iniciar cadastro', url: '/triagem' });
-      }
-      break;
-      
-    case 'legal_advice_request':
-      if (audience === 'client') {
-        message = `Entendo sua dúvida. Como cliente, você tem acesso completo. Posso te ajudar com:\n\n1. **Análise do seu caso**\n2. **Próximos passos**\n3. **Falar com advogada**\n\nO que precisa?`;
-        actions.push({ type: 'quick_reply', label: 'Analisar meu caso' });
-        actions.push({ type: 'quick_reply', label: 'Falar com advogada' });
-      } else if (audience === 'staff') {
-        message = `Análise jurídica solicitada. Posso ajudar com:\n\n1. **Resumo do caso**\n2. **Estratégia sugerida**\n3. **Documentos necessários**\n\nO que precisa?`;
-        actions.push({ type: 'quick_reply', label: 'Resumir caso' });
-        actions.push({ type: 'quick_reply', label: 'Sugerir estratégia' });
-      }
-      // Bloqueio para visitors já tratado no início
-      break;
-      
-    case 'case_status':
-      if (audience === 'client') {
-        message = `Para verificar o status do seu caso, acesse o portal do cliente. Lá você encontra:\n\n- Andamento atual\n- Próximos passos\n- Documentos pendentes\n- Agenda\n\nQuer acesso ao portal?`;
-        actions.push({ type: 'cta', label: 'Acessar portal', url: '/portal' });
-      } else if (audience === 'staff') {
-        message = `Status dos casos em andamento. Você pode:\n\n1. **Ver fila atual**\n2. **Priorizar casos urgentes**\n3. **Ver detalhes específicos**\n\nO que precisa?`;
-        actions.push({ type: 'quick_reply', label: 'Ver fila' });
-        actions.push({ type: 'quick_reply', label: 'Casos urgentes' });
-      } else {
-        message = `Para acompanhar um caso, é necessário ser cliente cadastrado. Posso te ajudar a iniciar o processo de atendimento?`;
-        actions.push({ type: 'cta', label: 'Fazer triagem', url: '/triagem' });
-      }
-      break;
-      
-    case 'priority_request':
-      if (audience === 'staff') {
-        message = `Análise de prioridades. Você tem:\n\n- 3 casos urgentes\n- 2 documentos críticos\n- 1 audiência hoje\n\nQuer organizar por ordem?`;
-        actions.push({ type: 'quick_reply', label: 'Organizar por urgência' });
-        actions.push({ type: 'quick_reply', label: 'Ver detalhes' });
-      } else {
-        message = `Para prioridades específicas, fale diretamente com a equipe. Posso te conectar com alguém agora?`;
-        actions.push({ type: 'cta', label: 'Falar com equipe', url: '/contato' });
-      }
-      break;
-      
-    default:
-      // Resposta genérica baseada no tema
-      const themeResponses = {
-        'previdenciario': `Entendi sua dúvida sobre previdenciário. Muitas pessoas passam por isso. Para te ajudar com precisão, preciso analisar seu caso específico.\n\nPosso te orientar sobre:\n\n1. **Aposentadoria** - Regras e cálculos\n2. **Benefícios** - Auxílios e pensões\n3. **Recursos** - Revisões e apelações\n\nQual sua situação?`,
-        'bancario': `Entendi seu problema com o banco. Isso é muito comum e você pode ter direitos. Para te ajudar, preciso entender melhor:\n\n1. **Tipo de problema** - Juros, cobrança, contrato?\n2. **Valores envolvidos**\n3. **Documentos que tem\n\nMe conta mais detalhes?`,
-        'familia': `Compreendo sua situação familiar. Esses momentos são delicados e você merece orientação segura. Posso ajudar com:\n\n1. **Divórcio** - Consensual ou litigioso\n2. **Pensão** - Alimentos e guarda\n3. **Herança** - Partilha e inventário\n\nSobre o que precisa?`,
-        'civil': `Entendi sua questão civil. Para te orientar corretamente, preciso saber:\n\n1. **Tipo de contrato** ou situação\n2. **O que aconteceu** - Descumprimento? Dano?\n3. **O que busca** - Indenização? Cumprimento?\n\nMe explica melhor?`,
-        'geral': `Entendi sua dúvida. Sou a NoemIA e posso te ajudar com diversas áreas do direito.\n\n**Atuo principalmente em:**\n- Previdenciário (aposentadoria, benefícios)\n- Bancário (juros, cobranças)\n- Família (divórcio, pensão)\n- Civil (contratos, indenizações)\n\nQual sua situação?`
-      };
-      
-      message = themeResponses[theme as keyof typeof themeResponses] || themeResponses.geral;
-      
-      if (audience === 'visitor') {
-        actions.push({ type: 'cta', label: 'Fazer triagem', url: '/triagem' });
-        actions.push({ type: 'cta', label: 'Agendar consulta', url: '/consulta' });
-      }
-      break;
-  }
-  
-  // Adicionar CTAs extras para clientes
-  if (audience === 'client') {
-    actions.push({ type: 'cta', label: 'Ver meu processo', url: '/portal' });
-    actions.push({ type: 'cta', label: 'Falar com advogada', url: '/contato' });
-  }
-  
-  return { message, actions };
+  // Sucesso com OpenAI
+  recordNoemiaMetrics({
+    question: input.message,
+    intent,
+    profile: effectiveAudience,
+    source: "openai",
+    timestamp: new Date(),
+    actions: [], // OpenAI não gera CTAs ainda
+    sessionId,
+    responseTime: Date.now() - startTime,
+    tema: urlContext.tema,
+    origem: urlContext.origem
+  });
+
+  return {
+    audience: effectiveAudience,
+    answer
+  };
 }
+
+export { getContextFromURL };
