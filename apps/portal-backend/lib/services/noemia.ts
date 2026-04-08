@@ -853,17 +853,177 @@ function detectUserIntent(message: string): string {
   return "geral";
 }
 
+// Função para chamar a API real da OpenAI
+async function callOpenAI(
+  message: string,
+  contextText: string,
+  detectedTheme?: string | null
+): Promise<{ success: boolean; response?: string; error?: string }> {
+  const startTime = Date.now();
+  
+  try {
+    // Verificar se a chave está disponível
+    const apiKey = process.env.OPENAI_API_KEY;
+    const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+    
+    if (!apiKey) {
+      console.log('OPENAI_REQUEST_FAILED: API key not configured');
+      return { success: false, error: 'API key not configured' };
+    }
+    
+    console.log('OPENAI_REQUEST_STARTED', {
+      model,
+      messageLength: message.length,
+      contextLength: contextText.length,
+      detectedTheme
+    });
+    
+    const openai = new OpenAI({ apiKey });
+    
+    // Construir o prompt com contexto da NoemIA
+    const systemPrompt = [
+      "Você é Noemia, assistente do escritório Noêmia Paixão Advocacia.",
+      "Responda em português do Brasil com tom acolhedor, claro e profissional.",
+      "Seja útil mas não prometa resultados, não invente direito e não dê consultoria definitiva.",
+      "Foque em triagem e condução para atendimento humano quando necessário.",
+      "",
+      "Contexto disponível:",
+      contextText,
+      detectedTheme ? `\nTema jurídico detectado: ${detectedTheme}` : "",
+      "",
+      "Responda de forma curta a moderada, natural e organizada."
+    ].join('\n');
+    
+    const response = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ],
+      max_tokens: 500,
+      temperature: 0.7
+    });
+    
+    const responseText = response.choices[0]?.message?.content?.trim();
+    
+    if (!responseText) {
+      console.log('OPENAI_REQUEST_FAILED: Empty response');
+      return { success: false, error: 'Empty response' };
+    }
+    
+    console.log('OPENAI_REQUEST_SUCCESS', {
+      responseLength: responseText.length,
+      responseTime: Date.now() - startTime,
+      model
+    });
+    
+    return { success: true, response: responseText };
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('OPENAI_REQUEST_FAILED', {
+      error: errorMessage,
+      responseTime: Date.now() - startTime
+    });
+    
+    return { success: false, error: errorMessage };
+  }
+}
+
 async function generateIntelligentResponse(intent: string, userMessage: string, profile: PortalProfile | null, audience: string, sessionId?: string, urlContext?: URLContext): Promise<NoemiaResponse> {
+  const startTime = Date.now();
+  
   try {
     const context = sessionId ? getSessionContext(sessionId) : { history: [] } as SessionContext;
     const isFollowUp = context.lastIntent === intent && context.history.length > 1;
     const detectedTheme = detectLegalTheme(userMessage) || urlContext?.tema || context.lastTheme || null;
     
+    // 1. TENTAR CHAMADA REAL DA OPENAI (exceto para consultoria gratuita de visitors)
+    const shouldTryOpenAI = !(intent === 'legal_advice_request' && audience === 'visitor');
+    
+    if (shouldTryOpenAI) {
+      // Construir contexto baseado no perfil
+      let contextText = '';
+      
+      if (audience === 'staff' && profile) {
+        contextText = await buildStaffContext(profile);
+      } else if (audience === 'client' && profile) {
+        contextText = await buildClientContext(profile);
+      } else {
+        contextText = buildPublicContext();
+      }
+      
+      // Adicionar histórico da sessão se existir
+      if (context.history.length > 0) {
+        const recentHistory = context.history.slice(-4); // últimas 4 interações
+        const historyText = recentHistory
+          .map(item => `${item.role}: ${item.content}`)
+          .join('\n');
+        contextText += '\n\nHistórico recente da conversa:\n' + historyText;
+      }
+      
+      // Chamar OpenAI real
+      const openaiResult = await callOpenAI(userMessage, contextText, detectedTheme);
+      
+      if (openaiResult.success && openaiResult.response) {
+        // Sucesso da OpenAI - registrar métricas e retornar
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'openai',
+          timestamp: new Date(),
+          actions: [], // OpenAI não gera actions por padrão
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return {
+          message: openaiResult.response,
+          actions: [], // Pode ser personalizado depois se necessário
+          meta: { intent, profile: audience, source: 'openai' }
+        };
+      }
+      
+      // Falha da OpenAI - registrar e continuar para fallback
+      console.log('OPENAI_FALLBACK_USED', {
+        reason: openaiResult.error || 'unknown',
+        intent,
+        audience,
+        detectedTheme
+      });
+    }
+    
+    // 2. BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
+    if (intent === 'legal_advice_request' && audience === 'visitor') {
+      // Usar resposta controlada com valor parcial
+      const controlledResponse = generateControlledResponse(intent, detectedTheme || undefined, isFollowUp);
+      
+      recordNoemiaMetrics({
+        question: userMessage,
+        intent: controlledResponse.meta?.intent || intent,
+        profile: audience,
+        source: 'fallback',
+        timestamp: new Date(),
+        actions: controlledResponse.actions || [],
+        sessionId,
+        responseTime: Date.now() - startTime,
+        tema: detectedTheme || undefined,
+        origem: urlContext?.origem
+      });
+      
+      return controlledResponse;
+    }
+    
+    // 3. FALLBACK INTELIGENTE (quando OpenAI falha ou não deve ser usada)
+    
     // Evitar repetição: detectar se usuário está repetindo mesma pergunta
     const lastUserMessage = context.history[context.history.length - 1]?.content || "";
     const isRepeating = normalizeText(lastUserMessage) === normalizeText(userMessage);
     if (isRepeating && intent === "geral") {
-      return {
+      const fallbackResponse = {
         message: "Vamos organizar melhor sua dúvida! Posso ajudar com agendamentos, processos, documentos ou orientar sobre próximos passos. O que você precisa especificamente?",
         actions: [
           { label: "Iniciar atendimento", href: "/triagem" },
@@ -871,22 +1031,28 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
         ],
         meta: { intent: "avoid_repetition", profile: audience, source: "fallback" }
       };
+      
+      recordNoemiaMetrics({
+        question: userMessage,
+        intent: fallbackResponse.meta?.intent || intent,
+        profile: audience,
+        source: 'fallback',
+        timestamp: new Date(),
+        actions: fallbackResponse.actions || [],
+        sessionId,
+        responseTime: Date.now() - startTime,
+        tema: detectedTheme || undefined,
+        origem: urlContext?.origem
+      });
+      
+      return fallbackResponse;
     }
-    
-    // BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
-    if (intent === 'legal_advice_request' && audience === 'visitor') {
-      // Usar resposta controlada com valor parcial
-      const controlledResponse = generateControlledResponse(intent, detectedTheme || undefined, isFollowUp);
-      return controlledResponse;
-    }
-    
-    // Clientes nunca são bloqueados - sempre ajudam
     if (audience === 'client' && profile) {
       const workspace = await getClientWorkspace(profile);
       
       switch (intent) {
         case 'legal_advice_request':
-          return {
+          const clientAdviceResponse = {
             message: `Olá, ${profile.full_name}! Como cliente nosso, você tem direito a orientação completa. Para te ajudar melhor com sua situação específica, recomendo agendar uma consulta para analisarmos seu caso em detalhes. Você pode acessar seus documentos e processos pelo portal.`,
             actions: [
               { label: "Ver meu processo", href: "/cases" },
@@ -895,13 +1061,28 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
+          
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: clientAdviceResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return clientAdviceResponse;
         
         case 'agenda':
           const upcomingAppointments = workspace.appointments.filter(
             (apt: any) => new Date(apt.starts_at) >= new Date() && apt.status !== 'cancelled'
           ).length;
           const mainCase = workspace.cases[0];
-          return {
+          const agendaResponse = {
             message: isFollowUp
               ? `Sua agenda: ${upcomingAppointments} consulta(s) próxima(s). Status: "${mainCase?.statusLabel || 'Em andamento'}".`
               : `Sobre sua agenda, organizei para você: • ${upcomingAppointments} consulta(s) próxima(s) • Status do seu caso: "${mainCase?.statusLabel || 'Em andamento'}" • ${workspace.documentRequests.filter((req: any) => req.status === 'pending').length} documento(s) pendente(s). Mantenha seus documentos em dia para agilizar tudo!`,
@@ -912,10 +1093,25 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: agendaResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return agendaResponse;
+          
         case 'processos':
           const caseInfo = workspace.cases[0];
           const caseArea = caseInfo?.area || 'Jurídica';
-          return {
+          const processResponse = {
             message: isFollowUp
               ? `Seu processo está "${caseInfo?.statusLabel || 'Em andamento'}" na área ${caseArea}.`
               : `Sobre seu processo, ele está "${caseInfo?.statusLabel || 'Em andamento'}" na área ${caseArea}. ${workspace.documentRequests.length > 0 ? `Para continuar, aguardamos ${workspace.documentRequests.length} documento(s).` : 'Todos os documentos estão em ordem.'} Você pode enviar tudo pelo portal.`,
@@ -926,10 +1122,25 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: processResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return processResponse;
+          
         case 'documentos':
           const receivedDocs = workspace.documents.filter((doc: any) => doc.status === 'recebido').length;
           const pendingDocs = workspace.documents.filter((doc: any) => doc.status === 'pendente').length;
-          return {
+          const docsResponse = {
             message: isFollowUp
               ? `Documentos: ${receivedDocs} recebidos, ${pendingDocs} pendentes.`
               : `Sobre seus documentos, você tem ${receivedDocs} recebido(s) e ${pendingDocs} pendente(s). ${pendingDocs > 0 ? 'Envie os pendentes pelo portal para agilizar seu processo.' : 'Ótimo! Seus documentos estão em dia.'}`,
@@ -940,10 +1151,25 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: docsResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return docsResponse;
+          
         case 'saudacao':
           // Se tiver tema, usar mensagem contextual
           if (urlContext?.tema) {
-            return {
+            const saudacaoContextResponse = {
               message: getInitialMessage(urlContext.tema),
               actions: [
                 { label: "Agendar consulta", href: "/triagem.html?origem=noemia-consulta" },
@@ -951,9 +1177,24 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
               ],
               meta: { intent, profile: audience, source: "fallback" }
             };
+            
+            recordNoemiaMetrics({
+              question: userMessage,
+              intent,
+              profile: audience,
+              source: 'fallback',
+              timestamp: new Date(),
+              actions: saudacaoContextResponse.actions || [],
+              sessionId,
+              responseTime: Date.now() - startTime,
+              tema: detectedTheme || undefined,
+              origem: urlContext?.origem
+            });
+            
+            return saudacaoContextResponse;
           }
           
-          return {
+          const saudacaoResponse = {
             message: `Olá, ${profile.full_name}! Que bom ter você aqui. Sou a NoemIA e estou aqui para ajudar com sua jornada jurídica. Vejo que seu cadastro está "${workspace.clientRecord.status}" com ${workspace.cases.length} processo(s) em andamento. Como posso apoiar você hoje?`,
             actions: [
               { label: "Ver meu processo", href: "/cases" },
@@ -962,8 +1203,23 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: saudacaoResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return saudacaoResponse;
+          
         default:
-          return {
+          const defaultClientResponse = {
             message: `Seu cadastro está "${workspace.clientRecord.status}" com ${workspace.cases.length} processo(s) em andamento. Para informações detalhadas, você pode acessar o portal ou posso ajudar com algo específico.`,
             actions: [
               { label: "Ver meu painel", href: "/dashboard" },
@@ -971,6 +1227,21 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
+          
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: defaultClientResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return defaultClientResponse;
       }
     }
     
@@ -987,7 +1258,7 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
       
       switch (intent) {
         case 'legal_advice_request':
-          return {
+          const staffAdviceResponse = {
             message: `Vejo que você precisa de orientação jurídica. Tenho ${overview.latestCases.length} casos ativos no sistema. Os casos mais recentes são: ${topCases.map(c => c.title).slice(0, 2).join(' e ')}. Recomendo revisar o histórico completo do cliente antes de fornecer orientação.`,
             actions: [
               { label: "Ver casos recentes", href: "/internal/casos" },
@@ -996,13 +1267,28 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffAdviceResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffAdviceResponse;
+          
         case 'agenda':
           const todayItems = overview.operationalCenter.queues.today.slice(0, 5);
           const todaySummary = todayItems.length > 0 
             ? todayItems.map(item => `${item.kindLabel}: ${item.title}`).join('; ')
             : 'Nenhum item para hoje';
           
-          return {
+          const staffAgendaResponse = {
             message: isFollowUp 
               ? `Sua agenda operacional: ${overview.operationalCenter.summary.criticalCount} tarefas críticas e ${overview.operationalCenter.summary.todayCount} itens para hoje. Principais itens: ${todaySummary}`
               : `Sua agenda de hoje está organizada com ${overview.operationalCenter.summary.criticalCount} tarefas críticas e ${overview.operationalCenter.summary.todayCount} itens no total. Principais pendências: ${todaySummary}. ${overview.operationalCenter.summary.waitingClientCount > 0 ? `Além disso, ${overview.operationalCenter.summary.waitingClientCount} clientes estão aguardando seu retorno.` : ''}`,
@@ -1013,11 +1299,26 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffAgendaResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffAgendaResponse;
+          
         case 'clientes':
           const clientsAwaiting = awaitingClientItems.map(item => `${item.title} (${item.timingLabel})`).join('; ');
           const urgentClients = overview.latestClients.filter(c => c.statusLabel === 'Aguardando documentos').slice(0, 3);
           
-          return {
+          const staffClientesResponse = {
             message: isFollowUp
               ? `Situação dos clientes: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento. Pendências principais: ${clientsAwaiting || 'Nenhuma pendência crítica'}`
               : `Tenho ${overview.latestClients.length} clientes no sistema. Destaque para: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos${overview.operationalCenter.summary.waitingTeamCount > 0 ? ` e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento` : ''}. Pendências urgentes: ${clientsAwaiting || 'Nenhuma pendência crítica'}. ${urgentClients.length > 0 ? `Clientes precisando de atenção: ${urgentClients.map(c => c.fullName).join(', ')}.` : ''}`,
@@ -1028,11 +1329,26 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffClientesResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffClientesResponse;
+          
         case 'processos':
           const criticalCases = criticalItems.map(item => `${item.title} (${item.stateLabel})`).join('; ');
           const staleCasesInfo = overview.operationalCenter.summary.staleCasesCount;
           
-          return {
+          const staffProcessosResponse = {
             message: isFollowUp
               ? `Status dos processos: ${overview.latestCases.length} casos ativos, ${overview.operationalCenter.summary.criticalCount} críticos. ${staleCasesInfo > 0 ? `${staleCasesInfo} caso(s) sem atualização recente.` : 'Todos com atualizações recentes.'}`
               : `Tenho ${overview.latestCases.length} processos em andamento. Situação atual: ${overview.operationalCenter.summary.criticalCount} críticos e ${staleCasesInfo > 0 ? `${staleCasesInfo} caso(s) parado(s) há dias - precisa atenção` : 'todos com movimentação recente'}. Casos críticos: ${criticalCases || 'Nenhum caso crítico no momento'}. Próximos passos: atualizar status dos casos parados e contatar clientes com pendências.`,
@@ -1043,10 +1359,25 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffProcessosResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffProcessosResponse;
+          
         case 'documentos':
           const pendingDocsList = pendingDocs.map(doc => `${doc.title} (${doc.statusLabel})`).join('; ');
           
-          return {
+          const staffDocumentosResponse = {
             message: isFollowUp
               ? `Documentos: ${overdueDocs > 0 ? `${overdueDocs} vencido(s) há mais de 7 dias` : 'Nenhum documento vencido'}. Pendências atuais: ${pendingDocsList || 'Nenhuma pendência'}`
               : `Situação documental: ${overview.latestDocumentRequests.length} solicitações, ${pendingDocs.length} pendentes${overdueDocs > 0 ? ` e ${overdueDocs} vencida(s) há mais de 7 dias` : ''}. Pendências principais: ${pendingDocsList || 'Nenhuma pendência crítica'}. Ação recomendada: contatar clientes sobre documentos pendentes para não travar os casos.`,
@@ -1057,6 +1388,21 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffDocumentosResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffDocumentosResponse;
+          
         case 'prioridades':
           const prioritySummary = criticalItems.map(item => `${item.severity.toUpperCase()}: ${item.title} (${item.timingLabel})`).join('; ');
           const nextActions = [
@@ -1066,7 +1412,7 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             'Atualizar andamento dos casos'
           ].slice(0, 4);
           
-          return {
+          const staffPrioridadesResponse = {
             message: isFollowUp
               ? `Prioridades atualizadas: ${overview.operationalCenter.summary.criticalCount} críticas, ${overview.operationalCenter.summary.todayCount} para hoje.`
               : `Organizei suas prioridades operacionais: ${overview.operationalCenter.summary.criticalCount} tarefas críticas precisam atenção imediata. Principais prioridades: ${prioritySummary || 'Nenhuma prioridade crítica'}. Próximas ações recomendadas: ${nextActions.join(', ')}.`,
@@ -1077,6 +1423,21 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffPrioridadesResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffPrioridadesResponse;
+          
         case 'saudacao':
           const operationalSummary = [
             `${overview.operationalCenter.summary.criticalCount} tarefas críticas`,
@@ -1085,7 +1446,7 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             `${overview.latestClients.length} clientes`
           ].join(', ');
           
-          return {
+          const staffSaudacaoResponse = {
             message: `Olá! Sou a NoemIA, sua assistente operacional. Tenho tudo organizado para você: ${operationalSummary}. ${criticalItems.length > 0 ? `As prioridades de hoje são: ${criticalItems.slice(0, 2).map(item => item.title).join(' e ')}.` : 'Nenhuma prioridade crítica no momento.'} Como posso otimizar sua rotina hoje?`,
             actions: [
               { label: "Ver dashboard completo", href: "/internal" },
@@ -1094,8 +1455,23 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             meta: { intent, profile: audience, source: "fallback" }
           };
           
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffSaudacaoResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffSaudacaoResponse;
+          
         default:
-          return {
+          const staffDefaultResponse = {
             message: `Sua operação está com ${overview.operationalCenter.summary.criticalCount} itens críticos, ${overview.operationalCenter.summary.todayCount} tarefas para hoje e ${overview.operationalCenter.summary.waitingClientCount} clientes aguardando. Posso ajudar com: agenda, clientes específicos, processos, documentos ou prioridades. O que precisa organizar?`,
             actions: [
               { label: "Ver dashboard operacional", href: "/internal" },
@@ -1103,6 +1479,21 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
+          
+          recordNoemiaMetrics({
+            question: userMessage,
+            intent,
+            profile: audience,
+            source: 'fallback',
+            timestamp: new Date(),
+            actions: staffDefaultResponse.actions || [],
+            sessionId,
+            responseTime: Date.now() - startTime,
+            tema: detectedTheme || undefined,
+            origem: urlContext?.origem
+          });
+          
+          return staffDefaultResponse;
       }
     }
     
@@ -1110,6 +1501,19 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     if (audience === "visitor") {
       const themeResponse = buildVisitorThemeResponse(detectedTheme, isFollowUp, context);
       if (themeResponse) {
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent: themeResponse.meta?.intent || intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: themeResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
         return themeResponse;
       }
     }
@@ -1125,76 +1529,181 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
           ? 'Sobre agendamento, o primeiro passo é fazer sua triagem inicial.'
           : 'Entendi que você quer agendar algo. O primeiro passo é fazer sua triagem inicial para entendermos seu caso e depois a gente agenda sua consulta. É rápido e seguro!';
         
-        return {
+        const visitorAgendaResponse = {
           message: adaptMessageByLeadTemperature(baseMessageAgenda, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorAgendaResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorAgendaResponse;
         
       case 'clientes':
         const baseMessageClientes = isFollowUp
           ? 'Para informações sobre seus casos, faça login no portal.'
           : 'Sobre seus processos e documentos, o ideal é você acessar o portal do cliente. Lá você encontra tudo atualizado e pode enviar novos documentos quando precisar.';
         
-        return {
+        const visitorClientesResponse = {
           message: adaptMessageByLeadTemperature(baseMessageClientes, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorClientesResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorClientesResponse;
       case 'processos':
         const baseMessageProcessos = isFollowUp
           ? 'Seus processos são acompanhados com dedicação. Acesse o portal para detalhes.'
           : 'Seus processos são acompanhados com toda dedicação pela nossa equipe. Para status detalhados e acompanhamento em tempo real, acesse o portal do cliente ou fale com nossa equipe.';
         
-        return {
+        const visitorProcessosResponse = {
           message: adaptMessageByLeadTemperature(baseMessageProcessos, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorProcessosResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorProcessosResponse;
         
       case 'documentos':
         const baseMessageDocumentos = isFollowUp
           ? 'Mantenha seus documentos organizados pelo portal.'
           : 'Documentos organizados fazem toda a diferença! Mantenha seus arquivos atualizados pelo portal - isso agiliza muito seu processo e evita solicitações adicionais.';
         
-        return {
+        const visitorDocumentosResponse = {
           message: adaptMessageByLeadTemperature(baseMessageDocumentos, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorDocumentosResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorDocumentosResponse;
         
       case 'prioridades':
         const baseMessagePrioridades = isFollowUp
           ? 'Suas prioridades estão sendo organizadas pela equipe.'
           : 'Suas prioridades estão sendo organizadas com cuidado pela nossa equipe. Para acompanhar tudo, acesse regularmente o portal e mantenha seus documentos em dia.';
         
-        return {
+        const visitorPrioridadesResponse = {
           message: adaptMessageByLeadTemperature(baseMessagePrioridades, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorPrioridadesResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorPrioridadesResponse;
         
       case 'saudacao':
         const baseMessageSaudacao = isFollowUp
           ? 'Olá novamente! Estou aqui para ajudar. Quer conversar sobre seu caso ou precisa de algo específico?'
           : 'Olá! Sou a NoemIA, sua assistente jurídica. Posso te ajudar com casos de aposentadoria, descontos bancários, família, trabalhista ou agendar uma consulta. Como posso te ajudar hoje?';
         
-        return {
+        const visitorSaudacaoResponse = {
           message: adaptMessageByLeadTemperature(baseMessageSaudacao, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorSaudacaoResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorSaudacaoResponse;
         
       default:
         const baseMessageDefault = isFollowUp
           ? 'Vamos direto ao ponto! Posso te ajudar com: aposentadoria/INSS, descontos bancários, pensão alimentícia, divórcio, questões trabalhistas ou agendar consulta. Qual é o seu caso?'
           : 'Sou especialista em ajudar com casos jurídicos. Posso te orientar sobre: aposentadoria/INSS, descontos indevidos, pensão, divórcio, direito trabalhista ou agendar uma consulta. Me conte sua situação!';
         
-        return {
+        const visitorDefaultResponse = {
           message: adaptMessageByLeadTemperature(baseMessageDefault, temperature, urgency),
           actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
+        
+        recordNoemiaMetrics({
+          question: userMessage,
+          intent,
+          profile: audience,
+          source: 'fallback',
+          timestamp: new Date(),
+          actions: visitorDefaultResponse.actions || [],
+          sessionId,
+          responseTime: Date.now() - startTime,
+          tema: detectedTheme || undefined,
+          origem: urlContext?.origem
+        });
+        
+        return visitorDefaultResponse;
     }
   } catch (error) {
     console.warn('[noemia] Erro ao obter dados reais para fallback inteligente:', error);

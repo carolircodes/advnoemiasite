@@ -212,6 +212,7 @@ export function generateClientMessage(
       );
     
     case "appointment_scheduled":
+    case "new_appointment":
       return ClientMessageTemplates.appointmentScheduled(
         clientName,
         additionalData?.dateTime || "Data a definir",

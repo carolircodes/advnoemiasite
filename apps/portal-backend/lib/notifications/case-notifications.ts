@@ -12,7 +12,7 @@ export interface CaseNotificationInput {
   clientName: string;
   caseId: string;
   caseTitle: string;
-  eventType: "case_update" | "status_change" | "new_document" | "appointment_updated";
+  eventType: "case_update" | "status_change" | "new_document" | "document_request" | "new_appointment" | "appointment_updated";
   title: string;
   publicSummary: string;
   internalNote?: string;
