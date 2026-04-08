@@ -139,13 +139,55 @@ export async function POST(request: NextRequest) {
   try {
     const data = JSON.parse(body);
 
-    console.log("PAYLOAD_OBJECT:", data.object);
-    console.log("ENTRY_RAW:", JSON.stringify(data.entry, null, 2));
+    // LOGS SEGUROS DA ESTRUTURA REAL
+    console.log("ENTRY_COUNT:", data.entry?.length || 0);
+    console.log("ENTRY_KEYS:", data.entry?.length > 0 ? Object.keys(data.entry[0] || {}) : []);
+    console.log("FIRST_ENTRY_KEYS:", data.entry?.length > 0 ? Object.keys(data.entry[0] || {}) : []);
+
+    if (data.entry?.length > 0) {
+      const firstEntry = data.entry[0];
+      const messagingCount = firstEntry.messaging?.length || 0;
+      const changesCount = firstEntry.changes?.length || 0;
+
+      console.log("MESSAGING_COUNT:", messagingCount);
+      console.log("CHANGES_COUNT:", changesCount);
+
+      if (changesCount > 0) {
+        const firstChange = firstEntry.changes[0];
+        console.log("CHANGE_FIELD:", firstChange.field);
+        console.log("CHANGE_VALUE_KEYS:", Object.keys(firstChange.value || {}));
+      }
+
+      if (messagingCount > 0) {
+        const firstMessaging = firstEntry.messaging[0];
+        console.log("MESSAGE_KEYS:", Object.keys(firstMessaging || {}));
+      }
+    }
+
+    // LOG RESUMIDO DO PRIMEIRO EVENTO
+    if (data.entry?.length > 0) {
+      const firstEntry = data.entry[0];
+      const eventSummary = {
+        object: data.object,
+        entryKeys: Object.keys(firstEntry),
+        hasMessaging: !!firstEntry.messaging,
+        hasChanges: !!firstEntry.changes,
+        changeField: firstEntry.changes?.[0]?.field,
+        changeValueKeys: Object.keys(firstEntry.changes?.[0]?.value || {}),
+        senderKeys: firstEntry.messaging?.[0]?.sender ? Object.keys(firstEntry.messaging[0].sender) : null,
+        recipientKeys: firstEntry.messaging?.[0]?.recipient ? Object.keys(firstEntry.messaging[0].recipient) : null,
+        messageKeys: firstEntry.messaging?.[0]?.message ? Object.keys(firstEntry.messaging[0].message) : null,
+        hasText: !!(firstEntry.messaging?.[0]?.message?.text || firstEntry.changes?.[0]?.value?.messages?.[0]?.text),
+        hasMid: !!(firstEntry.messaging?.[0]?.message?.mid || firstEntry.changes?.[0]?.value?.messages?.[0]?.mid)
+      };
+      console.log("EVENT_SUMMARY:", JSON.stringify(eventSummary, null, 2));
+    }
 
     if (data.object === "instagram") {
       for (const entry of data.entry || []) {
         // Process entry.messaging format
         for (const messaging of entry.messaging || []) {
+          console.log("INSTAGRAM_STRUCTURE_MATCHED: messaging");
           if (!messaging.message?.text) {
             console.log("EVENT_IGNORED_NO_MESSAGE: messaging structure without message.text");
             continue;
@@ -158,7 +200,7 @@ export async function POST(request: NextRequest) {
             console.log("EVENT_IGNORED_NO_TEXT: messaging structure with empty text");
             continue;
           }
-          
+
           console.log("INSTAGRAM_MESSAGE_STRUCTURE_DETECTED: messaging");
           console.log("INSTAGRAM_SENDER_EXTRACTED:", messaging.sender.id);
           console.log("INSTAGRAM_TEXT_EXTRACTED:", messaging.message.text);
@@ -171,11 +213,12 @@ export async function POST(request: NextRequest) {
 
         // Process entry.changes format
         for (const change of entry.changes || []) {
+          console.log("INSTAGRAM_STRUCTURE_MATCHED: changes");
           if (change.field !== "messages") {
             console.log("EVENT_IGNORED_UNSUPPORTED_STRUCTURE: changes field not 'messages'", { field: change.field });
             continue;
           }
-          
+
           console.log("INSTAGRAM_MESSAGE_STRUCTURE_DETECTED: changes");
           const messages = change.value?.messages || [];
 
@@ -192,7 +235,7 @@ export async function POST(request: NextRequest) {
               console.log("EVENT_IGNORED_NO_TEXT: changes message with empty text");
               continue;
             }
-            
+
             console.log("INSTAGRAM_SENDER_EXTRACTED:", message.from.id);
             console.log("INSTAGRAM_TEXT_EXTRACTED:", message.text);
 
