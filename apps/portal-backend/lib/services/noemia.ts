@@ -866,6 +866,14 @@ async function callOpenAI(
     const apiKey = process.env.OPENAI_API_KEY;
     const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
     
+    console.log('=== OPENAI_CALL_START ===');
+    console.log('MODEL:', model);
+    console.log('API_KEY_EXISTS:', !!apiKey);
+    console.log('API_KEY_LENGTH:', apiKey?.length || 0);
+    console.log('MESSAGE_LENGTH:', message.length);
+    console.log('CONTEXT_LENGTH:', contextText.length);
+    console.log('DETECTED_THEME:', detectedTheme || 'none');
+    
     if (!apiKey) {
       console.log('OPENAI_REQUEST_FAILED: API key not configured');
       return { success: false, error: 'API key not configured' };
@@ -894,6 +902,8 @@ async function callOpenAI(
       "Responda de forma curta a moderada, natural e organizada."
     ].join('\n');
     
+    console.log('OPENAI_API_CALL: Making request to OpenAI API');
+    
     const response = await openai.chat.completions.create({
       model,
       messages: [
@@ -903,6 +913,8 @@ async function callOpenAI(
       max_tokens: 500,
       temperature: 0.7
     });
+    
+    console.log('OPENAI_API_RESPONSE: Received response from OpenAI');
     
     const responseText = response.choices[0]?.message?.content?.trim();
     
@@ -917,6 +929,10 @@ async function callOpenAI(
       model
     });
     
+    console.log('=== OPENAI_CALL_SUCCESS ===');
+    console.log('RESPONSE_LENGTH:', responseText.length);
+    console.log('RESPONSE_TIME:', Date.now() - startTime, 'ms');
+    
     return { success: true, response: responseText };
     
   } catch (error) {
@@ -926,6 +942,10 @@ async function callOpenAI(
       responseTime: Date.now() - startTime
     });
     
+    console.log('=== OPENAI_CALL_FAILED ===');
+    console.log('ERROR:', errorMessage);
+    console.log('RESPONSE_TIME:', Date.now() - startTime, 'ms');
+    
     return { success: false, error: errorMessage };
   }
 }
@@ -933,24 +953,44 @@ async function callOpenAI(
 async function generateIntelligentResponse(intent: string, userMessage: string, profile: PortalProfile | null, audience: string, sessionId?: string, urlContext?: URLContext): Promise<NoemiaResponse> {
   const startTime = Date.now();
   
+  console.log('=== GENERATE_INTELLIGENT_RESPONSE_START ===');
+  console.log('INTENT:', intent);
+  console.log('MESSAGE:', userMessage);
+  console.log('AUDIENCE:', audience);
+  console.log('SESSION_ID:', sessionId || 'none');
+  console.log('URL_CONTEXT:', urlContext || 'none');
+  
   try {
     const context = sessionId ? getSessionContext(sessionId) : { history: [] } as SessionContext;
     const isFollowUp = context.lastIntent === intent && context.history.length > 1;
     const detectedTheme = detectLegalTheme(userMessage) || urlContext?.tema || context.lastTheme || null;
     
+    console.log('DETECTED_THEME:', detectedTheme || 'none');
+    console.log('IS_FOLLOW_UP:', isFollowUp);
+    console.log('HISTORY_LENGTH:', context.history.length);
+    
     // 1. TENTAR CHAMADA REAL DA OPENAI (exceto para consultoria gratuita de visitors)
     const shouldTryOpenAI = !(intent === 'legal_advice_request' && audience === 'visitor');
     
+    console.log('SHOULD_TRY_OPENAI:', shouldTryOpenAI);
+    console.log('LEGAL_ADVICE_REQUEST:', intent === 'legal_advice_request');
+    console.log('IS_VISITOR:', audience === 'visitor');
+    
     if (shouldTryOpenAI) {
+      console.log('=== OPENAI_ELIGIBLE ===');
+      
       // Construir contexto baseado no perfil
       let contextText = '';
       
       if (audience === 'staff' && profile) {
         contextText = await buildStaffContext(profile);
+        console.log('CONTEXT_TYPE: staff');
       } else if (audience === 'client' && profile) {
         contextText = await buildClientContext(profile);
+        console.log('CONTEXT_TYPE: client');
       } else {
         contextText = buildPublicContext();
+        console.log('CONTEXT_TYPE: public');
       }
       
       // Adicionar histórico da sessão se existir
@@ -960,12 +1000,22 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
           .map(item => `${item.role}: ${item.content}`)
           .join('\n');
         contextText += '\n\nHistórico recente da conversa:\n' + historyText;
+        console.log('HISTORY_ADDED: true');
+        console.log('HISTORY_ENTRIES:', recentHistory.length);
+      } else {
+        console.log('HISTORY_ADDED: false');
       }
       
+      console.log('CONTEXT_LENGTH:', contextText.length);
+      
       // Chamar OpenAI real
+      console.log('=== CALLING_OPENAI ===');
       const openaiResult = await callOpenAI(userMessage, contextText, detectedTheme);
       
       if (openaiResult.success && openaiResult.response) {
+        console.log('=== OPENAI_SUCCESS ===');
+        console.log('OPENAI_RESPONSE_LENGTH:', openaiResult.response.length);
+        
         // Sucesso da OpenAI - registrar métricas e retornar
         recordNoemiaMetrics({
           question: userMessage,
@@ -987,6 +1037,9 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
         };
       }
       
+      console.log('=== OPENAI_FAILED ===');
+      console.log('OPENAI_ERROR:', openaiResult.error || 'unknown');
+      
       // Falha da OpenAI - registrar e continuar para fallback
       console.log('OPENAI_FALLBACK_USED', {
         reason: openaiResult.error || 'unknown',
@@ -994,10 +1047,15 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
         audience,
         detectedTheme
       });
+    } else {
+      console.log('=== OPENAI_SKIPPED ===');
+      console.log('SKIP_REASON: legal_advice_request + visitor');
     }
     
     // 2. BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
     if (intent === 'legal_advice_request' && audience === 'visitor') {
+      console.log('=== LEGAL_ADVICE_BLOCK ===');
+      
       // Usar resposta controlada com valor parcial
       const controlledResponse = generateControlledResponse(intent, detectedTheme || undefined, isFollowUp);
       

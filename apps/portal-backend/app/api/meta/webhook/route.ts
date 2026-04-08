@@ -24,12 +24,26 @@ function logEvent(
 }
 
 function verifySignature(body: string, signature: string): boolean {
-  // LOGS DE DIAGNÓSTICO SEGURO
+  // LOGS DE DIAGNÓSTICO SEGURO E DETALHADO
+  console.log("=== SIGNATURE_VALIDATION_DEBUG ===");
+  console.log("ENV_VAR_USED: META_APP_SECRET");
   console.log("SIGNATURE_HEADER_PRESENT:", !!signature);
   console.log("SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : null);
   console.log("META_APP_SECRET_PRESENT:", !!APP_SECRET);
   console.log("META_APP_SECRET_LENGTH:", APP_SECRET?.length || 0);
   console.log("RAW_BODY_LENGTH:", body.length);
+  
+  // Log do nome exato da variável sendo usada
+  console.log("APP_SECRET_VAR_NAME: META_APP_SECRET");
+  
+  // Verificar se há valores alternativos ou fallbacks
+  const altSecret1 = process.env.META_APP_SECRET;
+  const altSecret2 = process.env.APP_SECRET;
+  const altSecret3 = process.env.INSTAGRAM_APP_SECRET;
+  
+  console.log("ALT_META_APP_SECRET_PRESENT:", !!altSecret1);
+  console.log("ALT_APP_SECRET_PRESENT:", !!altSecret2);
+  console.log("ALT_INSTAGRAM_APP_SECRET_PRESENT:", !!altSecret3);
   
   // Hash do body para diagnóstico (sem expor conteúdo)
   const bodyHash = createHmac("sha256", "debug").update(body, "utf8").digest("hex").substring(0, 16);
@@ -40,15 +54,41 @@ function verifySignature(body: string, signature: string): boolean {
     return false;
   }
 
+  // Verificar se o body está intacto (antes de qualquer parse)
+  console.log("BODY_IS_STRING:", typeof body === 'string');
+  console.log("BODY_HAS_CONTENT:", body.length > 0);
+  
+  // Calcular assinatura esperada
   const expectedSignature = `sha256=${createHmac("sha256", APP_SECRET)
     .update(body, "utf8")
     .digest("hex")}`;
     
   console.log("EXPECTED_SIGNATURE_PREFIX:", expectedSignature.substring(0, 20));
+  console.log("RECEIVED_SIGNATURE_PREFIX:", signature.substring(0, 20));
   console.log("SIGNATURE_MATCH:", signature === expectedSignature);
   
+  // Log adicional para diagnóstico
   if (signature !== expectedSignature) {
-    console.log("SIGNATURE_DIAGNOSIS: Signature mismatch - possible APP_SECRET incorrect");
+    console.log("SIGNATURE_DIAGNOSIS: Signature mismatch - possible causes:");
+    console.log("1. META_APP_SECRET incorrect in Vercel env vars");
+    console.log("2. Body mutated before signature calculation");
+    console.log("3. Different app configured in Meta Developers");
+    console.log("4. Encoding issue with body text");
+    
+    // Tentar com secrets alternativos se existirem
+    if (altSecret2 && altSecret2 !== APP_SECRET) {
+      const altSignature = `sha256=${createHmac("sha256", altSecret2)
+        .update(body, "utf8")
+        .digest("hex")}`;
+      console.log("ALT_APP_SECRET_MATCH:", signature === altSignature);
+    }
+    
+    if (altSecret3 && altSecret3 !== APP_SECRET) {
+      const altSignature = `sha256=${createHmac("sha256", altSecret3)
+        .update(body, "utf8")
+        .digest("hex")}`;
+      console.log("ALT_INSTAGRAM_APP_SECRET_MATCH:", signature === altSignature);
+    }
   } else {
     console.log("SIGNATURE_DIAGNOSIS: Signature valid");
   }
@@ -164,10 +204,23 @@ async function handleUnsupportedInstagramMessage(senderId: string, messageType: 
 
 async function processMessageWithNoemia(senderId: string, messageText: string) {
   try {
+    console.log('=== INSTAGRAM_MESSAGE_RECEIVED ===');
+    console.log('SENDER_ID:', senderId);
+    console.log('MESSAGE:', messageText);
+    console.log('LENGTH:', messageText.length);
+    
     logEvent("INSTAGRAM_CALLING_NOEMIA", {
       senderId,
       messageLength: messageText.length
     });
+
+    // Verificar se OpenAI está configurada
+    const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+    const openAIModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+    
+    console.log('INSTAGRAM_OPENAI_ELIGIBLE: true');
+    console.log('INSTAGRAM_OPENAI_KEY_EXISTS:', hasOpenAIKey);
+    console.log('INSTAGRAM_OPENAI_MODEL:', openAIModel);
 
     // Usar a lógica centralizada da NoemIA
     const response = await answerNoemia({
@@ -176,26 +229,46 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
       history: []
     }, null);
 
+    console.log('INSTAGRAM_NOEMIA_RESPONSE_RECEIVED');
+    console.log('RESPONSE_LENGTH:', response.answer?.length || 0);
+    console.log('RESPONSE_SOURCE:', response.meta?.source || 'unknown');
+    
     logEvent("INSTAGRAM_NOEMIA_RESPONSE", {
       senderId,
       responseLength: response.answer?.length || 0,
-      audience: response.audience
+      audience: response.audience,
+      source: response.meta?.source
     });
 
+    // Log específico baseado na fonte
+    if (response.meta?.source === 'openai') {
+      console.log('INSTAGRAM_OPENAI_SUCCESS: OpenAI responded successfully');
+    } else if (response.meta?.source === 'fallback') {
+      console.log('INSTAGRAM_FALLBACK_USED: Fallback was used');
+    } else {
+      console.log('INSTAGRAM_SOURCE_UNKNOWN: Unknown response source');
+    }
+
+    console.log('=== INSTAGRAM_SEND_ATTEMPT ===');
     const sent = await sendInstagramMessage(senderId, response.answer || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
     if (sent) {
+      console.log('INSTAGRAM_SEND_SUCCESS: Message sent successfully');
       logEvent("INSTAGRAM_RESPONSE_SENT", {
         senderId,
         responseLength: response.answer?.length || 0
       });
     } else {
+      console.log('INSTAGRAM_SEND_FAILED: Failed to send message');
       logEvent("INSTAGRAM_RESPONSE_FAILED", {
         senderId,
         responseLength: response.answer?.length || 0
       }, "error");
     }
   } catch (error) {
+    console.log('INSTAGRAM_NOEMIA_ERROR: Error in processMessageWithNoemia');
+    console.log('ERROR:', error instanceof Error ? error.message : String(error));
+    
     logEvent("INSTAGRAM_NOEMIA_ERROR", {
       senderId,
       error: error instanceof Error ? error.message : String(error)
@@ -204,9 +277,11 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
     // Fallback para mensagem fixa em caso de erro
     const fallbackResponse = "Oi! Vi que você enviou uma mensagem. Vou te explicar de forma simples o que pode estar acontecendo no seu caso. Muitas pessoas passam por isso sem saber que podem ter um direito não reconhecido. Se você quiser, posso entender melhor sua situação.";
     
+    console.log('=== INSTAGRAM_FALLBACK_ATTEMPT ===');
     const sent = await sendInstagramMessage(senderId, fallbackResponse);
     
     if (sent) {
+      console.log('INSTAGRAM_FALLBACK_SENT: Fallback message sent');
       logEvent("INSTAGRAM_FALLBACK_SENT", {
         senderId,
         responseLength: fallbackResponse.length

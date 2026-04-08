@@ -374,10 +374,23 @@ export async function POST(request: NextRequest) {
 // Processar mensagem de texto usando lógica centralizada da NoemIA
 async function processTextMessage(messageInfo: any) {
   try {
+    console.log('=== WHATSAPP_MESSAGE_RECEIVED ===');
+    console.log('FROM:', messageInfo.from);
+    console.log('CONTENT:', messageInfo.content);
+    console.log('LENGTH:', messageInfo.content?.length || 0);
+    
     logEvent('WHATSAPP_CALLING_NOEMIA', {
       from: messageInfo.from,
       message: messageInfo.content
     });
+
+    // Verificar se OpenAI está configurada
+    const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+    const openAIModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+    
+    console.log('WHATSAPP_OPENAI_ELIGIBLE: true');
+    console.log('WHATSAPP_OPENAI_KEY_EXISTS:', hasOpenAIKey);
+    console.log('WHATSAPP_OPENAI_MODEL:', openAIModel);
 
     // Usar a lógica centralizada da NoemIA
     const response = await answerNoemia({
@@ -386,26 +399,45 @@ async function processTextMessage(messageInfo: any) {
       history: []
     }, null);
 
+    console.log('WHATSAPP_NOEMIA_RESPONSE_RECEIVED');
+    console.log('RESPONSE_LENGTH:', response.answer?.length || 0);
+    console.log('RESPONSE_SOURCE:', response.meta?.source || 'unknown');
+    
     logEvent('WHATSAPP_NOEMIA_RESPONSE', {
       from: messageInfo.from,
       responseLength: response.answer?.length || 0,
-      audience: response.audience
+      audience: response.audience,
+      source: response.meta?.source
     });
+    
+    // Log específico baseado na fonte
+    if (response.meta?.source === 'openai') {
+      console.log('WHATSAPP_OPENAI_SUCCESS: OpenAI responded successfully');
+    } else if (response.meta?.source === 'fallback') {
+      console.log('WHATSAPP_FALLBACK_USED: Fallback was used');
+    } else {
+      console.log('WHATSAPP_SOURCE_UNKNOWN: Unknown response source');
+    }
     
     const sent = await sendWhatsAppResponse(messageInfo.from, response.answer || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
     if (sent) {
+      console.log('WHATSAPP_RESPONSE_SENT: Message sent successfully');
       logEvent('WHATSAPP_RESPONSE_SENT', {
         from: messageInfo.from,
         responseLength: response.answer?.length || 0
       });
     } else {
+      console.log('WHATSAPP_RESPONSE_FAILED: Failed to send message');
       logEvent('WHATSAPP_RESPONSE_FAILED', {
         from: messageInfo.from,
         responseLength: response.answer?.length || 0
       }, 'error');
     }
   } catch (error) {
+    console.log('WHATSAPP_NOEMIA_ERROR: Error in processTextMessage');
+    console.log('ERROR:', error instanceof Error ? error.message : String(error));
+    
     logEvent('WHATSAPP_NOEMIA_ERROR', {
       from: messageInfo.from,
       error: error instanceof Error ? error.message : String(error)
@@ -417,6 +449,7 @@ async function processTextMessage(messageInfo: any) {
     const sent = await sendWhatsAppResponse(messageInfo.from, fallbackResponse);
     
     if (sent) {
+      console.log('WHATSAPP_FALLBACK_SENT: Fallback message sent');
       logEvent('WHATSAPP_FALLBACK_SENT', {
         from: messageInfo.from,
         responseLength: fallbackResponse.length
