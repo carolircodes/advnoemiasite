@@ -356,7 +356,7 @@ export async function POST(request: NextRequest) {
 // Processar mensagem de texto
 async function processTextMessage(messageInfo: any) {
   // Resposta automática FIXA sem dependência de IA
-  const fixedResponse = "Olá! Recebi sua mensagem e já vou te ajudar.";
+  const fixedResponse = "Oi! Vi que você comentou no vídeo 👩‍⚖️✨\n\nVou te explicar de forma simples o que pode estar acontecendo no seu caso.\n\nMuitas pessoas passam por isso sem saber que podem ter um direito que não foi reconhecido, seja por erro na análise ou por falta de orientação correta.\n\nSe você quiser, posso entender melhor sua situação e te orientar com mais precisão.";
   
   logEvent('WHATSAPP_ABOUT_TO_SEND', {
     from: messageInfo.from,
