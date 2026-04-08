@@ -252,6 +252,10 @@ export type SessionContext = {
       urgency?: string;
     };
   };
+  lead?: {
+    temperature: "cold" | "warm" | "hot";
+    urgency: "low" | "medium" | "high";
+  };
 };
 
 // Armazenamento simples em memória para contexto de sessão
@@ -293,6 +297,15 @@ export function updateSessionContext(sessionId: string, message: string, intent:
   context.lastMessage = message;
   context.profile = profile;
   context.lastTheme = theme ?? context.lastTheme ?? null;
+  
+  // LEAD SCORING - detectar e salvar temperatura/urgência
+  const temperature = detectLeadTemperature(message);
+  const urgency = detectUrgencyLevel(message);
+  context.lead = {
+    temperature,
+    urgency
+  };
+  
   context.history.push({
     role: "user",
     content: message,
@@ -373,54 +386,170 @@ function inferUrgency(message: string): string | null {
   return null;
 }
 
-function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean): NoemiaResponse | null {
+// LEAD SCORING - DETECTAR TEMPERATURA DO LEAD
+function detectLeadTemperature(message: string): "cold" | "warm" | "hot" {
+  const normalizedMessage = normalizeText(message);
+  
+  // HOT: dor + urgência + prejuízo claro
+  if (/(urgente|prejuizo|bloque|desconto|nao paga|negado|parou|atrasado|dificuldade|perdi|perdendo|estou sem|nao consigo|preciso urgentemente|socorro|ajuda urgente)/.test(normalizedMessage) &&
+      /(meses|anos|semanas|tempo|há muito)/.test(normalizedMessage)) {
+    return "hot";
+  }
+  
+  // WARM: problema descrito mas sem urgência clara
+  if (/(problema|situacao|caso|questao|dificuldade|duvida|tenho|estou com|preciso|gostaria)/.test(normalizedMessage) &&
+      /(aposent|desconto|pensao|divorcio|trabalhista|familia|banco|inss)/.test(normalizedMessage)) {
+    return "warm";
+  }
+  
+  // COLD: pergunta genérica ou informativa
+  return "cold";
+}
+
+// DETECTAR NÍVEL DE URGENCIA
+function detectUrgencyLevel(message: string): "low" | "medium" | "high" {
+  const normalizedMessage = normalizeText(message);
+  
+  // HIGH: urgência clara + prejuízo
+  if (/(urgente|preciso urgentemente|socorro|ajuda urgente|bloque|perdi|estou sem|nao consigo|imediato|agora|hoje)/.test(normalizedMessage) ||
+      /(prejuizo|prejuízo|perdendo dinheiro|multa|juros altos|corte|suspensao)/.test(normalizedMessage)) {
+    return "high";
+  }
+  
+  // MEDIUM: problema sem urgência clara
+  if (/(problema|situacao|caso|questao|dificuldade|preciso|gostaria|meses|semanas)/.test(normalizedMessage)) {
+    return "medium";
+  }
+  
+  // LOW: dúvida inicial
+  return "low";
+}
+
+// CONSTRUIR CTA INTELIGENTE BASEADO EM TEMPERATURA E URGENCIA
+function buildSmartCTA(temperature: "cold" | "warm" | "hot", urgency: "low" | "medium" | "high"): NoemiaAction[] {
+  // COLD: linguagem leve, CTA suave
+  if (temperature === "cold") {
+    return [
+      { label: "Conhecer serviços", href: "/services" },
+      { label: "Iniciar atendimento", href: "/triagem" }
+    ];
+  }
+  
+  // WARM: orientação + direção, CTA médio
+  if (temperature === "warm") {
+    return [
+      { label: "Iniciar triagem", href: "/triagem" },
+      { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
+    ];
+  }
+  
+  // HOT: linguagem firme, senso de urgência, CTA direto
+  if (temperature === "hot" || urgency === "high") {
+    return [
+      { label: "Agendar consulta urgente", href: "/triagem.html?origem=urgente" },
+      { label: "WhatsApp urgente", href: "https://wa.me/5511999999999" },
+      { label: "Falar com advogada", href: "/contact" }
+    ];
+  }
+  
+  // Default
+  return [
+    { label: "Iniciar atendimento", href: "/triagem" }
+  ];
+}
+
+// ADAPTAR MENSAGEM BASEADO EM TEMPERATURA E URGENCIA
+function adaptMessageByLeadTemperature(baseMessage: string, temperature: "cold" | "warm" | "hot", urgency: "low" | "medium" | "high"): string {
+  // COLD: linguagem leve
+  if (temperature === "cold") {
+    return baseMessage + " Se tiver alguma dúvida específica, é só me contar!";
+  }
+  
+  // WARM: orientação + direção
+  if (temperature === "warm") {
+    return baseMessage + " Vamos organizar seu caso para te dar a melhor orientação possível.";
+  }
+  
+  // HOT: linguagem firme, senso de urgência
+  if (temperature === "hot" || urgency === "high") {
+    return baseMessage + " Sua situação requer atenção imediata. Vamos resolver isso agora mesmo.";
+  }
+  
+  return baseMessage;
+}
+
+function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, context?: SessionContext): NoemiaResponse | null {
+  const temperature = context?.lead?.temperature || "cold";
+  const urgency = context?.lead?.urgency || "low";
+  const smartCTA = buildSmartCTA(temperature, urgency);
+  
   switch (theme) {
     case "aposentadoria":
+      const baseMessageAposentadoria = isFollowUp
+        ? "Sobre aposentadoria, preciso entender: você já tentou solicitar o benefício? Foi negado? Ainda não começou o processo?"
+        : "Sobre aposentadoria, posso te orientar melhor. Você já tentou solicitar o benefício ou ainda está planejando? O INSS negou algum pedido?";
+      
       return {
-        message: isFollowUp
-          ? "Entendi. Para te orientar melhor sobre aposentadoria, me conta o que exatamente está acontecendo no seu caso."
-          : "Entendi. Sobre aposentadoria, cada situação pode mudar conforme tempo de contribuição, benefício e documentos. Me conta: o que exatamente está acontecendo no seu caso?",
-        actions: [
-          { label: "Iniciar atendimento", href: "/triagem" },
-          { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
-        ],
+        message: adaptMessageByLeadTemperature(baseMessageAposentadoria, temperature, urgency),
+        actions: smartCTA,
         meta: { intent: "theme_aposentadoria", profile: "visitor", source: "fallback" }
       };
+      
     case "desconto-indevido":
+      const baseMessageDesconto = isFollowUp
+        ? "Sobre desconto indevido, preciso saber: qual banco está fazendo o desconto? É empréstimo, tarifa ou outro tipo de cobrança?"
+        : "Entendi sobre desconto indevido. Qual banco está fazendo essa cobrança? Você reconhece o valor ou parece ser algo que não contratou?";
+      
       return {
-        message: isFollowUp
-          ? "Entendi. Sobre esse desconto ou cobrança, me conta melhor o que está acontecendo para eu te direcionar com mais precisão."
-          : "Entendi. Quando existe desconto indevido ou cobrança irregular, é importante entender a origem e há quanto tempo isso acontece. Me conta melhor o que está acontecendo.",
-        actions: [
-          { label: "Iniciar atendimento", href: "/triagem" },
-          { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
-        ],
+        message: adaptMessageByLeadTemperature(baseMessageDesconto, temperature, urgency),
+        actions: smartCTA,
         meta: { intent: "theme_desconto_indevido", profile: "visitor", source: "fallback" }
       };
+      
     case "pensao":
-    case "divorcio":
-    case "familia":
+      const baseMessagePensao = isFollowUp
+        ? "Sobre pensão alimentícia, me diga: você precisa receber ou está sendo cobrado? Já tem acordo judicial?"
+        : "Sobre pensão alimentícia, você precisa receber valores ou está sendo cobrado para pagar? Já existe algum processo ou acordo?";
+      
       return {
-        message: isFollowUp
-          ? "Entendi. Em direito de família, alguns detalhes mudam bastante a orientação inicial. Me conta o que está acontecendo no seu caso."
-          : "Entendi. Em questões de família, o contexto faz muita diferença. Me conta o que está acontecendo no seu caso para eu te direcionar melhor.",
-        actions: [
-          { label: "Iniciar atendimento", href: "/triagem" },
-          { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
-        ],
+        message: adaptMessageByLeadTemperature(baseMessagePensao, temperature, urgency),
+        actions: smartCTA,
+        meta: { intent: "theme_pensao", profile: "visitor", source: "fallback" }
+      };
+      
+    case "divorcio":
+      const baseMessageDivorcio = isFollowUp
+        ? "Sobre divórcio, preciso entender: vocês estão de acordo sobre tudo ou tem disputas? Têm filhos menores?"
+        : "Sobre divórcio, vocês estão se separando de acordo ou tem disputas? Têm filhos menores ou bens para dividir?";
+      
+      return {
+        message: adaptMessageByLeadTemperature(baseMessageDivorcio, temperature, urgency),
+        actions: smartCTA,
+        meta: { intent: "theme_divorcio", profile: "visitor", source: "fallback" }
+      };
+      
+    case "familia":
+      const baseMessageFamilia = isFollowUp
+        ? "Em direito de família, me diga mais: é sobre guarda de filhos, partilha de bens ou outra situação familiar?"
+        : "Em questões de família, posso ajudar com guarda, pensão, divórcio ou partilha. Qual é a sua situação específica?";
+      
+      return {
+        message: adaptMessageByLeadTemperature(baseMessageFamilia, temperature, urgency),
+        actions: smartCTA,
         meta: { intent: "theme_familia", profile: "visitor", source: "fallback" }
       };
+      
     case "trabalhista":
+      const baseMessageTrabalhista = isFollowUp
+        ? "Sobre questão trabalhista, preciso saber: você foi demitido? Tem verbas pendentes? Problema com contrato?"
+        : "Sobre direito trabalhista, você foi demitido, tem verbas não recebidas ou outro problema no trabalho? Me conta o que aconteceu.";
+      
       return {
-        message: isFollowUp
-          ? "Entendi. Em questões trabalhistas, alguns detalhes do vínculo e do que aconteceu são essenciais. Me conta melhor o seu caso."
-          : "Entendi. Em questões trabalhistas, o que aconteceu e quando aconteceu fazem diferença. Me conta melhor o seu caso para eu te orientar no próximo passo.",
-        actions: [
-          { label: "Iniciar atendimento", href: "/triagem" },
-          { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
-        ],
+        message: adaptMessageByLeadTemperature(baseMessageTrabalhista, temperature, urgency),
+        actions: smartCTA,
         meta: { intent: "theme_trabalhista", profile: "visitor", source: "fallback" }
       };
+      
     default:
       return null;
   }
@@ -565,7 +694,8 @@ function detectUserIntent(message: string): string {
   const normalizedMessage = normalizeText(message);
   const theme = detectLegalTheme(message);
 
-  if (/(o que fazer|o que eu faco|tenho direito|posso processar|devo processar|orientacao juridica|analise de caso|estrategia juridica|justica|advogado)/.test(normalizedMessage)) {
+  // Detectar solicitações de orientação jurídica mais amplas
+  if (/(o que fazer|o que eu faco|tenho direito|posso processar|devo processar|orientacao juridica|analise de caso|estrategia juridica|justica|advogado|como funciona|qual o prazo|o que e|me ajuda|preciso de ajuda|duvida|problema|situacao|caso|resolver|entrar na justica)/.test(normalizedMessage)) {
     return "legal_advice_request";
   }
 
@@ -605,6 +735,20 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     const context = sessionId ? getSessionContext(sessionId) : { history: [] } as SessionContext;
     const isFollowUp = context.lastIntent === intent && context.history.length > 1;
     const detectedTheme = detectLegalTheme(userMessage) || urlContext?.tema || context.lastTheme || null;
+    
+    // Evitar repetição: detectar se usuário está repetindo mesma pergunta
+    const lastUserMessage = context.history[context.history.length - 1]?.content || "";
+    const isRepeating = normalizeText(lastUserMessage) === normalizeText(userMessage);
+    if (isRepeating && intent === "geral") {
+      return {
+        message: "Vamos organizar melhor sua dúvida! Posso ajudar com agendamentos, processos, documentos ou orientar sobre próximos passos. O que você precisa especificamente?",
+        actions: [
+          { label: "Iniciar atendimento", href: "/triagem" },
+          { label: "Ver serviços", href: "/services" }
+        ],
+        meta: { intent: "avoid_repetition", profile: audience, source: "fallback" }
+      };
+    }
     
     // BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
     if (intent === 'legal_advice_request' && audience === 'visitor') {
@@ -811,104 +955,111 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     
     // Visitor: respostas temáticas antes do fallback genérico
     if (audience === "visitor") {
-      const themeResponse = buildVisitorThemeResponse(detectedTheme, isFollowUp);
+      const themeResponse = buildVisitorThemeResponse(detectedTheme, isFollowUp, context);
       if (themeResponse) {
         return themeResponse;
       }
     }
 
     // Fallback para visitor ou quando não há dados
+    const temperature = context?.lead?.temperature || "cold";
+    const urgency = context?.lead?.urgency || "low";
+    const smartCTA = buildSmartCTA(temperature, urgency);
+    
     switch (intent) {
       case 'agenda':
+        const baseMessageAgenda = isFollowUp
+          ? 'Sobre agendamento, o primeiro passo é fazer sua triagem inicial.'
+          : 'Entendi que você quer agendar algo. O primeiro passo é fazer sua triagem inicial para entendermos seu caso e depois a gente agenda sua consulta. É rápido e seguro!';
+        
         return {
-          message: isFollowUp
-            ? 'Sobre agendamento, o primeiro passo é fazer sua triagem inicial.'
-            : 'Entendi que você quer agendar algo. O primeiro passo é fazer sua triagem inicial para entendermos seu caso e depois a gente agenda sua consulta. É rápido e seguro!',
-          actions: [
-            { label: "Iniciar atendimento", href: "/triagem" },
-            { label: "Entrar no portal", href: "/login" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessageAgenda, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
-        break;
+        
       case 'clientes':
+        const baseMessageClientes = isFollowUp
+          ? 'Para informações sobre seus casos, faça login no portal.'
+          : 'Sobre seus processos e documentos, o ideal é você acessar o portal do cliente. Lá você encontra tudo atualizado e pode enviar novos documentos quando precisar.';
+        
         return {
-          message: isFollowUp
-            ? 'Para informações sobre seus casos, faça login no portal.'
-            : 'Sobre seus processos e documentos, o ideal é você acessar o portal do cliente. Lá você encontra tudo atualizado e pode enviar novos documentos quando precisar.',
-          actions: [
-            { label: "Entrar no portal", href: "/login" },
-            { label: "Falar no WhatsApp", href: "/whatsapp" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessageClientes, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
-        break;
       case 'processos':
+        const baseMessageProcessos = isFollowUp
+          ? 'Seus processos são acompanhados com dedicação. Acesse o portal para detalhes.'
+          : 'Seus processos são acompanhados com toda dedicação pela nossa equipe. Para status detalhados e acompanhamento em tempo real, acesse o portal do cliente ou fale com nossa equipe.';
+        
         return {
-          message: isFollowUp
-            ? 'Seus processos são acompanhados com dedicação. Acesse o portal para detalhes.'
-            : 'Seus processos são acompanhados com toda dedicação pela nossa equipe. Para status detalhados e acompanhamento em tempo real, acesse o portal do cliente ou fale com nossa equipe.',
-          actions: [
-            { label: "Acessar portal", href: "/login" },
-            { label: "Falar com equipe", href: "/contact" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessageProcessos, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
-        break;
+        
       case 'documentos':
+        const baseMessageDocumentos = isFollowUp
+          ? 'Mantenha seus documentos organizados pelo portal.'
+          : 'Documentos organizados fazem toda a diferença! Mantenha seus arquivos atualizados pelo portal - isso agiliza muito seu processo e evita solicitações adicionais.';
+        
         return {
-          message: isFollowUp
-            ? 'Mantenha seus documentos organizados pelo portal.'
-            : 'Documentos organizados fazem toda a diferença! Mantenha seus arquivos atualizados pelo portal - isso agiliza muito seu processo e evita solicitações adicionais.',
-          actions: [
-            { label: "Enviar documentos", href: "/documents/upload" },
-            { label: "Acessar portal", href: "/login" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessageDocumentos, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
-        break;
+        
       case 'prioridades':
+        const baseMessagePrioridades = isFollowUp
+          ? 'Suas prioridades estão sendo organizadas pela equipe.'
+          : 'Suas prioridades estão sendo organizadas com cuidado pela nossa equipe. Para acompanhar tudo, acesse regularmente o portal e mantenha seus documentos em dia.';
+        
         return {
-          message: isFollowUp
-            ? 'Suas prioridades estão sendo organizadas pela equipe.'
-            : 'Suas prioridades estão sendo organizadas com cuidado pela nossa equipe. Para acompanhar tudo, acesse regularmente o portal e mantenha seus documentos em dia.',
-          actions: [
-            { label: "Ver status", href: "/login" },
-            { label: "Falar com equipe", href: "/contact" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessagePrioridades, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
-        break;
+        
       case 'saudacao':
+        const baseMessageSaudacao = isFollowUp
+          ? 'Olá novamente! Estou aqui para ajudar. Quer conversar sobre seu caso ou precisa de algo específico?'
+          : 'Olá! Sou a NoemIA, sua assistente jurídica. Posso te ajudar com casos de aposentadoria, descontos bancários, família, trabalhista ou agendar uma consulta. Como posso te ajudar hoje?';
+        
         return {
-          message: 'Olá! Que bom ter você aqui. Sou a NoemIA, sua assistente inteligente para jornada jurídica. Posso ajudar com agendamentos, processos, documentos ou orientar sobre próximos passos. Como posso apoiar você hoje?',
-          actions: [
-            { label: "Iniciar atendimento", href: "/triagem" },
-            { label: "Conhecer serviços", href: "/services" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessageSaudacao, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
-        break;
+        
       default:
+        const baseMessageDefault = isFollowUp
+          ? 'Vamos direto ao ponto! Posso te ajudar com: aposentadoria/INSS, descontos bancários, pensão alimentícia, divórcio, questões trabalhistas ou agendar consulta. Qual é o seu caso?'
+          : 'Sou especialista em ajudar com casos jurídicos. Posso te orientar sobre: aposentadoria/INSS, descontos indevidos, pensão, divórcio, direito trabalhista ou agendar uma consulta. Me conte sua situação!';
+        
         return {
-          message: 'Estou aqui para ajudar com sua jornada jurídica. Posso organizar informações sobre agendamentos, processos, documentos e prioridades. O que você precisa saber?',
-          actions: [
-            { label: "Iniciar atendimento", href: "/triagem" },
-            { label: "Ver serviços", href: "/services" }
-          ],
+          message: adaptMessageByLeadTemperature(baseMessageDefault, temperature, urgency),
+          actions: smartCTA,
           meta: { intent, profile: audience, source: "fallback" }
         };
     }
   } catch (error) {
     console.warn('[noemia] Erro ao obter dados reais para fallback inteligente:', error);
     
-    // Fallback simples sem dados
+    // Fallback simples sem dados - usando lead scoring
+    const fallbackTemperature = context?.lead?.temperature || "cold";
+    const fallbackUrgency = context?.lead?.urgency || "low";
+    const fallbackCTA = buildSmartCTA(fallbackTemperature, fallbackUrgency);
+    
+    const fallbackMessage = adaptMessageByLeadTemperature(
+      'Estou aqui para ajudar com sua jornada jurídica. Para informações detalhadas, acesse o portal do cliente ou fale com nossa equipe.',
+      fallbackTemperature,
+      fallbackUrgency
+    );
+    
     return {
-      message: 'Estou aqui para ajudar com sua jornada jurídica. Para informações detalhadas, acesse o portal do cliente ou fale com nossa equipe.',
-      actions: [
-        { label: "Acessar portal", href: "/login" },
-        { label: "Falar com equipe", href: "/contact" }
-      ],
+      message: fallbackMessage,
+      actions: fallbackCTA,
       meta: { intent, profile: audience, source: "fallback" }
     };
   }
