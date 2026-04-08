@@ -21,11 +21,34 @@ function logEvent(
 }
 
 function verifySignature(body: string, signature: string): boolean {
-  if (!signature) return false;
+  // LOGS DE DIAGNÓSTICO SEGURO
+  console.log("SIGNATURE_HEADER_PRESENT:", !!signature);
+  console.log("SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : null);
+  console.log("META_APP_SECRET_PRESENT:", !!APP_SECRET);
+  console.log("META_APP_SECRET_LENGTH:", APP_SECRET?.length || 0);
+  console.log("RAW_BODY_LENGTH:", body.length);
+  
+  // Hash do body para diagnóstico (sem expor conteúdo)
+  const bodyHash = createHmac("sha256", "debug").update(body, "utf8").digest("hex").substring(0, 16);
+  console.log("RAW_BODY_HASH_SHA256:", bodyHash);
+  
+  if (!signature) {
+    console.log("SIGNATURE_DIAGNOSIS: No signature header found");
+    return false;
+  }
 
   const expectedSignature = `sha256=${createHmac("sha256", APP_SECRET)
     .update(body, "utf8")
     .digest("hex")}`;
+    
+  console.log("EXPECTED_SIGNATURE_PREFIX:", expectedSignature.substring(0, 20));
+  console.log("SIGNATURE_MATCH:", signature === expectedSignature);
+  
+  if (signature !== expectedSignature) {
+    console.log("SIGNATURE_DIAGNOSIS: Signature mismatch - possible APP_SECRET incorrect");
+  } else {
+    console.log("SIGNATURE_DIAGNOSIS: Signature valid");
+  }
 
   return signature === expectedSignature;
 }
@@ -122,8 +145,13 @@ export async function POST(request: NextRequest) {
 
   const body = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
-
-  if (!verifySignature(body, signature || "")) {
+  
+  console.log("SIGNATURE_HEADER_NAME: x-hub-signature-256");
+  console.log("SIGNATURE_HEADER_VALUE:", signature ? "[PRESENT]" : "[MISSING]");
+  
+  const isValid = verifySignature(body, signature || "");
+  
+  if (!isValid) {
     console.log("INSTAGRAM_SIGNATURE_INVALID");
     logEvent(
       "INSTAGRAM_SIGNATURE_INVALID",
