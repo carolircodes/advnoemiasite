@@ -1014,14 +1014,11 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
 
   const systemInstructions = buildSystemInstructions(effectiveAudience as "visitor" | "client" | "staff", contextText);
 
-  const conversationHistory = input.history.slice(-8).map((message) => ({
-    role: message.role,
-    content: [
-      {
-        type: "input_text",
-        text: message.content
-      }
-    ]
+  // PEGAR HISTÓRICO REAL DA SESSÃO
+  const sessionContext = getSessionContext(sessionId);
+  const realHistory = sessionContext.history.slice(-8).map((msg) => ({
+    role: msg.role,
+    content: msg.content
   }));
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1037,10 +1034,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
           role: "system",
           content: systemInstructions
         },
-        ...conversationHistory.map(msg => ({
-          role: msg.role,
-          content: msg.content[0].text
-        })),
+        ...realHistory,
         {
           role: "user",
           content: input.message
@@ -1107,6 +1101,14 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   }
   
   // Sucesso com OpenAI
+  
+  // SALVAR RESPOSTA DA IA NO HISTÓRICO
+  sessionContext.history.push({
+    role: "assistant",
+    content: answer,
+    timestamp: new Date()
+  });
+  
   recordNoemiaMetrics({
     question: input.message,
     intent,
