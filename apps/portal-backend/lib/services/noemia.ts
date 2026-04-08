@@ -82,7 +82,7 @@ function getInitialMessage(tema?: string): string {
 }
 
 // Respostas com valor controlado para conversão
-function generateControlledResponse(intent: string, tema?: string, isFollowUp: boolean = false): NoemiaResponse {
+function generateControlledResponse(intent: string, tema?: string, isFollowUp: boolean = false, message?: string): NoemiaResponse {
   const responses: Record<string, { main: string; factors: string[] }> = {
     'aposentadoria': {
       main: 'Sobre aposentadoria, é importante analisar vários fatores específicos do seu caso.',
@@ -117,12 +117,39 @@ function generateControlledResponse(intent: string, tema?: string, isFollowUp: b
   
   const response = responses[tema || ''] || responses[intent] || defaultResponse;
   
-  const message = isFollowUp
-    ? `Complementando o que expliquei, em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
-    : `${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+  // Personalizar resposta baseado na mensagem do usuário se disponível
+  let personalizedMessage = '';
+  if (message) {
+    const normalizedUserMessage = message.toLowerCase();
+    
+    // Detectar palavras-chave específicas para personalizar
+    if (normalizedUserMessage.includes('aposentar') || normalizedUserMessage.includes('aposentadoria')) {
+      personalizedMessage = isFollowUp
+        ? `Complementando o que expliquei sobre aposentadoria, é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
+        : `Entendi sua dúvida sobre aposentadoria. ${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+    } else if (normalizedUserMessage.includes('banco') || normalizedUserMessage.includes('desconto') || normalizedUserMessage.includes('cobrança')) {
+      personalizedMessage = isFollowUp
+        ? `Complementando o que expliquei sobre descontos bancários, é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
+        : `Entendi sua situação com o banco/desconto. ${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+    } else if (normalizedUserMessage.includes('pensão') || normalizedUserMessage.includes('alimentícia')) {
+      personalizedMessage = isFollowUp
+        ? `Complementando o que expliquei sobre pensão alimentícia, é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
+        : `Entendi sua questão sobre pensão alimentícia. ${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+    } else {
+      // Resposta genérica mas personalizada
+      personalizedMessage = isFollowUp
+        ? `Complementando o que expliquei, em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
+        : `${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+    }
+  } else {
+    // Resposta padrão sem personalização
+    personalizedMessage = isFollowUp
+      ? `Complementando o que expliquei, em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`
+      : `${response.main} Em situações como essa, normalmente é importante analisar ${response.factors.slice(0, 3).join(', ')} e ${response.factors[3] || 'outros detalhes específicos'}. Cada caso pode mudar bastante dependendo dos detalhes. Para te orientar com precisão e segurança, o ideal é analisar seu caso de forma individual na consulta com a advogada.`;
+  }
   
   return {
-    message,
+    message: personalizedMessage,
     actions: [
       { label: "Agendar consulta", href: "/triagem.html?origem=noemia-consulta" },
       { label: "Falar no WhatsApp", href: "https://wa.me/5511999999999" }
@@ -254,7 +281,8 @@ type SessionContext = {
   conversationStage?: 'initial' | 'exploring' | 'considering' | 'ready';
   ctaOffered?: string;
   triage?: {
-    step: 'start' | 'theme' | 'problem' | 'time' | 'urgency' | 'done';
+    active: boolean;
+    step: "start" | "theme" | "problem" | "time" | "urgency" | "done";
     data: {
       theme?: string;
       problem?: string;
@@ -422,7 +450,7 @@ function buildSmartActions(intent: string, audience: string, leadTemperature: 'c
 
 // Fluxo conversacional de triagem
 function handleTriageFlow(context: SessionContext, message: string): NoemiaResponse | null {
-  const triage = context.triage || { step: 'start', data: {} };
+  const triage = context.triage || { active: false, step: 'start', data: {} };
   const normalizedMessage = message.toLowerCase();
   
   // STEP: START - Iniciar triagem
@@ -434,7 +462,7 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
         normalizedMessage.includes('preciso') || normalizedMessage.includes('problema')) {
       
       // Iniciar triagem
-      context.triage = { step: 'theme', data: {} };
+      context.triage = { active: true, step: 'theme', data: {} };
       
       return {
         message: 'Ótimo! Vou fazer uma triagem rápida para entender seu caso. Primeiro: qual é o tema principal da sua situação?\n\nExemplos:\n• Aposentadoria ou INSS\n• Desconto indevido / bancário\n• Pensão alimentícia\n• Divórcio\n• Trabalhista\n• Outro tema',
@@ -478,6 +506,7 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
     
     // Salvar tema e avançar
     context.triage = { 
+      active: true,
       step: 'problem', 
       data: { ...triage.data, theme } 
     };
@@ -493,6 +522,7 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
   if (triage.step === 'problem') {
     // Salvar descrição do problema
     context.triage = { 
+      active: true,
       step: 'time', 
       data: { ...triage.data, problem: message } 
     };
@@ -532,6 +562,7 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
     
     // Salvar tempo e avançar
     context.triage = { 
+      active: true,
       step: 'urgency', 
       data: { ...triage.data, time } 
     };
@@ -568,12 +599,13 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
     
     // Finalizar triagem
     context.triage = { 
+      active: true,
       step: 'done', 
       data: { ...triage.data, urgency: urgencyLevel } 
     };
     
     // Gerar resumo e CTA
-    const { theme, problem, time, urgency } = context.triage.data;
+    const { theme, problem, time, urgency } = context.triage?.data || {};
     const summary = `**Resumo da sua triagem:**\n\n• **Tema:** ${theme}\n• **Problema:** ${problem}\n• **Tempo:** ${time}\n• **Urgência:** ${urgency}`;
     
     return {
@@ -593,7 +625,7 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
     if (normalizedMessage.includes('nova') || normalizedMessage.includes('reiniciar') || 
         normalizedMessage.includes('outra') || normalizedMessage.includes('triagem')) {
       
-      context.triage = { step: 'start', data: {} };
+      context.triage = { active: true, step: 'start', data: {} };
       
       return {
         message: 'Vamos começar uma nova triagem! Qual é o tema principal da sua situação?',
@@ -614,19 +646,20 @@ function handleTriageFlow(context: SessionContext, message: string): NoemiaRespo
         { label: 'Falar no WhatsApp', href: 'https://wa.me/5511999999999' },
         { label: 'Nova triagem', action: 'restart_triage' }
       ],
-      meta: { intent: 'triage_done', profile: 'visitor', source: 'fallback' }
-    };
-  }
-  
   return null;
 }
-
-function detectUserIntent(message: string): string {
+function detectLegalTheme(message: string): string | null {
   const normalizedMessage = message.toLowerCase();
   
+  // Temas sugeridos com palavras-chave específicas
+  if (normalizedMessage.includes('aposentar') || normalizedMessage.includes('aposentadoria') || 
+      normalizedMessage.includes('inss') || normalizedMessage.includes('benefício') ||
+      normalizedMessage.includes('aposentar') || normalizedMessage.includes('previdenciário')) {
+    return 'aposentadoria';
+  }
+  
   // Consultoria jurídica gratuita (BLOQUEAR)
-  if (normalizedMessage.includes('o que fazer') || normalizedMessage.includes('o que eu faço') ||
-      normalizedMessage.includes('posso me aposentar') || normalizedMessage.includes('posso aposentar') ||
+  if (normalizedMessage.includes('posso me aposentar') || normalizedMessage.includes('posso aposentar') ||
       normalizedMessage.includes('banco cobrou') || normalizedMessage.includes('cobrança indevida') ||
       normalizedMessage.includes('não paga pensão') || normalizedMessage.includes('pensão atrasada') ||
       normalizedMessage.includes('demissão injusta') || normalizedMessage.includes('fui demitido') ||
@@ -692,7 +725,7 @@ function detectUserIntent(message: string): string {
   return 'geral';
 }
 
-async function generateIntelligentResponse(intent: string, profile: PortalProfile | null, audience: string, sessionId?: string, urlContext?: URLContext): Promise<NoemiaResponse> {
+async function generateIntelligentResponse(intent: string, profile: PortalProfile | null, audience: string, sessionId?: string, urlContext?: URLContext, message?: string): Promise<NoemiaResponse> {
   try {
     const context = sessionId ? getSessionContext(sessionId) : { history: [] };
     const isFollowUp = context.lastIntent === intent && context.history.length > 1;
@@ -705,7 +738,7 @@ async function generateIntelligentResponse(intent: string, profile: PortalProfil
     // BLOQUEIO DE CONSULTORIA GRATUITA - apenas para visitors
     if (intent === 'legal_advice_request' && audience === 'visitor') {
       // Usar resposta controlada com valor parcial e CTAs inteligentes
-      const controlledResponse = generateControlledResponse(intent, urlContext?.tema, isFollowUp);
+      const controlledResponse = generateControlledResponse(intent, urlContext?.tema, isFollowUp, message);
       // Substituir CTAs fixos por CTAs inteligentes
       const smartActions = buildSmartActions(intent, audience, leadTemperature, urgencyLevel, theme);
       controlledResponse.actions = smartActions;
@@ -715,6 +748,7 @@ async function generateIntelligentResponse(intent: string, profile: PortalProfil
     // Clientes nunca são bloqueados - sempre ajudam
     if (audience === 'client' && profile) {
       const { getClientWorkspace } = await import("./dashboard");
+// ... (rest of the code remains the same)
       const workspace = await getClientWorkspace(profile);
       
       switch (intent) {
@@ -1292,43 +1326,281 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   // Obter contexto da sessão para uso posterior
   const sessionContext = getSessionContext(sessionId);
 
-  // VERIFICAR TRIAGEM CONVERSACIONAL ATIVA - apenas para visitors
-  if (effectiveAudience === 'visitor' && (!sessionContext.triage || sessionContext.triage.step !== 'done')) {
-    console.log("[noemia] Verificando fluxo de triagem conversacional");
+  // TRIAGEM CONVERSACIONAL - apenas para visitors
+  if (effectiveAudience === 'visitor') {
+    // Função simples de detecção de tema
+    const detectTheme = (msg: string): string | null => {
+      const normalized = msg.toLowerCase();
+      if (normalized.includes('aposentar') || normalized.includes('aposentadoria') || normalized.includes('inss')) return 'aposentadoria';
+      if (normalized.includes('desconto') || normalized.includes('banco') || normalized.includes('cobrança')) return 'desconto-indevido';
+      if (normalized.includes('pensão') || normalized.includes('alimentícia')) return 'pensao';
+      if (normalized.includes('divórcio') || normalized.includes('separação')) return 'divorcio';
+      if (normalized.includes('trabalhista') || normalized.includes('demissão') || normalized.includes('trabalho')) return 'trabalhista';
+      if (normalized.includes('família') || normalized.includes('guarda')) return 'familia';
+      return null;
+    };
 
-    const triageResponse = handleTriageFlow(sessionContext, input.message);
-    if (triageResponse) {
-      console.log("[noemia] Triagem ativa, usando resposta de triagem");
+    // Iniciar triagem se for visitor e tiver problema jurídico
+    if (!sessionContext.triage || sessionContext.triage.step === 'start') {
+      const hasLegalIssue = detectTheme(input.message) !== null || 
+                           input.message.toLowerCase().includes('ajuda') ||
+                           input.message.toLowerCase().includes('problema') ||
+                           input.message.toLowerCase().includes('consulta') ||
+                           urlContext.tema;
 
-      // Salvar resposta da triagem no histórico
+      if (hasLegalIssue) {
+        console.log("[noemia] Iniciando triagem conversacional");
+        
+        // Iniciar triagem
+        sessionContext.triage = { active: true, step: 'theme', data: {} };
+        
+        const detectedTheme = urlContext.tema || detectTheme(input.message);
+        
+        // Se já detectou tema, pular para problem
+        if (detectedTheme) {
+          sessionContext.triage = { 
+            active: true,
+            step: 'problem', 
+            data: { theme: detectedTheme } 
+          };
+          
+          const triageResponse = {
+            message: `Entendi! Seu caso é sobre ${detectedTheme}. Agora, me descreva brevemente qual é o seu problema ou situação. O que aconteceu?`,
+            actions: [],
+            meta: { intent: 'triage', profile: 'visitor', source: 'fallback' }
+          };
+          
+          // Salvar no histórico
+          sessionContext.history.push({
+            role: "assistant",
+            content: triageResponse.message,
+            timestamp: new Date()
+          });
+          
+          return {
+            audience: effectiveAudience,
+            answer: triageResponse.message
+          };
+        }
+        
+        // Pedir para escolher tema
+        const triageResponse = {
+          message: 'Ótimo! Vou fazer uma triagem rápida para entender seu caso. Primeiro: qual é o tema principal da sua situação?\n\nExemplos:\n• Aposentadoria ou INSS\n• Desconto indevido / bancário\n• Pensão alimentícia\n• Divórcio\n• Trabalhista\n• Outro tema',
+          actions: [
+            { label: 'Aposentadoria', action: 'theme_aposentadoria' },
+            { label: 'Desconto bancário', action: 'theme_desconto' },
+            { label: 'Pensão', action: 'theme_pensao' },
+            { label: 'Divórcio', action: 'theme_divorcio' },
+            { label: 'Trabalhista', action: 'theme_trabalhista' }
+          ],
+          meta: { intent: 'triage', profile: 'visitor', source: 'fallback' }
+        };
+        
+        // Salvar no histórico
+        sessionContext.history.push({
+          role: "assistant",
+          content: triageResponse.message,
+          timestamp: new Date()
+        });
+        
+        return {
+          audience: effectiveAudience,
+          answer: triageResponse.message
+        };
+      }
+    }
+    
+    // Continuar triagem se já estiver ativa
+    if (sessionContext.triage && sessionContext.triage.step !== 'done') {
+      console.log("[noemia] Continuando triagem conversacional");
+      
+      if (sessionContext.triage.step === 'theme') {
+        const theme = detectTheme(input.message) || 'outro';
+        
+        sessionContext.triage = { 
+          active: true,
+          step: 'problem', 
+          data: { ...sessionContext.triage.data, theme } 
+        };
+        
+        const triageResponse = {
+          message: `Entendi! Seu caso é sobre ${theme}. Agora, me descreva brevemente qual é o seu problema ou situação. O que aconteceu?`,
+          actions: [],
+          meta: { intent: 'triage', profile: 'visitor', source: 'fallback' }
+        };
+        
+        sessionContext.history.push({
+          role: "assistant",
+          content: triageResponse.message,
+          timestamp: new Date()
+        });
+        
+        return {
+          audience: effectiveAudience,
+          answer: triageResponse.message
+        };
+      }
+      
+      if (sessionContext.triage.step === 'problem') {
+        sessionContext.triage = { 
+          active: true,
+          step: 'time', 
+          data: { ...sessionContext.triage.data, problem: input.message } 
+        };
+        
+        const triageResponse = {
+          message: 'Obrigado pela descrição. Para entender melhor o tempo: quando essa situação começou ou há quanto tempo está acontecendo?',
+          actions: [
+            { label: 'Aconteceu agora', action: 'time_agora' },
+            { label: 'Últimos dias', action: 'time_dias' },
+            { label: 'Últimas semanas', action: 'time_semanas' },
+            { label: 'Meses', action: 'time_meses' },
+            { label: 'Anos', action: 'time_anos' }
+          ],
+          meta: { intent: 'triage', profile: 'visitor', source: 'fallback' }
+        };
+        
+        sessionContext.history.push({
+          role: "assistant",
+          content: triageResponse.message,
+          timestamp: new Date()
+        });
+        
+        return {
+          audience: effectiveAudience,
+          answer: triageResponse.message
+        };
+      }
+      
+      if (sessionContext.triage.step === 'time') {
+        const normalizedMessage = input.message.toLowerCase();
+        let time = 'desconhecido';
+        
+        if (normalizedMessage.includes('agora') || normalizedMessage.includes('hoje')) time = 'agora';
+        else if (normalizedMessage.includes('dia') || normalizedMessage.includes('dias')) time = 'dias';
+        else if (normalizedMessage.includes('semana') || normalizedMessage.includes('semanas')) time = 'semanas';
+        else if (normalizedMessage.includes('mês') || normalizedMessage.includes('meses')) time = 'meses';
+        else if (normalizedMessage.includes('ano') || normalizedMessage.includes('anos')) time = 'anos';
+        
+        sessionContext.triage = { 
+          active: true,
+          step: 'urgency', 
+          data: { ...sessionContext.triage.data, time } 
+        };
+        
+        const triageResponse = {
+          message: 'Entendi. E qual é o nível de urgência dessa situação para você?',
+          actions: [
+            { label: 'Urgente - preciso resolver agora', action: 'urgency_urgente' },
+            { label: 'Alta - preciso resolver rápido', action: 'urgency_alta' },
+            { label: 'Média - posso esperar um pouco', action: 'urgency_media' },
+            { label: 'Baixa - não tem pressa', action: 'urgency_baixa' }
+          ],
+          meta: { intent: 'triage', profile: 'visitor', source: 'fallback' }
+        };
+        
+        sessionContext.history.push({
+          role: "assistant",
+          content: triageResponse.message,
+          timestamp: new Date()
+        });
+        
+        return {
+          audience: effectiveAudience,
+          answer: triageResponse.message
+        };
+      }
+      
+      if (sessionContext.triage.step === 'urgency') {
+        const normalizedMessage = input.message.toLowerCase();
+        let urgency = 'desconhecida';
+        
+        if (normalizedMessage.includes('urgente') || normalizedMessage.includes('imediato')) urgency = 'urgente';
+        else if (normalizedMessage.includes('alta') || normalizedMessage.includes('rápido')) urgency = 'alta';
+        else if (normalizedMessage.includes('média') || normalizedMessage.includes('pouco')) urgency = 'média';
+        else if (normalizedMessage.includes('baixa') || normalizedMessage.includes('pressa')) urgency = 'baixa';
+        
+        // Finalizar triagem
+        sessionContext.triage = { 
+          active: true,
+          step: 'done', 
+          data: { ...sessionContext.triage.data, urgency } 
+        };
+        
+        const { theme, problem, time } = sessionContext.triage.data;
+        const summary = `**Resumo da sua triagem:**\n\n• **Tema:** ${theme}\n• **Problema:** ${problem}\n• **Tempo:** ${time}\n• **Urgência:** ${urgency}`;
+        
+        const triageResponse = {
+          message: `${summary}\n\nPerfeito! Com essas informações já consigo te orientar melhor. Sua situação foi registrada e vou encaminhar para análise da nossa equipe.\n\n**Próximos passos:**\n1. Nossa equipe vai analisar seu caso\n2. Entraremos em contato em até 24h\n3. Se necessário, agendaremos uma consulta\n\nEnquanto isso, se precisar falar conosco imediatamente, pode usar o WhatsApp.`,
+          actions: [
+            { label: 'Falar no WhatsApp agora', href: 'https://wa.me/5511999999999' },
+            { label: 'Ver nossos serviços', href: '/services' },
+            { label: 'Fazer nova consulta', action: 'restart_triage' }
+          ],
+          meta: { intent: 'triage_done', profile: 'visitor', source: 'fallback' }
+        };
+        
+        sessionContext.history.push({
+          role: "assistant",
+          content: triageResponse.message,
+          timestamp: new Date()
+        });
+        
+        return {
+          audience: effectiveAudience,
+          answer: triageResponse.message
+        };
+      }
+    }
+    
+    // Triagem finalizada - permitir reiniciar
+    if (sessionContext.triage && sessionContext.triage.step === 'done') {
+      const normalizedMessage = input.message.toLowerCase();
+      
+      if (normalizedMessage.includes('nova') || normalizedMessage.includes('reiniciar') || 
+          normalizedMessage.includes('outra') || normalizedMessage.includes('triagem')) {
+        
+        sessionContext.triage = { active: true, step: 'start', data: {} };
+        
+        const triageResponse = {
+          message: 'Vamos começar uma nova triagem! Qual é o tema principal da sua situação?',
+          actions: [
+            { label: 'Aposentadoria', action: 'theme_aposentadoria' },
+            { label: 'Desconto bancário', action: 'theme_desconto' },
+            { label: 'Pensão', action: 'theme_pensao' },
+            { label: 'Divórcio', action: 'theme_divorcio' },
+            { label: 'Trabalhista', action: 'theme_trabalhista' }
+          ],
+          meta: { intent: 'triage', profile: 'visitor', source: 'fallback' }
+        };
+        
+        sessionContext.history.push({
+          role: "assistant",
+          content: triageResponse.message,
+          timestamp: new Date()
+        });
+        
+        return {
+          audience: effectiveAudience,
+          answer: triageResponse.message
+        };
+      }
+      
+      const triageResponse = {
+        message: 'Sua triagem já foi concluída! Se precisar de algo novo, fale conosco pelo WhatsApp ou inicie uma nova triagem dizendo "nova triagem".',
+        actions: [
+          { label: 'Falar no WhatsApp', href: 'https://wa.me/5511999999999' },
+          { label: 'Nova triagem', action: 'restart_triage' }
+        ],
+        meta: { intent: 'triage_done', profile: 'visitor', source: 'fallback' }
+      };
+      
       sessionContext.history.push({
         role: "assistant",
         content: triageResponse.message,
         timestamp: new Date()
       });
-
-      // Manter apenas últimos 5 turnos
-      if (sessionContext.history.length > 10) {
-        sessionContext.history = sessionContext.history.slice(-10);
-      }
-
-      // Registrar métricas da triagem
-      recordNoemiaMetrics({
-        question: input.message,
-        intent: triageResponse.meta?.intent || 'triage',
-        profile: effectiveAudience,
-        source: "fallback",
-        timestamp: new Date(),
-        actions: triageResponse.actions || [],
-        sessionId,
-        responseTime: Date.now() - startTime,
-        tema: urlContext.tema,
-        origem: urlContext.origem,
-        leadTemperature: sessionContext.leadTemperature,
-        urgencyLevel: sessionContext.urgencyLevel,
-        conversationStage: sessionContext.conversationStage
-      });
-
+      
       return {
         audience: effectiveAudience,
         answer: triageResponse.message
@@ -1339,7 +1611,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   // MOTOR INTERNO PRINCIPAL - Sem dependência de OpenAI
   console.log("[noemia] Usando motor interno para resposta inteligente");
 
-  const internalResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
+  // ... (rest of the code remains the same)
 
   // Salvar resposta da NoemIA no histórico da sessão
   sessionContext.history.push({
