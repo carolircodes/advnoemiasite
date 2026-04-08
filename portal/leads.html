@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Leads - NoemIA</title>
+    <link rel="stylesheet" href="../assets/css/leads.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="leads-container">
+        <!-- Header -->
+        <header class="leads-header">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1><i class="fas fa-users"></i> Painel de Leads</h1>
+                    <p class="header-subtitle">Leads coletados pela NoemIA</p>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-card">
+                        <span class="stat-number" id="totalLeads">0</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat-card priority-high">
+                        <span class="stat-number" id="priorityLeads">0</span>
+                        <span class="stat-label">Prioritários</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="recentLeads">0</span>
+                        <span class="stat-label">Hoje</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Filtros -->
+        <section class="filters-section">
+            <div class="filters-container">
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="all">
+                        <i class="fas fa-list"></i> Todos
+                    </button>
+                    <button class="filter-btn" data-filter="priority">
+                        <i class="fas fa-star"></i> Prioritários
+                    </button>
+                    <button class="filter-btn" data-filter="today">
+                        <i class="fas fa-calendar-day"></i> Hoje
+                    </button>
+                </div>
+                <div class="filter-group">
+                    <select class="theme-filter" id="themeFilter">
+                        <option value="">Todos os temas</option>
+                        <option value="aposentadoria">Aposentadoria</option>
+                        <option value="desconto-indevido">Desconto Indevido</option>
+                        <option value="pensao">Pensão</option>
+                        <option value="divorcio">Divórcio</option>
+                        <option value="trabalhista">Trabalhista</option>
+                        <option value="familia">Família</option>
+                    </select>
+                </div>
+                <div class="search-group">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Buscar leads...">
+                    <button class="search-btn"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lista de Leads -->
+        <main class="leads-main">
+            <div class="leads-grid" id="leadsGrid">
+                <!-- Cards de leads serão inseridos aqui dinamicamente -->
+            </div>
+            
+            <!-- Estado vazio -->
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div class="empty-icon">
+                    <i class="fas fa-users-slash"></i>
+                </div>
+                <h3>Nenhum lead encontrado</h3>
+                <p>Os leads coletados pela NoemIA aparecerão aqui.</p>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading-state" id="loadingState">
+                <div class="loading-spinner"></div>
+                <p>Carregando leads...</p>
+            </div>
+        </main>
+
+        <!-- Modal de Detalhes -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Detalhes do Lead</h2>
+                    <button class="modal-close" id="modalClose">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Conteúdo dinâmico -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado da aplicação
+        let allLeads = [];
+        let filteredLeads = [];
+        let currentFilter = 'all';
+
+        // Utilitários
+        function formatTimestamp(timestamp) {
+            const now = new Date();
+            const leadTime = new Date(timestamp);
+            const diffMs = now - leadTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'agora';
+            if (diffMins < 60) return `há ${diffMins} minutos`;
+            if (diffHours < 24) return `há ${diffHours} horas`;
+            if (diffDays < 7) return `há ${diffDays} dias`;
+            return leadTime.toLocaleDateString('pt-BR');
+        }
+
+        function getPriorityClass(priority) {
+            switch (priority) {
+                case 'high': return 'priority-high';
+                case 'medium': return 'priority-medium';
+                default: return 'priority-low';
+            }
+        }
+
+        function getUrgencyClass(urgency) {
+            switch (urgency) {
+                case 'high': return 'urgency-high';
+                case 'medium': return 'urgency-medium';
+                default: return 'urgency-low';
+            }
+        }
+
+        function getTemperatureClass(temperature) {
+            switch (temperature) {
+                case 'hot': return 'temp-hot';
+                case 'warm': return 'temp-warm';
+                default: return 'temp-cold';
+            }
+        }
+
+        function getThemeIcon(theme) {
+            const icons = {
+                'aposentadoria': 'fa-user-clock',
+                'desconto-indevido': 'fa-credit-card',
+                'pensao': 'fa-hand-holding-usd',
+                'divorcio': 'fa-heart-broken',
+                'trabalhista': 'fa-briefcase',
+                'familia': 'fa-home'
+            };
+            return icons[theme] || 'fa-question-circle';
+        }
+
+        function getThemeLabel(theme) {
+            const labels = {
+                'aposentadoria': 'Aposentadoria',
+                'desconto-indevido': 'Desconto Indevido',
+                'pensao': 'Pensão',
+                'divorcio': 'Divórcio',
+                'trabalhista': 'Trabalhista',
+                'familia': 'Família'
+            };
+            return labels[theme] || 'Outro';
+        }
+
+        // Renderização
+        function renderLeadCard(lead) {
+            const priorityClass = getPriorityClass(lead.priority);
+            const urgencyClass = getUrgencyClass(lead.urgency);
+            const tempClass = getTemperatureClass(lead.temperature);
+            const themeIcon = getThemeIcon(lead.theme);
+            const themeLabel = getThemeLabel(lead.theme);
+            const timeAgo = formatTimestamp(lead.timestamp);
+
+            return `
+                <div class="lead-card ${priorityClass}" data-session-id="${lead.sessionId}">
+                    <div class="lead-priority-indicator"></div>
+                    <div class="lead-content">
+                        <div class="lead-header">
+                            <div class="lead-theme">
+                                <i class="fas ${themeIcon}"></i>
+                                <span class="theme-label">${themeLabel}</span>
+                            </div>
+                            <div class="lead-badges">
+                                ${lead.priority === 'high' ? '<span class="badge priority-badge">PRIORITÁRIO</span>' : ''}
+                                <span class="badge urgency-badge ${urgencyClass}">${lead.urgency}</span>
+                                <span class="badge temp-badge ${tempClass}">${lead.temperature}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="lead-problem">
+                            <h4>${lead.summary.problem || 'Sem problema definido'}</h4>
+                        </div>
+                        
+                        <div class="lead-message">
+                            <p>"${lead.lastMessage}"</p>
+                        </div>
+                        
+                        <div class="lead-footer">
+                            <div class="lead-time">
+                                <i class="fas fa-clock"></i>
+                                <span>${timeAgo}</span>
+                            </div>
+                            <button class="expand-btn" onclick="showLeadDetails('${lead.sessionId}')">
+                                <i class="fas fa-expand"></i>
+                                Ver detalhes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLeads() {
+            const grid = document.getElementById('leadsGrid');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredLeads.length === 0) {
+                grid.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            grid.innerHTML = filteredLeads.map(lead => renderLeadCard(lead)).join('');
+        }
+
+        function updateStats() {
+            const totalEl = document.getElementById('totalLeads');
+            const priorityEl = document.getElementById('priorityLeads');
+            const recentEl = document.getElementById('recentLeads');
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const todayLeads = allLeads.filter(lead => {
+                return new Date(lead.timestamp) >= today;
+            });
+            
+            totalEl.textContent = allLeads.length;
+            priorityEl.textContent = allLeads.filter(l => l.priority === 'high').length;
+            recentEl.textContent = todayLeads.length;
+        }
+
+        // Filtros
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const themeFilter = document.getElementById('themeFilter').value;
+            
+            filteredLeads = allLeads.filter(lead => {
+                // Filtro principal
+                if (currentFilter === 'priority' && lead.priority !== 'high') return false;
+                if (currentFilter === 'today') {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (new Date(lead.timestamp) < today) return false;
+                }
+                
+                // Filtro de tema
+                if (themeFilter && lead.theme !== themeFilter) return false;
+                
+                // Busca
+                if (searchTerm) {
+                    const searchIn = [
+                        lead.lastMessage,
+                        lead.summary.problem,
+                        lead.theme,
+                        lead.sessionId
+                    ].join(' ').toLowerCase();
+                    
+                    if (!searchIn.includes(searchTerm)) return false;
+                }
+                
+                return true;
+            });
+            
+            renderLeads();
+        }
+
+        // Modal
+        function showLeadDetails(sessionId) {
+            const lead = allLeads.find(l => l.sessionId === sessionId);
+            if (!lead) return;
+            
+            const modal = document.getElementById('modalOverlay');
+            const modalBody = document.getElementById('modalBody');
+            
+            const themeIcon = getThemeIcon(lead.theme);
+            const themeLabel = getThemeLabel(lead.theme);
+            const timeAgo = formatTimestamp(lead.timestamp);
+            
+            modalBody.innerHTML = `
+                <div class="lead-detail">
+                    <div class="detail-header">
+                        <div class="detail-theme">
+                            <i class="fas ${themeIcon}"></i>
+                            <h3>${themeLabel}</h3>
+                        </div>
+                        <div class="detail-time">
+                            <i class="fas fa-clock"></i>
+                            <span>${timeAgo}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Informações do Lead</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>Prioridade:</label>
+                                <span class="badge ${getPriorityClass(lead.priority)}">${lead.priority}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Temperatura:</label>
+                                <span class="badge ${getTemperatureClass(lead.temperature)}">${lead.temperature}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Urgência:</label>
+                                <span class="badge ${getUrgencyClass(lead.urgency)}">${lead.urgency}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Problema</h4>
+                        <p class="problem-text">${lead.summary.problem || 'Não definido'}</p>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Última Mensagem</h4>
+                        <div class="message-bubble">
+                            <p>${lead.lastMessage}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Dados Coletados</h4>
+                        <div class="collected-data">
+                            ${lead.summary.time ? `<div><strong>Tempo:</strong> ${lead.summary.time}</div>` : ''}
+                            ${lead.summary.urgency ? `<div><strong>Urgência:</strong> ${lead.summary.urgency}</div>` : ''}
+                            ${lead.summary.needsHumanAttention ? `<div><strong>Atenção Humana:</strong> Sim</div>` : ''}
+                            ${lead.summary.handoffReason ? `<div><strong>Motivo:</strong> ${lead.summary.handoffReason}</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="detail-actions">
+                        <button class="action-btn primary">
+                            <i class="fas fa-phone"></i>
+                            Contatar
+                        </button>
+                        <button class="action-btn secondary">
+                            <i class="fas fa-calendar"></i>
+                            Agendar
+                        </button>
+                        <button class="action-btn secondary">
+                            <i class="fas fa-edit"></i>
+                            Anotar
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        // Carregamento de dados
+        async function loadLeads() {
+            const loadingState = document.getElementById('loadingState');
+            loadingState.style.display = 'block';
+            
+            try {
+                // Simulação - em produção, chamar a API real
+                // const response = await fetch('/api/noemia/leads');
+                // allLeads = await response.json();
+                
+                // Dados de exemplo para teste
+                allLeads = [
+                    {
+                        sessionId: "session-1",
+                        summary: {
+                            theme: "aposentadoria",
+                            problem: "INSS negou benefício de aposentadoria",
+                            time: "há 2 meses",
+                            urgency: "sim",
+                            temperature: "hot",
+                            urgencyLevel: "high",
+                            priority: "high",
+                            needsHumanAttention: true,
+                            handoffReason: "Lead quente com alta urgência - situação crítica detectada"
+                        },
+                        lastMessage: "O INSS negou minha aposentadoria e estou sem renda, o que fazer?",
+                        priority: "high",
+                        temperature: "hot",
+                        urgency: "high",
+                        theme: "aposentadoria",
+                        timestamp: new Date(Date.now() - 1000 * 60 * 5) // 5 minutos atrás
+                    },
+                    {
+                        sessionId: "session-2",
+                        summary: {
+                            theme: "desconto-indevido",
+                            problem: "Banco fazendo desconto indevido na conta",
+                            time: "há 1 semana",
+                            urgency: "não",
+                            temperature: "warm",
+                            urgencyLevel: "medium",
+                            priority: "normal",
+                            needsHumanAttention: false,
+                            handoffReason: "Lead morno - tratamento padrão automatizado"
+                        },
+                        lastMessage: "Meu banco está descontando um valor que não reconheço na conta",
+                        priority: "normal",
+                        temperature: "warm",
+                        urgency: "medium",
+                        theme: "desconto-indevido",
+                        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2) // 2 horas atrás
+                    }
+                ];
+                
+                filteredLeads = [...allLeads];
+                updateStats();
+                renderLeads();
+                
+            } catch (error) {
+                console.error('Erro ao carregar leads:', error);
+                document.getElementById('emptyState').innerHTML = `
+                    <div class="empty-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h3>Erro ao carregar leads</h3>
+                    <p>Tente novamente mais tarde.</p>
+                `;
+                document.getElementById('emptyState').style.display = 'block';
+            } finally {
+                loadingState.style.display = 'none';
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLeads();
+            
+            // Filtros principais
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentFilter = e.target.dataset.filter;
+                    applyFilters();
+                });
+            });
+            
+            // Filtro de tema
+            document.getElementById('themeFilter').addEventListener('change', applyFilters);
+            
+            // Busca
+            document.getElementById('searchInput').addEventListener('input', applyFilters);
+            
+            // Modal
+            document.getElementById('modalClose').addEventListener('click', closeModal);
+            document.getElementById('modalOverlay').addEventListener('click', (e) => {
+                if (e.target.id === 'modalOverlay') closeModal();
+            });
+            
+            // Refresh
+            setInterval(loadLeads, 30000); // Atualizar a cada 30 segundos
+        });
+    </script>
+</body>
+</html>

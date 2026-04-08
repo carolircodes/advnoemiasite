@@ -256,6 +256,17 @@ export type SessionContext = {
     temperature: "cold" | "warm" | "hot";
     urgency: "low" | "medium" | "high";
   };
+  leadSummary?: {
+    theme?: string;
+    problem?: string;
+    time?: string;
+    urgency?: string;
+    temperature?: "cold" | "warm" | "hot";
+    urgencyLevel?: "low" | "medium" | "high";
+    priority?: "normal" | "high";
+    needsHumanAttention?: boolean;
+    handoffReason?: string;
+  };
 };
 
 // Armazenamento simples em memória para contexto de sessão
@@ -305,6 +316,9 @@ export function updateSessionContext(sessionId: string, message: string, intent:
     temperature,
     urgency
   };
+  
+  // HANDOFF INTELIGENTE - construir e salvar resumo do lead
+  context.leadSummary = buildLeadSummary(sessionId);
   
   context.history.push({
     role: "user",
@@ -478,10 +492,113 @@ function adaptMessageByLeadTemperature(baseMessage: string, temperature: "cold" 
   return baseMessage;
 }
 
+// HANDOFF INTELIGENTE - DETECTAR NECESSIDADE DE ATENÇÃO HUMANA
+function detectHumanHandoffNeed(temperature: "cold" | "warm" | "hot", urgencyLevel: "low" | "medium" | "high", theme?: string): {
+  needsHumanAttention: boolean;
+  priority: "normal" | "high";
+  handoffReason: string;
+} {
+  // HOT + HIGH => atenção prioritária imediata
+  if (temperature === "hot" && urgencyLevel === "high") {
+    return {
+      needsHumanAttention: true,
+      priority: "high",
+      handoffReason: "Lead quente com alta urgência - situação crítica detectada"
+    };
+  }
+  
+  // WARM + HIGH => atenção prioritária
+  if (temperature === "warm" && urgencyLevel === "high") {
+    return {
+      needsHumanAttention: true,
+      priority: "high",
+      handoffReason: "Lead morno com alta urgência - requer atenção humana"
+    };
+  }
+  
+  // HOT + MEDIUM => atenção prioritária
+  if (temperature === "hot" && urgencyLevel === "medium") {
+    return {
+      needsHumanAttention: true,
+      priority: "high",
+      handoffReason: "Lead quente com urgência média - potencial crítico"
+    };
+  }
+  
+  // TEMAS ESPECÍFICOS CRÍTICOS
+  if (theme && ["desconto-indevido", "trabalhista"].includes(theme) && urgencyLevel !== "low") {
+    return {
+      needsHumanAttention: true,
+      priority: "high",
+      handoffReason: `Tema crítico (${theme}) com urgência detectada`
+    };
+  }
+  
+  // COLD => atendimento normal
+  return {
+    needsHumanAttention: false,
+    priority: "normal",
+    handoffReason: "Lead frio - tratamento padrão automatizado"
+  };
+}
+
+// CONSTRUIR RESUMO ESTRUTURADO DO LEAD
+function buildLeadSummary(sessionId: string): SessionContext["leadSummary"] {
+  const context = getSessionContext(sessionId);
+  const triageData = context.triage?.data || {};
+  const leadData = context.lead || { temperature: "cold", urgency: "low" };
+  
+  const summary: SessionContext["leadSummary"] = {
+    theme: triageData.theme || context.lastTheme || undefined,
+    problem: triageData.problem || undefined,
+    time: triageData.time || undefined,
+    urgency: triageData.urgency || undefined,
+    temperature: leadData.temperature,
+    urgencyLevel: leadData.urgency,
+    priority: "normal",
+    needsHumanAttention: false,
+    handoffReason: ""
+  };
+  
+  // Detectar necessidade de handoff
+  const handoffDetection = detectHumanHandoffNeed(summary.temperature || "cold", summary.urgencyLevel || "low", summary.theme);
+  summary.priority = handoffDetection.priority;
+  summary.needsHumanAttention = handoffDetection.needsHumanAttention;
+  summary.handoffReason = handoffDetection.handoffReason;
+  
+  return summary;
+}
+
+// ADAPTAR RESPOSTA PARA LEADS PRIORITÁRIOS
+function adaptPriorityResponse(baseMessage: string, priority: "normal" | "high"): string {
+  if (priority === "high") {
+    return "Pelo que você me contou, sua situação merece atenção prioritária. " + baseMessage + " O melhor próximo passo agora é falar com a equipe para organizar seu atendimento com mais agilidade.";
+  }
+  
+  return baseMessage;
+}
+
+// CONSTRUIR CTA PRIORITÁRIO
+function buildPriorityCTA(priority: "normal" | "high"): NoemiaAction[] {
+  if (priority === "high") {
+    return [
+      { label: "Atendimento prioritário", href: "/triagem.html?origem=prioritario" },
+      { label: "WhatsApp urgente", href: "https://wa.me/5511999999999" },
+      { label: "Falar com advogada", href: "/contact" }
+    ];
+  }
+  
+  // CTA normal (usa smartCTA existente)
+  return [
+    { label: "Iniciar atendimento", href: "/triagem" }
+  ];
+}
+
 function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, context?: SessionContext): NoemiaResponse | null {
   const temperature = context?.lead?.temperature || "cold";
   const urgency = context?.lead?.urgency || "low";
-  const smartCTA = buildSmartCTA(temperature, urgency);
+  const priority = context?.leadSummary?.priority || "normal";
+  const smartCTA = priority === "high" ? buildPriorityCTA(priority) : buildSmartCTA(temperature, urgency);
   
   switch (theme) {
     case "aposentadoria":
@@ -490,7 +607,7 @@ function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, co
         : "Sobre aposentadoria, posso te orientar melhor. Você já tentou solicitar o benefício ou ainda está planejando? O INSS negou algum pedido?";
       
       return {
-        message: adaptMessageByLeadTemperature(baseMessageAposentadoria, temperature, urgency),
+        message: adaptPriorityResponse(adaptMessageByLeadTemperature(baseMessageAposentadoria, temperature, urgency), priority),
         actions: smartCTA,
         meta: { intent: "theme_aposentadoria", profile: "visitor", source: "fallback" }
       };
@@ -501,7 +618,7 @@ function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, co
         : "Entendi sobre desconto indevido. Qual banco está fazendo essa cobrança? Você reconhece o valor ou parece ser algo que não contratou?";
       
       return {
-        message: adaptMessageByLeadTemperature(baseMessageDesconto, temperature, urgency),
+        message: adaptPriorityResponse(adaptMessageByLeadTemperature(baseMessageDesconto, temperature, urgency), priority),
         actions: smartCTA,
         meta: { intent: "theme_desconto_indevido", profile: "visitor", source: "fallback" }
       };
@@ -512,7 +629,7 @@ function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, co
         : "Sobre pensão alimentícia, você precisa receber valores ou está sendo cobrado para pagar? Já existe algum processo ou acordo?";
       
       return {
-        message: adaptMessageByLeadTemperature(baseMessagePensao, temperature, urgency),
+        message: adaptPriorityResponse(adaptMessageByLeadTemperature(baseMessagePensao, temperature, urgency), priority),
         actions: smartCTA,
         meta: { intent: "theme_pensao", profile: "visitor", source: "fallback" }
       };
@@ -523,7 +640,7 @@ function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, co
         : "Sobre divórcio, vocês estão se separando de acordo ou tem disputas? Têm filhos menores ou bens para dividir?";
       
       return {
-        message: adaptMessageByLeadTemperature(baseMessageDivorcio, temperature, urgency),
+        message: adaptPriorityResponse(adaptMessageByLeadTemperature(baseMessageDivorcio, temperature, urgency), priority),
         actions: smartCTA,
         meta: { intent: "theme_divorcio", profile: "visitor", source: "fallback" }
       };
@@ -534,7 +651,7 @@ function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, co
         : "Em questões de família, posso ajudar com guarda, pensão, divórcio ou partilha. Qual é a sua situação específica?";
       
       return {
-        message: adaptMessageByLeadTemperature(baseMessageFamilia, temperature, urgency),
+        message: adaptPriorityResponse(adaptMessageByLeadTemperature(baseMessageFamilia, temperature, urgency), priority),
         actions: smartCTA,
         meta: { intent: "theme_familia", profile: "visitor", source: "fallback" }
       };
@@ -545,7 +662,7 @@ function buildVisitorThemeResponse(theme: string | null, isFollowUp: boolean, co
         : "Sobre direito trabalhista, você foi demitido, tem verbas não recebidas ou outro problema no trabalho? Me conta o que aconteceu.";
       
       return {
-        message: adaptMessageByLeadTemperature(baseMessageTrabalhista, temperature, urgency),
+        message: adaptPriorityResponse(adaptMessageByLeadTemperature(baseMessageTrabalhista, temperature, urgency), priority),
         actions: smartCTA,
         meta: { intent: "theme_trabalhista", profile: "visitor", source: "fallback" }
       };
@@ -1047,8 +1164,8 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     console.warn('[noemia] Erro ao obter dados reais para fallback inteligente:', error);
     
     // Fallback simples sem dados - usando lead scoring
-    const fallbackTemperature = context?.lead?.temperature || "cold";
-    const fallbackUrgency = context?.lead?.urgency || "low";
+    const fallbackTemperature = sessionId ? getSessionContext(sessionId)?.lead?.temperature || "cold" : "cold";
+    const fallbackUrgency = sessionId ? getSessionContext(sessionId)?.lead?.urgency || "low" : "low";
     const fallbackCTA = buildSmartCTA(fallbackTemperature, fallbackUrgency);
     
     const fallbackMessage = adaptMessageByLeadTemperature(
@@ -1393,4 +1510,60 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     audience: effectiveAudience,
     answer: internalResponse.message
   };
+}
+
+// Função para retornar todos os leads coletados pela NoemIA
+export function getAllLeads() {
+  const leads: Array<{
+    sessionId: string;
+    summary: any;
+    lastMessage: string;
+    priority: string;
+    temperature: string;
+    urgency: string;
+    theme?: string;
+    timestamp: Date;
+  }> = [];
+
+  // Percorrer todos os sessionContexts
+  for (const [sessionId, context] of sessionContexts.entries()) {
+    // Ignorar sessões sem leadSummary
+    if (!context.leadSummary) {
+      continue;
+    }
+
+    // Extrair timestamp da última interação
+    const lastInteraction = context.history[context.history.length - 1];
+    const timestamp = lastInteraction?.timestamp || new Date();
+
+    // Montar objeto do lead
+    const lead = {
+      sessionId,
+      summary: context.leadSummary,
+      lastMessage: context.lastMessage || '',
+      priority: context.leadSummary.priority || 'normal',
+      temperature: context.lead?.temperature || 'cold',
+      urgency: context.lead?.urgency || 'low',
+      theme: context.leadSummary.theme || context.lastTheme || undefined,
+      timestamp
+    };
+
+    leads.push(lead);
+  }
+
+  // Ordenar: priority high primeiro, depois por timestamp mais recente
+  leads.sort((a, b) => {
+    // Primeiro ordenar por priority (high antes de normal)
+    if (a.priority === 'high' && b.priority !== 'high') {
+      return -1;
+    }
+    if (a.priority !== 'high' && b.priority === 'high') {
+      return 1;
+    }
+    
+    // Depois ordenar por timestamp (mais recente primeiro)
+    return b.timestamp.getTime() - a.timestamp.getTime();
+  });
+
+  return leads;
 }
