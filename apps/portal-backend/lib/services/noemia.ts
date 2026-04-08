@@ -931,139 +931,32 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
   const intent = detectUserIntent(input.message);
   updateSessionContext(sessionId, input.message, intent, effectiveAudience);
 
-  if (!env.OPENAI_API_KEY) {
-    console.error("[noemia] OPENAI_API_KEY nao encontrada no ambiente");
-    
-    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
-    recordNoemiaMetrics({
-      question: input.message,
-      intent,
-      profile: effectiveAudience,
-      source: "fallback",
-      timestamp: new Date(),
-      actions: fallbackResponse.actions || [],
-      error: "OPENAI_API_KEY não encontrada",
-      sessionId,
-      responseTime: Date.now() - startTime,
-      tema: urlContext.tema,
-      origem: urlContext.origem
-    });
-
-    return {
-      audience: effectiveAudience,
-      answer: fallbackResponse.message
-    };
-  }
-
-  const contextText =
-    effectiveAudience === "staff" && profile
-      ? await buildStaffContext(profile)
-      : effectiveAudience === "client" && profile
-        ? await buildClientContext(profile)
-        : buildPublicContext();
-
-  const systemInstructions = buildSystemInstructions(effectiveAudience as "visitor" | "client" | "staff", contextText);
-
-  const conversationHistory = input.history.slice(-8).map((message) => ({
-    role: message.role,
-    content: [
-      {
-        type: "input_text",
-        text: message.content
-      }
-    ]
-  }));
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: systemInstructions
-        },
-        ...conversationHistory.map(msg => ({
-          role: msg.role,
-          content: msg.content[0].text
-        })),
-        {
-          role: "user",
-          content: input.message
-        }
-      ],
-      max_tokens: effectiveAudience === "staff" ? 900 : 600
-    })
-  });
-
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("[noemia] Erro na chamada OpenAI:", details);
-
-    // Usar fallback inteligente em vez de mensagem genérica
-    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
-    
-    recordNoemiaMetrics({
-      question: input.message,
-      intent,
-      profile: effectiveAudience,
-      source: "fallback",
-      timestamp: new Date(),
-      actions: fallbackResponse.actions || [],
-      error: details,
-      sessionId,
-      responseTime: Date.now() - startTime,
-      tema: urlContext.tema,
-      origem: urlContext.origem
-    });
-
-    return {
-      audience: effectiveAudience,
-      answer: fallbackResponse.message
-    };
-  }
-
-  const payload = await response.json();
-  const answer = extractResponseText(payload);
-
-  if (!answer) {
-    console.error("[noemia] Resposta vazia da OpenAI");
-
-    // Usar fallback inteligente mesmo com resposta vazia
-    const fallbackResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
-    
-    recordNoemiaMetrics({
-      question: input.message,
-      intent,
-      profile: effectiveAudience,
-      source: "fallback",
-      timestamp: new Date(),
-      actions: fallbackResponse.actions || [],
-      error: "Resposta vazia da OpenAI",
-      sessionId,
-      responseTime: Date.now() - startTime,
-      tema: urlContext.tema,
-      origem: urlContext.origem
-    });
-
-    return {
-      audience: effectiveAudience,
-      answer: fallbackResponse.message
-    };
-  }
+  // MOTOR INTERNO PRINCIPAL - Sem dependência de OpenAI
+  console.log("[noemia] Usando motor interno para resposta inteligente");
   
-  // Sucesso com OpenAI
+  const internalResponse = await generateIntelligentResponse(intent, profile, effectiveAudience, sessionId, urlContext);
+  
+  // Salvar resposta da NoemIA no histórico da sessão
+  const sessionContext = getSessionContext(sessionId);
+  sessionContext.history.push({
+    role: "assistant",
+    content: internalResponse.message,
+    timestamp: new Date()
+  });
+  
+  // Manter apenas últimos 5 turnos
+  if (sessionContext.history.length > 10) {
+    sessionContext.history = sessionContext.history.slice(-10);
+  }
+
+  // Registrar métricas do motor interno
   recordNoemiaMetrics({
     question: input.message,
     intent,
     profile: effectiveAudience,
-    source: "openai",
+    source: "fallback",
     timestamp: new Date(),
-    actions: [], // OpenAI não gera CTAs ainda
+    actions: internalResponse.actions || [],
     sessionId,
     responseTime: Date.now() - startTime,
     tema: urlContext.tema,
@@ -1072,7 +965,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
 
   return {
     audience: effectiveAudience,
-    answer
+    answer: internalResponse.message
   };
 }
 
