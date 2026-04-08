@@ -155,6 +155,7 @@ async function sendInstagramMessage(
 
     const apiUrl = `https://graph.facebook.com/v19.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
     console.log("INSTAGRAM_GRAPH_API_URL_FINAL:", apiUrl);
+    console.log("INSTAGRAM_USING_ME_ENDPOINT: TRUE - Conforme documentação oficial Instagram Messaging");
     console.log("INSTAGRAM_ACCESS_TOKEN_PREFIX_MASKED:", INSTAGRAM_ACCESS_TOKEN ? `${INSTAGRAM_ACCESS_TOKEN.substring(0, 6)}...` : 'MISSING');
     console.log("INSTAGRAM_ACCESS_TOKEN_LENGTH:", INSTAGRAM_ACCESS_TOKEN?.length || 0);
     
