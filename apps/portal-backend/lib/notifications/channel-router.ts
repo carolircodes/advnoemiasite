@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sendNotificationEmail } from "./email-delivery";
+import { sendViaWhatsApp } from "./whatsapp-delivery";
 import { getNotificationEnv } from "../config/env"
 
 export type ChannelDeliveryInput = {
@@ -13,13 +14,11 @@ export type ChannelDeliveryInput = {
 /**
  * Roteador central de canais de notificação.
  *
- * Canal "email": ativo — entrega via Resend ou SMTP conforme NOTIFICATIONS_PROVIDER.
+ * Canal "email": ativo - entrega via Resend ou SMTP conforme NOTIFICATIONS_PROVIDER.
  *
- * Canal "whatsapp": preparado para integração futura.
- *   Providers suportados: Z-API, Twilio, 360Dialog.
- *   Para ativar: defina WHATSAPP_PROVIDER e as credenciais no painel do Vercel,
- *   implemente sendViaWhatsapp() em lib/notifications/whatsapp-delivery.ts e
- *   adicione a migração para aceitar channel='whatsapp' na tabela notifications_outbox.
+ * Canal "whatsapp": ativo - entrega via Meta WhatsApp Cloud API.
+ *   Usa META_WHATSAPP_ACCESS_TOKEN e META_WHATSAPP_PHONE_NUMBER_ID.
+ *   Verifica preferências do cliente antes de enviar.
  *
  * Canal "noemia": preparado para integração futura.
  *   Permitirá que a NoemIA envie mensagens contextuais diretamente ao cliente
@@ -36,10 +35,8 @@ export async function routeNotificationByChannel(
       return;
 
     case "whatsapp":
-      throw new Error(
-        "Canal WhatsApp ainda nao configurado. " +
-          "Defina WHATSAPP_PROVIDER e implemente lib/notifications/whatsapp-delivery.ts."
-      );
+      await sendViaWhatsApp(input);
+      return;
 
     case "noemia":
       throw new Error(

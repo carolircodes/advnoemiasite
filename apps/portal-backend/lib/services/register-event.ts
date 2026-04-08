@@ -2,7 +2,7 @@ import "server-only";
 
 import { assertStaffActor } from "../auth/guards";
 import { recordPortalEventSchema } from "../domain/portal";
-import { queueCaseEventNotification } from "../notifications/outbox";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { createServerSupabaseClient } from "../supabase/server";
 
@@ -80,21 +80,33 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
     throw new Error(eventError?.message || "Nao foi possivel registrar a atualizacao do caso.");
   }
 
-  let notificationId: string | null = null;
+  let notificationResults: {
+    emailNotificationId?: string;
+    whatsappNotificationId?: string;
+    skipped: string[];
+    errors: string[];
+  } = {
+    skipped: [],
+    errors: []
+  };
+
   try {
     if (shouldNotifyClient && profileRecord.email) {
-      const notificationSummary =
-        publicSummary || "Nova atualizacao registrada no portal.";
-      const notification = await queueCaseEventNotification({
+      // Usar novo fluxo unificado de notificações
+      notificationResults = await sendCaseUpdateNotification({
         clientProfileId: profileRecord.id,
         clientEmail: profileRecord.email,
+        clientId: clientRecord.id,
+        clientName: profileRecord.full_name || "Cliente",
+        caseId: caseRecord.id,
+        caseTitle: input.title,
         eventType: input.eventType,
         title: input.title,
-        publicSummary: notificationSummary,
+        publicSummary: publicSummary || "Nova atualização registrada no portal.",
+        shouldNotifyEmail: true,
+        shouldNotifyWhatsApp: true,
         relatedId: eventRecord.id
       });
-
-      notificationId = notification.id;
     }
 
     const { error: auditError } = await supabase.from("audit_logs").insert({
@@ -108,7 +120,10 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
         visibleToClient,
         shouldNotifyClient,
         occurredAt,
-        notificationId
+        emailSent: !!notificationResults.emailNotificationId,
+        whatsappSent: !!notificationResults.whatsappNotificationId,
+        skipped: notificationResults.skipped,
+        errors: notificationResults.errors
       }
     });
 
@@ -121,21 +136,38 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
     console.error("[case-events.create] Rolling back case update after downstream failure", {
       caseId: caseRecord.id,
       eventId: eventRecord.id,
-      notificationId,
+      emailNotificationId: notificationResults.emailNotificationId,
+      whatsappNotificationId: notificationResults.whatsappNotificationId,
       message: error instanceof Error ? error.message : String(error)
     });
 
-    if (notificationId) {
-      const { error: deleteNotificationError } = await supabase
+    // Rollback de notificações (email e WhatsApp)
+    if (notificationResults.emailNotificationId) {
+      const { error: deleteEmailError } = await supabase
         .from("notifications_outbox")
         .delete()
-        .eq("id", notificationId);
+        .eq("id", notificationResults.emailNotificationId);
 
-      if (deleteNotificationError) {
-        console.error("[case-events.create] Failed to rollback notification", {
+      if (deleteEmailError) {
+        console.error("[case-events.create] Failed to rollback email notification", {
           eventId: eventRecord.id,
-          notificationId,
-          message: deleteNotificationError.message
+          notificationId: notificationResults.emailNotificationId,
+          message: deleteEmailError.message
+        });
+      }
+    }
+
+    if (notificationResults.whatsappNotificationId) {
+      const { error: deleteWhatsAppError } = await supabase
+        .from("notifications_outbox")
+        .delete()
+        .eq("id", notificationResults.whatsappNotificationId);
+
+      if (deleteWhatsAppError) {
+        console.error("[case-events.create] Failed to rollback WhatsApp notification", {
+          eventId: eventRecord.id,
+          notificationId: notificationResults.whatsappNotificationId,
+          message: deleteWhatsAppError.message
         });
       }
     }
@@ -158,7 +190,10 @@ export async function registerPortalEvent(rawInput: unknown, actorProfileId: str
 
   return {
     eventId: eventRecord.id,
-    notificationId
+    emailNotificationId: notificationResults.emailNotificationId,
+    whatsappNotificationId: notificationResults.whatsappNotificationId,
+    skipped: notificationResults.skipped,
+    errors: notificationResults.errors
   };
 }
 

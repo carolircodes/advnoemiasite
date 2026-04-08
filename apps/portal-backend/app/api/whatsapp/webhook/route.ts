@@ -138,6 +138,20 @@ function extractMessageInfo(message: any) {
   return info;
 }
 
+// Função de proteção global para entradas não suportadas
+async function handleUnsupportedWhatsAppMessage(sender: string, messageType: string): Promise<boolean> {
+  const unsupportedMessage = "No momento, este atendimento está habilitado apenas para mensagens escritas. Pode me contar por texto, de forma simples, o que aconteceu no seu caso?";
+  
+  logEvent('UNSUPPORTED_MESSAGE_HANDLED', {
+    platform: 'whatsapp',
+    sender,
+    messageType,
+    response: unsupportedMessage
+  });
+
+  return await sendWhatsAppResponse(sender, unsupportedMessage);
+}
+
 // Enviar resposta via WhatsApp API
 async function sendWhatsAppResponse(to: string, message: string) {
   logEvent('WHATSAPP_GRAPH_API_STATUS', {
@@ -318,6 +332,9 @@ export async function POST(request: NextRequest) {
                   type: messageInfo.type,
                   from: messageInfo.from
                 });
+                
+                // Enviar mensagem de proteção para conteúdo não suportado
+                await handleUnsupportedWhatsAppMessage(messageInfo.from, messageInfo.type);
               }
             }
           }

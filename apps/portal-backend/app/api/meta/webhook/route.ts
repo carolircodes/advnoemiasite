@@ -148,6 +148,20 @@ async function sendInstagramMessage(
 }
 
 // Processar mensagem usando lógica centralizada da NoemIA
+// Função de proteção global para entradas não suportadas no Instagram
+async function handleUnsupportedInstagramMessage(senderId: string, messageType: string): Promise<boolean> {
+  const unsupportedMessage = "No momento, este atendimento está habilitado apenas para mensagens escritas. Pode me contar por texto, de forma simples, o que aconteceu no seu caso?";
+  
+  logEvent("UNSUPPORTED_MESSAGE_HANDLED", {
+    platform: "instagram",
+    sender: senderId,
+    messageType,
+    response: unsupportedMessage
+  });
+
+  return await sendInstagramMessage(senderId, unsupportedMessage);
+}
+
 async function processMessageWithNoemia(senderId: string, messageText: string) {
   try {
     logEvent("INSTAGRAM_CALLING_NOEMIA", {
@@ -298,14 +312,19 @@ export async function POST(request: NextRequest) {
         // Process entry.messaging format
         for (const messaging of entry.messaging || []) {
           console.log("INSTAGRAM_STRUCTURE_MATCHED: messaging");
-          if (!messaging.message?.text) {
-            console.log("EVENT_IGNORED_NO_MESSAGE: messaging structure without message.text");
-            continue;
-          }
           if (!messaging.sender?.id) {
             console.log("EVENT_IGNORED_MISSING_SENDER: messaging structure without sender.id");
             continue;
           }
+
+          // Verificar se é mensagem de texto
+          if (!messaging.message?.text) {
+            console.log("EVENT_IGNORED_NO_MESSAGE: messaging structure without message.text");
+            // Enviar mensagem de proteção para conteúdo não suportado
+            await handleUnsupportedInstagramMessage(messaging.sender.id, messaging.message?.type || 'unknown');
+            continue;
+          }
+
           if (!messaging.message.text.trim()) {
             console.log("EVENT_IGNORED_NO_TEXT: messaging structure with empty text");
             continue;
@@ -399,14 +418,19 @@ export async function POST(request: NextRequest) {
           const messages = change.value?.messages || [];
 
           for (const message of messages) {
-            if (!message.text) {
-              console.log("EVENT_IGNORED_NO_MESSAGE: changes message without text");
-              continue;
-            }
             if (!message.from?.id) {
               console.log("EVENT_IGNORED_MISSING_SENDER: changes message without from.id");
               continue;
             }
+
+            // Verificar se é mensagem de texto
+            if (!message.text) {
+              console.log("EVENT_IGNORED_NO_MESSAGE: changes message without text");
+              // Enviar mensagem de proteção para conteúdo não suportado
+              await handleUnsupportedInstagramMessage(message.from.id, message.type || 'unknown');
+              continue;
+            }
+
             if (!message.text.trim()) {
               console.log("EVENT_IGNORED_NO_TEXT: changes message with empty text");
               continue;

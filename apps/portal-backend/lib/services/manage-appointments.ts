@@ -9,7 +9,7 @@ import {
   registerCaseAppointmentSchema,
   updateCaseAppointmentSchema
 } from "../domain/portal";
-import { queueCaseEventNotification } from "../notifications/outbox";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { createServerSupabaseClient } from "../supabase/server";
 
@@ -314,6 +314,7 @@ async function createAppointmentEvent(input: {
   actorProfileId: string;
   clientProfileId: string;
   clientEmail: string;
+  clientName?: string;
   eventType: any;
   title: string;
   description: string;
@@ -347,20 +348,33 @@ async function createAppointmentEvent(input: {
     );
   }
 
-  let notificationId: string | null = null;
+  let notificationResults: {
+    emailNotificationId?: string;
+    whatsappNotificationId?: string;
+    skipped: string[];
+    errors: string[];
+  } = {
+    skipped: [],
+    errors: []
+  };
 
   try {
     if (input.shouldNotifyClient && input.clientEmail) {
-      const notification = await queueCaseEventNotification({
+      // Usar novo fluxo unificado de notificações
+      notificationResults = await sendCaseUpdateNotification({
         clientProfileId: input.clientProfileId,
         clientEmail: input.clientEmail,
+        clientId: input.clientId,
+        clientName: input.clientName || "Cliente",
+        caseId: input.caseId,
+        caseTitle: input.title,
         eventType: input.eventType,
         title: input.title,
         publicSummary: input.publicSummary,
+        shouldNotifyEmail: true,
+        shouldNotifyWhatsApp: true,
         relatedId: eventRecord.id
       });
-
-      notificationId = notification.id;
     }
   } catch (error) {
     const { error: rollbackEventError } = await supabase
@@ -380,7 +394,10 @@ async function createAppointmentEvent(input: {
 
   return {
     eventId: eventRecord.id,
-    notificationId
+    emailNotificationId: notificationResults.emailNotificationId,
+    whatsappNotificationId: notificationResults.whatsappNotificationId,
+    notificationSkipped: notificationResults.skipped,
+    notificationErrors: notificationResults.errors
   };
 }
 
@@ -660,7 +677,7 @@ export async function registerCaseAppointment(rawInput: unknown, actorProfileId:
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
     }
 
     await createAuditLog({
@@ -776,7 +793,7 @@ export async function updateCaseAppointment(rawInput: unknown, actorProfileId: s
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
     }
 
     await createAuditLog({

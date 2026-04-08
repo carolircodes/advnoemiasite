@@ -1,9 +1,25 @@
 import "server-only";
 
-import type { PortalProfile } from "../auth/guards";
-import { askNoemiaSchema, caseAreaLabels } from "../domain/portal";
-import { getBusinessIntelligenceOverview } from "./intelligence";
-import { getClientWorkspace, getStaffOverview } from "./dashboard";
+import { OpenAI } from "openai";
+import { createServerSupabaseClient } from "../supabase/server";
+import { 
+  getInitialMessage, 
+  getThemeSuggestions, 
+  generateControlledResponse,
+  detectLegalTheme,
+  looksLikeLegalHelpRequest,
+  extractRelativeTime,
+  inferUrgency,
+  detectLeadTemperature,
+  detectUrgencyLevel,
+  buildSmartCTA,
+  adaptMessageByLeadTemperature,
+  detectHumanHandoffNeed,
+  buildLeadSummary,
+  adaptPriorityResponse,
+  buildPriorityCTA
+} from "./noemia-helpers";
+import { logger, logNoemia } from "../logging/structured-logger";
 
 function compactText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -203,11 +219,13 @@ export type NoemiaAction = {
 
 export type NoemiaResponse = {
   message: string;
+  answer?: string;
+  audience?: string;
   actions?: NoemiaAction[];
   meta?: {
     intent: string;
     profile: string;
-    source: "openai" | "fallback";
+    source: string;
   };
 };
 
@@ -969,101 +987,133 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
       }
     }
     
-    // Staff - normal operation
+    // Staff - operação com dados reais do banco
     if (audience === 'staff' && profile) {
       const { getStaffOverview } = await import("./dashboard");
       const overview = await getStaffOverview();
       
+      // Dados operacionais reais
+      const criticalItems = overview.operationalCenter.queues.today.filter(item => item.severity === 'critical').slice(0, 3);
+      const awaitingClientItems = overview.operationalCenter.queues.awaitingClient.slice(0, 3);
+      const topCases = overview.latestCases.slice(0, 3);
+      const pendingDocs = overview.latestDocumentRequests.filter(doc => doc.status === 'pending').slice(0, 3);
+      
       switch (intent) {
         case 'legal_advice_request':
           return {
-            message: 'Detectei uma solicitação de orientação jurídica. Como staff, você pode acessar os casos e documentos para análise. Recomendo verificar o histórico do cliente e agendar uma consulta se necessário.',
+            message: `Vejo que você precisa de orientação jurídica. Tenho ${overview.latestCases.length} casos ativos no sistema. Os casos mais recentes são: ${topCases.map(c => c.title).slice(0, 2).join(' e ')}. Recomendo revisar o histórico completo do cliente antes de fornecer orientação.`,
             actions: [
-              { label: "Ver casos recentes", href: "/cases" },
-              { label: "Agendar consulta", href: "/consulta" }
+              { label: "Ver casos recentes", href: "/internal/casos" },
+              { label: "Ver detalhes dos casos", href: "/internal/casos?filter=recent" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         case 'agenda':
+          const todayItems = overview.operationalCenter.queues.today.slice(0, 5);
+          const todaySummary = todayItems.length > 0 
+            ? todayItems.map(item => `${item.kindLabel}: ${item.title}`).join('; ')
+            : 'Nenhum item para hoje';
+          
           return {
             message: isFollowUp 
-              ? `Complementando sua agenda, você tem ${overview.operationalCenter.summary.criticalCount} tarefas críticas requiring atenção imediata e ${overview.operationalCenter.summary.todayCount} itens para hoje. Recomendo priorizar os documentos pendentes.`
-              : `Entendi que você quer organizar sua agenda. Para hoje, você tem: • ${overview.operationalCenter.summary.criticalCount} tarefas críticas requiring atenção imediata • ${overview.operationalCenter.summary.todayCount} itens na fila do dia • ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente • ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
+              ? `Sua agenda operacional: ${overview.operationalCenter.summary.criticalCount} tarefas críticas e ${overview.operationalCenter.summary.todayCount} itens para hoje. Principais itens: ${todaySummary}`
+              : `Sua agenda de hoje está organizada com ${overview.operationalCenter.summary.criticalCount} tarefas críticas e ${overview.operationalCenter.summary.todayCount} itens no total. Principais pendências: ${todaySummary}. ${overview.operationalCenter.summary.waitingClientCount > 0 ? `Além disso, ${overview.operationalCenter.summary.waitingClientCount} clientes estão aguardando seu retorno.` : ''}`,
             actions: [
-              { label: "Ver painel operacional", href: "/dashboard" },
-              { label: "Checar prioridades", href: "/priorities" }
+              { label: "Ver painel operacional", href: "/internal" },
+              { label: "Ver itens críticos", href: "/internal?filter=critical" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         case 'clientes':
+          const clientsAwaiting = awaitingClientItems.map(item => `${item.title} (${item.timingLabel})`).join('; ');
+          const urgentClients = overview.latestClients.filter(c => c.status === 'aguardando_documento').slice(0, 3);
+          
           return {
             message: isFollowUp
-              ? `Sobre seus clientes, ${overview.operationalCenter.summary.waitingClientCount} estão aguardando documentos e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento.`
-              : `Sobre seus clientes, atualmente ${overview.operationalCenter.summary.waitingClientCount} estão aguardando documentos e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento. A prioridade é contatar os clientes com pendências documentais.`,
+              ? `Situação dos clientes: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento. Pendências principais: ${clientsAwaiting || 'Nenhuma pendência crítica'}`
+              : `Tenho ${overview.latestClients.length} clientes no sistema. Destaque para: ${overview.operationalCenter.summary.waitingClientCount} aguardando documentos${overview.operationalCenter.summary.waitingTeamCount > 0 ? ` e ${overview.operationalCenter.summary.waitingTeamCount} com casos em andamento` : ''}. Pendências urgentes: ${clientsAwaiting || 'Nenhuma pendência crítica'}. ${urgentClients.length > 0 ? `Clientes precisando de atenção: ${urgentClients.map(c => c.full_name).join(', ')}.` : ''}`,
             actions: [
-              { label: "Ver lista de clientes", href: "/clients" },
-              { label: "Pendências documentais", href: "/documents/pending" }
+              { label: "Ver todos os clientes", href: "/internal/clientes" },
+              { label: "Pendências documentais", href: "/internal/documentos" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         case 'processos':
-          const criticalCount = overview.operationalCenter.summary.criticalCount;
-          const staleCount = overview.operationalCenter.summary.staleCasesCount;
+          const criticalCases = criticalItems.map(item => `${item.title} (${item.stateLabel})`).join('; ');
+          const staleCasesInfo = overview.operationalCenter.summary.staleCasesCount;
+          
           return {
             message: isFollowUp
-              ? `Seus processos: ${overview.operationalCenter.summary.todayCount} em andamento, ${criticalCount} críticos. ${staleCount > 0 ? `${staleCount} caso está aguardando há dias.` : 'Todos com atualizações recentes.'}`
-              : `Sobre seus processos, você tem ${overview.operationalCenter.summary.todayCount} em andamento, sendo ${criticalCount} críticos. O foco hoje é análise de laudos médicos e atualização de status. ${staleCount > 0 ? `${staleCount} caso está aguardando há dias sem atualização - requer atenção prioritária.` : 'Todos os casos estão com atualizações recentes.'}`,
+              ? `Status dos processos: ${overview.latestCases.length} casos ativos, ${overview.operationalCenter.summary.criticalCount} críticos. ${staleCasesInfo > 0 ? `${staleCasesInfo} caso(s) sem atualização recente.` : 'Todos com atualizações recentes.'}`
+              : `Tenho ${overview.latestCases.length} processos em andamento. Situação atual: ${overview.operationalCenter.summary.criticalCount} críticos e ${staleCasesInfo > 0 ? `${staleCasesInfo} caso(s) parado(s) há dias - precisa atenção` : 'todos com movimentação recente'}. Casos críticos: ${criticalCases || 'Nenhum caso crítico no momento'}. Próximos passos: atualizar status dos casos parados e contatar clientes com pendências.`,
             actions: [
-              { label: "Ver casos críticos", href: "/cases?filter=critical" },
-              { label: "Atualizar status", href: "/cases/update" }
+              { label: "Ver casos críticos", href: "/internal/casos?filter=critical" },
+              { label: "Atualizar andamento", href: "/internal/casos" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         case 'documentos':
-          const agedDocs = overview.operationalCenter.summary.agedPendingDocumentsCount;
+          const overdueDocs = overview.operationalCenter.summary.agedPendingDocumentsCount;
+          const pendingDocsList = pendingDocs.map(doc => `${doc.title} (${doc.timingLabel})`).join('; ');
+          
           return {
             message: isFollowUp
-              ? `Documentos: ${agedDocs > 0 ? `${agedDocs} pendente há mais de 7 dias.` : 'Nenhum vencido.'}`
-              : `Sobre documentos, ${agedDocs > 0 ? `${agedDocs} documento está pendente há mais de 7 dias.` : 'Nenhum documento vencido.'} Você tem 3 solicitações documentais abertas. Ação recomendada: contatar clientes sobre pendências.`,
+              ? `Documentos: ${overdueDocs > 0 ? `${overdueDocs} vencido(s) há mais de 7 dias` : 'Nenhum documento vencido'}. Pendências atuais: ${pendingDocsList || 'Nenhuma pendência'}`
+              : `Situação documental: ${overview.latestDocumentRequests.length} solicitações, ${pendingDocs.length} pendentes${overdueDocs > 0 ? ` e ${overdueDocs} vencida(s) há mais de 7 dias` : ''}. Pendências principais: ${pendingDocsList || 'Nenhuma pendência crítica'}. Ação recomendada: contatar clientes sobre documentos pendentes para não travar os casos.`,
             actions: [
-              { label: "Ver documentos pendentes", href: "/documents/pending" },
-              { label: "Solicitações abertas", href: "/document-requests" }
+              { label: "Ver documentos pendentes", href: "/internal/documentos?filter=pending" },
+              { label: "Solicitar documentos", href: "/internal/documentos/solicitar" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         case 'prioridades':
+          const prioritySummary = criticalItems.map(item => `${item.severity.toUpperCase()}: ${item.title} (${item.timingLabel})`).join('; ');
+          const nextActions = [
+            ...(criticalItems.length > 0 ? ['Resolver itens críticos'] : []),
+            ...(overview.operationalCenter.summary.waitingClientCount > 0 ? ['Contatar clientes aguardando'] : []),
+            ...(overdueDocs > 0 ? ['Regularizar documentos vencidos'] : []),
+            'Atualizar andamento dos casos'
+          ].slice(0, 4);
+          
           return {
             message: isFollowUp
-              ? `Suas prioridades: ${overview.operationalCenter.summary.criticalCount} críticas, ${overview.operationalCenter.summary.todayCount} para hoje.`
-              : `Organizei suas prioridades: Críticas (${overview.operationalCenter.summary.criticalCount}) → Documentos vencidos, Hoje (${overview.operationalCenter.summary.todayCount}) → Análises pendentes, Aguardando cliente (${overview.operationalCenter.summary.waitingClientCount}) → Respostas necessárias. Foco: resolver críticas primeiro.`,
+              ? `Prioridades atualizadas: ${overview.operationalCenter.summary.criticalCount} críticas, ${overview.operationalCenter.summary.todayCount} para hoje.`
+              : `Organizei suas prioridades operacionais: ${overview.operationalCenter.summary.criticalCount} tarefas críticas precisam atenção imediata. Principais prioridades: ${prioritySummary || 'Nenhuma prioridade crítica'}. Próximas ações recomendadas: ${nextActions.join(', ')}.`,
             actions: [
-              { label: "Ver painel de prioridades", href: "/priorities" },
-              { label: "Resolver críticas", href: "/tasks/critical" }
+              { label: "Ver painel de prioridades", href: "/internal" },
+              { label: "Resolver críticas", href: "/internal?filter=critical" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         case 'saudacao':
+          const operationalSummary = [
+            `${overview.operationalCenter.summary.criticalCount} tarefas críticas`,
+            `${overview.operationalCenter.summary.todayCount} itens para hoje`,
+            `${overview.latestCases.length} casos ativos`,
+            `${overview.latestClients.length} clientes`
+          ].join(', ');
+          
           return {
-            message: `Olá! Que bom ter você aqui. Sou a NoemIA, sua assistente inteligente para rotina jurídica. Vejo que você tem ${overview.operationalCenter.summary.criticalCount} tarefas críticas e ${overview.operationalCenter.summary.todayCount} itens para hoje. Como posso apoiar sua rotina?`,
+            message: `Olá! Sou a NoemIA, sua assistente operacional. Tenho tudo organizado para você: ${operationalSummary}. ${criticalItems.length > 0 ? `As prioridades de hoje são: ${criticalItems.slice(0, 2).map(item => item.title).join(' e ')}.` : 'Nenhuma prioridade crítica no momento.'} Como posso otimizar sua rotina hoje?`,
             actions: [
-              { label: "Ver agenda do dia", href: "/agenda" },
-              { label: "Ver prioridades", href: "/priorities" }
+              { label: "Ver dashboard completo", href: "/internal" },
+              { label: "Ver prioridades do dia", href: "/internal?filter=today" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
           
         default:
           return {
-            message: `Estou aqui para otimizar sua rotina. Você tem ${overview.operationalCenter.summary.criticalCount} itens críticos, ${overview.operationalCenter.summary.todayCount} para hoje e ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente. O que precisa organizar?`,
+            message: `Sua operação está com ${overview.operationalCenter.summary.criticalCount} itens críticos, ${overview.operationalCenter.summary.todayCount} tarefas para hoje e ${overview.operationalCenter.summary.waitingClientCount} clientes aguardando. Posso ajudar com: agenda, clientes específicos, processos, documentos ou prioridades. O que precisa organizar?`,
             actions: [
-              { label: "Ver dashboard", href: "/dashboard" },
-              { label: "Ver agenda", href: "/agenda" }
+              { label: "Ver dashboard operacional", href: "/internal" },
+              { label: "Ver casos recentes", href: "/internal/casos" }
             ],
             meta: { intent, profile: audience, source: "fallback" }
           };
@@ -1433,11 +1483,19 @@ function buildSystemInstructions(mode: "visitor" | "client" | "staff", contextTe
     .join("\n");
 }
 
-export async function answerNoemia(rawInput: unknown, profile: PortalProfile | null, currentPath?: string) {
+export async function answerNoemia(
+  rawInput: unknown,
+  profile: PortalProfile | null,
+  sessionId?: string,
+  urlContext?: URLContext
+): Promise<NoemiaResponse> {
   const startTime = Date.now();
+  let response: NoemiaResponse;
+
   const input = askNoemiaSchema.parse(rawInput);
   const requestedAudience = input.audience;
-  const urlContext = getContextFromURL(currentPath);
+  const currentPath = ""; // TODO: Obter do request
+  const parsedUrlContext = getContextFromURL(currentPath);
 
   let effectiveAudience: "visitor" | "client" | "staff" =
     requestedAudience === "staff" && profile && profile.role !== "cliente"
@@ -1454,15 +1512,15 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     effectiveAudience = "visitor";
   }
 
-  const sessionId = input.sessionId || profile?.id || `visitor-${Buffer.from((currentPath || "site") + input.message).toString("base64").slice(0, 16)}`;
-  const detectedTheme = detectLegalTheme(input.message) || urlContext.tema || null;
+  const finalSessionId = input.sessionId || profile?.id || `visitor-${Buffer.from((currentPath || "site") + input.message).toString("base64").slice(0, 16)}`;
+  const detectedTheme = detectLegalTheme(input.message) || (urlContext || parsedUrlContext).tema || null;
   const intent = detectUserIntent(input.message);
 
-  updateSessionContext(sessionId, input.message, intent, effectiveAudience, detectedTheme);
+  updateSessionContext(finalSessionId, input.message, intent, effectiveAudience, detectedTheme);
 
-  const triageResponse = handleTriageFlow(sessionId, input.message, effectiveAudience, urlContext);
+  const triageResponse = handleTriageFlow(finalSessionId, input.message, effectiveAudience, urlContext || parsedUrlContext);
   if (triageResponse) {
-    addAssistantMessageToSession(sessionId, triageResponse.message);
+    addAssistantMessageToSession(finalSessionId, triageResponse.message);
     recordNoemiaMetrics({
       question: input.message,
       intent: triageResponse.meta?.intent || intent,
@@ -1470,15 +1528,16 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
       source: "fallback",
       timestamp: new Date(),
       actions: triageResponse.actions || [],
-      sessionId,
+      sessionId: finalSessionId,
       responseTime: Date.now() - startTime,
       tema: detectedTheme || undefined,
-      origem: urlContext.origem
+      origem: (urlContext || parsedUrlContext).origem
     });
 
     return {
       audience: effectiveAudience,
-      answer: triageResponse.message
+      answer: triageResponse.message,
+      message: triageResponse.message
     };
   }
 
@@ -1487,11 +1546,11 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     input.message,
     profile,
     effectiveAudience,
-    sessionId,
-    urlContext
+    finalSessionId,
+    urlContext || parsedUrlContext
   );
 
-  addAssistantMessageToSession(sessionId, internalResponse.message);
+  addAssistantMessageToSession(finalSessionId, internalResponse.message);
 
   recordNoemiaMetrics({
     question: input.message,
@@ -1500,15 +1559,32 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     source: "fallback",
     timestamp: new Date(),
     actions: internalResponse.actions || [],
-    sessionId,
+    sessionId: finalSessionId,
     responseTime: Date.now() - startTime,
     tema: detectedTheme || undefined,
-    origem: urlContext.origem
+    origem: (urlContext || parsedUrlContext).origem
   });
+
+  // Log estruturado da resposta
+  await logNoemia(
+    "response_generated",
+    profile?.id || "visitor",
+    `Resposta gerada para ${effectiveAudience}: ${intent}`,
+    {
+      intent,
+      audience: effectiveAudience,
+      responseTime: Date.now() - startTime,
+      messageLength: internalResponse.message.length,
+      sessionId: finalSessionId,
+      detectedTheme,
+      urlContext: urlContext || parsedUrlContext
+    }
+  );
 
   return {
     audience: effectiveAudience,
-    answer: internalResponse.message
+    answer: internalResponse.message,
+    message: internalResponse.message
   };
 }
 

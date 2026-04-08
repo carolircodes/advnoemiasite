@@ -158,8 +158,19 @@ async function processNotification(record: NotificationRecord) {
         html: renderedEmail.html,
         text: renderedEmail.text
       });
+    } else if (channel === "whatsapp") {
+      // Para WhatsApp, usar payload com mensagem específica
+      const payload = record.payload as any;
+      const whatsappMessage = payload?.message || record.subject;
+      
+      await routeNotificationByChannel("whatsapp", {
+        to: record.recipient_email, // Para WhatsApp, este campo contém o telefone
+        subject: record.subject,
+        html: "",
+        text: whatsappMessage
+      });
     } else {
-      // Canais futuros (whatsapp, noemia): roteador lanca erro informativo
+      // Canais futuros (noemia): roteador lança erro informativo
       await routeNotificationByChannel(channel, {
         to: record.recipient_email,
         subject: record.subject,

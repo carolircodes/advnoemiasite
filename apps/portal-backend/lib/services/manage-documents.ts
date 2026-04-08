@@ -11,7 +11,7 @@ import {
   requestCaseDocumentSchema,
   updateDocumentRequestStatusSchema
 } from "../domain/portal";
-import { queueCaseEventNotification } from "../notifications/outbox";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { createServerSupabaseClient } from "../supabase/server";
 
@@ -251,20 +251,33 @@ async function createCaseEventForDocumentFlow(input: {
     );
   }
 
-  let notificationId: string | null = null;
+  let notificationResults: {
+    emailNotificationId?: string;
+    whatsappNotificationId?: string;
+    skipped: string[];
+    errors: string[];
+  } = {
+    skipped: [],
+    errors: []
+  };
 
   try {
     if (input.shouldNotifyClient && input.clientEmail) {
-      const notification = await queueCaseEventNotification({
+      // Usar novo fluxo unificado de notificações
+      notificationResults = await sendCaseUpdateNotification({
         clientProfileId: input.clientProfileId,
         clientEmail: input.clientEmail,
+        clientId: input.clientId,
+        clientName: input.clientName,
+        caseId: input.caseId,
+        caseTitle: input.title,
         eventType: input.eventType,
         title: input.title,
         publicSummary: input.publicSummary,
+        shouldNotifyEmail: true,
+        shouldNotifyWhatsApp: true,
         relatedId: eventRecord.id
       });
-
-      notificationId = notification.id;
     }
   } catch (error) {
     const { error: rollbackEventError } = await supabase
@@ -284,7 +297,10 @@ async function createCaseEventForDocumentFlow(input: {
 
   return {
     eventId: eventRecord.id,
-    notificationId
+    emailNotificationId: notificationResults.emailNotificationId,
+    whatsappNotificationId: notificationResults.whatsappNotificationId,
+    notificationSkipped: notificationResults.skipped,
+    notificationErrors: notificationResults.errors
   };
 }
 

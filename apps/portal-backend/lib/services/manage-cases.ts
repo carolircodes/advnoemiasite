@@ -8,8 +8,9 @@ import {
   updateCaseDetailsSchema,
   updateCaseStatusSchema
 } from "../domain/portal";
-import { queueCaseEventNotification } from "../notifications/outbox";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications";
 import { createAdminSupabaseClient } from "../supabase/admin";
+import { logger, logCaseUpdate } from "../logging/structured-logger";
 
 type CaseRecord = {
   id: string;
@@ -122,12 +123,15 @@ async function createVisibleCaseEvent(input: {
   actorProfileId: string;
   clientProfileId: string;
   clientEmail: string;
+  clientName: string;
   eventType: "case_update" | "status_change";
   title: string;
   description: string;
   publicSummary: string;
   payload: Record<string, unknown>;
   shouldNotifyClient: boolean;
+  shouldNotifyEmail?: boolean;
+  shouldNotifyWhatsApp?: boolean;
   occurredAt: string;
 }) {
   const supabase = createAdminSupabaseClient();
@@ -155,40 +159,95 @@ async function createVisibleCaseEvent(input: {
     );
   }
 
-  let notificationId: string | null = null;
+  let notificationResults: {
+    emailNotificationId?: string;
+    whatsappNotificationId?: string;
+    skipped: string[];
+    errors: string[];
+  } = {
+    skipped: [],
+    errors: []
+  };
 
   try {
-    if (input.shouldNotifyClient && input.clientEmail) {
-      const notification = await queueCaseEventNotification({
+    if (input.shouldNotifyClient) {
+      // Buscar nome do cliente se não fornecido
+      let clientName = input.clientName;
+      if (!clientName) {
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("profiles!inner(full_name)")
+          .eq("id", input.clientId)
+          .single();
+        
+        const profile = clientData?.profiles as any;
+        clientName = profile?.full_name || "Cliente";
+      }
+
+      notificationResults = await sendCaseUpdateNotification({
         clientProfileId: input.clientProfileId,
         clientEmail: input.clientEmail,
+        clientId: input.clientId,
+        clientName,
+        caseId: input.caseId,
+        caseTitle: input.title,
         eventType: input.eventType,
         title: input.title,
         publicSummary: input.publicSummary,
-        relatedId: eventRecord.id
+        shouldNotifyEmail: input.shouldNotifyEmail !== false,
+        shouldNotifyWhatsApp: input.shouldNotifyWhatsApp !== false,
+        relatedId: eventRecord.id,
+        previousStatus: input.payload?.previousStatus as string,
+        newStatus: input.payload?.nextStatus as string
       });
-
-      notificationId = notification.id;
     }
   } catch (error) {
-    const { error: rollbackEventError } = await supabase
-      .from("case_events")
-      .delete()
-      .eq("id", eventRecord.id);
-
-    if (rollbackEventError) {
-      console.error("[cases.activity] Failed to rollback case event", {
+    await logger.error(
+      "cases",
+      "notification_error",
+      "Erro no envio de notificações do caso",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        caseId: input.caseId,
         eventId: eventRecord.id,
-        message: rollbackEventError.message
-      });
-    }
+        eventType: input.eventType
+      },
+      {
+        userId: input.actorProfileId,
+        clientId: input.clientId,
+        caseId: input.caseId
+      }
+    );
+  }
 
-    throw error;
+  // Log de sucesso com detalhes das notificações
+  if (notificationResults.emailNotificationId || notificationResults.whatsappNotificationId) {
+    const { error: successLogError } = await supabase.from("audit_logs").insert({
+      actor_profile_id: input.actorProfileId,
+      action: "case.notification.sent",
+      entity_type: "case_events",
+      entity_id: eventRecord.id,
+      payload: {
+        caseId: input.caseId,
+        emailSent: !!notificationResults.emailNotificationId,
+        whatsappSent: !!notificationResults.whatsappNotificationId,
+        skipped: notificationResults.skipped,
+        errors: notificationResults.errors,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    if (successLogError) {
+      console.error("[cases.activity] Falha ao registrar sucesso de notificação:", successLogError);
+    }
   }
 
   return {
     eventId: eventRecord.id,
-    notificationId
+    emailNotificationId: notificationResults.emailNotificationId,
+    whatsappNotificationId: notificationResults.whatsappNotificationId,
+    notificationSkipped: notificationResults.skipped,
+    notificationErrors: notificationResults.errors
   };
 }
 
@@ -266,6 +325,7 @@ export async function createCaseForClient(rawInput: unknown, actorProfileId: str
         actorProfileId,
         clientProfileId: profileRecord.id,
         clientEmail: profileRecord.email || "",
+        clientName: profileRecord.full_name || "Cliente",
         eventType: "case_update",
         title: `Novo caso aberto: ${input.title}`,
         description:
@@ -285,8 +345,22 @@ export async function createCaseForClient(rawInput: unknown, actorProfileId: str
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
     }
+
+    await logCaseUpdate(
+      "cases.create",
+      caseRecord.id,
+      clientRecord.id,
+      `Novo caso criado: "${input.title}" na área ${input.area}`,
+      {
+        area: input.area,
+        priority: input.priority,
+        status: input.status,
+        shouldNotifyClient
+      },
+      actorProfileId
+    );
 
     await createAuditLog({
       actorProfileId,
@@ -393,6 +467,7 @@ export async function updateCaseDetails(rawInput: unknown, actorProfileId: strin
         actorProfileId,
         clientProfileId: profileRecord.id,
         clientEmail: profileRecord.email || "",
+        clientName: profileRecord.full_name || "Cliente",
         eventType: "case_update",
         title: `Caso atualizado: ${input.title}`,
         description:
@@ -412,7 +487,7 @@ export async function updateCaseDetails(rawInput: unknown, actorProfileId: strin
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
     }
 
     await createAuditLog({
@@ -509,6 +584,7 @@ export async function updateCaseStatus(rawInput: unknown, actorProfileId: string
         actorProfileId,
         clientProfileId: profileRecord.id,
         clientEmail: profileRecord.email || "",
+        clientName: profileRecord.full_name || "Cliente",
         eventType: "status_change",
         title: `Status do caso atualizado: ${nextStatusLabel}`,
         description,
@@ -523,7 +599,7 @@ export async function updateCaseStatus(rawInput: unknown, actorProfileId: string
       });
 
       eventId = activity.eventId;
-      notificationId = activity.notificationId;
+      notificationId = activity.emailNotificationId || activity.whatsappNotificationId;
     }
 
     await createAuditLog({

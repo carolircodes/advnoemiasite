@@ -4,6 +4,7 @@ import * as net from "node:net";
 import * as tls from "node:tls";
 
 import { getNotificationEnv } from "../config/env";
+import { logger } from "../logging/structured-logger";
 
 type DeliveryInput = {
   to: string;
@@ -305,10 +306,41 @@ async function sendViaResend(input: DeliveryInput) {
 export async function sendNotificationEmail(input: DeliveryInput) {
   const config = getNotificationEnv();
   
-  if (config.provider === "resend") {
-    await sendViaResend(input);
-    return;
-  }
+  try {
+    if (config.provider === "resend") {
+      await sendViaResend(input);
+    } else {
+      await sendViaSmtp(input);
+    }
 
-  await sendViaSmtp(input);
+    await logger.info(
+      "notifications",
+      "email_sent",
+      `Email enviado com sucesso para ${input.to}`,
+      {
+        provider: config.provider,
+        subject: input.subject,
+        messageLength: input.html.length
+      },
+      {
+        channel: "email"
+      }
+    );
+  } catch (error) {
+    await logger.error(
+      "notifications",
+      "email_error",
+      "Erro no envio de email",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        provider: config.provider,
+        to: input.to,
+        subject: input.subject
+      },
+      {
+        channel: "email"
+      }
+    );
+    throw error;
+  }
 }

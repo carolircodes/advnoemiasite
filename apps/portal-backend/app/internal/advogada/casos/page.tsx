@@ -180,16 +180,16 @@ export default async function InternalCasesPage({
 
   return (
     <AppFrame
-      eyebrow="Casos"
-      title="Central operacional de casos."
-      description="Aqui os casos ficam organizados em uma trilha propria para abrir, revisar, editar e acompanhar andamento sem poluir o dashboard principal."
+      eyebrow="Gestão de Casos"
+      title="Painel Operacional de Casos"
+      description="Gerencie todos os casos jurídicos em um ambiente organizado. Abra novos processos, atualize andamentos, altere status e mantenha o controle completo da jornada de cada cliente."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
           fullName={profile.full_name}
           email={profile.email}
-          workspaceLabel="Casos internos protegidos"
-          workspaceHint="Sessao interna ativa para operar abertura, status, andamento e leitura operacional dos casos."
+          workspaceLabel="Ambiente Operacional"
+          workspaceHint="Sessão interna ativa para gestão completa de casos jurídicos"
         />
       }
       navigation={[
@@ -200,21 +200,21 @@ export default async function InternalCasesPage({
         { href: buildInternalCasesHref(selectedClientId || null), label: "Casos", active: true }
       ]}
       highlights={[
-        { label: "Casos visiveis", value: String(filteredCases.length) },
+        { label: "Casos ativos", value: String(filteredCases.length) },
         { label: "Alta prioridade", value: String(highPriorityCount) },
-        { label: "Aguardando cliente", value: String(waitingClientCount) },
-        { label: "Sem atualizacao", value: String(staleCount) }
+        { label: "Aguardando retorno", value: String(waitingClientCount) },
+        { label: "Inativos há 10+ dias", value: String(staleCount) }
       ]}
       actions={[
-        { href: buildInternalNewCaseHref(selectedClientId || null), label: "Abrir novo caso" },
+        { href: buildInternalNewCaseHref(selectedClientId || null), label: "Novo Caso" },
         {
           href: focusCase ? buildInternalCaseHref(focusCase.id) : buildInternalCasesHref(selectedClientId || null),
-          label: focusCase ? "Continuar caso em foco" : "Ver casos",
+          label: focusCase ? "Ver Caso em Foco" : "Listar Casos",
           tone: "secondary"
         },
         {
           href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada",
-          label: selectedClient ? "Voltar ao cliente" : "Voltar ao painel",
+          label: selectedClient ? "Ver Cliente" : "Painel Principal",
           tone: "secondary"
         }
       ]}
@@ -222,23 +222,23 @@ export default async function InternalCasesPage({
       {error ? <div className="error-notice">{error}</div> : null}
 
       <SectionCard
-        title="Busca e filtros"
-        description="Use filtros curtos para chegar rapido ao caso certo, especialmente quando a rotina estiver puxada."
+        title="Filtrar Casos"
+        description="Encontre rapidamente qualquer caso usando busca inteligente e filtros específicos. Otimize seu tempo focando nos casos mais relevantes."
       >
         <form className="stack">
           <div className="fields">
             <div className="field-full">
-              <label htmlFor="cases-q">Buscar por caso, cliente ou resumo</label>
+              <label htmlFor="cases-q">Buscar casos</label>
               <input
                 id="cases-q"
                 name="q"
                 type="search"
                 defaultValue={query}
-                placeholder="Titulo do caso, cliente, prioridade ou contexto"
+                placeholder="Título, cliente, área ou descrição do caso"
               />
             </div>
             <div className="field">
-              <label htmlFor="cases-client">Cliente</label>
+              <label htmlFor="cases-client">Filtrar por Cliente</label>
               <select id="cases-client" name="clientId" defaultValue={selectedClientId}>
                 <option value="">Todos os clientes</option>
                 {overview.clientOptions.map((client) => (
@@ -249,7 +249,7 @@ export default async function InternalCasesPage({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cases-status">Status</label>
+              <label htmlFor="cases-status">Status do Processo</label>
               <select id="cases-status" name="status" defaultValue={selectedStatus}>
                 <option value="">Todos os status</option>
                 {caseStatuses.map((status) => (
@@ -260,7 +260,7 @@ export default async function InternalCasesPage({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cases-priority">Prioridade</label>
+              <label htmlFor="cases-priority">Nível de Prioridade</label>
               <select id="cases-priority" name="priority" defaultValue={selectedPriority}>
                 <option value="">Todas as prioridades</option>
                 {casePriorities.map((priority) => (
@@ -271,11 +271,11 @@ export default async function InternalCasesPage({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cases-sort">Ordenacao</label>
+              <label htmlFor="cases-sort">Ordenar por</label>
               <select id="cases-sort" name="sort" defaultValue={sort}>
-                <option value="priority">Mais prioritarios primeiro</option>
+                <option value="priority">Prioridade (maior primeiro)</option>
                 <option value="recent">Atividade mais recente</option>
-                <option value="stale">Mais tempo sem atualizacao</option>
+                <option value="stale">Mais tempo sem atualização</option>
               </select>
             </div>
           </div>
