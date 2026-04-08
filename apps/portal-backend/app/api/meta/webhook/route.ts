@@ -3,7 +3,7 @@ import { createHmac } from "crypto";
 import { answerNoemia } from "../../../../lib/services/noemia";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
-const APP_SECRET = process.env.META_APP_SECRET || "noeminia_app_secret_2026";
+const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 const PALAVRA_CHAVE_INSTAGRAM = "palavra";
@@ -27,36 +27,44 @@ function verifySignature(body: string, signature: string): boolean {
   console.log("=== META_SIGNATURE_AUDIT_START ===");
 
   const envCandidates = [
+    { name: 'INSTAGRAM_APP_SECRET', value: process.env.INSTAGRAM_APP_SECRET },
     { name: 'META_APP_SECRET', value: process.env.META_APP_SECRET },
     { name: 'APP_SECRET', value: process.env.APP_SECRET },
-    { name: 'INSTAGRAM_APP_SECRET', value: process.env.INSTAGRAM_APP_SECRET },
     { name: 'META_INSTAGRAM_APP_SECRET', value: process.env.META_INSTAGRAM_APP_SECRET }
   ];
 
-  console.log("META_SECRET_RESOLUTION_ORDER: 1.META_APP_SECRET 2.APP_SECRET 3.INSTAGRAM_APP_SECRET 4.META_INSTAGRAM_APP_SECRET");
+  console.log("META_SECRET_RESOLUTION_ORDER: 1.INSTAGRAM_APP_SECRET 2.META_APP_SECRET 3.APP_SECRET 4.META_INSTAGRAM_APP_SECRET");
 
   let selectedSecret = null;
   let selectedEnvName = null;
 
-  if (process.env.META_APP_SECRET) {
+  if (process.env.INSTAGRAM_APP_SECRET) {
+    selectedSecret = process.env.INSTAGRAM_APP_SECRET;
+    selectedEnvName = 'INSTAGRAM_APP_SECRET';
+  } else if (process.env.META_APP_SECRET) {
     selectedSecret = process.env.META_APP_SECRET;
     selectedEnvName = 'META_APP_SECRET';
   } else if (process.env.APP_SECRET) {
     selectedSecret = process.env.APP_SECRET;
     selectedEnvName = 'APP_SECRET';
-  } else if (process.env.INSTAGRAM_APP_SECRET) {
-    selectedSecret = process.env.INSTAGRAM_APP_SECRET;
-    selectedEnvName = 'INSTAGRAM_APP_SECRET';
   } else if (process.env.META_INSTAGRAM_APP_SECRET) {
     selectedSecret = process.env.META_INSTAGRAM_APP_SECRET;
     selectedEnvName = 'META_INSTAGRAM_APP_SECRET';
   } else {
-    selectedSecret = "noeminia_app_secret_2026"; // fallback hardcoded
-    selectedEnvName = 'FALLBACK_HARDCODED';
+    console.log("META_WEBHOOK_ABORT_REASON: No app secret configured");
+    console.log("META_SECRET_RESOLUTION_ORDER: 1.INSTAGRAM_APP_SECRET 2.META_APP_SECRET 3.APP_SECRET 4.META_INSTAGRAM_APP_SECRET");
+    console.log("META_SECRET_CANDIDATES_STATUS:", {
+      INSTAGRAM_APP_SECRET: !!process.env.INSTAGRAM_APP_SECRET,
+      META_APP_SECRET: !!process.env.META_APP_SECRET,
+      APP_SECRET: !!process.env.APP_SECRET,
+      META_INSTAGRAM_APP_SECRET: !!process.env.META_INSTAGRAM_APP_SECRET
+    });
+    return false;
   }
 
-  console.log("META_SECRET_SELECTED_ENV_NAME:", selectedEnvName);
-  console.log("META_SECRET_SELECTED_LENGTH:", selectedSecret?.length || 0);
+  console.log("APP_SECRET_SOURCE_SELECTED:", selectedEnvName);
+  console.log("APP_SECRET_LENGTH:", selectedSecret?.length || 0);
+  console.log("APP_SECRET_FIRST6_MASKED:", selectedSecret ? `${selectedSecret.substring(0, 6)}...` : 'MISSING');
 
   envCandidates.forEach((env, index) => {
     console.log(`META_SECRET_CANDIDATE_${index + 1}:`, {
@@ -67,10 +75,14 @@ function verifySignature(body: string, signature: string): boolean {
     });
   });
 
-  console.log("META_SIGNATURE_HEADER_PRESENT:", !!signature);
-  console.log("META_SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : 'MISSING');
-  console.log("META_RAW_BODY_LENGTH:", body.length);
-  console.log("META_RAW_BODY_TYPE:", typeof body);
+  console.log("SIGNATURE_HEADER_PRESENT:", !!signature);
+  console.log("SIGNATURE_HEADER_LENGTH:", signature?.length || 0);
+  console.log("SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : 'MISSING');
+  console.log("RAW_BODY_BYTE_LENGTH:", body.length);
+  console.log("RAW_BODY_TYPE:", typeof body);
+
+  const bodySha256 = createHmac("sha256", "debug").update(body, "utf8").digest("hex");
+  console.log("RAW_BODY_SHA256_PREFIX:", bodySha256.substring(0, 16));
 
   if (!signature) {
     console.log("META_WEBHOOK_ABORT_REASON: No signature header");
@@ -81,14 +93,32 @@ function verifySignature(body: string, signature: string): boolean {
   console.log("META_HEADER_EXPECTED: x-hub-signature-256");
   console.log("META_BODY_BEFORE_HMAC: RAW_UNMODIFIED_STRING");
 
+  console.log("BODY_CONSUMPTION_CHECK:", {
+    isString: typeof body === 'string',
+    hasUndefined: body.includes('undefined'),
+    hasNull: body.includes('null'),
+    isJsonParsed: false, // confirmamos que não foi parseado ainda
+    originalLength: body.length
+  });
+
   const hmac = createHmac("sha256", selectedSecret);
   hmac.update(body, "utf8");
   const computedHash = hmac.digest("hex");
   const expectedSignature = `sha256=${computedHash}`;
 
-  console.log("META_HMAC_COMPUTED_PREFIX:", expectedSignature.substring(0, 20));
-  console.log("META_SIGNATURE_RECEIVED_PREFIX:", signature.substring(0, 20));
-  console.log("META_SIGNATURE_MATCH:", signature === expectedSignature);
+  console.log("COMPUTED_SIGNATURE_PREFIX:", expectedSignature.substring(0, 20));
+  console.log("COMPUTED_SIGNATURE_LENGTH:", expectedSignature.length);
+  console.log("SIGNATURE_RECEIVED_PREFIX:", signature.substring(0, 20));
+  console.log("SIGNATURE_HEADER_LENGTH:", signature.length);
+
+  const signatureMatch = signature === expectedSignature;
+  console.log("SIGNATURE_MATCH_EXACT:", signatureMatch);
+  console.log("SIGNATURE_FORMAT_CHECK:", {
+    receivedStartsWithSha256: signature.startsWith('sha256='),
+    computedStartsWithSha256: expectedSignature.startsWith('sha256='),
+    receivedHasPrefix: signature.includes('sha256='),
+    computedHasPrefix: expectedSignature.includes('sha256=')
+  });
 
   if (signature !== expectedSignature) {
     console.log("META_WEBHOOK_ABORT_REASON: Signature mismatch");
