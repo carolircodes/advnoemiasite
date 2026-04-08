@@ -3,28 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PrioridadesDoDia } from "./prioridades";
-
-// Tipos para os dados dos leads
-interface Lead {
-  id: string;
-  platform_user_id: string;
-  platform: "instagram" | "whatsapp";
-  username: string | null;
-  legal_area: "previdenciario" | "bancario" | "familia" | "geral";
-  lead_status: "frio" | "curioso" | "interessado" | "quente" | "pronto_para_agendar" | "cliente_ativo" | "sem_aderencia";
-  funnel_stage: "contato_inicial" | "qualificacao" | "triagem" | "interesse" | "agendamento" | "cliente";
-  urgency: "baixa" | "media" | "alta";
-  last_message: string;
-  last_response: string;
-  wants_human: boolean;
-  should_schedule: boolean;
-  summary: string;
-  suggested_action: string;
-  first_contact_at: string;
-  last_contact_at: string;
-  conversation_count: number;
-  metadata?: Record<string, any>;
-}
+import { Lead } from "./types";
 
 interface Conversation {
   id: string;
@@ -68,20 +47,6 @@ const legalAreaConfig: Record<string, { label: string; color: string; bgColor: s
   }
 };
 
-const platformConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
-  instagram: {
-    label: "Instagram",
-    color: "#E1306C",
-    bgColor: "#FDF2F8",
-    icon: "📷"
-  },
-  whatsapp: {
-    label: "WhatsApp",
-    color: "#25D366",
-    bgColor: "#ECFDF5",
-    icon: "💬"
-  }
-};
 
 const leadStatusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   frio: { label: "Frio", color: "#9CA3AF", bgColor: "#F9FAFB" },
@@ -155,7 +120,6 @@ function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) =
   const statusConfig = leadStatusConfig[lead.lead_status];
   const urgencyConfigData = urgencyConfig[lead.urgency];
   const funnelConfig = funnelStageConfig[lead.funnel_stage];
-  const platformConfigData = platformConfig[lead.platform];
 
   return (
     <tr 
@@ -169,11 +133,8 @@ function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) =
             <div className="font-medium text-gray-900">
               {lead.username || `@${lead.platform_user_id}`}
             </div>
-            <div className="text-sm text-gray-500 flex items-center gap-2">
-              <span>{platformConfigData.icon}</span>
-              <span>{platformConfigData.label}</span>
-              <span>•</span>
-              <span>ID: {lead.platform_user_id}</span>
+            <div className="text-sm text-gray-500">
+              ID: {lead.platform_user_id}
             </div>
           </div>
         </div>
@@ -229,7 +190,6 @@ export default function LeadsDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
-    platform: "",
     legal_area: "",
     urgency: "",
     lead_status: "",
@@ -239,8 +199,6 @@ export default function LeadsDashboard() {
   // Métricas calculadas
   const metrics = {
     total: leads.length,
-    instagram: leads.filter(l => l.platform === "instagram").length,
-    whatsapp: leads.filter(l => l.platform === "whatsapp").length,
     quentes: leads.filter(l => l.lead_status === "quente").length,
     prontosParaAgendar: leads.filter(l => l.lead_status === "pronto_para_agendar").length,
     urgentes: leads.filter(l => l.urgency === "alta").length
@@ -254,7 +212,6 @@ export default function LeadsDashboard() {
        lead.last_message.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesFilters = 
-      (!filters.platform || lead.platform === filters.platform) &&
       (!filters.legal_area || lead.legal_area === filters.legal_area) &&
       (!filters.urgency || lead.urgency === filters.urgency) &&
       (!filters.lead_status || lead.lead_status === filters.lead_status) &&
@@ -324,27 +281,13 @@ export default function LeadsDashboard() {
         <PrioridadesDoDia leads={leads} />
 
         {/* Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Total de Leads"
             value={metrics.total}
-            subtitle="Todas as plataformas"
+            subtitle="Todas as áreas"
             color="#8B5CF6"
             icon="👥"
-          />
-          <MetricCard
-            title="Instagram"
-            value={metrics.instagram}
-            subtitle="Leads via Instagram"
-            color="#E1306C"
-            icon="�"
-          />
-          <MetricCard
-            title="WhatsApp"
-            value={metrics.whatsapp}
-            subtitle="Leads via WhatsApp"
-            color="#25D366"
-            icon="�"
           />
           <MetricCard
             title="Leads Quentes"
@@ -360,6 +303,13 @@ export default function LeadsDashboard() {
             color="#10B981"
             icon="📅"
           />
+          <MetricCard
+            title="Urgentes"
+            value={metrics.urgentes}
+            subtitle="Atenção prioritária"
+            color="#F59E0B"
+            icon="⚡"
+          />
         </div>
 
         {/* Filtros e Busca */}
@@ -374,17 +324,7 @@ export default function LeadsDashboard() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
-            <select
-              value={filters.platform}
-              onChange={(e) => setFilters({...filters, platform: e.target.value})}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            >
-              <option value="">Todas Plataformas</option>
-              {Object.entries(platformConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
-              ))}
-            </select>
-            <select
+                        <select
               value={filters.legal_area}
               onChange={(e) => setFilters({...filters, legal_area: e.target.value})}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
