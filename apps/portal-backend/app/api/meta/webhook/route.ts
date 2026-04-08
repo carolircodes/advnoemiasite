@@ -51,7 +51,7 @@ async function sendInstagramMessage(
       message: { text: messageText },
     };
 
-    console.log("ABOUT_TO_SEND_INSTAGRAM_MESSAGE");
+    console.log("INSTAGRAM_ABOUT_TO_SEND");
     console.log("GRAPH_API_URL:", apiUrl);
     console.log("GRAPH_API_PAYLOAD:", JSON.stringify(payload));
 
@@ -65,13 +65,13 @@ async function sendInstagramMessage(
 
     const responseText = await response.text();
 
-    console.log("GRAPH_API_STATUS:", response.status);
-    console.log("GRAPH_API_RESPONSE_TEXT:", responseText);
+    console.log("INSTAGRAM_GRAPH_API_STATUS:", response.status);
+    console.log("INSTAGRAM_GRAPH_API_RESPONSE:", responseText);
 
     if (!response.ok) {
-      console.log("INSTAGRAM_SEND_ERROR");
+      console.log("INSTAGRAM_RESPONSE_FAILED");
       logEvent(
-        "INSTAGRAM_SEND_ERROR",
+        "INSTAGRAM_RESPONSE_FAILED",
         {
           senderId,
           httpStatus: response.status,
@@ -83,8 +83,8 @@ async function sendInstagramMessage(
       return false;
     }
 
-    console.log("INSTAGRAM_MESSAGE_SENT");
-    logEvent("INSTAGRAM_MESSAGE_SENT", {
+    console.log("INSTAGRAM_RESPONSE_SENT");
+    logEvent("INSTAGRAM_RESPONSE_SENT", {
       senderId,
       httpStatus: response.status,
       responseText,
@@ -118,24 +118,22 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("INSTAGRAM_WEBHOOK_POST_RECEIVED");
+  console.log("INSTAGRAM_POST_RECEIVED");
 
   const body = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 
-  console.log("=== VALIDATING META SIGNATURE ===");
-
   if (!verifySignature(body, signature || "")) {
-    console.log("SIGNATURE_INVALID_BUT_IGNORED");
+    console.log("INSTAGRAM_SIGNATURE_INVALID");
     logEvent(
-      "SIGNATURE_INVALID_BUT_IGNORED",
+      "INSTAGRAM_SIGNATURE_INVALID",
       {
         signature: signature ? `${signature.substring(0, 20)}...` : null,
       },
       "warn"
     );
   } else {
-    console.log("=== META SIGNATURE VALID ===");
+    console.log("INSTAGRAM_SIGNATURE_VALID");
   }
 
   try {
@@ -148,33 +146,60 @@ export async function POST(request: NextRequest) {
       for (const entry of data.entry || []) {
         // Process entry.messaging format
         for (const messaging of entry.messaging || []) {
-          if (messaging.message?.text && messaging.sender?.id) {
-            console.log("SENDER_ID_EXTRACTED:", messaging.sender.id);
-            console.log("MESSAGE_TEXT_EXTRACTED:", messaging.message.text);
-            
-            await sendInstagramMessage(
-              messaging.sender.id,
-              "Olá! Recebi sua mensagem e já vou te ajudar."
-            );
+          if (!messaging.message?.text) {
+            console.log("EVENT_IGNORED_NO_MESSAGE: messaging structure without message.text");
+            continue;
           }
+          if (!messaging.sender?.id) {
+            console.log("EVENT_IGNORED_MISSING_SENDER: messaging structure without sender.id");
+            continue;
+          }
+          if (!messaging.message.text.trim()) {
+            console.log("EVENT_IGNORED_NO_TEXT: messaging structure with empty text");
+            continue;
+          }
+          
+          console.log("INSTAGRAM_MESSAGE_STRUCTURE_DETECTED: messaging");
+          console.log("INSTAGRAM_SENDER_EXTRACTED:", messaging.sender.id);
+          console.log("INSTAGRAM_TEXT_EXTRACTED:", messaging.message.text);
+
+          await sendInstagramMessage(
+            messaging.sender.id,
+            "Olá! Recebi sua mensagem e já vou te ajudar."
+          );
         }
 
         // Process entry.changes format
         for (const change of entry.changes || []) {
-          if (change.field === "messages") {
-            const messages = change.value?.messages || [];
+          if (change.field !== "messages") {
+            console.log("EVENT_IGNORED_UNSUPPORTED_STRUCTURE: changes field not 'messages'", { field: change.field });
+            continue;
+          }
+          
+          console.log("INSTAGRAM_MESSAGE_STRUCTURE_DETECTED: changes");
+          const messages = change.value?.messages || [];
 
-            for (const message of messages) {
-              if (message.text && message.from?.id) {
-                console.log("SENDER_ID_EXTRACTED:", message.from.id);
-                console.log("MESSAGE_TEXT_EXTRACTED:", message.text);
-                
-                await sendInstagramMessage(
-                  message.from.id,
-                  "Olá! Recebi sua mensagem e já vou te ajudar."
-                );
-              }
+          for (const message of messages) {
+            if (!message.text) {
+              console.log("EVENT_IGNORED_NO_MESSAGE: changes message without text");
+              continue;
             }
+            if (!message.from?.id) {
+              console.log("EVENT_IGNORED_MISSING_SENDER: changes message without from.id");
+              continue;
+            }
+            if (!message.text.trim()) {
+              console.log("EVENT_IGNORED_NO_TEXT: changes message with empty text");
+              continue;
+            }
+            
+            console.log("INSTAGRAM_SENDER_EXTRACTED:", message.from.id);
+            console.log("INSTAGRAM_TEXT_EXTRACTED:", message.text);
+
+            await sendInstagramMessage(
+              message.from.id,
+              "Olá! Recebi sua mensagem e já vou te ajudar."
+            );
           }
         }
       }
