@@ -854,6 +854,8 @@ async function buildStaffContext(profile: PortalProfile) {
         `Perfil interno autenticado: ${profile.full_name} (${profile.email}).`,
         `Resumo operacional atual: ${overview.operationalCenter.summary.criticalCount} item(ns) critico(s), ${overview.operationalCenter.summary.todayCount} para hoje, ${overview.operationalCenter.summary.waitingClientCount} aguardando cliente, ${overview.operationalCenter.summary.waitingTeamCount} aguardando equipe.`,
         `Leitura de BI dos ultimos 30 dias: abandono de triagem ${formatRateValue(intelligence.summary.triageAbandonmentRate)}, triagem para cliente ${formatRateValue(intelligence.summary.triageToClientRate)}, ativacao no portal ${formatRateValue(intelligence.summary.portalActivationRate)}.`,
+      ].join("\n");
+    } catch (fallbackError) {
 export const NOEMIA_SYSTEM_PROMPT = `Você é a NoemIA, assistente virtual do escritório Noemia Paixão Advocacia.
 
 Sua função é fazer o primeiro atendimento com clareza, empatia, organização e autoridade, ajudando a pessoa a entender de forma inicial o que pode estar acontecendo e conduzindo com naturalidade para o próximo passo adequado.
@@ -936,7 +938,7 @@ PARA VISITANTES:
     "",
     "Responda em português do Brasil.",
     "Não invente fatos, prazos, movimentações, documentos ou acessos que não estejam no contexto recebido.",
-    "Se a pergunta exigir análise jurídica profunda, estratégia ou decisão técnica do caso, reconheça o limite e oriente falar com a equipe responsável.",
+    "Se a pergunta exigir análise jurídica profunda, estratégia ou decisão técnica do caso, reconheça o limite e orientar falar com a equipe responsável.",
     "Sempre que fizer sentido, indique o próximo passo mais prático.",
     "",
     modeSpecificInstructions[mode],
@@ -944,85 +946,12 @@ PARA VISITANTES:
     "CONTEXTO DISPONÍVEL:",
     contextText
   ].filter(Boolean).join("\n");
-  
-  // Extrair contexto da URL
-  const urlContext = getContextFromURL(currentPath);
-  
-  // Gerar ID de sessão simples (em produção usar algo mais robusto)
-  const sessionId = profile?.id || 'visitor-' + Math.random().toString(36).substr(2, 9);
-
-  let effectiveAudience =
-    requestedAudience === "staff" && profile && profile.role !== "cliente"
-      ? "staff"
-      : requestedAudience === "client" && profile?.role === "cliente"
-        ? "client"
-        : "visitor";
-
-  if (requestedAudience === "client" && (!profile || profile.role !== "cliente")) {
-    console.log("[noemia] Cliente nao autenticado, usando audience visitor");
-    effectiveAudience = "visitor";
-  }
-
-  if (requestedAudience === "staff" && (!profile || profile.role === "cliente")) {
-    console.log("[noemia] Staff nao autenticado, usando audience visitor");
-    effectiveAudience = "visitor";
-  }
-
-  // Detectar intenção e atualizar contexto
-  const intent = detectUserIntent(input.message);
-  updateSessionContext(sessionId, input.message, intent, effectiveAudience);
-  
-  // Pegar contexto da sessão
-  const sessionContext = getSessionContext(sessionId);
-  
-  // Detectar tema jurídico
-  const legalTheme = detectLegalTheme(input.message);
-  
-  // Detectar estágio da conversa
-  const conversationStage = detectConversationStage(sessionContext, intent);
-  
-  // Construir resposta interna
-  const internalResponse = buildInternalResponse(
-    intent, 
-    legalTheme, 
-    conversationStage, 
-    effectiveAudience, 
-    profile, 
-    sessionContext
-  );
-  
-  // Salvar resposta no histórico
-  sessionContext.history.push({
-    role: "assistant",
-    content: internalResponse.message,
-    timestamp: new Date()
-  });
-  
-  // Registrar métricas
-  recordNoemiaMetrics({
-    question: input.message,
-    intent,
-    profile: effectiveAudience,
-    source: "internal",
-    timestamp: new Date(),
-    actions: internalResponse.actions,
-    sessionId,
-    responseTime: Date.now() - startTime,
-    tema: urlContext.tema,
-    origem: urlContext.origem
-  });
-
-  return {
-    audience: effectiveAudience,
-    answer: internalResponse.message,
-    actions: internalResponse.actions
-  };
 }
 
 // Funções auxiliares para motor interno
 function detectLegalTheme(message: string): string {
   const msg = message.toLowerCase();
-  
+  // ... restante do código ...
   if (msg.includes('aposentador') || msg.includes('inss') || msg.includes('benefício') || msg.includes('auxílio')) {
     return 'previdenciario';
   }
