@@ -217,7 +217,7 @@ export type URLContext = {
   origem?: string;
 };
 
-function getContextFromURL(url?: string): URLContext {
+export function getContextFromURL(url?: string): URLContext {
   if (!url) return {};
   
   try {
