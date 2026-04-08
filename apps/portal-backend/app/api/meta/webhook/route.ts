@@ -130,6 +130,18 @@ async function sendInstagramMessage(
     console.log("INSTAGRAM_BUSINESS_ACCOUNT_ID_LENGTH:", INSTAGRAM_BUSINESS_ACCOUNT_ID?.length || 0);
     console.log("INSTAGRAM_ACCESS_TOKEN_PRESENT:", !!INSTAGRAM_ACCESS_TOKEN);
     console.log("INSTAGRAM_ACCESS_TOKEN_LENGTH:", INSTAGRAM_ACCESS_TOKEN?.length || 0);
+    
+    // DIAGNÓSTICO TEMPORÁRIO DO TOKEN EM RUNTIME
+    if (INSTAGRAM_ACCESS_TOKEN) {
+      const prefix = INSTAGRAM_ACCESS_TOKEN.substring(0, 8);
+      const suffix = INSTAGRAM_ACCESS_TOKEN.slice(-8);
+      const length = INSTAGRAM_ACCESS_TOKEN.length;
+      console.log("INSTAGRAM_TOKEN_DEBUG:", JSON.stringify({
+        prefix,
+        suffix,
+        length
+      }));
+    }
     console.log("FACEBOOK_PAGE_ID_PRESENT:", !!FACEBOOK_PAGE_ID);
     console.log("FACEBOOK_PAGE_ID_VALUE_MASKED:", FACEBOOK_PAGE_ID ? `${FACEBOOK_PAGE_ID.substring(0, 6)}...` : 'MISSING');
     console.log("INSTAGRAM_SENDER_ID_EXTRACTED:", senderId);
