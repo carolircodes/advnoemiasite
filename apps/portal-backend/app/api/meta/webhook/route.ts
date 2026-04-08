@@ -6,6 +6,7 @@ const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
 const PALAVRA_CHAVE_INSTAGRAM = "palavra";
 
 function logEvent(
@@ -129,6 +130,8 @@ async function sendInstagramMessage(
     console.log("INSTAGRAM_BUSINESS_ACCOUNT_ID_LENGTH:", INSTAGRAM_BUSINESS_ACCOUNT_ID?.length || 0);
     console.log("INSTAGRAM_ACCESS_TOKEN_PRESENT:", !!INSTAGRAM_ACCESS_TOKEN);
     console.log("INSTAGRAM_ACCESS_TOKEN_LENGTH:", INSTAGRAM_ACCESS_TOKEN?.length || 0);
+    console.log("FACEBOOK_PAGE_ID_PRESENT:", !!FACEBOOK_PAGE_ID);
+    console.log("FACEBOOK_PAGE_ID_VALUE_MASKED:", FACEBOOK_PAGE_ID ? `${FACEBOOK_PAGE_ID.substring(0, 6)}...` : 'MISSING');
     console.log("INSTAGRAM_SENDER_ID_EXTRACTED:", senderId);
     console.log("INSTAGRAM_MESSAGE_TEXT_EXTRACTED:", messageText);
 
@@ -141,7 +144,19 @@ async function sendInstagramMessage(
       return false;
     }
 
+    if (!FACEBOOK_PAGE_ID) {
+      console.log("INSTAGRAM_SEND_MESSAGE_FAILED: FACEBOOK_PAGE_ID missing");
+      logEvent("INSTAGRAM_SEND_MESSAGE_FAILED", { 
+        reason: "FACEBOOK_PAGE_ID_MISSING", 
+        senderId 
+      }, "error");
+      return false;
+    }
+
     const apiUrl = `https://graph.facebook.com/v19.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
+    console.log("INSTAGRAM_GRAPH_API_URL_FINAL:", apiUrl);
+    console.log("INSTAGRAM_ACCESS_TOKEN_PREFIX_MASKED:", INSTAGRAM_ACCESS_TOKEN ? `${INSTAGRAM_ACCESS_TOKEN.substring(0, 6)}...` : 'MISSING');
+    console.log("INSTAGRAM_ACCESS_TOKEN_LENGTH:", INSTAGRAM_ACCESS_TOKEN?.length || 0);
     
     const payload = {
       recipient: { 
