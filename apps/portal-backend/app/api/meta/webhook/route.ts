@@ -23,7 +23,7 @@ function logEvent(
   );
 }
 
-function verifySignature(body: string, signature: string): boolean {
+function verifySignature(rawBuffer: Buffer, signature: string): boolean {
   console.log("=== META_SIGNATURE_AUDIT_START ===");
 
   const envCandidates = [
@@ -78,11 +78,10 @@ function verifySignature(body: string, signature: string): boolean {
   console.log("SIGNATURE_HEADER_PRESENT:", !!signature);
   console.log("SIGNATURE_HEADER_LENGTH:", signature?.length || 0);
   console.log("SIGNATURE_HEADER_PREFIX:", signature ? signature.substring(0, 20) : 'MISSING');
-  console.log("RAW_BODY_BYTE_LENGTH:", body.length);
-  console.log("RAW_BODY_TYPE:", typeof body);
+  console.log("RAW_BODY_BUFFER_LENGTH:", rawBuffer.length);
 
-  const bodySha256 = createHmac("sha256", "debug").update(body, "utf8").digest("hex");
-  console.log("RAW_BODY_SHA256_PREFIX:", bodySha256.substring(0, 16));
+  const bodyText = rawBuffer.toString('utf8');
+  console.log("RAW_BODY_TEXT_LENGTH:", bodyText.length);
 
   if (!signature) {
     console.log("META_WEBHOOK_ABORT_REASON: No signature header");
@@ -91,41 +90,26 @@ function verifySignature(body: string, signature: string): boolean {
 
   console.log("META_HMAC_ALGORITHM: SHA256");
   console.log("META_HEADER_EXPECTED: x-hub-signature-256");
-  console.log("META_BODY_BEFORE_HMAC: RAW_UNMODIFIED_STRING");
+  console.log("META_BODY_BEFORE_HMAC: RAW_BUFFER_BYTES");
 
-  console.log("BODY_CONSUMPTION_CHECK:", {
-    isString: typeof body === 'string',
-    hasUndefined: body.includes('undefined'),
-    hasNull: body.includes('null'),
-    isJsonParsed: false, // confirmamos que não foi parseado ainda
-    originalLength: body.length
-  });
-
-  const hmac = createHmac("sha256", selectedSecret);
-  hmac.update(body, "utf8");
-  const computedHash = hmac.digest("hex");
+  const hmac = createHmac('sha256', selectedSecret);
+  hmac.update(rawBuffer);
+  const computedHash = hmac.digest('hex');
   const expectedSignature = `sha256=${computedHash}`;
 
   console.log("COMPUTED_SIGNATURE_PREFIX:", expectedSignature.substring(0, 20));
-  console.log("COMPUTED_SIGNATURE_LENGTH:", expectedSignature.length);
   console.log("SIGNATURE_RECEIVED_PREFIX:", signature.substring(0, 20));
-  console.log("SIGNATURE_HEADER_LENGTH:", signature.length);
 
   const signatureMatch = signature === expectedSignature;
   console.log("SIGNATURE_MATCH_EXACT:", signatureMatch);
-  console.log("SIGNATURE_FORMAT_CHECK:", {
-    receivedStartsWithSha256: signature.startsWith('sha256='),
-    computedStartsWithSha256: expectedSignature.startsWith('sha256='),
-    receivedHasPrefix: signature.includes('sha256='),
-    computedHasPrefix: expectedSignature.includes('sha256=')
-  });
 
   if (signature !== expectedSignature) {
     console.log("META_WEBHOOK_ABORT_REASON: Signature mismatch");
     console.log("META_DEBUG_INFO:", {
       selectedEnvName,
       secretLength: selectedSecret?.length || 0,
-      bodyLength: body.length,
+      bufferLength: rawBuffer.length,
+      textLength: bodyText.length,
       signatureLength: signature.length,
       computedHashLength: computedHash.length
     });
@@ -141,7 +125,6 @@ async function sendInstagramMessage(
   messageText: string
 ): Promise<boolean> {
   try {
-    // VALIDAÇÃO DAS VARIÁVEIS CRÍTICAS
     console.log("INSTAGRAM_BUSINESS_ACCOUNT_ID_PRESENT:", !!INSTAGRAM_BUSINESS_ACCOUNT_ID);
     console.log("INSTAGRAM_BUSINESS_ACCOUNT_ID_LENGTH:", INSTAGRAM_BUSINESS_ACCOUNT_ID?.length || 0);
     console.log("INSTAGRAM_ACCESS_TOKEN_PRESENT:", !!INSTAGRAM_ACCESS_TOKEN);
@@ -158,10 +141,8 @@ async function sendInstagramMessage(
       return false;
     }
 
-    // ENDPOINT CORRETO - usa /me/messages para Instagram Direct
     const apiUrl = `https://graph.facebook.com/v19.0/me/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
     
-    // PAYLOAD OTIMIZADO - estrutura correta para Instagram
     const payload = {
       recipient: { 
         id: senderId 
@@ -227,8 +208,6 @@ async function sendInstagramMessage(
   }
 }
 
-// Processar mensagem usando lógica centralizada da NoemIA
-// Função de proteção global para entradas não suportadas no Instagram
 async function handleUnsupportedInstagramMessage(senderId: string, messageType: string): Promise<boolean> {
   const unsupportedMessage = "No momento, este atendimento está habilitado apenas para mensagens escritas. Pode me contar por texto, de forma simples, o que aconteceu no seu caso?";
   
@@ -254,7 +233,6 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
       messageLength: messageText.length
     });
 
-    // Verificar se OpenAI está configurada
     const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
     const openAIModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
     
@@ -262,7 +240,6 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
     console.log('INSTAGRAM_OPENAI_KEY_EXISTS:', hasOpenAIKey);
     console.log('INSTAGRAM_OPENAI_MODEL:', openAIModel);
 
-    // Usar a lógica centralizada da NoemIA
     const response = await answerNoemia({
       message: messageText,
       audience: "visitor",
@@ -280,7 +257,6 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
       source: response.meta?.source
     });
 
-    // Log específico baseado na fonte
     if (response.meta?.source === 'openai') {
       console.log('INSTAGRAM_OPENAI_SUCCESS: OpenAI responded successfully');
     } else if (response.meta?.source === 'fallback') {
@@ -314,7 +290,6 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
       error: error instanceof Error ? error.message : String(error)
     }, "error");
 
-    // Fallback para mensagem fixa em caso de erro
     const fallbackResponse = "Oi! Vi que você enviou uma mensagem. Vou te explicar de forma simples o que pode estar acontecendo no seu caso. Muitas pessoas passam por isso sem saber que podem ter um direito não reconhecido. Se você quiser, posso entender melhor sua situação.";
     
     console.log('=== INSTAGRAM_FALLBACK_ATTEMPT ===');
@@ -346,19 +321,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("INSTAGRAM_WEBHOOK_POST_RECEIVED");
 
-  // VALIDAÇÃO DAS VARIÁVEIS DE AMBIENTE
   console.log("META_APP_SECRET_PRESENT:", !!APP_SECRET);
   console.log("META_APP_SECRET_LENGTH:", APP_SECRET?.length || 0);
   console.log("META_VERIFY_TOKEN_PRESENT:", !!VERIFY_TOKEN);
   console.log("META_VERIFY_TOKEN_LENGTH:", VERIFY_TOKEN?.length || 0);
 
-  const body = await request.text();
+  const rawBuffer = Buffer.from(await request.arrayBuffer());
   const signature = request.headers.get("x-hub-signature-256");
   
   console.log("INSTAGRAM_SIGNATURE_HEADER_RECEIVED:", signature ? "[PRESENT]" : "[MISSING]");
   console.log("INSTAGRAM_SIGNATURE_HEADER_VALUE:", signature ? `${signature.substring(0, 20)}...` : "[MISSING]");
   
-  const isValid = verifySignature(body, signature || "");
+  const isValid = verifySignature(rawBuffer, signature || "");
   
   console.log("INSTAGRAM_SIGNATURE_VALIDATION_RESULT:", isValid ? "VALID" : "INVALID");
   
