@@ -195,13 +195,13 @@ function getNoemiaMetricsSummary() {
 }
 
 // Tipos para resposta estruturada da NoemIA
-type NoemiaAction = {
+export type NoemiaAction = {
   label: string;
   href?: string;
   action?: string;
 };
 
-type NoemiaResponse = {
+export type NoemiaResponse = {
   message: string;
   actions?: NoemiaAction[];
   meta?: {
@@ -212,7 +212,7 @@ type NoemiaResponse = {
 };
 
 // Contexto de URL para personalização
-type URLContext = {
+export type URLContext = {
   tema?: string;
   origem?: string;
 };
@@ -236,7 +236,7 @@ function getContextFromURL(url?: string): URLContext {
 // Contexto de sessão para memória curta
 type TriageStep = "start" | "theme" | "problem" | "time" | "urgency" | "done";
 
-type SessionContext = {
+export type SessionContext = {
   lastIntent?: string;
   lastMessage?: string;
   profile?: string;
@@ -257,7 +257,7 @@ type SessionContext = {
 // Armazenamento simples em memória para contexto de sessão
 const sessionContexts = new Map<string, SessionContext>();
 
-function getSessionContext(sessionId: string): SessionContext {
+export function getSessionContext(sessionId: string): SessionContext {
   if (!sessionContexts.has(sessionId)) {
     sessionContexts.set(sessionId, {
       history: [],
@@ -287,7 +287,7 @@ function trimSessionHistory(context: SessionContext, maxItems: number = 10): voi
   }
 }
 
-function updateSessionContext(sessionId: string, message: string, intent: string, profile: string, theme?: string | null): void {
+export function updateSessionContext(sessionId: string, message: string, intent: string, profile: string, theme?: string | null): void {
   const context = getSessionContext(sessionId);
   context.lastIntent = intent;
   context.lastMessage = message;
