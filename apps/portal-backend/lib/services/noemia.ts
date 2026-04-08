@@ -438,7 +438,11 @@ function handleTriageFlow(sessionId: string, message: string, audience: string, 
   if (audience !== "visitor") return null;
 
   const context = getSessionContext(sessionId);
-  const triage = ensureVisitorTriage(sessionId);
+  const triage = context.triage ?? {
+    active: false,
+    step: "start",
+    data: {}
+  };
   const normalizedMessage = normalizeText(message);
   const detectedTheme = detectLegalTheme(message) || urlContext?.tema || context.lastTheme || undefined;
   const detectedTime = extractRelativeTime(message);
