@@ -6,6 +6,7 @@ class NoemiaChat {
     this.fallbackMode = false;
     this.messages = [];
     this.isLoading = false;
+    this.sessionId = this.getOrCreateSessionId();
     this.init();
   }
 
@@ -28,6 +29,36 @@ class NoemiaChat {
     } else {
       return '/api/noemia/chat';
     }
+  }
+
+  getOrCreateSessionId() {
+    // Apenas para visitantes do site público
+    if (this.environment !== 'public') {
+      return null; // Portal usa profile.id
+    }
+
+    const storageKey = 'noemia_visitor_session_id';
+    let sessionId = localStorage.getItem(storageKey);
+
+    if (!sessionId) {
+      // Gerar ID estável: visitor-UUID
+      sessionId = 'visitor-' + this.generateUUID();
+      localStorage.setItem(storageKey, sessionId);
+      console.log('[NoemIA] Novo sessionId gerado:', sessionId);
+    } else {
+      console.log('[NoemIA] SessionId existente recuperado:', sessionId);
+    }
+
+    return sessionId;
+  }
+
+  generateUUID() {
+    // Gerar UUID v4 simples
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 
   init() {
@@ -234,11 +265,13 @@ class NoemiaChat {
         };
         expectedResponseFormat = 'portal';
       } else {
-        // Formato do site público
+        // Formato público
         payload = {
           message: message,
-          context: 'public_chat',
-          timestamp: new Date().toISOString()
+          audience: audience,
+          currentPath: window.location.pathname,
+          history: history,
+          sessionId: this.sessionId // Incluir sessionId estável para visitantes
         };
         expectedResponseFormat = 'public';
       }

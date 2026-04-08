@@ -627,6 +627,7 @@ export const askNoemiaSchema = z.object({
     .trim()
     .min(5, "Escreva uma pergunta com pelo menos 5 caracteres.")
     .max(2000, "A pergunta precisa ter no maximo 2000 caracteres."),
+  sessionId: z.string().trim().max(100).optional(),
   history: z
     .array(
       z.object({

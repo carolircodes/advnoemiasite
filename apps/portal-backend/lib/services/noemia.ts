@@ -1454,7 +1454,7 @@ export async function answerNoemia(rawInput: unknown, profile: PortalProfile | n
     effectiveAudience = "visitor";
   }
 
-  const sessionId = profile?.id || `visitor-${Buffer.from((currentPath || "site") + input.message).toString("base64").slice(0, 16)}`;
+  const sessionId = input.sessionId || profile?.id || `visitor-${Buffer.from((currentPath || "site") + input.message).toString("base64").slice(0, 16)}`;
   const detectedTheme = detectLegalTheme(input.message) || urlContext.tema || null;
   const intent = detectUserIntent(input.message);
 

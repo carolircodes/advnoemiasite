@@ -60,6 +60,15 @@ const urgencyConfig: Record<string, VisualConfig> = {
   alta: { label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" }
 };
 
+const operationalStatusConfig: Record<string, VisualConfig> = {
+  new: { label: "Novo", color: "#6B7280", bgColor: "#F9FAFB" },
+  viewed: { label: "Visualizado", color: "#3B82F6", bgColor: "#EFF6FF" },
+  in_progress: { label: "Em Atendimento", color: "#F59E0B", bgColor: "#FEF3C7" },
+  scheduled: { label: "Agendado", color: "#8B5CF6", bgColor: "#F3E8FF" },
+  converted: { label: "Convertido", color: "#10B981", bgColor: "#D1FAE5" },
+  closed: { label: "Encerrado", color: "#6B7280", bgColor: "#F9FAFB" }
+};
+
 const funnelStageConfig: Record<string, VisualConfig> = {
   contato_inicial: { label: "Contato Inicial", color: "#9CA3AF", bgColor: "#F9FAFB" },
   qualificacao: { label: "Qualificação", color: "#F59E0B", bgColor: "#FEF3C7" },
@@ -109,6 +118,7 @@ function LeadTableRow({ lead, onSelect }: LeadTableRowProps) {
   const statusConfig = leadStatusConfig[lead.lead_status];
   const urgencyStyle = urgencyConfig[lead.urgency];
   const funnelConfig = funnelStageConfig[lead.funnel_stage];
+  const operationalConfig = operationalStatusConfig[lead.operational_status];
 
   return (
     <tr 
@@ -137,6 +147,9 @@ function LeadTableRow({ lead, onSelect }: LeadTableRowProps) {
       </td>
       <td className="px-6 py-4">
         <StatusBadge config={urgencyStyle} />
+      </td>
+      <td className="px-6 py-4">
+        <StatusBadge config={operationalConfig} />
       </td>
       <td className="px-6 py-4">
         <div className="max-w-xs">
@@ -180,7 +193,8 @@ export default function LeadsDashboard() {
     legal_area: "",
     urgency: "",
     lead_status: "",
-    funnel_stage: ""
+    funnel_stage: "",
+    operational_status: ""
   });
 
   // Métricas calculadas
@@ -188,7 +202,15 @@ export default function LeadsDashboard() {
     total: leads.length,
     quentes: leads.filter(l => l.lead_status === "quente").length,
     prontosParaAgendar: leads.filter(l => l.lead_status === "pronto_para_agendar").length,
-    urgentes: leads.filter(l => l.urgency === "alta").length
+    urgentes: leads.filter(l => l.urgency === "alta").length,
+    novosHoje: leads.filter(l => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return new Date(l.created_at) >= today && l.operational_status === "new";
+    }).length,
+    emAtendimento: leads.filter(l => l.operational_status === "in_progress").length,
+    agendados: leads.filter(l => l.operational_status === "scheduled").length,
+    convertidos: leads.filter(l => l.operational_status === "converted").length
   };
 
   // Leads filtrados
@@ -202,12 +224,46 @@ export default function LeadsDashboard() {
       (!filters.legal_area || lead.legal_area === filters.legal_area) &&
       (!filters.urgency || lead.urgency === filters.urgency) &&
       (!filters.lead_status || lead.lead_status === filters.lead_status) &&
-      (!filters.funnel_stage || lead.funnel_stage === filters.funnel_stage);
+      (!filters.funnel_stage || lead.funnel_stage === filters.funnel_stage) &&
+      (!filters.operational_status || lead.operational_status === filters.operational_status);
 
     return matchesSearch && matchesFilters;
   });
 
-  // Carregar dados
+  // Atualizar status do lead
+  async function updateLeadStatus(leadId: string, newStatus: Lead['operational_status']) {
+    try {
+      const response = await fetch('/api/internal/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, operational_status: newStatus })
+      });
+
+      if (response.ok) {
+        // Atualizar lead localmente
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            lead.id === leadId 
+              ? { ...lead, operational_status: newStatus, updated_at: new Date().toISOString() }
+              : lead
+          )
+        );
+        
+        // Fechar modal se convertido ou encerrado
+        if (newStatus === 'converted' || newStatus === 'closed') {
+          setSelectedLead(null);
+        }
+        
+        console.log(`✅ Lead ${leadId} atualizado para ${newStatus}`);
+      } else {
+        console.error('❌ Falha ao atualizar lead:', await response.text());
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar lead:', error);
+    }
+  }
+
+// Carregar dados
   useEffect(() => {
     async function loadData() {
       try {
@@ -266,7 +322,39 @@ export default function LeadsDashboard() {
         {/* Prioridades do Dia */}
         <PrioridadesDoDia leads={leads} />
 
-        {/* Métricas */}
+        {/* Métricas Operacionais */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <MetricCard
+            title="Novos Hoje"
+            value={metrics.novosHoje}
+            subtitle="Leads novos hoje"
+            color="#6B7280"
+            icon="🆕"
+          />
+          <MetricCard
+            title="Em Atendimento"
+            value={metrics.emAtendimento}
+            subtitle="Atendimento ativo"
+            color="#F59E0B"
+            icon="🔄"
+          />
+          <MetricCard
+            title="Agendados"
+            value={metrics.agendados}
+            subtitle="Consulta marcada"
+            color="#8B5CF6"
+            icon="📅"
+          />
+          <MetricCard
+            title="Convertidos"
+            value={metrics.convertidos}
+            subtitle="Clientes conquistados"
+            color="#10B981"
+            icon="🎯"
+          />
+        </div>
+
+        {/* Métricas de Qualidade */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Total de Leads"
@@ -350,6 +438,16 @@ export default function LeadsDashboard() {
                 <option key={key} value={key}>{config.label}</option>
               ))}
             </select>
+            <select
+              value={filters.operational_status}
+              onChange={(e) => setFilters({...filters, operational_status: e.target.value})}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">Todos Status</option>
+              {Object.entries(operationalStatusConfig).map(([key, config]) => (
+                <option key={key} value={key}>{config.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -378,6 +476,9 @@ export default function LeadsDashboard() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Urgência
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Operacional
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Última Mensagem
@@ -519,8 +620,38 @@ export default function LeadsDashboard() {
                   </div>
                 </div>
 
-                {/* Ações */}
+                {/* Ações Operacionais */}
                 <div className="flex flex-wrap gap-4">
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead.id, 'viewed')}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    👁️ Marcar como Visualizado
+                  </button>
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead.id, 'in_progress')}
+                    className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                  >
+                    � Iniciar Atendimento
+                  </button>
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead.id, 'scheduled')}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    📅 Marcar como Agendado
+                  </button>
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead.id, 'converted')}
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    🎯 Marcar como Convertido
+                  </button>
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead.id, 'closed')}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    ✖️ Encerrar Lead
+                  </button>
                   <a
                     href={`https://wa.me/5511999999999?text=Olá, vim pelo sistema sobre o lead @${selectedLead.username || selectedLead.platform_user_id}`}
                     target="_blank"
@@ -529,21 +660,6 @@ export default function LeadsDashboard() {
                   >
                     📱 Abrir WhatsApp
                   </a>
-                  <button
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                  >
-                    📅 Agendar Consulta
-                  </button>
-                  <button
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    👥 Marcar como Cliente
-                  </button>
-                  <button
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    ✏️ Atualizar Status
-                  </button>
                 </div>
               </div>
             </div>

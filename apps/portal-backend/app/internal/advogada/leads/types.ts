@@ -17,6 +17,9 @@ export interface Lead {
   first_contact_at: string;
   last_contact_at: string;
   conversation_count: number;
+  operational_status: "new" | "viewed" | "in_progress" | "scheduled" | "converted" | "closed";
+  created_at: string;
+  updated_at: string;
   metadata?: Record<string, any>;
 }
 
