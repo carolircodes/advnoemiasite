@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
+import { answerNoemia } from "../../../../lib/services/noemia";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.META_APP_SECRET || "noeminia_app_secret_2026";
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+const PALAVRA_CHAVE_INSTAGRAM = "palavra";
 
 function logEvent(
   event: string,
@@ -145,6 +147,60 @@ async function sendInstagramMessage(
   }
 }
 
+// Processar mensagem usando lógica centralizada da NoemIA
+async function processMessageWithNoemia(senderId: string, messageText: string) {
+  try {
+    logEvent("INSTAGRAM_CALLING_NOEMIA", {
+      senderId,
+      messageLength: messageText.length
+    });
+
+    // Usar a lógica centralizada da NoemIA
+    const response = await answerNoemia({
+      message: messageText,
+      audience: "visitor",
+      history: []
+    }, null);
+
+    logEvent("INSTAGRAM_NOEMIA_RESPONSE", {
+      senderId,
+      responseLength: response.answer?.length || 0,
+      audience: response.audience
+    });
+
+    const sent = await sendInstagramMessage(senderId, response.answer || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
+    
+    if (sent) {
+      logEvent("INSTAGRAM_RESPONSE_SENT", {
+        senderId,
+        responseLength: response.answer?.length || 0
+      });
+    } else {
+      logEvent("INSTAGRAM_RESPONSE_FAILED", {
+        senderId,
+        responseLength: response.answer?.length || 0
+      }, "error");
+    }
+  } catch (error) {
+    logEvent("INSTAGRAM_NOEMIA_ERROR", {
+      senderId,
+      error: error instanceof Error ? error.message : String(error)
+    }, "error");
+
+    // Fallback para mensagem fixa em caso de erro
+    const fallbackResponse = "Oi! Vi que você enviou uma mensagem. Vou te explicar de forma simples o que pode estar acontecendo no seu caso. Muitas pessoas passam por isso sem saber que podem ter um direito não reconhecido. Se você quiser, posso entender melhor sua situação.";
+    
+    const sent = await sendInstagramMessage(senderId, fallbackResponse);
+    
+    if (sent) {
+      logEvent("INSTAGRAM_FALLBACK_SENT", {
+        senderId,
+        responseLength: fallbackResponse.length
+      });
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("hub.mode");
@@ -259,17 +315,83 @@ export async function POST(request: NextRequest) {
           console.log("INSTAGRAM_SENDER_EXTRACTED:", messaging.sender.id);
           console.log("INSTAGRAM_TEXT_EXTRACTED:", messaging.message.text);
 
-          await sendInstagramMessage(
-            messaging.sender.id,
-            "Oi! Vi que você comentou no vídeo 👩‍⚖️✨\n\nVou te explicar de forma simples o que pode estar acontecendo no seu caso.\n\nMuitas pessoas passam por isso sem saber que podem ter um direito que não foi reconhecido, seja por erro na análise ou por falta de orientação correta.\n\nSe você quiser, posso entender melhor sua situação e te orientar com mais precisão."
-          );
+          await processMessageWithNoemia(messaging.sender.id, messaging.message.text);
         }
 
         // Process entry.changes format
         for (const change of entry.changes || []) {
           console.log("INSTAGRAM_STRUCTURE_MATCHED: changes");
-          if (change.field !== "messages") {
-            console.log("EVENT_IGNORED_UNSUPPORTED_STRUCTURE: changes field not 'messages'", { field: change.field });
+          
+          // Processar comentários
+          if (change.field === "comments") {
+            console.log("INSTAGRAM_COMMENT_STRUCTURE_DETECTED: comments");
+            
+            const comment = change.value;
+            if (!comment || !comment.from || !comment.id || !comment.text) {
+              console.log("EVENT_IGNORED_INCOMPLETE_COMMENT: missing required fields");
+              continue;
+            }
+
+            console.log("INSTAGRAM_COMMENT_RECEIVED:");
+            console.log("  - COMMENT_ID:", comment.id);
+            console.log("  - USER_ID:", comment.from.id);
+            console.log("  - USERNAME:", comment.from.username || "N/A");
+            console.log("  - COMMENT_TEXT:", comment.text);
+            console.log("  - POST_ID:", comment.media?.id || "N/A");
+
+            // Detectar palavra-chave (case-insensitive)
+            const commentTextLower = comment.text.toLowerCase();
+            const keywordDetected = commentTextLower.includes(PALAVRA_CHAVE_INSTAGRAM.toLowerCase());
+            
+            console.log("INSTAGRAM_KEYWORD_DETECTION:");
+            console.log("  - KEYWORD:", PALAVRA_CHAVE_INSTAGRAM);
+            console.log("  - DETECTED:", keywordDetected);
+            console.log("  - COMMENT_TEXT_LOWER:", commentTextLower);
+
+            if (keywordDetected) {
+              console.log("INSTAGRAM_KEYWORD_MATCHED: sending private reply");
+              
+              await processMessageWithNoemia(comment.from.id, comment.text);
+
+              const replySent = true; // Se chegou aqui, o processamento foi iniciado
+
+              if (replySent) {
+                console.log("INSTAGRAM_PRIVATE_REPLY_SUCCESS: Comment triggered DM sent");
+                logEvent("INSTAGRAM_PRIVATE_REPLY_SUCCESS", {
+                  commentId: comment.id,
+                  userId: comment.from.id,
+                  username: comment.from.username,
+                  postId: comment.media?.id,
+                  keyword: PALAVRA_CHAVE_INSTAGRAM,
+                  commentText: comment.text
+                });
+              } else {
+                console.log("INSTAGRAM_PRIVATE_REPLY_FAILED: Could not send DM to commenter");
+                logEvent("INSTAGRAM_PRIVATE_REPLY_FAILED", {
+                  commentId: comment.id,
+                  userId: comment.from.id,
+                  username: comment.from.username,
+                  postId: comment.media?.id,
+                  keyword: PALAVRA_CHAVE_INSTAGRAM,
+                  commentText: comment.text
+                }, "error");
+              }
+            } else {
+              console.log("INSTAGRAM_KEYWORD_NOT_MATCHED: no action taken");
+              logEvent("INSTAGRAM_KEYWORD_NOT_MATCHED", {
+                commentId: comment.id,
+                userId: comment.from.id,
+                username: comment.from.username,
+                postId: comment.media?.id,
+                keyword: PALAVRA_CHAVE_INSTAGRAM,
+                commentText: comment.text
+              });
+            }
+          }
+          
+          // Processar mensagens (código existente)
+          if (change.field !== "messages" && change.field !== "comments") {
+            console.log("EVENT_IGNORED_UNSUPPORTED_STRUCTURE: changes field not 'messages' or 'comments'", { field: change.field });
             continue;
           }
 
@@ -293,10 +415,7 @@ export async function POST(request: NextRequest) {
             console.log("INSTAGRAM_SENDER_EXTRACTED:", message.from.id);
             console.log("INSTAGRAM_TEXT_EXTRACTED:", message.text);
 
-            await sendInstagramMessage(
-              message.from.id,
-              "Oi! Vi que você comentou no vídeo 👩‍⚖️✨\n\nVou te explicar de forma simples o que pode estar acontecendo no seu caso.\n\nMuitas pessoas passam por isso sem saber que podem ter um direito que não foi reconhecido, seja por erro na análise ou por falta de orientação correta.\n\nSe você quiser, posso entender melhor sua situação e te orientar com mais precisão."
-            );
+            await processMessageWithNoemia(message.from.id, message.text);
           }
         }
       }

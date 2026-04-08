@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
+import { answerNoemia } from "../../../../lib/services/noemia";
 
 // Configurações
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "noeminha_verify_2026";
@@ -353,27 +354,56 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Processar mensagem de texto
+// Processar mensagem de texto usando lógica centralizada da NoemIA
 async function processTextMessage(messageInfo: any) {
-  // Resposta automática FIXA sem dependência de IA
-  const fixedResponse = "Oi! Vi que você comentou no vídeo 👩‍⚖️✨\n\nVou te explicar de forma simples o que pode estar acontecendo no seu caso.\n\nMuitas pessoas passam por isso sem saber que podem ter um direito que não foi reconhecido, seja por erro na análise ou por falta de orientação correta.\n\nSe você quiser, posso entender melhor sua situação e te orientar com mais precisão.";
-  
-  logEvent('WHATSAPP_ABOUT_TO_SEND', {
-    from: messageInfo.from,
-    responseLength: fixedResponse.length
-  });
-  
-  const sent = await sendWhatsAppResponse(messageInfo.from, fixedResponse);
-  
-  if (sent) {
-    logEvent('WHATSAPP_RESPONSE_SENT', {
+  try {
+    logEvent('WHATSAPP_CALLING_NOEMIA', {
       from: messageInfo.from,
-      responseLength: fixedResponse.length
+      message: messageInfo.content
     });
-  } else {
-    logEvent('WHATSAPP_RESPONSE_FAILED', {
+
+    // Usar a lógica centralizada da NoemIA
+    const response = await answerNoemia({
+      message: messageInfo.content,
+      audience: "visitor",
+      history: []
+    }, null);
+
+    logEvent('WHATSAPP_NOEMIA_RESPONSE', {
       from: messageInfo.from,
-      responseLength: fixedResponse.length
+      responseLength: response.answer?.length || 0,
+      audience: response.audience
+    });
+    
+    const sent = await sendWhatsAppResponse(messageInfo.from, response.answer || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
+    
+    if (sent) {
+      logEvent('WHATSAPP_RESPONSE_SENT', {
+        from: messageInfo.from,
+        responseLength: response.answer?.length || 0
+      });
+    } else {
+      logEvent('WHATSAPP_RESPONSE_FAILED', {
+        from: messageInfo.from,
+        responseLength: response.answer?.length || 0
+      }, 'error');
+    }
+  } catch (error) {
+    logEvent('WHATSAPP_NOEMIA_ERROR', {
+      from: messageInfo.from,
+      error: error instanceof Error ? error.message : String(error)
     }, 'error');
+
+    // Fallback para mensagem fixa em caso de erro
+    const fallbackResponse = "Oi! Vi que você enviou uma mensagem. Vou te explicar de forma simples o que pode estar acontecendo no seu caso. Muitas pessoas passam por isso sem saber que podem ter um direito não reconhecido. Se você quiser, posso entender melhor sua situação.";
+    
+    const sent = await sendWhatsAppResponse(messageInfo.from, fallbackResponse);
+    
+    if (sent) {
+      logEvent('WHATSAPP_FALLBACK_SENT', {
+        from: messageInfo.from,
+        responseLength: fallbackResponse.length
+      });
+    }
   }
 }
