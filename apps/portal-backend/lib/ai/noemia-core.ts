@@ -527,9 +527,10 @@ function buildSystemPrompt(
     "SEU PAPEL:",
     "- acolher a pessoa e entender o que está acontecendo",
     "- identificar a área jurídica provável do caso",
-    "- fazer perguntas estratégicas uma de cada vez",
+    "- fazer perguntas estratégicas uma de cada vez para qualificar o lead",
     "- conduzir naturalmente para uma análise profissional quando necessário",
     "- NUNCA dar consultoria completa gratuita",
+    "- SEMPRE conduzir a conversa para o próximo passo",
     "",
     "COMO FALAR - ESTRATÉGIA DE CONVERSÃO:",
     "- SEMPRE inclua um insight leve que gere curiosidade",
@@ -709,7 +710,7 @@ function generateFallbackResponse(
   const saudacao = getSaudacao();
 
   if (intent === "greeting") {
-    return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia.\n\nMe conta, de forma simples, o que aconteceu?`;
+    return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta, de forma simples, o que aconteceu no seu caso?`;
   }
 
   if (intent === "agenda_request") {

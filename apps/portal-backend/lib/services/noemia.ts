@@ -1082,10 +1082,10 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     const isRepeating = normalizeText(lastUserMessage) === normalizeText(userMessage);
     if (isRepeating && intent === "geral") {
       const fallbackResponse = {
-        message: "Vamos organizar melhor sua dúvida! Posso ajudar com agendamentos, processos, documentos ou orientar sobre próximos passos. O que você precisa especificamente?",
+        message: "Entendi... Faz sentido você querer esclarecer isso melhor. O interessante é que cada caso tem detalhes únicos que fazem toda a diferença. Me conta, de forma simples, o que exatamente aconteceu no seu caso?",
         actions: [
-          { label: "Iniciar atendimento", href: "/triagem" },
-          { label: "Ver serviços", href: "/services" }
+          { label: "Agendar consulta", href: "/consulta" },
+          { label: "Falar no WhatsApp", href: "https://wa.me/55XXXXXXXXXXX" }
         ],
         meta: { intent: "avoid_repetition", profile: audience, source: "fallback" }
       };
@@ -1713,8 +1713,8 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
         
       case 'saudacao':
         const baseMessageSaudacao = isFollowUp
-          ? 'Olá novamente! Estou aqui para ajudar. Quer conversar sobre seu caso ou precisa de algo específico?'
-          : 'Olá! Sou a NoemIA, sua assistente jurídica. Posso te ajudar com casos de aposentadoria, descontos bancários, família, trabalhista ou agendar uma consulta. Como posso te ajudar hoje?';
+          ? 'Faz sentido você continuar buscando orientação... O interessante é que cada caso tem detalhes únicos. Me conta, o que exatamente aconteceu na sua situação?'
+          : 'Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar. Eu sou a atendente do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso. Me conta, de forma simples, o que aconteceu no seu caso?';
         
         const visitorSaudacaoResponse = {
           message: adaptMessageByLeadTemperature(baseMessageSaudacao, temperature, urgency),
@@ -1739,8 +1739,8 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
         
       default:
         const baseMessageDefault = isFollowUp
-          ? 'Vamos direto ao ponto! Posso te ajudar com: aposentadoria/INSS, descontos bancários, pensão alimentícia, divórcio, questões trabalhistas ou agendar consulta. Qual é o seu caso?'
-          : 'Sou especialista em ajudar com casos jurídicos. Posso te orientar sobre: aposentadoria/INSS, descontos indevidos, pensão, divórcio, direito trabalhista ou agendar uma consulta. Me conte sua situação!';
+          ? 'Entendi... Faz sentido você querer esclarecer isso melhor. O interessante é que cada caso tem detalhes únicos que fazem toda a diferença. Me conta, de forma simples, o que exatamente aconteceu no seu caso?'
+          : 'Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar. Eu sou a atendente do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso. Me conta, de forma simples, o que aconteceu no seu caso?';
         
         const visitorDefaultResponse = {
           message: adaptMessageByLeadTemperature(baseMessageDefault, temperature, urgency),
@@ -1772,7 +1772,7 @@ async function generateIntelligentResponse(intent: string, userMessage: string, 
     const fallbackCTA = buildSmartCTA(fallbackTemperature, fallbackUrgency);
     
     const fallbackMessage = adaptMessageByLeadTemperature(
-      'Estou aqui para ajudar com sua jornada jurídica. Para informações detalhadas, acesse o portal do cliente ou fale com nossa equipe.',
+      'Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar. Eu sou a atendente do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso. Me conta, de forma simples, o que aconteceu no seu caso?',
       fallbackTemperature,
       fallbackUrgency
     );

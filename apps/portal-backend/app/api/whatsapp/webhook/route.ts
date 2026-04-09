@@ -154,6 +154,150 @@ async function handleUnsupportedWhatsAppMessage(sender: string, messageType: str
   return await sendWhatsAppResponse(sender, unsupportedMessage);
 }
 
+// Marcar mensagem como lida via WhatsApp API
+async function markAsRead(messageId: string) {
+  logEvent('WHATSAPP_MARK_AS_READ_START', {
+    messageId,
+    hasAccessToken: !!ACCESS_TOKEN,
+    hasPhoneNumberId: !!PHONE_NUMBER_ID
+  });
+
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+    logEvent('WHATSAPP_MARK_AS_READ_CREDENTIALS_MISSING', {
+      hasAccessToken: !!ACCESS_TOKEN,
+      hasPhoneNumberId: !!PHONE_NUMBER_ID
+    }, 'error');
+    return false;
+  }
+
+  try {
+    const markReadUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+    
+    const payload = {
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId
+    };
+
+    logEvent('WHATSAPP_MARK_AS_READ_API_CALL', {
+      url: markReadUrl,
+      messageId,
+      payloadSize: JSON.stringify(payload).length
+    });
+
+    const response = await fetch(markReadUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    logEvent('WHATSAPP_MARK_AS_READ_RESPONSE', {
+      httpStatus: response.status,
+      httpOk: response.ok,
+      statusText: response.statusText
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      logEvent('WHATSAPP_MARK_AS_READ_ERROR', {
+        httpStatus: response.status,
+        metaError: data.error?.message,
+        errorCode: data.error?.code,
+        messageId
+      }, 'error');
+      return false;
+    }
+
+    logEvent('WHATSAPP_MARK_AS_READ_SUCCESS', {
+      messageId,
+      httpStatus: response.status
+    });
+
+    return true;
+  } catch (error) {
+    logEvent('WHATSAPP_MARK_AS_READ_EXCEPTION', {
+      error: error instanceof Error ? error.message : String(error),
+      messageId
+    }, 'error');
+    return false;
+  }
+}
+
+// Enviar indicador de "digitando..." via WhatsApp API
+async function sendTypingIndicator(to: string) {
+  logEvent('WHATSAPP_TYPING_INDICATOR_START', {
+    to,
+    hasAccessToken: !!ACCESS_TOKEN,
+    hasPhoneNumberId: !!PHONE_NUMBER_ID
+  });
+
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+    logEvent('WHATSAPP_TYPING_INDICATOR_CREDENTIALS_MISSING', {
+      hasAccessToken: !!ACCESS_TOKEN,
+      hasPhoneNumberId: !!PHONE_NUMBER_ID
+    }, 'error');
+    return false;
+  }
+
+  try {
+    const typingUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+    
+    const payload = {
+      messaging_product: "whatsapp",
+      status: "typing",
+      to: to
+    };
+
+    logEvent('WHATSAPP_TYPING_INDICATOR_API_CALL', {
+      url: typingUrl,
+      to,
+      payloadSize: JSON.stringify(payload).length
+    });
+
+    const response = await fetch(typingUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    logEvent('WHATSAPP_TYPING_INDICATOR_RESPONSE', {
+      httpStatus: response.status,
+      httpOk: response.ok,
+      statusText: response.statusText
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      logEvent('WHATSAPP_TYPING_INDICATOR_ERROR', {
+        httpStatus: response.status,
+        metaError: data.error?.message,
+        errorCode: data.error?.code,
+        to
+      }, 'error');
+      return false;
+    }
+
+    logEvent('WHATSAPP_TYPING_INDICATOR_SUCCESS', {
+      to,
+      httpStatus: response.status
+    });
+
+    return true;
+  } catch (error) {
+    logEvent('WHATSAPP_TYPING_INDICATOR_EXCEPTION', {
+      error: error instanceof Error ? error.message : String(error),
+      to
+    }, 'error');
+    return false;
+  }
+}
+
 // Enviar resposta via WhatsApp API
 async function sendWhatsAppResponse(to: string, message: string) {
   logEvent('WHATSAPP_GRAPH_API_STATUS', {
@@ -388,7 +532,11 @@ async function processTextMessage(messageInfo: any) {
       message: messageInfo.content
     });
 
-    // 1. Verificar anti-spam guard
+    // 1. Marcar mensagem como lida e enviar indicador de "digitando..."
+    await markAsRead(messageInfo.messageId);
+    await sendTypingIndicator(messageInfo.from);
+
+    // 2. Verificar anti-spam guard
     const guardResult = await antiSpamGuard.shouldRespondToEvent({
       channel: 'whatsapp',
       externalMessageId: messageInfo.messageId,
@@ -408,7 +556,7 @@ async function processTextMessage(messageInfo: any) {
       return;
     }
 
-    // 2. Obter ou criar sessão de conversação
+    // 3. Obter ou criar sessão de conversação
     const session = await conversationPersistence.getOrCreateSession(
       'whatsapp',
       messageInfo.from
@@ -420,7 +568,7 @@ async function processTextMessage(messageInfo: any) {
       caseArea: session.case_area
     });
 
-    // 3. Salvar mensagem do usuário
+    // 4. Salvar mensagem do usuário
     await conversationPersistence.saveMessage(
       session.id,
       messageInfo.messageId,
@@ -436,10 +584,10 @@ async function processTextMessage(messageInfo: any) {
       }
     );
 
-    // 4. Obter histórico recente da conversação
+    // 5. Obter histórico recente da conversação
     const recentMessages = await conversationPersistence.getRecentMessages(session.id, 12);
     
-    // 5. Construir histórico para o Noemia Core
+    // 6. Construir histórico para o Noemia Core
     const history = recentMessages
       .reverse()
       .filter(msg => msg.role !== 'system')
@@ -454,13 +602,13 @@ async function processTextMessage(messageInfo: any) {
       lastSummary: session.last_summary
     });
 
-    // 6. Gerar resumo se a conversa for longa
+    // 7. Gerar resumo se a conversa for longa
     const summary = await conversationPersistence.generateConversationSummary(
       session.id,
       recentMessages
     );
 
-    // 7. Construir contexto para a IA
+    // 8. Construir contexto para a IA
     const context = {
       sessionId: session.id,
       leadStage: session.lead_stage,
@@ -470,7 +618,7 @@ async function processTextMessage(messageInfo: any) {
       conversationHistory: summary
     };
 
-    // 8. Processar com Noemia Core
+    // 9. Processar com Noemia Core
     const coreResponse = await processNoemiaCore({
       channel: 'whatsapp',
       userType: 'visitor',
@@ -502,7 +650,7 @@ async function processTextMessage(messageInfo: any) {
       classification: coreResponse.metadata.classification
     });
 
-    // 9. Salvar resposta da IA
+    // 10. Salvar resposta da IA
     await conversationPersistence.saveMessage(
       session.id,
       undefined, // IA não tem external message ID
@@ -517,7 +665,7 @@ async function processTextMessage(messageInfo: any) {
       }
     );
 
-    // 10. Atualizar sessão com informações da conversação
+    // 11. Atualizar sessão com informações da conversação
     await conversationPersistence.updateSession(session.id, {
       lead_stage: 'engaged',
       case_area: coreResponse.metadata.classification?.theme || session.case_area,
@@ -526,7 +674,7 @@ async function processTextMessage(messageInfo: any) {
       last_outbound_at: new Date().toISOString()
     });
 
-    // 11. Enviar resposta
+    // 12. Enviar resposta
     console.log('=== WHATSAPP_SEND_ATTEMPT ===');
     const sent = await sendWhatsAppResponse(messageInfo.from, coreResponse.reply || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
@@ -538,7 +686,7 @@ async function processTextMessage(messageInfo: any) {
         responseLength: coreResponse.reply.length
       });
 
-      // 12. Marcar evento como processado
+      // 13. Marcar evento como processado
       await antiSpamGuard.markEventProcessed({
         channel: 'whatsapp',
         externalMessageId: messageInfo.messageId,
