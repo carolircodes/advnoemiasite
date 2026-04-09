@@ -474,36 +474,74 @@ function generateTriageResponse(
     theme: LegalTheme;
     intent: ClassifiedIntent;
     leadTemperature: LeadTemperature;
-  }
+  },
+  previousMessage?: string
 ): string {
-  const saudacao = getSaudacao();
+  // Detectar respostas curtas para continuidade
+  const shortResponses = ["sim", "não", "ainda não", "quero", "ok", "entendi", "certo"];
+  const isShortResponse = previousMessage && shortResponses.some(sr => 
+    previousMessage.toLowerCase().trim() === sr
+  );
 
   switch (state.currentStep) {
     case "acolhimento":
+      // Primeira mensagem - manter acolhimento
       return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta rapidinho o que aconteceu no seu caso?`;
 
     case "identificacao_area":
-      const areaNome = classification.theme === "previdenciario" ? "previdenciária" : classification.theme === "bancario" ? "bancária" : classification.theme === "familia" ? "de família" : classification.theme === "civil" ? "cível" : "jurídica";
-      return `Olha... o interessante é que cada área tem detalhes que pouca gente conhece.\n\nPelo que você descreveu, seu caso parece estar na área ${areaNome}.\n\nO que mais te preocupa nessa história toda?`;
+      // Após o usuário contar o caso inicial
+      if (isShortResponse) {
+        return `Perfeito, isso já ajuda a entender melhor sua situação. Muitas pessoas estão exatamente nesse momento de dúvida antes de dar entrada.\n\nPelo que você descreveu, seu caso parece estar na área ${getAreaNome(classification.theme)}.\n\nMe conta: o que mais te preocupa nessa história toda?`;
+      }
+      return `Olha... o interessante é que cada área tem detalhes que pouca gente conhecem.\n\nPelo que você descreveu, seu caso parece estar na área ${getAreaNome(classification.theme)}.\n\nO que mais te preocupa nessa história toda?`;
 
     case "entendimento_situacao":
+      // Após identificar área e preocupações
+      if (isShortResponse) {
+        return `Entendi... Faz sentido você se sentir assim. Muita gente passa por isso antes de buscar ajuda.\n\nO momento certo de agir faz toda a diferença. Me conta: isso que você mencionou aconteceu há quanto tempo?`;
+      }
       return `Entendi... O momento certo de agir faz toda a diferença.\n\nIsso que você mencionou aconteceu há quanto tempo?`;
 
     case "identificacao_urgencia":
+      // Após entender tempo e situação
       if (state.isHotLead) {
+        if (isShortResponse) {
+          return `Pelo que você me contou, isso realmente precisa de atenção rápida. Faz sentido você ter essa urgência.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado. Você prefere atendimento online agora mesmo ou presencial?`;
+        }
         return `Pelo que você me contou, isso realmente precisa de atenção rápida.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVocê prefere atendimento online agora mesmo ou presencial?`;
       }
 
+      if (isShortResponse) {
+        return `Perfeito... Já estou entendendo melhor seu cenário. Faz sentido você estar pesquisando sobre isso.\n\nVocê está começando a entender isso agora ou já pesquisou algo sobre seu caso antes?`;
+      }
       return `Perfeito... Já estou entendendo melhor seu cenário.\n\nVocê está começando a entender isso agora ou já pesquisou algo sobre seu caso antes?`;
 
     case "conducao_proximo_passo":
+      // Após identificar urgência e contexto
+      if (isShortResponse) {
+        return `Obrigada por compartilhar isso comigo. Isso já me ajuda a ter uma visão mais clara do seu caso.\n\nExistem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir. Você já pensou em como seria ter uma análise profissional do seu caso?`;
+      }
       return `Obrigada por compartilhar isso comigo.\n\nExistem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
 
     case "conversao":
+      // Momento de conversão
+      if (isShortResponse) {
+        return `Perfeito! Isso mostra que você está no caminho certo para resolver isso.\n\nO melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia. Geralmente a solução pode ser mais simples do que parece. Você prefere agendar online ou falar primeiro por WhatsApp?`;
+      }
       return `Perfeito. O melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia.\n\nGeralmente a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
 
     default:
       return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nMe conta rapidinho o que aconteceu?`;
+  }
+}
+
+function getAreaNome(theme: LegalTheme): string {
+  switch (theme) {
+    case "previdenciario": return "previdenciária";
+    case "bancario": return "bancária";
+    case "familia": return "de família";
+    case "civil": return "cível";
+    default: return "jurídica";
   }
 }
 
@@ -909,7 +947,7 @@ export async function processNoemiaCore(
 
     const fallbackReply =
       effectiveAudience === "visitor"
-        ? generateTriageResponse(newConversationState, classification)
+        ? generateTriageResponse(newConversationState, classification, input.message)
         : generateFallbackResponse(
             intent,
             effectiveAudience,
