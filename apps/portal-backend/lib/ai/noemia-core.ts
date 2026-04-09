@@ -256,10 +256,30 @@ function buildSystemPrompt(channel: string, userType: string, context?: string):
     ]
   };
 
+  const getChannelPrompts = (ch: string) => {
+    switch (ch) {
+      case 'whatsapp': return channelPrompts.whatsapp;
+      case 'instagram': return channelPrompts.instagram;
+      case 'site': return channelPrompts.site;
+      case 'portal': return channelPrompts.portal;
+      default: return channelPrompts.site;
+    }
+  };
+
+  const getUserPrompts = (ut: string) => {
+    switch (ut) {
+      case 'visitor': return userPrompts.visitor;
+      case 'client': return userPrompts.client;
+      case 'staff': return userPrompts.staff;
+      case 'unknown': return userPrompts.visitor;
+      default: return userPrompts.visitor;
+    }
+  };
+
   const prompts = [
     ...basePrompt,
-    ...(channelPrompts[channel] || channelPrompts.site),
-    ...(userPrompts[userType] || userPrompts.visitor)
+    ...getChannelPrompts(channel),
+    ...getUserPrompts(userType)
   ];
 
   if (context) {
@@ -347,7 +367,20 @@ function generateFallbackResponse(
       : "Posso ajudar com diversas áreas do direito. Para te orientar melhor, me diga qual é sua situação ou agende uma consulta."
   };
   
-  return fallbacks[intent] || fallbacks.general_inquiry;
+  switch (intent) {
+    case 'legal_advice_request':
+      return fallbacks.legal_advice_request;
+    case 'greeting':
+      return fallbacks.greeting;
+    case 'agenda_request':
+      return fallbacks.agenda_request;
+    case 'case_request':
+      return fallbacks.case_request;
+    case 'document_request':
+      return fallbacks.document_request;
+    default:
+      return fallbacks.general_inquiry;
+  }
 }
 
 // Função principal do Noemia Core
@@ -379,7 +412,7 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
     const shouldBlockLegalAdvice = intent === 'legal_advice_request' && effectiveAudience === 'visitor';
     
     if (shouldBlockLegalAdvice) {
-      const fallbackResponse = generateFallbackResponse(intent, effectiveAudience, input.channel, detectedTheme);
+      const fallbackResponse = generateFallbackResponse(intent, effectiveAudience, input.channel, detectedTheme || undefined);
       return {
         reply: fallbackResponse,
         intent,
@@ -389,7 +422,7 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
         error: null,
         metadata: {
           responseTime: Date.now() - startTime,
-          detectedTheme,
+          detectedTheme: detectedTheme || undefined,
           channel: input.channel,
           openaiUsed: false
         }
@@ -415,7 +448,7 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
         error: null,
         metadata: {
           responseTime: Date.now() - startTime,
-          detectedTheme,
+          detectedTheme: detectedTheme || undefined,
           channel: input.channel,
           openaiUsed: true,
           classification
@@ -426,7 +459,7 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
     // Fallback se OpenAI falhar
     console.log(`NOEMIA_CORE_FALLBACK: ${input.channel} | ${openaiResult.error}`);
     
-    const fallbackResponse = generateFallbackResponse(intent, effectiveAudience, input.channel, detectedTheme);
+    const fallbackResponse = generateFallbackResponse(intent, effectiveAudience, input.channel, detectedTheme || undefined);
     
     return {
       reply: fallbackResponse,
@@ -437,7 +470,7 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
       error: openaiResult.error || null,
       metadata: {
         responseTime: Date.now() - startTime,
-        detectedTheme,
+        detectedTheme: detectedTheme || undefined,
         channel: input.channel,
         openaiUsed: false,
         classification
