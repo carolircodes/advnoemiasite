@@ -15,7 +15,7 @@ class CommentDuplicateGuard {
 
       // Verificar se o comentário já foi processado
       const { data: existingEvent, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .select('*')
         .eq('comment_id', commentId)
         .single();
@@ -66,6 +66,8 @@ class CommentDuplicateGuard {
     campaignId: string;
     keyword: string;
     commentText: string;
+    theme?: string;
+    area?: string;
     username?: string;
     userFullName?: string;
   }): Promise<boolean> {
@@ -73,20 +75,16 @@ class CommentDuplicateGuard {
       console.log('MARKING_COMMENT_AS_PROCESSED:', eventData.commentId);
 
       const { data, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .insert({
-          platform: 'instagram',
           comment_id: eventData.commentId,
-          media_id: eventData.mediaId,
-          external_user_id: eventData.userId,
-          comment_text: eventData.commentText,
-          keyword_matched: eventData.keyword,
-          public_replied: false,
+          user_id: eventData.userId,
+          keyword: eventData.keyword,
+          theme: eventData.theme || 'unknown',
+          area: eventData.area || 'unknown',
           dm_sent: false,
-          campaign_id: eventData.campaignId,
-          username: eventData.username,
-          user_full_name: eventData.userFullName,
-          processing_status: 'pending'
+          session_created: false,
+          processed_at: new Date().toISOString()
         })
         .select()
         .single();
@@ -111,7 +109,7 @@ class CommentDuplicateGuard {
   async getCommentProcessingHistory(commentId: string): Promise<any[]> {
     try {
       const { data, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .select('*')
         .eq('comment_id', commentId)
         .order('created_at', { ascending: false });
@@ -133,9 +131,9 @@ class CommentDuplicateGuard {
       const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
       const { data, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .select('*')
-        .eq('external_user_id', userId)
+        .eq('user_id', userId)
         .gte('created_at', since)
         .order('created_at', { ascending: false });
 
@@ -178,9 +176,9 @@ class CommentDuplicateGuard {
   }> {
     try {
       const { data: events, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .select('*')
-        .eq('media_id', mediaId);
+        .eq('comment_id', mediaId);
 
       if (error) {
         console.log('ERROR_GETTING_MEDIA_STATS:', error);
@@ -193,9 +191,9 @@ class CommentDuplicateGuard {
       }
 
       const totalComments = events?.length || 0;
-      const processedComments = events?.filter(e => e.processing_status === 'completed').length || 0;
-      const successfulReplies = events?.filter(e => e.public_replied || e.dm_sent).length || 0;
-      const uniqueUsers = new Set(events?.map(e => e.external_user_id) || []).size;
+      const processedComments = events?.length || 0; // Todos estão processados na nova tabela
+      const successfulReplies = events?.filter(e => e.dm_sent).length || 0;
+      const uniqueUsers = new Set(events?.map(e => e.user_id) || []).size;
 
       return {
         totalComments,
@@ -219,7 +217,7 @@ class CommentDuplicateGuard {
       const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000).toISOString();
 
       const { data, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .delete()
         .lt('created_at', cutoffDate)
         .select('id');

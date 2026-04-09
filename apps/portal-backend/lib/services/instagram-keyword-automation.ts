@@ -201,9 +201,14 @@ class InstagramKeywordAutomationService {
       };
 
       console.log('AUTO_DM_SENDING', {
-        userId,
+        endpoint: 'POST',
+        url: apiUrl,
+        apiVersion: 'v19.0',
+        businessAccountId: INSTAGRAM_BUSINESS_ACCOUNT_ID,
+        recipientId: userId,
+        messageType: 'RESPONSE',
         messageLength: message.length,
-        apiUrl
+        messagePreview: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
       });
 
       const response = await fetch(apiUrl, {
@@ -214,22 +219,33 @@ class InstagramKeywordAutomationService {
         body: JSON.stringify(payload)
       });
 
+      const responseText = await response.text();
+      const result = responseText ? JSON.parse(responseText) : {};
+      
       if (!response.ok) {
-        const errorText = await response.text();
         console.log('AUTO_DM_SEND_ERROR', {
           status: response.status,
           statusText: response.statusText,
-          error: errorText
+          error: responseText,
+          fullResponse: result,
+          errorType: result.error ? result.error.type : 'unknown',
+          errorCode: result.error ? result.error.code : 'unknown',
+          errorMessage: result.error ? result.error.message : 'unknown'
         });
         return false;
       }
-
-      const result = await response.json();
       
       console.log('AUTO_DM_SENT', {
         userId,
         messageId: result.message_id,
-        success: true
+        success: true,
+        fullResponse: result,
+        responseStatus: response.status,
+        responseHeaders: {
+          'content-type': response.headers.get('content-type'),
+          'x-fb-trace-id': response.headers.get('x-fb-trace-id'),
+          'x-fb-debug': response.headers.get('x-fb-debug')
+        }
       });
 
       return true;

@@ -6,7 +6,7 @@ export async function GET() {
     const supabase = createWebhookSupabaseClient();
     
     const { data: events, error } = await supabase
-      .from('comment_keyword_events')
+      .from('keyword_automation_events')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
@@ -22,14 +22,14 @@ export async function GET() {
     // Estatísticas
     const stats = {
       total: events?.length || 0,
-      completed: events?.filter((e: any) => e.processing_status === 'completed').length || 0,
-      failed: events?.filter((e: any) => e.processing_status === 'failed').length || 0,
-      pending: events?.filter((e: any) => e.processing_status === 'pending').length || 0,
-      processing: events?.filter((e: any) => e.processing_status === 'processing').length || 0,
-      publicReplied: events?.filter((e: any) => e.public_replied).length || 0,
+      completed: events?.length || 0, // Todos estão completos na nova tabela
+      failed: 0, // Não temos campo de status na nova tabela
+      pending: 0, // Não temos campo de status na nova tabela
+      processing: 0, // Não temos campo de status na nova tabela
+      publicReplied: 0, // Não temos campo de public reply na nova tabela
       dmSent: events?.filter((e: any) => e.dm_sent).length || 0,
-      uniqueUsers: new Set(events?.map((e: any) => e.external_user_id) || []).size,
-      uniqueMedia: new Set(events?.map((e: any) => e.media_id) || []).size
+      uniqueUsers: new Set(events?.map((e: any) => e.user_id) || []).size,
+      uniqueMedia: new Set(events?.map((e: any) => e.comment_id) || []).size
     };
 
     return NextResponse.json({

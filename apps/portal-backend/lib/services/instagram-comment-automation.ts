@@ -130,7 +130,7 @@ class InstagramCommentAutomationService {
   async wasCommentProcessed(commentId: string): Promise<boolean> {
     try {
       const { data, error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .select('id')
         .eq('comment_id', commentId)
         .single();
@@ -171,8 +171,17 @@ class InstagramCommentAutomationService {
       };
 
       const { data, error } = await this.supabase
-        .from('comment_keyword_events')
-        .insert(eventData)
+        .from('keyword_automation_events')
+        .insert({
+          comment_id: commentData.id,
+          user_id: commentData.from.id,
+          keyword: campaign.keyword,
+          theme: campaign.theme || 'unknown',
+          area: campaign.area || 'unknown',
+          dm_sent: false,
+          session_created: false,
+          processed_at: new Date().toISOString()
+        })
         .select()
         .single();
 
@@ -201,10 +210,11 @@ class InstagramCommentAutomationService {
   ): Promise<boolean> {
     try {
       const { error } = await this.supabase
-        .from('comment_keyword_events')
+        .from('keyword_automation_events')
         .update({
-          ...updates,
-          processed_at: updates.processing_status === 'completed' ? new Date().toISOString() : null
+          dm_sent: updates.dm_sent,
+          session_created: updates.session_created,
+          processed_at: new Date().toISOString()
         })
         .eq('id', eventId);
 
