@@ -7,6 +7,7 @@
 
 import { OpenAI } from "openai";
 import { clientContextService } from "../services/client-context";
+import { triagePersistence, TriageData } from "../services/triage-persistence";
 import { PortalProfile } from "../auth/guards";
 import { askNoemiaSchema } from "../domain/portal";
 
@@ -26,22 +27,50 @@ type ClassifiedIntent =
 type LeadTemperature = "cold" | "warm" | "hot";
 
 type ConversationStep =
-  | "acolhimento"
-  | "identificacao_area"
-  | "entendimento_situacao"
-  | "identificacao_urgencia"
-  | "conducao_proximo_passo"
-  | "conversao";
+  | "acolhimento"           // Boas-vindas e quebra-gelo
+  | "identificacao_area"     // Identificar área jurídica
+  | "problema_principal"     // Entender o que aconteceu
+  | "tempo_momento"          // Quando aconteceu / contexto temporal
+  | "documentos_provas"      // Verificar existência de provas
+  | "objetivo_cliente"       // O que o cliente quer alcançar
+  | "avaliacao_urgencia"     // Classificar nível de urgência
+  | "resumo_encaminhamento"  // Resumir e decidir próximo passo
+  | "conversao";            // Momento de conversão
 
 interface ConversationState {
   currentStep: ConversationStep;
   collectedData: {
+    // Bloco A - Tema Principal
     area?: LegalTheme;
-    situacao?: string;
-    urgencia?: LeadTemperature;
+    
+    // Bloco B - O Que Aconteceu
+    problema_principal?: string;
+    descricao_detalhada?: string;
+    
+    // Bloco C - Tempo / Momento
+    timeframe?: string;
+    acontecendo_agora?: boolean;
+    
+    // Bloco D - Documentos / Provas
+    tem_documentos?: boolean;
+    tipos_documentos?: string[];
+    
+    // Bloco E - Objetivo do Cliente
+    objetivo_cliente?: string;
+    resultado_esperado?: string;
+    
+    // Bloco F - Urgência
+    nivel_urgencia?: 'baixa' | 'media' | 'alta';
+    prejuizo_ativo?: boolean;
+    
+    // Metadados
     detalhes?: string[];
+    palavras_chave?: string[];
   };
   isHotLead: boolean;
+  needsHumanAttention: boolean;
+  handoffReason?: string;
+  triageCompleteness: number; // 0-100%
 }
 
 interface NoemiaCoreInput {
@@ -413,6 +442,8 @@ function initializeConversationState(): ConversationState {
     currentStep: "acolhimento",
     collectedData: {},
     isHotLead: false,
+    needsHumanAttention: false,
+    triageCompleteness: 0,
   };
 }
 
@@ -430,6 +461,7 @@ function updateConversationState(
     collectedData: {
       ...state.collectedData,
       detalhes: [...(state.collectedData.detalhes ?? [])],
+      palavras_chave: extractKeywords(message),
     },
   };
 
@@ -440,32 +472,163 @@ function updateConversationState(
       break;
 
     case "identificacao_area":
-      newState.currentStep = "entendimento_situacao";
-      newState.collectedData.situacao = message;
+      if (!newState.collectedData.problema_principal) {
+        newState.collectedData.problema_principal = message;
+        newState.currentStep = "tempo_momento";
+      }
       break;
 
-    case "entendimento_situacao":
-      newState.currentStep = "identificacao_urgencia";
-      newState.collectedData.urgencia = classification.leadTemperature;
-      newState.isHotLead = classification.leadTemperature === "hot";
+    case "tempo_momento":
+      const timeInfo = extractTimeInfo(message);
+      newState.collectedData.timeframe = timeInfo.timeframe;
+      newState.collectedData.acontecendo_agora = timeInfo.isHappeningNow;
+      newState.currentStep = "documentos_provas";
       break;
 
-    case "identificacao_urgencia":
-      newState.currentStep = newState.isHotLead
-        ? "conversao"
-        : "conducao_proximo_passo";
+    case "documentos_provas":
+      const docInfo = extractDocumentInfo(message);
+      newState.collectedData.tem_documentos = docInfo.hasDocuments;
+      newState.collectedData.tipos_documentos = docInfo.documentTypes;
+      newState.currentStep = "objetivo_cliente";
+      break;
+
+    case "objetivo_cliente":
+      if (!newState.collectedData.objetivo_cliente) {
+        newState.collectedData.objetivo_cliente = message;
+        newState.currentStep = "avaliacao_urgencia";
+      }
+      break;
+
+    case "avaliacao_urgencia":
+      const urgencyInfo = extractUrgencyInfo(message);
+      newState.collectedData.nivel_urgencia = urgencyInfo.level;
+      newState.collectedData.prejuizo_ativo = urgencyInfo.hasActiveDamage;
+      newState.isHotLead = urgencyInfo.level === 'alta' || urgencyInfo.hasActiveDamage;
+      newState.currentStep = "resumo_encaminhamento";
+      break;
+
+    case "resumo_encaminhamento":
+      // Calcular completude da triagem
+      newState.triageCompleteness = calculateTriageCompleteness(newState.collectedData);
+      
+      // Decidir handoff
+      const handoffDecision = evaluateHandoff(newState);
+      newState.needsHumanAttention = handoffDecision.needsAttention;
+      newState.handoffReason = handoffDecision.reason;
+      
+      newState.currentStep = newState.needsHumanAttention ? "conversao" : "conducao_proximo_passo";
       break;
 
     case "conducao_proximo_passo":
-      newState.collectedData.detalhes?.push(message);
-      break;
-
     case "conversao":
-      newState.currentStep = "conversao";
+      newState.collectedData.detalhes?.push(message);
       break;
   }
 
   return newState;
+}
+
+// Funções auxiliares para extração de informações
+function extractKeywords(message: string): string[] {
+  const keywords = message.toLowerCase().match(/\b(aposentadoria|inss|benefício|banco|empréstimo|divórcio|pensão|guarda|contrato|demissão|trabalhista)\b/g) || [];
+  return [...new Set(keywords)];
+}
+
+function extractTimeInfo(message: string): { timeframe: string; isHappeningNow: boolean } {
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('agora') || lowerMessage.includes('hoje') || lowerMessage.includes('está acontecendo')) {
+    return { timeframe: 'agora', isHappeningNow: true };
+  }
+  
+  if (lowerMessage.includes('ontem') || lowerMessage.includes('semana passada')) {
+    return { timeframe: 'recentemente', isHappeningNow: false };
+  }
+  
+  if (lowerMessage.includes('mês') || lowerMessage.includes('meses')) {
+    return { timeframe: 'alguns meses', isHappeningNow: false };
+  }
+  
+  if (lowerMessage.includes('ano') || lowerMessage.includes('anos')) {
+    return { timeframe: 'muito tempo', isHappeningNow: false };
+  }
+  
+  return { timeframe: 'não especificado', isHappeningNow: false };
+}
+
+function extractDocumentInfo(message: string): { hasDocuments: boolean; documentTypes: string[] } {
+  const lowerMessage = message.toLowerCase();
+  const documentTypes: string[] = [];
+  
+  if (lowerMessage.includes('contrato')) documentTypes.push('contrato');
+  if (lowerMessage.includes('extrato') || lowerMessage.includes('demonstrativo')) documentTypes.push('extrato');
+  if (lowerMessage.includes('holerite') || lowerMessage.includes('contracheque')) documentTypes.push('holerite');
+  if (lowerMessage.includes('print') || lowerMessage.includes('printscreen')) documentTypes.push('prints');
+  if (lowerMessage.includes('notificação') || lowerMessage.includes('carta')) documentTypes.push('notificação');
+  if (lowerMessage.includes('decisão') || lowerMessage.includes('sentença')) documentTypes.push('decisão judicial');
+  
+  const hasDocuments = lowerMessage.includes('sim') || lowerMessage.includes('tenho') || lowerMessage.includes('já') || documentTypes.length > 0;
+  
+  return { hasDocuments, documentTypes };
+}
+
+function extractUrgencyInfo(message: string): { level: 'baixa' | 'media' | 'alta'; hasActiveDamage: boolean } {
+  const lowerMessage = message.toLowerCase();
+  
+  const highUrgency = ['urgente', 'imediato', 'perdi', 'estou sem', 'bloqueou', 'parou', 'suspenderam', 'corte'];
+  const mediumUrgency = ['preciso', 'quero', 'prejudicado', 'problema', 'difuldade'];
+  const damageIndicators = ['perdendo dinheiro', 'prejuízo', 'prejuizo', 'multa', 'juros', 'corte'];
+  
+  const hasActiveDamage = damageIndicators.some(indicator => lowerMessage.includes(indicator));
+  
+  if (highUrgency.some(word => lowerMessage.includes(word)) || hasActiveDamage) {
+    return { level: 'alta', hasActiveDamage };
+  }
+  
+  if (mediumUrgency.some(word => lowerMessage.includes(word))) {
+    return { level: 'media', hasActiveDamage };
+  }
+  
+  return { level: 'baixa', hasActiveDamage };
+}
+
+function calculateTriageCompleteness(data: ConversationState['collectedData']): number {
+  const fields = [
+    data.area,
+    data.problema_principal,
+    data.timeframe,
+    data.tem_documentos !== undefined,
+    data.objetivo_cliente,
+    data.nivel_urgencia
+  ];
+  
+  const completedFields = fields.filter(field => field !== undefined && field !== null).length;
+  return Math.round((completedFields / fields.length) * 100);
+}
+
+function evaluateHandoff(state: ConversationState): { needsAttention: boolean; reason: string } {
+  // Critérios para handoff humano
+  if (state.isHotLead) {
+    return { needsAttention: true, reason: 'Lead quente detectado - atenção prioritária' };
+  }
+  
+  if (state.collectedData.nivel_urgencia === 'alta') {
+    return { needsAttention: true, reason: 'Alta urgência identificada' };
+  }
+  
+  if (state.collectedData.prejuizo_ativo) {
+    return { needsAttention: true, reason: 'Prejuízo ativo em andamento' };
+  }
+  
+  if (state.triageCompleteness >= 80) {
+    return { needsAttention: true, reason: 'Triagem completa - pronto para análise humana' };
+  }
+  
+  if (state.collectedData.area === 'previdenciario' && state.collectedData.tem_documentos) {
+    return { needsAttention: true, reason: 'Caso previdenciário com documentos - análise recomendada' };
+  }
+  
+  return { needsAttention: false, reason: 'Continuar triagem automatizada' };
 }
 
 function generateTriageResponse(
@@ -485,46 +648,55 @@ function generateTriageResponse(
 
   switch (state.currentStep) {
     case "acolhimento":
-      // Primeira mensagem - manter acolhimento
-      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta rapidinho o que aconteceu no seu caso?`;
+      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta rapidinho o que aconteceu no seu caso.`;
 
     case "identificacao_area":
-      // Após o usuário contar o caso inicial
       if (isShortResponse) {
-        return `Perfeito, isso já ajuda a entender melhor sua situação. Muitas pessoas estão exatamente nesse momento de dúvida antes de dar entrada.\n\nPelo que você descreveu, seu caso parece estar na área ${getAreaNome(classification.theme)}.\n\nMe conta: o que mais te preocupa nessa história toda?`;
+        return `Perfeito, isso já ajuda a entender melhor sua situação. Muitas pessoas estão exatamente nesse momento de dúvida antes de dar entrada.\n\nPelo que você descreveu, seu caso parece estar na área ${getAreaNome(classification.theme)}.\n\nAgora me conta: isso que você mencionou aconteceu há quanto tempo?`;
       }
-      return `Olha... o interessante é que cada área tem detalhes que pouca gente conhecem.\n\nPelo que você descreveu, seu caso parece estar na área ${getAreaNome(classification.theme)}.\n\nO que mais te preocupa nessa história toda?`;
+      return `Olha... o interessante é que cada área tem detalhes que pouca gente conhecem.\n\nPelo que você descreveu, seu caso parece estar na área ${getAreaNome(classification.theme)}.\n\nIsso aconteceu há quanto tempo?`;
 
-    case "entendimento_situacao":
-      // Após identificar área e preocupações
+    case "tempo_momento":
       if (isShortResponse) {
-        return `Entendi... Faz sentido você se sentir assim. Muita gente passa por isso antes de buscar ajuda.\n\nO momento certo de agir faz toda a diferença. Me conta: isso que você mencionou aconteceu há quanto tempo?`;
+        return `Entendi... Faz sentido você se sentir assim. O momento certo de agir faz toda a diferença.\n\nVocê já tem algum documento ou prova sobre isso? Contratos, extratos, prints, notificações?`;
       }
-      return `Entendi... O momento certo de agir faz toda a diferença.\n\nIsso que você mencionou aconteceu há quanto tempo?`;
+      return `Entendi... O momento certo de agir faz toda a diferença.\n\nVocê já tem algum documento ou prova sobre isso?`;
 
-    case "identificacao_urgencia":
-      // Após entender tempo e situação
-      if (state.isHotLead) {
+    case "documentos_provas":
+      if (isShortResponse) {
+        return `Perfeito... Já estou entendendo melhor seu cenário.\n\nO que você espera conseguir com essa análise jurídica? Qual seria o resultado ideal para você?`;
+      }
+      return `Perfeito... Já estou entendendo melhor seu cenário.\n\nO que você espera conseguir com essa análise jurídica? Qual seria o resultado ideal?`;
+
+    case "objetivo_cliente":
+      if (isShortResponse) {
+        return `Obrigada por compartilhar isso comigo. Isso já me ajuda a ter uma visão mais clara.\n\nEssa situação está te causando algum prejuízo ou dificuldade agora? Ou é mais preventivo?`;
+      }
+      return `Obrigada por compartilhar isso comigo. Isso já me ajuda a ter uma visão mais clara.\n\nEssa situação está te causando algum prejuízo ou dificuldade agora?`;
+
+    case "avaliacao_urgencia":
+      if (state.needsHumanAttention) {
         if (isShortResponse) {
-          return `Pelo que você me contou, isso realmente precisa de atenção rápida. Faz sentido você ter essa urgência.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado. Você prefere atendimento online agora mesmo ou presencial?`;
+          return `Pelo que você me contou, isso realmente precisa de atenção ${state.collectedData.nivel_urgencia === 'alta' ? 'rápida' : 'especializada'}.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVou organizar tudo para a Dra. Noêmia analisar seu caso. Você prefere agendar uma consulta online ou falar primeiro por WhatsApp?`;
         }
-        return `Pelo que você me contou, isso realmente precisa de atenção rápida.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVocê prefere atendimento online agora mesmo ou presencial?`;
+        return `Pelo que você me contou, isso realmente precisa de atenção ${state.collectedData.nivel_urgencia === 'alta' ? 'rápida' : 'especializada'}.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVou organizar tudo para a Dra. Noêmia analisar seu caso. Você prefere agendar uma consulta online ou falar primeiro por WhatsApp?`;
       }
 
       if (isShortResponse) {
-        return `Perfeito... Já estou entendendo melhor seu cenário. Faz sentido você estar pesquisando sobre isso.\n\nVocê está começando a entender isso agora ou já pesquisou algo sobre seu caso antes?`;
+        return `Perfeito... Já estou entendendo melhor seu cenário.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso? Às vezes o que parece complicado tem solução mais simples do que imaginamos.`;
       }
-      return `Perfeito... Já estou entendendo melhor seu cenário.\n\nVocê está começando a entender isso agora ou já pesquisou algo sobre seu caso antes?`;
+      return `Perfeito... Já estou entendendo melhor seu cenário.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
+
+    case "resumo_encaminhamento":
+      const summary = generateInternalSummary(state);
+      if (state.needsHumanAttention) {
+        return `Ótimo! Já organizei tudo o que você me contou.\n\n${generateUserFriendlySummary(state)}\n\nO melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia. Geralmente a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
+      }
+      
+      return `Entendi... Já estou organizando suas informações.\n\n${generateUserFriendlySummary(state)}\n\nPara te dar a melhor orientação possível, preciso mais alguns detalhes. Podemos continuar conversando ou você prefere já agendar uma análise com a Dra. Noêmia?`;
 
     case "conducao_proximo_passo":
-      // Após identificar urgência e contexto
-      if (isShortResponse) {
-        return `Obrigada por compartilhar isso comigo. Isso já me ajuda a ter uma visão mais clara do seu caso.\n\nExistem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir. Você já pensou em como seria ter uma análise profissional do seu caso?`;
-      }
-      return `Obrigada por compartilhar isso comigo.\n\nExistem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
-
     case "conversao":
-      // Momento de conversão
       if (isShortResponse) {
         return `Perfeito! Isso mostra que você está no caminho certo para resolver isso.\n\nO melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia. Geralmente a solução pode ser mais simples do que parece. Você prefere agendar online ou falar primeiro por WhatsApp?`;
       }
@@ -533,6 +705,41 @@ function generateTriageResponse(
     default:
       return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nMe conta rapidinho o que aconteceu?`;
   }
+}
+
+function generateUserFriendlySummary(state: ConversationState): string {
+  const data = state.collectedData;
+  const parts: string[] = [];
+  
+  if (data.area) parts.push(`Área: ${getAreaNome(data.area)}`);
+  if (data.problema_principal) parts.push(`Situação: ${data.problema_principal.substring(0, 80)}${data.problema_principal.length > 80 ? '...' : ''}`);
+  if (data.timeframe && data.timeframe !== 'não especificado') parts.push(`Quando: ${data.timeframe}`);
+  if (data.tem_documentos) parts.push(`Documentos: ${data.tipos_documentos.length > 0 ? data.tipos_documentos.join(', ') : 'disponíveis'}`);
+  if (data.objetivo_cliente) parts.push(`Objetivo: ${data.objetivo_cliente.substring(0, 60)}${data.objetivo_cliente.length > 60 ? '...' : ''}`);
+  if (data.nivel_urgencia && data.nivel_urgencia !== 'baixa') parts.push(`Urgência: ${data.nivel_urgencia}`);
+  
+  return parts.join(' | ');
+}
+
+function generateInternalSummary(state: ConversationState): string {
+  const data = state.collectedData;
+  return `
+=== RESUMO DA TRIAGEM ===
+Área Jurídica: ${data.area || 'não identificada'}
+Problema Principal: ${data.problema_principal || 'não informado'}
+Timeframe: ${data.timeframe || 'não informado'}
+Acontecendo Agora: ${data.acontecendo_agora ? 'Sim' : 'Não'}
+Tem Documentos: ${data.tem_documentos ? 'Sim' : 'Não'}
+Tipos de Documentos: ${data.tipos_documentos?.join(', ') || 'N/A'}
+Objetivo do Cliente: ${data.objetivo_cliente || 'não informado'}
+Nível de Urgência: ${data.nivel_urgencia || 'não avaliado'}
+Prejuízo Ativo: ${data.prejuizo_ativo ? 'Sim' : 'Não'}
+Completude da Triagem: ${state.triageCompleteness}%
+Necessita Atenção Humana: ${state.needsHumanAttention ? 'Sim' : 'Não'}
+Motivo: ${state.handoffReason || 'N/A'}
+Palavras-chave: ${data.palavras_chave?.join(', ') || 'N/A'}
+========================
+  `.trim();
 }
 
 function getAreaNome(theme: LegalTheme): string {
@@ -874,10 +1081,7 @@ export async function processNoemiaCore(
       effectiveAudience = "visitor";
     }
 
-    if (
-      input.userType === "staff" &&
-      (!input.profile || input.profile.role === "cliente")
-    ) {
+    if (input.userType === "staff" && (!input.profile || input.profile.role === "cliente")) {
       effectiveAudience = "visitor";
     }
 
@@ -920,6 +1124,16 @@ export async function processNoemiaCore(
         } catch (pipelineError) {
           console.error('PIPELINE_AUTO_UPDATE_ERROR', pipelineError);
           // Não quebrar o fluxo se a atualização do pipeline falhar
+        }
+      }
+
+      // Fase 4.6 - Salvar dados da triagem se houver estado de conversação
+      if (newConversationState && input.channel !== 'portal') {
+        try {
+          await saveTriageData(input, newConversationState, classification);
+        } catch (triageError) {
+          console.error('TRIAGE_SAVE_ERROR', triageError);
+          // Não quebrar o fluxo se o salvamento da triagem falhar
         }
       }
 
