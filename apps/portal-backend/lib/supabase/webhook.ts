@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-import { getPublicEnv } from "../config/env";
+import { getServerEnv } from "../config/env";
 
-// Cliente Supabase para webhooks (sem dependência de cookies)
+// Cliente Supabase para webhooks (server-side com service role)
 export function createWebhookSupabaseClient() {
-  const env = getPublicEnv();
+  const env = getServerEnv();
 
   return createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    env.SUPABASE_SECRET_KEY,
     {
       auth: {
         autoRefreshToken: false,
