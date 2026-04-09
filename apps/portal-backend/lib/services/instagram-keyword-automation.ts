@@ -311,21 +311,35 @@ class InstagramKeywordAutomationService {
         .eq('comment_id', commentId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      // Se a tabela não existe, criar automaticamente
+      if (error && error.code === 'PGRST116') {
+        console.log('KEYWORD_TABLE_NOT_EXISTS', {
+          error: error.message,
+          commentId,
+          action: 'Table does not exist, assuming not processed'
+        });
+        return false; // Tabela não existe, assume que não foi processado
+      }
+
+      // Outros erros de banco
+      if (error) {
         console.log('KEYWORD_COMMENT_CHECK_ERROR', {
           error: error.message,
-          commentId
+          code: error.code,
+          commentId,
+          action: 'Database error, assuming not processed to avoid blocking'
         });
-        return true; // Em caso de erro, assume que já foi processado
+        return false; // Em caso de erro, permite processamento para não bloquear
       }
 
       return !!data;
     } catch (error) {
       console.log('KEYWORD_COMMENT_CHECK_EXCEPTION', {
         error: error instanceof Error ? error.message : String(error),
-        commentId
+        commentId,
+        action: 'Exception, assuming not processed to avoid blocking'
       });
-      return true;
+      return false; // Em caso de exceção, permite processamento
     }
   }
 
@@ -355,9 +369,47 @@ class InstagramKeywordAutomationService {
         .from('keyword_automation_events')
         .insert(eventData);
 
+      // Se a tabela não existe, tentar criar e inserir novamente
+      if (error && error.code === 'PGRST116') {
+        console.log('KEYWORD_TABLE_NOT_EXISTS_ON_INSERT', {
+          error: error.message,
+          commentId,
+          keyword,
+          action: 'Attempting to create table and retry'
+        });
+
+        // Tentar criar a tabela
+        const tableCreated = await this.createKeywordAutomationTable();
+        if (tableCreated) {
+          // Tentar inserir novamente
+          const { error: retryError } = await this.supabase
+            .from('keyword_automation_events')
+            .insert(eventData);
+
+          if (retryError) {
+            console.log('KEYWORD_EVENT_RETRY_ERROR', {
+              error: retryError.message,
+              commentId,
+              keyword
+            });
+            return false;
+          }
+
+          console.log('KEYWORD_EVENT_RECORDED_AFTER_TABLE_CREATE', {
+            commentId,
+            userId,
+            keyword,
+            dmSent,
+            sessionCreated
+          });
+          return true;
+        }
+      }
+
       if (error) {
         console.log('KEYWORD_EVENT_RECORD_ERROR', {
           error: error.message,
+          code: error.code,
           commentId,
           keyword
         });
@@ -377,6 +429,24 @@ class InstagramKeywordAutomationService {
       console.log('KEYWORD_EVENT_RECORD_EXCEPTION', {
         error: error instanceof Error ? error.message : String(error),
         commentId
+      });
+      return false;
+    }
+  }
+
+  // Criar tabela keyword_automation_events se não existir
+  async createKeywordAutomationTable(): Promise<boolean> {
+    try {
+      console.log('KEYWORD_TABLE_CREATE_ATTEMPT', {
+        action: 'Table creation needed - please run migration manually'
+      });
+
+      // Não podemos criar tabelas dinamicamente via Supabase client
+      // Retornar false para indicar que a tabela precisa ser criada via migration
+      return false;
+    } catch (error) {
+      console.log('KEYWORD_TABLE_CREATE_EXCEPTION', {
+        error: error instanceof Error ? error.message : String(error)
       });
       return false;
     }
