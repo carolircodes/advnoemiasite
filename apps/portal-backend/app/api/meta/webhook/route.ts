@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
+import { conversationPersistence } from "../../../../lib/services/conversation-persistence";
+import { antiSpamGuard } from "../../../../lib/services/anti-spam-guard";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -250,32 +252,120 @@ async function handleUnsupportedInstagramMessage(senderId: string, messageType: 
   return await sendInstagramMessage(senderId, unsupportedMessage);
 }
 
-async function processMessageWithNoemia(senderId: string, messageText: string) {
+async function processMessageWithNoemia(
+  senderId: string, 
+  messageText: string,
+  externalMessageId?: string,
+  externalEventId?: string
+) {
   try {
     console.log('=== INSTAGRAM_MESSAGE_RECEIVED ===');
     console.log('SENDER_ID:', senderId);
     console.log('MESSAGE:', messageText);
     console.log('LENGTH:', messageText.length);
+    console.log('EXTERNAL_MESSAGE_ID:', externalMessageId);
+    console.log('EXTERNAL_EVENT_ID:', externalEventId);
     
     logEvent("INSTAGRAM_CALLING_NOEMIA", {
       senderId,
-      messageLength: messageText.length
+      messageLength: messageText.length,
+      externalMessageId,
+      externalEventId
     });
 
-    const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-    const openAIModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
-    
-    console.log('INSTAGRAM_OPENAI_ELIGIBLE: true');
-    console.log('INSTAGRAM_OPENAI_KEY_EXISTS:', hasOpenAIKey);
-    console.log('INSTAGRAM_OPENAI_MODEL:', openAIModel);
+    // 1. Verificar anti-spam guard
+    const guardResult = await antiSpamGuard.shouldRespondToEvent({
+      channel: 'instagram',
+      externalEventId,
+      externalMessageId,
+      externalUserId: senderId,
+      messageText,
+      isEcho: false,
+      messageType: 'text'
+    });
 
-    // Usar o Noemia Core centralizado
+    if (!guardResult.shouldRespond) {
+      console.log('INSTAGRAM_RESPONSE_BLOCKED_BY_GUARD:', guardResult.reason);
+      logEvent("INSTAGRAM_RESPONSE_BLOCKED_BY_GUARD", {
+        senderId,
+        reason: guardResult.reason,
+        guardResult
+      });
+      return;
+    }
+
+    // 2. Obter ou criar sessão de conversação
+    const session = await conversationPersistence.getOrCreateSession(
+      'instagram',
+      senderId
+    );
+
+    console.log('INSTAGRAM_SESSION_FOUND_OR_CREATED:', {
+      sessionId: session.id,
+      leadStage: session.lead_stage,
+      caseArea: session.case_area
+    });
+
+    // 3. Salvar mensagem do usuário
+    await conversationPersistence.saveMessage(
+      session.id,
+      externalMessageId,
+      'user',
+      messageText,
+      'inbound',
+      {
+        channel: 'instagram',
+        externalUserId: senderId,
+        externalMessageId
+      }
+    );
+
+    // 4. Obter histórico recente da conversação
+    const recentMessages = await conversationPersistence.getRecentMessages(session.id, 12);
+    
+    // 5. Construir histórico para o Noemia Core
+    const history = recentMessages
+      .reverse()
+      .filter(msg => msg.role !== 'system')
+      .map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+
+    console.log('INSTAGRAM_CONTEXT_LOADED:', {
+      sessionId: session.id,
+      historyLength: history.length,
+      lastSummary: session.last_summary
+    });
+
+    // 6. Gerar resumo se a conversa for longa
+    const summary = await conversationPersistence.generateConversationSummary(
+      session.id,
+      recentMessages
+    );
+
+    // 7. Construir contexto para a IA
+    const context = {
+      sessionId: session.id,
+      leadStage: session.lead_stage,
+      caseArea: session.case_area,
+      currentIntent: session.current_intent,
+      lastSummary: session.last_summary,
+      conversationHistory: summary
+    };
+
+    // 8. Processar com Noemia Core
     const coreResponse = await processNoemiaCore({
       channel: 'instagram',
       userType: 'visitor',
       message: messageText,
-      history: [],
-      metadata: { senderId }
+      history,
+      context,
+      metadata: { 
+        senderId,
+        sessionId: session.id,
+        externalMessageId
+      }
     });
 
     console.log('INSTAGRAM_NOEMIA_CORE_RESPONSE_RECEIVED');
@@ -287,6 +377,7 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
     
     logEvent("INSTAGRAM_NOEMIA_CORE_RESPONSE", {
       senderId,
+      sessionId: session.id,
       responseLength: coreResponse.reply.length,
       audience: coreResponse.audience,
       source: coreResponse.source,
@@ -295,14 +386,31 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
       classification: coreResponse.metadata.classification
     });
 
-    if (coreResponse.source === 'openai') {
-      console.log('INSTAGRAM_OPENAI_SUCCESS: OpenAI responded successfully');
-    } else if (coreResponse.source === 'fallback') {
-      console.log('INSTAGRAM_FALLBACK_USED: Fallback was used');
-    } else if (coreResponse.source === 'triage') {
-      console.log('INSTAGRAM_TRIAGE_USED: Legal advice blocked for visitor');
-    }
+    // 9. Salvar resposta da IA
+    await conversationPersistence.saveMessage(
+      session.id,
+      undefined, // IA não tem external message ID
+      'assistant',
+      coreResponse.reply,
+      'outbound',
+      {
+        channel: 'instagram',
+        source: coreResponse.source,
+        responseTime: coreResponse.metadata.responseTime,
+        classification: coreResponse.metadata.classification
+      }
+    );
 
+    // 10. Atualizar sessão com informações da conversação
+    await conversationPersistence.updateSession(session.id, {
+      lead_stage: 'engaged',
+      case_area: coreResponse.metadata.classification?.theme || session.case_area,
+      current_intent: coreResponse.intent || session.current_intent,
+      last_inbound_at: new Date().toISOString(),
+      last_outbound_at: new Date().toISOString()
+    });
+
+    // 11. Enviar resposta
     console.log('=== INSTAGRAM_SEND_ATTEMPT ===');
     const sent = await sendInstagramMessage(senderId, coreResponse.reply || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
@@ -310,12 +418,23 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
       console.log('INSTAGRAM_SEND_SUCCESS: Message sent successfully');
       logEvent("INSTAGRAM_RESPONSE_SENT", {
         senderId,
+        sessionId: session.id,
         responseLength: coreResponse.reply.length
+      });
+
+      // 12. Marcar evento como processado
+      await antiSpamGuard.markEventProcessed({
+        channel: 'instagram',
+        externalEventId,
+        externalMessageId,
+        externalUserId: senderId,
+        messageText
       });
     } else {
       console.log('INSTAGRAM_SEND_FAILED: Failed to send message');
       logEvent("INSTAGRAM_RESPONSE_FAILED", {
         senderId,
+        sessionId: session.id,
         error: 'Failed to send Instagram message'
       }, "error");
     }
@@ -474,7 +593,12 @@ export async function POST(request: NextRequest) {
           console.log("INSTAGRAM_TEXT_EXTRACTED:", messaging.message.text);
           console.log("INSTAGRAM_EVENT_OBJECT:", JSON.stringify(messaging, null, 2));
 
-          await processMessageWithNoemia(messaging.sender.id, messaging.message.text);
+          await processMessageWithNoemia(
+            messaging.sender.id, 
+            messaging.message.text,
+            messaging.message.mid,
+            `messaging_${messaging.sender.id}_${Date.now()}`
+          );
         }
 
         // Process entry.changes format
@@ -510,7 +634,12 @@ export async function POST(request: NextRequest) {
             if (keywordDetected) {
               console.log("INSTAGRAM_KEYWORD_MATCHED: sending private reply");
               
-              await processMessageWithNoemia(comment.from.id, comment.text);
+              await processMessageWithNoemia(
+                comment.from.id, 
+                comment.text,
+                comment.id,
+                `comment_${comment.id}_${Date.now()}`
+              );
 
               const replySent = true; // Se chegou aqui, o processamento foi iniciado
 
@@ -585,7 +714,12 @@ export async function POST(request: NextRequest) {
             console.log("INSTAGRAM_SENDER_EXTRACTED:", message.from.id);
             console.log("INSTAGRAM_TEXT_EXTRACTED:", message.text);
 
-            await processMessageWithNoemia(message.from.id, message.text);
+            await processMessageWithNoemia(
+              message.from.id, 
+              message.text,
+              message.mid,
+              `changes_${message.from.id}_${Date.now()}`
+            );
           }
         }
       }

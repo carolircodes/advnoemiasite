@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
+import { conversationPersistence } from "../../../../lib/services/conversation-persistence";
+import { antiSpamGuard } from "../../../../lib/services/anti-spam-guard";
 
 // Configurações
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "noeminha_verify_2026";
@@ -378,37 +380,108 @@ async function processTextMessage(messageInfo: any) {
     console.log('FROM:', messageInfo.from);
     console.log('CONTENT:', messageInfo.content);
     console.log('LENGTH:', messageInfo.content?.length || 0);
-    
-    // Detectar padrão específico da mensagem
-    const isAposentadoriaAutismo = messageInfo.content?.toLowerCase().includes('aposentadoria') && 
-                                      messageInfo.content?.toLowerCase().includes('autismo');
-    const isSegundaMensagem = messageInfo.content?.toLowerCase().includes('entendi') && 
-                                messageInfo.content?.toLowerCase().includes('começou');
-    
-    console.log('WHATSAPP_FLOW_BRANCH: ', isAposentadoriaAutismo ? 'aposentadoria_autismo_pattern' : 
-                                   isSegundaMensagem ? 'follow_up_pattern' : 'general_pattern');
+    console.log('MESSAGE_ID:', messageInfo.messageId);
     
     logEvent('WHATSAPP_CALLING_NOEMIA', {
       from: messageInfo.from,
+      messageId: messageInfo.messageId,
       message: messageInfo.content
     });
 
-    // Verificar se OpenAI está configurada
-    const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-    const openAIModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
-    
-    console.log('WHATSAPP_OPENAI_ELIGIBLE: true');
-    console.log('WHATSAPP_OPENAI_KEY_EXISTS:', hasOpenAIKey);
-    console.log('WHATSAPP_OPENAI_MODEL:', openAIModel);
-    console.log('WHATSAPP_OPENAI_ATTEMPTED: true');
+    // 1. Verificar anti-spam guard
+    const guardResult = await antiSpamGuard.shouldRespondToEvent({
+      channel: 'whatsapp',
+      externalMessageId: messageInfo.messageId,
+      externalUserId: messageInfo.from,
+      messageText: messageInfo.content,
+      isEcho: false,
+      messageType: messageInfo.type
+    });
 
-    // Usar o Noemia Core centralizado
+    if (!guardResult.shouldRespond) {
+      console.log('WHATSAPP_RESPONSE_BLOCKED_BY_GUARD:', guardResult.reason);
+      logEvent("WHATSAPP_RESPONSE_BLOCKED_BY_GUARD", {
+        from: messageInfo.from,
+        reason: guardResult.reason,
+        guardResult
+      });
+      return;
+    }
+
+    // 2. Obter ou criar sessão de conversação
+    const session = await conversationPersistence.getOrCreateSession(
+      'whatsapp',
+      messageInfo.from
+    );
+
+    console.log('WHATSAPP_SESSION_FOUND_OR_CREATED:', {
+      sessionId: session.id,
+      leadStage: session.lead_stage,
+      caseArea: session.case_area
+    });
+
+    // 3. Salvar mensagem do usuário
+    await conversationPersistence.saveMessage(
+      session.id,
+      messageInfo.messageId,
+      'user',
+      messageInfo.content,
+      'inbound',
+      {
+        channel: 'whatsapp',
+        externalUserId: messageInfo.from,
+        messageId: messageInfo.messageId,
+        messageType: messageInfo.type,
+        metadata: messageInfo.metadata
+      }
+    );
+
+    // 4. Obter histórico recente da conversação
+    const recentMessages = await conversationPersistence.getRecentMessages(session.id, 12);
+    
+    // 5. Construir histórico para o Noemia Core
+    const history = recentMessages
+      .reverse()
+      .filter(msg => msg.role !== 'system')
+      .map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+
+    console.log('WHATSAPP_CONTEXT_LOADED:', {
+      sessionId: session.id,
+      historyLength: history.length,
+      lastSummary: session.last_summary
+    });
+
+    // 6. Gerar resumo se a conversa for longa
+    const summary = await conversationPersistence.generateConversationSummary(
+      session.id,
+      recentMessages
+    );
+
+    // 7. Construir contexto para a IA
+    const context = {
+      sessionId: session.id,
+      leadStage: session.lead_stage,
+      caseArea: session.case_area,
+      currentIntent: session.current_intent,
+      lastSummary: session.last_summary,
+      conversationHistory: summary
+    };
+
+    // 8. Processar com Noemia Core
     const coreResponse = await processNoemiaCore({
       channel: 'whatsapp',
       userType: 'visitor',
       message: messageInfo.content,
-      history: [],
-      metadata: { from: messageInfo.from }
+      history,
+      context,
+      metadata: { 
+        from: messageInfo.from,
+        sessionId: session.id,
+        messageId: messageInfo.messageId
+      }
     });
 
     console.log('WHATSAPP_NOEMIA_CORE_RESPONSE_RECEIVED');
@@ -418,8 +491,9 @@ async function processTextMessage(messageInfo: any) {
     console.log('OPENAI_USED:', coreResponse.metadata.openaiUsed);
     console.log('CLASSIFICATION:', coreResponse.metadata.classification);
     
-    logEvent('WHATSAPP_NOEMIA_CORE_RESPONSE', {
+    logEvent("WHATSAPP_NOEMIA_CORE_RESPONSE", {
       from: messageInfo.from,
+      sessionId: session.id,
       responseLength: coreResponse.reply.length,
       audience: coreResponse.audience,
       source: coreResponse.source,
@@ -427,30 +501,57 @@ async function processTextMessage(messageInfo: any) {
       responseTime: coreResponse.metadata.responseTime,
       classification: coreResponse.metadata.classification
     });
-    
-    // Log específico baseado na fonte
-    if (coreResponse.source === 'openai') {
-      console.log('WHATSAPP_OPENAI_SUCCESS: OpenAI responded successfully');
-    } else if (coreResponse.source === 'fallback') {
-      console.log('WHATSAPP_FALLBACK_USED: Fallback was used');
-    } else if (coreResponse.source === 'triage') {
-      console.log('WHATSAPP_TRIAGE_USED: Legal advice blocked for visitor');
-    }
-    
+
+    // 9. Salvar resposta da IA
+    await conversationPersistence.saveMessage(
+      session.id,
+      undefined, // IA não tem external message ID
+      'assistant',
+      coreResponse.reply,
+      'outbound',
+      {
+        channel: 'whatsapp',
+        source: coreResponse.source,
+        responseTime: coreResponse.metadata.responseTime,
+        classification: coreResponse.metadata.classification
+      }
+    );
+
+    // 10. Atualizar sessão com informações da conversação
+    await conversationPersistence.updateSession(session.id, {
+      lead_stage: 'engaged',
+      case_area: coreResponse.metadata.classification?.theme || session.case_area,
+      current_intent: coreResponse.intent || session.current_intent,
+      last_inbound_at: new Date().toISOString(),
+      last_outbound_at: new Date().toISOString()
+    });
+
+    // 11. Enviar resposta
+    console.log('=== WHATSAPP_SEND_ATTEMPT ===');
     const sent = await sendWhatsAppResponse(messageInfo.from, coreResponse.reply || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
     if (sent) {
-      console.log('WHATSAPP_RESPONSE_SENT: Message sent successfully');
-      logEvent('WHATSAPP_RESPONSE_SENT', {
+      console.log('WHATSAPP_SEND_SUCCESS: Message sent successfully');
+      logEvent("WHATSAPP_RESPONSE_SENT", {
         from: messageInfo.from,
+        sessionId: session.id,
         responseLength: coreResponse.reply.length
       });
+
+      // 12. Marcar evento como processado
+      await antiSpamGuard.markEventProcessed({
+        channel: 'whatsapp',
+        externalMessageId: messageInfo.messageId,
+        externalUserId: messageInfo.from,
+        messageText: messageInfo.content
+      });
     } else {
-      console.log('WHATSAPP_RESPONSE_FAILED: Failed to send message');
-      logEvent('WHATSAPP_RESPONSE_FAILED', {
+      console.log('WHATSAPP_SEND_FAILED: Failed to send message');
+      logEvent("WHATSAPP_RESPONSE_FAILED", {
         from: messageInfo.from,
+        sessionId: session.id,
         error: 'Failed to send WhatsApp message'
-      }, 'error');
+      }, "error");
     }
   } catch (error) {
     console.log('WHATSAPP_NOEMIA_ERROR: Error in processTextMessage');
