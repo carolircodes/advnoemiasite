@@ -5,6 +5,30 @@ import Link from "next/link";
 import { PrioridadesDoDia } from "./prioridades";
 import { Lead } from "./types";
 
+// 🚀 EXTENDER TIPO LEAD COM CAMPOS DE CONVERSÃO
+interface ExtendedLead extends Lead {
+  lead_temperature: 'cold' | 'warm' | 'hot';
+  conversion_score: number;
+  priority_level: 'low' | 'medium' | 'high' | 'urgent';
+  recommended_action: 'continue_triage' | 'schedule_consultation' | 'human_handoff' | 'send_info';
+  ready_for_handoff: boolean;
+  commercial_moment_detected: boolean;
+  // Pipeline comercial
+  commercial_status?: 'new_lead' | 'triage_in_progress' | 'qualified' | 'awaiting_human_contact' | 'human_contact_started' | 'consultation_proposed' | 'consultation_scheduled' | 'follow_up_needed' | 'converted' | 'lost';
+  handoff_package?: any;
+  // Preferências de contato
+  preferred_contact_channel?: 'whatsapp' | 'ligacao' | 'consulta_online' | 'email';
+  preferred_contact_period?: 'manha' | 'tarde' | 'noite' | 'qualquer_horario';
+  preferred_contact_urgency?: 'hoje' | 'esta_semana' | 'proxima_semana' | 'sem_urgencia';
+  consultation_intent?: boolean;
+  follow_up_needed?: boolean;
+  // Follow-up inteligente
+  last_follow_up_at?: string;
+  follow_up_attempts?: number;
+  next_follow_up_at?: string;
+  follow_up_status?: 'pending' | 'sent' | 'responded' | 'cancelled';
+}
+
 interface Conversation {
   id: string;
   platform_user_id: string;
@@ -18,6 +42,27 @@ interface Conversation {
   urgency: string;
   created_at: string;
 }
+
+// Configurações de pipeline comercial
+const commercialStatusConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
+  new_lead: { label: "Novo Lead", color: "#6B7280", bgColor: "#F9FAFB", icon: "1" },
+  triage_in_progress: { label: "Triagem", color: "#3B82F6", bgColor: "#EFF6FF", icon: "2" },
+  qualified: { label: "Qualificado", color: "#F59E0B", bgColor: "#FEF3C7", icon: "3" },
+  awaiting_human_contact: { label: "Aguardando Contato", color: "#EF4444", bgColor: "#FEE2E2", icon: "4" },
+  human_contact_started: { label: "Contato Iniciado", color: "#8B5CF6", bgColor: "#F3E8FF", icon: "5" },
+  consultation_proposed: { label: "Consulta Proposta", color: "#10B981", bgColor: "#D1FAE5", icon: "6" },
+  consultation_scheduled: { label: "Consulta Agendada", color: "#059669", bgColor: "#D1FAE5", icon: "7" },
+  follow_up_needed: { label: "Follow-up", color: "#F97316", bgColor: "#FED7AA", icon: "8" },
+  converted: { label: "Convertido", color: "#059669", bgColor: "#D1FAE5", icon: "9" },
+  lost: { label: "Perdido", color: "#DC2626", bgColor: "#FEE2E2", icon: "X" }
+};
+
+const contactChannelConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
+  whatsapp: { label: "WhatsApp", color: "#25D366", bgColor: "#D1FAE5", icon: "W" },
+  ligacao: { label: "Ligação", color: "#3B82F6", bgColor: "#EFF6FF", icon: "T" },
+  consulta_online: { label: "Online", color: "#8B5CF6", bgColor: "#F3E8FF", icon: "V" },
+  email: { label: "E-mail", color: "#6B7280", bgColor: "#F9FAFB", icon: "E" }
+};
 
 // Configurações de visual
 const legalAreaConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
@@ -62,6 +107,27 @@ const urgencyConfig: Record<string, { label: string; color: string; bgColor: str
   baixa: { label: "Baixa", color: "#10B981", bgColor: "#D1FAE5" },
   media: { label: "Média", color: "#F59E0B", bgColor: "#FEF3C7" },
   alta: { label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" }
+};
+
+// 🚀 CONFIGURAÇÕES DE CONVERSÃO
+const temperatureConfig: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
+  cold: { label: "Frio", color: "#6B7280", bgColor: "#F9FAFB", icon: "❄️" },
+  warm: { label: "Morno", color: "#F59E0B", bgColor: "#FEF3C7", icon: "🌡️" },
+  hot: { label: "Quente", color: "#EF4444", bgColor: "#FEE2E2", icon: "🔥" }
+};
+
+const priorityConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  low: { label: "Baixa", color: "#10B981", bgColor: "#D1FAE5" },
+  medium: { label: "Média", color: "#F59E0B", bgColor: "#FEF3C7" },
+  high: { label: "Alta", color: "#F97316", bgColor: "#FED7AA" },
+  urgent: { label: "Urgente", color: "#DC2626", bgColor: "#FEE2E2" }
+};
+
+const actionConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  continue_triage: { label: "Continuar Triagem", color: "#3B82F6", bgColor: "#EFF6FF" },
+  schedule_consultation: { label: "Agendar Consulta", color: "#10B981", bgColor: "#D1FAE5" },
+  human_handoff: { label: "Encaminhar Humano", color: "#F59E0B", bgColor: "#FEF3C7" },
+  send_info: { label: "Enviar Informações", color: "#6B7280", bgColor: "#F9FAFB" }
 };
 
 const funnelStageConfig: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -115,11 +181,15 @@ function StatusBadge({ config }: { config: any }) {
   );
 }
 
-function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) => void }) {
+function LeadTableRow({ lead, onSelect }: { lead: ExtendedLead; onSelect: (lead: ExtendedLead) => void }) {
   const areaConfig = legalAreaConfig[lead.legal_area];
   const statusConfig = leadStatusConfig[lead.lead_status];
   const urgencyConfigData = urgencyConfig[lead.urgency];
   const funnelConfig = funnelStageConfig[lead.funnel_stage];
+  // 🚀 CONFIGURAÇÕES DE CONVERSÃO
+  const temperatureConfigData = temperatureConfig[lead.lead_temperature];
+  const priorityConfigData = priorityConfig[lead.priority_level];
+  const actionConfigData = actionConfig[lead.recommended_action];
 
   return (
     <tr 
@@ -152,6 +222,32 @@ function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) =
         <StatusBadge config={urgencyConfigData} />
       </td>
       <td className="px-6 py-4">
+        {/* 🚀 TEMPERATURA DO LEAD */}
+        <div className="flex items-center space-x-2">
+          <span className="text-xl">{temperatureConfigData.icon}</span>
+          <StatusBadge config={temperatureConfigData} />
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        {/* 🚀 SCORE DE CONVERSÃO */}
+        <div className="text-center">
+          <div className={`text-lg font-bold ${
+            lead.conversion_score >= 70 ? 'text-red-600' : 
+            lead.conversion_score >= 45 ? 'text-orange-500' : 
+            lead.conversion_score >= 25 ? 'text-yellow-600' : 'text-gray-600'
+          }`}>
+            {lead.conversion_score}
+          </div>
+          <div className="text-xs text-gray-500">Score</div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <StatusBadge config={priorityConfigData} />
+      </td>
+      <td className="px-6 py-4">
+        <StatusBadge config={actionConfigData} />
+      </td>
+      <td className="px-6 py-4">
         <div className="max-w-xs">
           <p className="text-sm text-gray-900 truncate">{lead.last_message}</p>
         </div>
@@ -177,6 +273,16 @@ function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) =
               📅 Agendar
             </span>
           )}
+          {lead.ready_for_handoff && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+              📋 Pronto Handoff
+            </span>
+          )}
+          {lead.commercial_moment_detected && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+              💰 Momento Comercial
+            </span>
+          )}
         </div>
       </td>
     </tr>
@@ -184,8 +290,8 @@ function LeadTableRow({ lead, onSelect }: { lead: Lead; onSelect: (lead: Lead) =
 }
 
 export default function LeadsDashboard() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [leads, setLeads] = useState<ExtendedLead[]>([]);
+  const [selectedLead, setSelectedLead] = useState<ExtendedLead | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -193,7 +299,11 @@ export default function LeadsDashboard() {
     legal_area: "",
     urgency: "",
     lead_status: "",
-    funnel_stage: ""
+    funnel_stage: "",
+    // 🚀 FILTROS DE CONVERSÃO
+    lead_temperature: "",
+    priority_level: "",
+    recommended_action: ""
   });
 
   // Métricas calculadas
@@ -201,7 +311,13 @@ export default function LeadsDashboard() {
     total: leads.length,
     quentes: leads.filter(l => l.lead_status === "quente").length,
     prontosParaAgendar: leads.filter(l => l.lead_status === "pronto_para_agendar").length,
-    urgentes: leads.filter(l => l.urgency === "alta").length
+    urgentes: leads.filter(l => l.urgency === "alta").length,
+    // 🚀 MÉTRICAS DE CONVERSÃO
+    leadsQuentes: leads.filter(l => l.lead_temperature === "hot").length,
+    leadsMornos: leads.filter(l => l.lead_temperature === "warm").length,
+    prontosParaHandoff: leads.filter(l => l.ready_for_handoff).length,
+    momentosComerciais: leads.filter(l => l.commercial_moment_detected).length,
+    scoreMedio: leads.length > 0 ? Math.round(leads.reduce((sum, l) => sum + l.conversion_score, 0) / leads.length) : 0
   };
 
   // Leads filtrados
@@ -215,7 +331,11 @@ export default function LeadsDashboard() {
       (!filters.legal_area || lead.legal_area === filters.legal_area) &&
       (!filters.urgency || lead.urgency === filters.urgency) &&
       (!filters.lead_status || lead.lead_status === filters.lead_status) &&
-      (!filters.funnel_stage || lead.funnel_stage === filters.funnel_stage);
+      (!filters.funnel_stage || lead.funnel_stage === filters.funnel_stage) &&
+      // 🚀 FILTROS DE CONVERSÃO
+      (!filters.lead_temperature || lead.lead_temperature === filters.lead_temperature) &&
+      (!filters.priority_level || lead.priority_level === filters.priority_level) &&
+      (!filters.recommended_action || lead.recommended_action === filters.recommended_action);
 
     return matchesSearch && matchesFilters;
   });
@@ -281,7 +401,7 @@ export default function LeadsDashboard() {
         <PrioridadesDoDia leads={leads} />
 
         {/* Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MetricCard
             title="Total de Leads"
             value={metrics.total}
@@ -312,9 +432,42 @@ export default function LeadsDashboard() {
           />
         </div>
 
+        {/* 🚀 MÉTRICAS DE CONVERSÃO */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">🚀 Métricas de Conversão</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">{metrics.leadsQuentes}</div>
+              <div className="text-sm text-gray-600">🔥 Leads Quentes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-500">{metrics.leadsMornos}</div>
+              <div className="text-sm text-gray-600">🌡️ Leads Mornos</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{metrics.prontosParaHandoff}</div>
+              <div className="text-sm text-gray-600">📋 Prontos Handoff</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">{metrics.momentosComerciais}</div>
+              <div className="text-sm text-gray-600">💰 Momentos Comerciais</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{metrics.scoreMedio}</div>
+              <div className="text-sm text-gray-600">📊 Score Médio</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-600">
+                {leads.length > 0 ? Math.round((metrics.leadsQuentes + metrics.leadsMornos) / leads.length * 100) : 0}%
+              </div>
+              <div className="text-sm text-gray-600">🎯 Taxa Conversão</div>
+            </div>
+          </div>
+        </div>
+
         {/* Filtros e Busca */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-10 gap-4">
             <div className="lg:col-span-2">
               <input
                 type="text"
@@ -324,7 +477,7 @@ export default function LeadsDashboard() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
-                        <select
+            <select
               value={filters.legal_area}
               onChange={(e) => setFilters({...filters, legal_area: e.target.value})}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -364,6 +517,37 @@ export default function LeadsDashboard() {
                 <option key={key} value={key}>{config.label}</option>
               ))}
             </select>
+            {/* 🚀 FILTROS DE CONVERSÃO */}
+            <select
+              value={filters.lead_temperature}
+              onChange={(e) => setFilters({...filters, lead_temperature: e.target.value})}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">🚀 Todas Temperaturas</option>
+              {Object.entries(temperatureConfig).map(([key, config]) => (
+                <option key={key} value={key}>{config.icon} {config.label}</option>
+              ))}
+            </select>
+            <select
+              value={filters.priority_level}
+              onChange={(e) => setFilters({...filters, priority_level: e.target.value})}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">🚀 Todas Prioridades</option>
+              {Object.entries(priorityConfig).map(([key, config]) => (
+                <option key={key} value={key}>{config.label}</option>
+              ))}
+            </select>
+            <select
+              value={filters.recommended_action}
+              onChange={(e) => setFilters({...filters, recommended_action: e.target.value})}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">🚀 Todas Ações</option>
+              {Object.entries(actionConfig).map(([key, config]) => (
+                <option key={key} value={key}>{config.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -392,6 +576,18 @@ export default function LeadsDashboard() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Urgência
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    🚀 Temperatura
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    🚀 Score
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    🚀 Prioridade
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    🚀 Ação
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Última Mensagem

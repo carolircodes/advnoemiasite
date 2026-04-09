@@ -24,7 +24,6 @@ export async function saveTriageData(
     
     // Bloco B - O Que Aconteceu
     problema_principal: conversationState.collectedData.problema_principal,
-    descricao_detalhada: conversationState.collectedData.descricao_detalhada,
     
     // Bloco C - Tempo / Momento
     timeframe: conversationState.collectedData.timeframe,
@@ -36,7 +35,6 @@ export async function saveTriageData(
     
     // Bloco E - Objetivo do Cliente
     objetivo_cliente: conversationState.collectedData.objetivo_cliente,
-    resultado_esperado: conversationState.collectedData.resultado_esperado,
     
     // Bloco F - Urgência
     nivel_urgencia: conversationState.collectedData.nivel_urgencia,

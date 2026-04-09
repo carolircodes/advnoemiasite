@@ -7,6 +7,7 @@ import { instagramCommentAutomation } from "../../../../lib/services/instagram-c
 import { instagramCommentContext } from "../../../../lib/services/instagram-comment-context";
 import { instagramMessageGuard } from "../../../../lib/services/instagram-message-guard";
 import { instagramKeywordAutomation } from "../../../../lib/services/instagram-keyword-automation";
+import { leadCaptureService } from "../../../../lib/services/lead-capture";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -83,60 +84,62 @@ function verifySignature(rawBuffer: Buffer, signature: string): boolean {
   return isValid;
 }
 
-async function sendInstagramMessage(recipientId: string, messageText: string): Promise<boolean> {
+async function sendInstagramMessage(recipientId: string, messageText: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!INSTAGRAM_ACCESS_TOKEN || !FACEBOOK_PAGE_ID) {
       console.log("INSTAGRAM_MESSAGE_SEND_FAILED: Missing credentials");
-      return false;
+      return { success: false, error: "Missing credentials" };
     }
 
-    const apiUrl = `https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
-    
-    const payload = {
-      recipient: { 
-        id: recipientId 
-      },
-      message: { 
-        text: messageText 
-      },
-      messaging_type: "RESPONSE"
-    };
-
-    console.log("SEND_INSTAGRAM_API_CALL:", {
-      url: apiUrl,
+    console.log("SEND_INSTAGRAM_API_CALL", {
       recipientId,
-      messageLength: messageText.length
+      messageLength: messageText.length,
+      hasToken: !!INSTAGRAM_ACCESS_TOKEN,
+      hasPageId: !!FACEBOOK_PAGE_ID
     });
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const responseText = await response.text();
-
-    console.log("SEND_INSTAGRAM_RESPONSE:", {
-      status: response.status,
-      body: responseText
-    });
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${INSTAGRAM_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipient: {
+            id: recipientId,
+          },
+          message: {
+            text: messageText,
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
-      console.log("SEND_INSTAGRAM_ERROR:", {
+      const errorText = await response.text();
+      console.log("SEND_INSTAGRAM_API_ERROR", {
         status: response.status,
         statusText: response.statusText,
-        body: responseText
+        errorText: errorText.substring(0, 500)
       });
-      return false;
+      return { success: false, error: `API Error: ${response.status}` };
     }
 
-    console.log("SEND_INSTAGRAM_SUCCESS");
-    return true;
+    const responseData = await response.json();
+    console.log("SEND_INSTAGRAM_RESPONSE_SUCCESS", {
+      messageId: responseData.message_id,
+      recipientId
+    });
+
+    return { success: true };
   } catch (error) {
-    console.log("SEND_INSTAGRAM_EXCEPTION:", error);
-    return false;
+    console.log("SEND_INSTAGRAM_EXCEPTION", {
+      error: error instanceof Error ? error.message : String(error),
+      recipientId
+    });
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -601,7 +604,80 @@ export async function POST(request: NextRequest) {
               console.log("  - COMMENT_TEXT:", comment.text);
               console.log("  - POST_ID:", comment.media?.id || "N/A");
 
-              // FASE 1: Processar automação por palavra-chave
+              // FASE 1: Capturar lead com sistema de aquisição
+              try {
+                console.log("LEAD_CAPTURE_START", {
+                  commentId: comment.id,
+                  userId: comment.from.id,
+                  commentText: comment.text
+                });
+
+                const captureResult = await leadCaptureService.captureFromComment(
+                  comment.from.id,
+                  comment.from.username,
+                  comment.text,
+                  comment.media?.id || '',
+                  {
+                    userAgent: 'Instagram Webhook',
+                    ipAddress: 'Instagram',
+                    referrer: 'Instagram Comment'
+                  }
+                );
+
+                if (captureResult.success) {
+                  console.log("LEAD_CAPTURE_SUCCESS", {
+                    commentId: comment.id,
+                    userId: comment.from.id,
+                    sessionId: captureResult.lead?.sessionId,
+                    keyword: captureResult.lead?.trigger.keyword,
+                    contentTitle: captureResult.lead?.content.title
+                  });
+
+                  // Enviar DM inicial se gerado
+                  if (captureResult.noemiaResponse && INSTAGRAM_ACCESS_TOKEN) {
+                    try {
+                      const dmResponse = await sendInstagramMessage(
+                        comment.from.id,
+                        captureResult.noemiaResponse
+                      );
+
+                      if (dmResponse.success) {
+                        console.log("LEAD_CAPTURE_DM_SENT", {
+                          commentId: comment.id,
+                          userId: comment.from.id,
+                          sessionId: captureResult.lead?.sessionId
+                        });
+                      } else {
+                        console.log("LEAD_CAPTURE_DM_ERROR", {
+                          commentId: comment.id,
+                          userId: comment.from.id,
+                          error: dmResponse.error
+                        });
+                      }
+                    } catch (dmError) {
+                      console.log("LEAD_CAPTURE_DM_EXCEPTION", {
+                        commentId: comment.id,
+                        userId: comment.from.id,
+                        error: dmError instanceof Error ? dmError.message : String(dmError)
+                      });
+                    }
+                  }
+                } else {
+                  console.log("LEAD_CAPTURE_SKIPPED", {
+                    commentId: comment.id,
+                    userId: comment.from.id,
+                    reason: captureResult.errorMessage
+                  });
+                }
+              } catch (captureError) {
+                console.log("LEAD_CAPTURE_ERROR", {
+                  commentId: comment.id,
+                  userId: comment.from.id,
+                  error: captureError instanceof Error ? captureError.message : String(captureError)
+                });
+              }
+
+              // FASE 2: Processar automação por palavra-chave (sistema legado)
               try {
                 const keywordResult = await instagramKeywordAutomation.processKeywordAutomation(
                   comment.id,

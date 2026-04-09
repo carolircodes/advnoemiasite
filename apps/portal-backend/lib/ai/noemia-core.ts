@@ -14,7 +14,7 @@ import { askNoemiaSchema } from "../domain/portal";
 
 type NoemiaChannel = "site" | "portal" | "whatsapp" | "instagram";
 type NoemiaUserType = "visitor" | "client" | "staff" | "unknown";
-type LegalTheme =
+export type LegalTheme =
   | "previdenciario"
   | "bancario"
   | "familia"
@@ -26,6 +26,301 @@ type ClassifiedIntent =
   | "support"
   | "appointment_interest";
 type LeadTemperature = "cold" | "warm" | "hot";
+type PriorityLevel = "low" | "medium" | "high" | "urgent";
+type RecommendedAction = "continue_triage" | "schedule_consultation" | "human_handoff" | "send_info";
+
+// Tipos para Follow-up Inteligente
+export type FollowUpTrigger = 'inactivity' | 'post_handoff' | 'consultation_proposed' | 'follow_up_needed';
+type FollowUpPriority = 'immediate' | 'high' | 'medium' | 'low';
+export type FollowUpCadence = {
+  minutes: number;
+  hours: number;
+  days: number;
+};
+
+export interface FollowUpRule {
+  id: string;
+  trigger: FollowUpTrigger;
+  temperature: LeadTemperature;
+  commercialStatus?: string;
+  cadence: FollowUpCadence;
+  maxAttempts: number;
+  priority: FollowUpPriority;
+}
+
+export interface FollowUpAttempt {
+  id: string;
+  sessionId: string;
+  attemptNumber: number;
+  trigger: FollowUpTrigger;
+  message: string;
+  sentAt: Date;
+  responseReceived?: boolean;
+  nextAttemptAt?: Date;
+}
+
+interface FollowUpContext {
+  lastMessage: string;
+  lastMessageTime: Date;
+  currentTime: Date;
+  inactivityMinutes: number;
+  conversationState: ConversationState;
+  previousAttempts: FollowUpAttempt[];
+}
+
+export function shouldTriggerFollowUp(
+  conversationState: ConversationState,
+  lastMessageTime: Date,
+  previousAttempts: FollowUpAttempt[] = []
+): {
+  shouldTrigger: boolean;
+  trigger?: FollowUpTrigger;
+  rule?: FollowUpRule;
+  message?: string;
+  nextAttemptAt?: Date;
+} {
+  const currentTime = new Date();
+  const inactivityMinutes = (currentTime.getTime() - lastMessageTime.getTime()) / (1000 * 60);
+  
+  const context: FollowUpContext = {
+    lastMessage: '', // Seria preenchido com a última mensagem real
+    lastMessageTime,
+    currentTime,
+    inactivityMinutes,
+    conversationState,
+    previousAttempts
+  };
+  
+  const trigger = detectFollowUpTrigger(context);
+  if (!trigger) {
+    return { shouldTrigger: false };
+  }
+  
+  const rule = getFollowUpRule(trigger, conversationState.leadTemperature, conversationState.commercialStatus);
+  if (!rule) {
+    return { shouldTrigger: false };
+  }
+  
+  // Verificar se já excedeu o número máximo de tentativas
+  const attemptsForTrigger = previousAttempts.filter(a => a.trigger === trigger);
+  if (attemptsForTrigger.length >= rule.maxAttempts) {
+    return { shouldTrigger: false };
+  }
+  
+  // Calcular próximo tempo de tentativa
+  const lastAttemptForTrigger = attemptsForTrigger[attemptsForTrigger.length - 1];
+  let nextAttemptAt: Date;
+  
+  if (!lastAttemptForTrigger) {
+    // Primeira tentativa - usar cadência da regra
+    nextAttemptAt = new Date(lastMessageTime.getTime() + 
+      (rule.cadence.minutes * 60 * 1000) + 
+      (rule.cadence.hours * 60 * 60 * 1000) + 
+      (rule.cadence.days * 24 * 60 * 60 * 1000)
+    );
+  } else {
+    // Tentativas subsequentes - dobrar o intervalo
+    const baseInterval = (rule.cadence.minutes * 60 * 1000) + 
+                       (rule.cadence.hours * 60 * 60 * 1000) + 
+                       (rule.cadence.days * 24 * 60 * 60 * 1000);
+    const multiplier = Math.pow(2, attemptsForTrigger.length);
+    nextAttemptAt = new Date(lastAttemptForTrigger.sentAt.getTime() + (baseInterval * multiplier));
+  }
+  
+  // Verificar se já é hora
+  if (currentTime >= nextAttemptAt) {
+    const attemptNumber = attemptsForTrigger.length + 1;
+    const message = generateFollowUpMessage(context, rule, attemptNumber);
+    
+    return {
+      shouldTrigger: true,
+      trigger,
+      rule,
+      message,
+      nextAttemptAt
+    };
+  }
+  
+  return {
+    shouldTrigger: false,
+    nextAttemptAt
+  };
+}
+
+// Funções auxiliares de Follow-up
+function detectFollowUpTrigger(context: FollowUpContext): FollowUpTrigger | null {
+  const { inactivityMinutes, conversationState, previousAttempts } = context;
+  
+  // Detectar inatividade
+  if (inactivityMinutes >= 10 && !hasRecentAttempt(previousAttempts, 'inactivity', 60)) {
+    return 'inactivity';
+  }
+  
+  // Detectar pós-handoff
+  if (conversationState.readyForHandoff && conversationState.needsHumanAttention) {
+    const lastHandoffAttempt = previousAttempts.find(a => a.trigger === 'post_handoff');
+    if (!lastHandoffAttempt || (Date.now() - lastHandoffAttempt.sentAt.getTime()) > 2 * 60 * 60 * 1000) {
+      return 'post_handoff';
+    }
+  }
+  
+  // Detectar consulta proposta
+  if (conversationState.commercialStatus === 'consultation_proposed') {
+    return 'consultation_proposed';
+  }
+  
+  // Detectar follow-up necessário
+  if (conversationState.commercialStatus === 'follow_up_needed') {
+    return 'follow_up_needed';
+  }
+  
+  return null;
+}
+
+function hasRecentAttempt(attempts: FollowUpAttempt[], trigger: FollowUpTrigger, minutesAgo: number): boolean {
+  const cutoff = Date.now() - (minutesAgo * 60 * 1000);
+  return attempts.some(a => 
+    a.trigger === trigger && 
+    a.sentAt.getTime() > cutoff
+  );
+}
+
+function getFollowUpRule(trigger: FollowUpTrigger, temperature: LeadTemperature, commercialStatus?: string): FollowUpRule | null {
+  // Regras de follow-up baseadas em temperatura e status
+  const followUpRules: FollowUpRule[] = [
+    // HOT LEADS - Prioridade imediata
+    {
+      id: 'hot_inactivity_10min',
+      trigger: 'inactivity',
+      temperature: 'hot',
+      cadence: { minutes: 10, hours: 0, days: 0 },
+      maxAttempts: 3,
+      priority: 'immediate'
+    },
+    {
+      id: 'hot_post_handoff_2h',
+      trigger: 'post_handoff',
+      temperature: 'hot',
+      cadence: { minutes: 0, hours: 2, days: 0 },
+      maxAttempts: 2,
+      priority: 'high'
+    },
+    
+    // WARM LEADS - Cadência padrão
+    {
+      id: 'warm_inactivity_2h',
+      trigger: 'inactivity',
+      temperature: 'warm',
+      cadence: { minutes: 0, hours: 2, days: 0 },
+      maxAttempts: 3,
+      priority: 'high'
+    },
+    {
+      id: 'warm_consultation_24h',
+      trigger: 'consultation_proposed',
+      temperature: 'warm',
+      cadence: { minutes: 0, hours: 0, days: 1 },
+      maxAttempts: 2,
+      priority: 'medium'
+    },
+    
+    // COLD LEADS - Cadência mais espaçada
+    {
+      id: 'cold_inactivity_24h',
+      trigger: 'inactivity',
+      temperature: 'cold',
+      cadence: { minutes: 0, hours: 0, days: 1 },
+      maxAttempts: 2,
+      priority: 'medium'
+    },
+    {
+      id: 'cold_followup_3d',
+      trigger: 'follow_up_needed',
+      temperature: 'cold',
+      cadence: { minutes: 0, hours: 0, days: 3 },
+      maxAttempts: 1,
+      priority: 'low'
+    }
+  ];
+
+  return followUpRules.find(rule => 
+    rule.trigger === trigger && 
+    rule.temperature === temperature &&
+    (!rule.commercialStatus || rule.commercialStatus === commercialStatus)
+  ) || null;
+}
+
+function generateFollowUpMessage(context: FollowUpContext, rule: FollowUpRule, attemptNumber: number): string {
+  const { conversationState } = context;
+  const { leadTemperature: temperature, collectedData } = conversationState;
+  
+  // Mensagens baseadas no trigger
+  const triggerMessages = {
+    'inactivity': generateInactivityFollowUp(temperature, attemptNumber, collectedData),
+    'post_handoff': generatePostHandoffFollowUp(temperature, attemptNumber, collectedData),
+    'consultation_proposed': generateConsultationFollowUp(temperature, attemptNumber, collectedData),
+    'follow_up_needed': generateFollowUpNeededMessage(temperature, attemptNumber, collectedData)
+  };
+  
+  return triggerMessages[rule.trigger] || generateDefaultFollowUp(temperature, attemptNumber);
+}
+
+function generateInactivityFollowUp(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
+  const area = data.area || 'seu caso';
+  const problem = data.problema_principal || '';
+  
+  if (temperature === 'hot') {
+    if (attemptNumber === 1) {
+      return `Pensei mais sobre ${area === 'geral' ? 'sua situação' : `seu caso de ${area}`}... ${problem ? `Vi que mencionou "${problem.substring(0, 50)}${problem.length > 50 ? '...' : ''}"` : ''}. Alguns detalhes podem mudar completamente o resultado. Posso te ajudar a entender melhor?`;
+    } else if (attemptNumber === 2) {
+      return `Sobre ${area === 'geral' ? 'nossa conversa' : `seu caso de ${area}`}, sei que o tempo é crucial nestas situações. Muitas vezes agir agora faz toda a diferença. Como está pensando em prosseguir?`;
+    }
+    return `Estou aqui para ajudar com ${area === 'geral' ? 'sua situação' : `seu caso de ${area}`}. Acha que vale a pena darmos um próximo passo?`;
+  }
+  
+  if (temperature === 'warm') {
+    if (attemptNumber === 1) {
+      return `Retomando nossa conversa sobre ${area === 'geral' ? 'seu caso' : area}... ${problem ? `lembrei que você mencionou: "${problem.substring(0, 40)}${problem.length > 40 ? '...' : ''}"` : ''}. Já conseguiu pensar mais sobre isso?`;
+    } else if (attemptNumber === 2) {
+      return `Sobre ${area === 'geral' ? 'nossa conversa anterior' : area}, às vezes uma conversa rápida já ajuda a clarear bastante. Que tal continuarmos?`;
+    }
+    return `Ainda pensando sobre ${area === 'geral' ? 'seu caso' : area}? Estou aqui se precisar retomar.`;
+  }
+  
+  // COLD
+  if (attemptNumber === 1) {
+    return `Oi! Vi que conversamos sobre ${area === 'geral' ? 'algumas questões jurídicas' : area} outro dia. ${problem ? `Lembrei que você mencionou algo sobre "${problem.substring(0, 30)}${problem.length > 30 ? '...' : ''}"` : ''}. Como está isso agora?`;
+  }
+  return `Oi! Espero que esteja tudo bem. Estava pensando em ${area === 'geral' ? 'nossa conversa anterior' : area}. Se ainda tiver dúvidas, estou aqui para ajudar.`;
+}
+
+function generatePostHandoffFollowUp(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
+  if (attemptNumber === 1) {
+    return `Já organizei suas informações para a Dra. Noêmia analisar. ${data.area === 'geral' ? 'Seu caso' : `Seu caso de ${data.area}`} já está na fila de prioridade. Você prefere agendar uma consulta online ou falar primeiro com a equipe por WhatsApp?`;
+  }
+  return `Sobre ${data.area === 'geral' ? 'seu caso' : `seu caso de ${data.area}`}, a equipe já está ciente. Para agilizar, sugiro agendar uma consulta de 15 minutos para avaliação inicial. Que tal?`;
+}
+
+function generateConsultationFollowUp(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
+  if (attemptNumber === 1) {
+    return `Pensei mais sobre ${data.area === 'geral' ? 'sua situação' : `seu caso de ${data.area}`}. Uma consulta de 15 minutos já pode te dar bastante clareza sobre os próximos passos. Tem alguma preferência de horário para conversarmos?`;
+  }
+  return `Sobre a consulta que mencionei, sei que tempo é precioso. Posso te mostrar exatamente como seria e o que já poderíamos avançar nestes 15 minutos. Interessa?`;
+}
+
+function generateFollowUpNeededMessage(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
+  if (attemptNumber === 1) {
+    return `Estou organizando os próximos passos para ${data.area === 'geral' ? 'seu caso' : `seu caso de ${data.area}`}. Há algo específico que você gostaria de esclarecer antes de continuarmos?`;
+  }
+  return `Para darmos continuidade a ${data.area === 'geral' ? 'sua situação' : data.area}, seria útil saber se você já tem algum documento ou informação adicional. Como está isso?`;
+}
+
+function generateDefaultFollowUp(temperature: LeadTemperature, attemptNumber: number): string {
+  if (attemptNumber === 1) {
+    return `Oi! Como está? Estou aqui se precisar de ajuda com alguma questão jurídica.`;
+  }
+  return `Oi! Espero que esteja tudo bem. Se tiver alguma dúvida jurídica, estou aqui para ajudar.`;
+}
 
 type ConversationStep =
   | "acolhimento"           // Boas-vindas e quebra-gelo
@@ -36,42 +331,6 @@ type ConversationStep =
   | "objetivo_cliente"       // O que o cliente quer alcançar
   | "avaliacao_urgencia"     // Classificar nível de urgência
   | "resumo_encaminhamento"; // Resumir e decidir próximo passo
-
-export interface ConversationState {
-  currentStep: ConversationStep;
-  collectedData: {
-    // Bloco A - Tema Principal
-    area?: LegalTheme;
-    
-    // Bloco B - O Que Aconteceu
-    problema_principal?: string;
-    descricao_detalhada?: string;
-    
-    // Bloco C - Tempo / Momento
-    timeframe?: string;
-    acontecendo_agora?: boolean;
-    
-    // Bloco D - Documentos / Provas
-    tem_documentos?: boolean;
-    tipos_documentos?: string[];
-    
-    // Bloco E - Objetivo do Cliente
-    objetivo_cliente?: string;
-    resultado_esperado?: string;
-    
-    // Bloco F - Urgência
-    nivel_urgencia?: 'baixa' | 'media' | 'alta';
-    prejuizo_ativo?: boolean;
-    
-    // Metadados
-    detalhes?: string[];
-    palavras_chave?: string[];
-  };
-  isHotLead: boolean;
-  needsHumanAttention: boolean;
-  handoffReason?: string;
-  triageCompleteness: number; // 0-100%
-}
 
 export interface NoemiaCoreInput {
   channel: NoemiaChannel;
@@ -437,6 +696,181 @@ function classifyMessage(message: string): {
   return { theme, intent, leadTemperature };
 }
 
+// FUNÇÃO DE LEAD SCORE - SISTEMA DE CONVERSÃO
+function calculateLeadScore(state: ConversationState, message: string): {
+  temperature: 'cold' | 'warm' | 'hot';
+  score: number;
+  priorityLevel: 'low' | 'medium' | 'high' | 'urgent';
+  recommendedAction: 'continue_triage' | 'schedule_consultation' | 'human_handoff' | 'send_info';
+  readyForHandoff: boolean;
+  commercialMomentDetected: boolean;
+  reasoning: string[];
+} {
+  const reasoning: string[] = [];
+  let score = 0;
+  
+  // SINAIS FORTES (40+ pontos cada)
+  const urgencyInfo = extractUrgencyInfo(message);
+  if (urgencyInfo.level === 'alta') {
+    score += 50;
+    reasoning.push('Urgência alta detectada (+50)');
+  }
+  
+  if (urgencyInfo.hasActiveDamage) {
+    score += 40;
+    reasoning.push('Prejuízo ativo detectado (+40)');
+  }
+  
+  if (state.collectedData.tem_documentos) {
+    score += 30;
+    reasoning.push('Já possui documentos (+30)');
+  }
+  
+  if (state.collectedData.objetivo_cliente && state.collectedData.objetivo_cliente.length > 20) {
+    score += 35;
+    reasoning.push('Objetivo claro e bem definido (+35)');
+  }
+  
+  // SINAIS MÉDIOS (20+ pontos cada)
+  if (urgencyInfo.level === 'media') {
+    score += 25;
+    reasoning.push('Urgência média detectada (+25)');
+  }
+  
+  if (state.collectedData.problema_principal && state.collectedData.problema_principal.length > 30) {
+    score += 20;
+    reasoning.push('Problema bem detalhado (+20)');
+  }
+  
+  if (state.collectedData.area && state.collectedData.area !== 'geral') {
+    score += 25;
+    reasoning.push('Área jurídica identificada (+25)');
+  }
+  
+  // SINAIS FRACOS (10+ pontos cada)
+  const messageLength = message.length;
+  if (messageLength > 100) {
+    score += 15;
+    reasoning.push('Mensagem detalhada (+15)');
+  }
+  
+  if (state.collectedData.timeframe) {
+    score += 10;
+    reasoning.push('Contexto temporal fornecido (+10)');
+  }
+  
+  // DETECTAR INTENÇÃO DE AÇÃO
+  const actionKeywords = ['quero', 'preciso', 'gostaria', 'precisava', 'queria', 'posso', 'consigo'];
+  if (actionKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+    score += 20;
+    reasoning.push('Intenção de ação clara (+20)');
+  }
+  
+  // BÔNUS POR COMPLETUDE
+  const completeness = state.triageCompleteness || 0;
+  if (completeness > 70) {
+    score += 25;
+    reasoning.push('Alta completude da triagem (+25)');
+  }
+  
+  // LIMITAR SCORE EM 0-100
+  score = Math.min(100, Math.max(0, score));
+  
+  // CLASSIFICAR TEMPERATURA
+  let temperature: 'cold' | 'warm' | 'hot' = 'cold';
+  let priorityLevel: 'low' | 'medium' | 'high' | 'urgent' = 'low';
+  let recommendedAction: 'continue_triage' | 'schedule_consultation' | 'human_handoff' | 'send_info' = 'continue_triage';
+  let readyForHandoff = false;
+  let commercialMomentDetected = false;
+  
+  if (score >= 70) {
+    temperature = 'hot';
+    priorityLevel = 'urgent';
+    recommendedAction = 'schedule_consultation';
+    readyForHandoff = true;
+    commercialMomentDetected = true;
+    reasoning.push(' LEAD QUENTE - Pronto para conversão');
+  } else if (score >= 45) {
+    temperature = 'warm';
+    priorityLevel = 'high';
+    recommendedAction = 'continue_triage';
+    commercialMomentDetected = true;
+    reasoning.push(' LEAD Morno - Potencial comercial');
+  } else if (score >= 25) {
+    temperature = 'warm';
+    priorityLevel = 'medium';
+    recommendedAction = 'continue_triage';
+    reasoning.push(' LEAD Morno - Requer qualificação');
+  } else {
+    temperature = 'cold';
+    priorityLevel = 'low';
+    recommendedAction = 'continue_triage';
+    reasoning.push(' LEAD Frio - Curiosidade inicial');
+  }
+  
+  return {
+    temperature,
+    score,
+    priorityLevel,
+    recommendedAction,
+    readyForHandoff,
+    commercialMomentDetected,
+    reasoning
+  };
+}
+
+export interface CollectedData {
+  // Bloco A - Tema Principal
+  area?: LegalTheme;
+  
+  // Bloco B - Problema Principal
+  problema_principal?: string;
+  
+  // Bloco C - Tempo e Momento
+  timeframe?: string;
+  acontecendo_agora?: boolean;
+  
+  // Bloco D - Documentos e Provas
+  tem_documentos?: boolean;
+  tipos_documentos?: string[];
+  
+  // Bloco E - Objetivo do Cliente
+  objetivo_cliente?: string;
+  
+  // Bloco F - Urgência e Prejuízo
+  nivel_urgencia?: 'baixa' | 'media' | 'alta';
+  prejuizo_ativo?: boolean;
+  
+  // Bloco G - Detalhes Adicionais
+  detalhes?: string[];
+  palavras_chave?: string[];
+}
+
+export interface ConversationState {
+  currentStep: ConversationStep;
+  collectedData: CollectedData;
+  isHotLead: boolean;
+  needsHumanAttention: boolean;
+  triageCompleteness: number;
+  leadTemperature: LeadTemperature;
+  conversionScore: number;
+  priorityLevel: PriorityLevel;
+  recommendedAction: RecommendedAction;
+  readyForHandoff: boolean;
+  commercialMomentDetected: boolean;
+  sessionId: string;
+  handoffReason?: string;
+  // Handoff e Agendamento
+  contactPreferences?: {
+    channel: 'whatsapp' | 'ligacao' | 'consulta_online' | 'email';
+    period: 'manha' | 'tarde' | 'noite' | 'qualquer_horario';
+    urgency: 'hoje' | 'esta_semana' | 'proxima_semana' | 'sem_urgencia';
+    availability: string;
+  };
+  commercialStatus?: 'new_lead' | 'triage_in_progress' | 'qualified' | 'awaiting_human_contact' | 'human_contact_started' | 'consultation_proposed' | 'consultation_scheduled' | 'follow_up_needed' | 'converted' | 'lost';
+  handoffPackage?: any;
+}
+
 function initializeConversationState(): ConversationState {
   return {
     currentStep: "acolhimento",
@@ -444,6 +878,17 @@ function initializeConversationState(): ConversationState {
     isHotLead: false,
     needsHumanAttention: false,
     triageCompleteness: 0,
+    leadTemperature: 'cold',
+    conversionScore: 0,
+    priorityLevel: 'low',
+    recommendedAction: 'continue_triage',
+    readyForHandoff: false,
+    commercialMomentDetected: false,
+    sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    handoffReason: undefined,
+    contactPreferences: undefined,
+    commercialStatus: undefined,
+    handoffPackage: undefined,
   };
 }
 
@@ -511,10 +956,22 @@ function updateConversationState(
       // Calcular completude da triagem
       newState.triageCompleteness = calculateTriageCompleteness(newState.collectedData);
       
+      // 🚀 CALCULAR LEAD SCORE E CAMPOS DE CONVERSÃO
+      const leadScoreResult = calculateLeadScore(newState, message);
+      newState.leadTemperature = leadScoreResult.temperature;
+      newState.conversionScore = leadScoreResult.score;
+      newState.priorityLevel = leadScoreResult.priorityLevel;
+      newState.recommendedAction = leadScoreResult.recommendedAction;
+      newState.readyForHandoff = leadScoreResult.readyForHandoff;
+      newState.commercialMomentDetected = leadScoreResult.commercialMomentDetected;
+      
+      // Atualizar isHotLead baseado no score
+      newState.isHotLead = leadScoreResult.temperature === 'hot' || newState.collectedData.nivel_urgencia === 'alta' || (newState.collectedData.prejuizo_ativo === true);
+      
       // Decidir handoff
       const handoffDecision = evaluateHandoff(newState);
-      newState.needsHumanAttention = handoffDecision.needsAttention;
-      newState.handoffReason = handoffDecision.reason;
+      newState.needsHumanAttention = handoffDecision.needsAttention || leadScoreResult.readyForHandoff;
+      newState.handoffReason = handoffDecision.reason || leadScoreResult.reasoning.join('; ');
       
       newState.currentStep = "resumo_encaminhamento";
       break;
@@ -588,6 +1045,48 @@ function extractUrgencyInfo(message: string): { level: 'baixa' | 'media' | 'alta
   return { level: 'baixa', hasActiveDamage };
 }
 
+function extractContactPreferences(message: string): {
+  channel: 'whatsapp' | 'ligacao' | 'consulta_online' | 'email' | null;
+  period: 'manha' | 'tarde' | 'noite' | 'qualquer_horario' | null;
+  urgency: 'hoje' | 'esta_semana' | 'proxima_semana' | 'sem_urgencia' | null;
+  availability: string;
+} {
+  const lowerMessage = message.toLowerCase();
+  
+  // Canal de contato
+  let channel: 'whatsapp' | 'ligacao' | 'consulta_online' | 'email' | null = null;
+  if (lowerMessage.includes('whatsapp') || lowerMessage.includes('zap')) channel = 'whatsapp';
+  else if (lowerMessage.includes('ligação') || lowerMessage.includes('ligar') || lowerMessage.includes('telefone')) channel = 'ligacao';
+  else if (lowerMessage.includes('consulta online') || lowerMessage.includes('online') || lowerMessage.includes('video')) channel = 'consulta_online';
+  else if (lowerMessage.includes('email') || lowerMessage.includes('e-mail')) channel = 'email';
+  
+  // Período do dia
+  let period: 'manha' | 'tarde' | 'noite' | 'qualquer_horario' | null = null;
+  if (lowerMessage.includes('manhã') || lowerMessage.includes('manha')) period = 'manha';
+  else if (lowerMessage.includes('tarde')) period = 'tarde';
+  else if (lowerMessage.includes('noite')) period = 'noite';
+  else if (lowerMessage.includes('qualquer horário') || lowerMessage.includes('qualquer hora') || lowerMessage.includes('flexível')) period = 'qualquer_horario';
+  
+  // Urgência
+  let urgency: 'hoje' | 'esta_semana' | 'proxima_semana' | 'sem_urgencia' | null = null;
+  if (lowerMessage.includes('hoje') || lowerMessage.includes('agora')) urgency = 'hoje';
+  else if (lowerMessage.includes('esta semana') || lowerMessage.includes('semana')) urgency = 'esta_semana';
+  else if (lowerMessage.includes('próxima semana') || lowerMessage.includes('proxima semana')) urgency = 'proxima_semana';
+  else if (lowerMessage.includes('sem urgência') || lowerMessage.includes('sem pressa') || lowerMessage.includes('quando puder')) urgency = 'sem_urgencia';
+  
+  // Disponibilidade textual
+  let availability = '';
+  if (channel || period || urgency) {
+    const parts = [];
+    if (channel) parts.push(`Canal: ${channel}`);
+    if (period) parts.push(`Período: ${period}`);
+    if (urgency) parts.push(`Urgência: ${urgency}`);
+    availability = parts.join(' | ');
+  }
+  
+  return { channel, period, urgency, availability };
+}
+
 function calculateTriageCompleteness(data: ConversationState['collectedData']): number {
   const fields = [
     data.area,
@@ -627,6 +1126,121 @@ function evaluateHandoff(state: ConversationState): { needsAttention: boolean; r
   return { needsAttention: false, reason: 'Continuar triagem automatizada' };
 }
 
+function shouldAdvanceToNextStage(state: ConversationState): boolean {
+  // Critérios para avançar para próximo estágio
+  if (state.commercialMomentDetected && state.conversionScore >= 70) return true;
+  if (state.triageCompleteness >= 80) return true;
+  if (state.readyForHandoff) return true;
+  if (state.recommendedAction === 'schedule_consultation' || state.recommendedAction === 'human_handoff') return true;
+  
+  return false;
+}
+
+// Handoff Package - Pacote completo para equipe humana
+function generateHandoffPackage(state: ConversationState, lastMessage: string): {
+  sessionId: string;
+  areaOfLaw: string;
+  issueSummary: string;
+  urgencyLevel: string;
+  hasDocuments: boolean;
+  clientGoal: string;
+  triageCompleteness: number;
+  leadTemperature: string;
+  conversionScore: number;
+  priorityLevel: string;
+  recommendedAction: string;
+  handoffReason: string;
+  lastUserMessage: string;
+  internalSummary: string;
+  commercialStatus: string;
+  timestamp: string;
+} {
+  const data = state.collectedData;
+  
+  return {
+    sessionId: state.sessionId || 'unknown',
+    areaOfLaw: data.area || 'não identificada',
+    issueSummary: data.problema_principal || 'não informado',
+    urgencyLevel: data.nivel_urgencia || 'baixa',
+    hasDocuments: data.tem_documentos || false,
+    clientGoal: data.objetivo_cliente || 'não informado',
+    triageCompleteness: state.triageCompleteness,
+    leadTemperature: state.leadTemperature,
+    conversionScore: state.conversionScore,
+    priorityLevel: state.priorityLevel,
+    recommendedAction: state.recommendedAction,
+    handoffReason: state.handoffReason || 'Pronto para análise humana',
+    lastUserMessage: lastMessage,
+    internalSummary: generateInternalSummary(state),
+    commercialStatus: determineCommercialStatus(state),
+    timestamp: new Date().toISOString()
+  };
+}
+
+function determineCommercialStatus(state: ConversationState): string {
+  if (state.readyForHandoff && state.leadTemperature === 'hot') {
+    return 'awaiting_human_contact';
+  }
+  if (state.readyForHandoff && state.leadTemperature === 'warm') {
+    return 'qualified';
+  }
+  if (state.commercialMomentDetected) {
+    return 'consultation_proposed';
+  }
+  return 'triage_in_progress';
+}
+
+function generateHandoffMessage(state: ConversationState, handoffType: 'hot_lead' | 'urgent' | 'warm_ready' | 'individual_analysis'): string {
+  const data = state.collectedData;
+  
+  switch (handoffType) {
+    case 'hot_lead':
+      return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente precisa de atenção especializada e rápida.\n\nVou organizar todo o contexto que você compartilhou e encaminhar para a equipe da Dra. Noêmia com prioridade máxima. Eles já receberão todas as informações importantes para começar a analisar seu caso.\n\nO que poucos entendem é que cada dia de espera pode impactar diretamente seu resultado. A equipe entrará em contato em até 2 horas úteis.\n\nEnquanto isso, se houver algum agravamento da situação, me avise imediatamente.`;
+      
+    case 'urgent':
+      return `Compreendo completamente a urgência e complexidade do seu caso. Situações como a sua exigem análise humana especializada imediata.\n\nVou encaminhar seu caso diretamente para a equipe da Dra. Noêmia com prioridade máxima e sinalização de urgência. Você receberá contato em até 1 hora útil.\n\nJá organizei todas as informações que você forneceu para que a equipe possa começar a trabalhar no seu caso assim que receber o encaminhamento.\n\nSe algo mudar ou piorar, me avise imediatamente.`;
+      
+    case 'warm_ready':
+      return `Excelente! Já estou entendendo bem seu cenário. Vejo que seu caso tem potencial e merece uma análise cuidadosa por parte da equipe especializada.\n\nVou preparar um resumo completo com todos os detalhes que você compartilhou e encaminhar para a Dra. Noêmia avaliar suas possibilidades reais.\n\nA equipe geralmente entra em contato em até 24 horas úteis para agendar uma conversa individual. Cada caso tem particularidades que só uma análise detalhada pode revelar.\n\nPosso já anotar alguma preferência de contato (WhatsApp, ligação) ou período (manhã, tarde, noite)?`;
+      
+    case 'individual_analysis':
+      return `Perfeito! Já consigo ver que há uma situação real que precisa ser entendida melhor por um profissional especializado.\n\nVou organizar todo o contexto que você compartilhou e encaminhar para a equipe da Dra. Noêmia fazer uma análise individual do seu caso.\n\nMuitas vezes o que parece complicado no início se torna mais claro com uma análise profissional. A Dra. Noêmia é especialista em identificar oportunidades que poucos percebem.\n\nA equipe entrará em contato em até 48 horas úteis para explorar suas possibilidades. Há alguma preferência de período para recebermos o contato?`;
+      
+    default:
+      return `Obrigada por compartilhar esses detalhes. Vou organizar sua informação e encaminhar para a equipe especializada analisar seu caso com atenção.`;
+  }
+}
+
+function generateConversionMessage(state: ConversationState): string {
+  const score = state.conversionScore;
+  const temperature = state.leadTemperature;
+  const action = state.recommendedAction;
+  
+  // 🚀 MENSAGENS PREMIUM DE CONVERSÃO
+  if (temperature === 'hot' && score >= 70) {
+    // LEAD QUENTE - Encaminhamento direto
+    if (action === 'schedule_consultation') {
+      return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente precisa de atenção especializada e rápida.\n\nO que poucos entendem é que cada dia de espera pode impactar diretamente seu resultado. Vou organizar tudo para a Dra. Noêmia analisar seu caso com prioridade máxima.\n\nGeralmente casos como o seu têm solução mais rápida do que imaginamos. Você prefere agendar uma consulta online ainda hoje ou falar primeiro com a equipe por WhatsApp?`;
+    }
+    if (action === 'human_handoff') {
+      return `Compreendo completamente a urgência e complexidade do seu caso. Situações como a sua exigem análise humana especializada imediata.\n\nVou encaminhar seu caso diretamente para a equipe da Dra. Noêmia com prioridade máxima. Você receberá contato em até 2 horas úteis.\n\nEnquanto isso, se houver algum agravamento da situação, me avise imediatamente.`;
+    }
+  }
+  
+  if (temperature === 'warm' && score >= 45) {
+    // LEAD MORNO - Condução qualificada
+    return `Excelente! Já estou entendendo bem seu cenário. Vejo que seu caso tem potencial e merece uma análise cuidadosa.\n\nPara te dar a orientação mais precisa possível, sugiro avançarmos para uma consulta individual. Cada caso tem particularidades que só uma análise detalhada pode revelar.\n\nPosso já organizar uma conversa com a Dra. Noêmia para avaliar suas opções reais?`;
+  }
+  
+  if (temperature === 'cold' && score >= 25) {
+    // LEAD FRIO COM POTENCIAL - Nutrir
+    return `Perfeito! Já consigo ver que há uma situação real que precisa ser entendida melhor.\n\nMuitas vezes o que parece complicado no início se torna mais claro com uma análise profissional. A Dra. Noêmia é especialista em identificar oportunidades que poucos percebem.\n\nQue tal agendarmos uma conversa inicial para explorar suas possibilidades? Sem compromisso, apenas para entender melhor seu caso.`;
+  }
+  
+  // PADRÃO - Continuar qualificação
+  return `Obrigada por compartilhar esses detalhes. Cada informação me ajuda a entender melhor seu cenário.\n\nPara te dar a orientação mais adequada, preciso entender alguns pontos específicos da sua situação. Podemos continuar?`;
+}
+
 function generateTriageResponse(
   state: ConversationState,
   classification: {
@@ -641,6 +1255,11 @@ function generateTriageResponse(
   const isShortResponse = previousMessage && shortResponses.some(sr => 
     previousMessage.toLowerCase().trim() === sr
   );
+
+  // VERIFICAR MOMENTO DE CONDUÇÃO
+  if (shouldAdvanceToNextStage(state)) {
+    return generateConversionMessage(state);
+  }
 
   switch (state.currentStep) {
     case "acolhimento":
@@ -671,11 +1290,16 @@ function generateTriageResponse(
       return `Obrigada por compartilhar isso comigo. Isso já me ajuda a ter uma visão mais clara.\n\nEssa situação está te causando algum prejuízo ou dificuldade agora?`;
 
     case "avaliacao_urgencia":
+      // VERIFICAR SE JÁ PODE CONDUZIR
+      if (state.commercialMomentDetected && state.conversionScore >= 60) {
+        return generateConversionMessage(state);
+      }
+      
       if (state.needsHumanAttention) {
         if (isShortResponse) {
-          return `Pelo que você me contou, isso realmente precisa de atenção ${state.collectedData.nivel_urgencia === 'alta' ? 'rápida' : 'especializada'}.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVou organizar tudo para a Dra. Noêmia analisar seu caso. Você prefere agendar uma consulta online ou falar primeiro por WhatsApp?`;
+          return `Pelo que você me contou, isso realmente precisa de atenção ${state.collectedData.nivel_urgencia === 'alta' ? 'rápida' : 'especializada'}.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVou organizar tudo para a Dra. Noêmia analisar seu caso. Você prefere agendar uma consulta online ou falar primeiro com a equipe por WhatsApp?`;
         }
-        return `Pelo que você me contou, isso realmente precisa de atenção ${state.collectedData.nivel_urgencia === 'alta' ? 'rápida' : 'especializada'}.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVou organizar tudo para a Dra. Noêmia analisar seu caso. Você prefere agendar uma consulta online ou falar primeiro por WhatsApp?`;
+        return `Pelo que você me contou, isso realmente precisa de atenção ${state.collectedData.nivel_urgencia === 'alta' ? 'rápida' : 'especializada'}.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVou organizar tudo para a Dra. Noêmia analisar seu caso. Você prefere agendar uma consulta online ou falar primeiro com a equipe por WhatsApp?`;
       }
 
       if (isShortResponse) {
@@ -684,12 +1308,8 @@ function generateTriageResponse(
       return `Perfeito... Já estou entendendo melhor seu cenário.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
 
     case "resumo_encaminhamento":
-      const summary = generateInternalSummary(state);
-      if (state.needsHumanAttention) {
-        return `Ótimo! Já organizei tudo o que você me contou.\n\n${generateUserFriendlySummary(state)}\n\nO melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia. Geralmente a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
-      }
-      
-      return `Entendi... Já estou organizando suas informações.\n\n${generateUserFriendlySummary(state)}\n\nPara te dar a melhor orientação possível, preciso mais alguns detalhes. Podemos continuar conversando ou você prefere já agendar uma análise com a Dra. Noêmia?`;
+      // SEMPRE CONDUZIR NESTE ESTÁGIO
+      return generateConversionMessage(state);
 
     default:
       return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nMe conta rapidinho o que aconteceu?`;
@@ -699,6 +1319,7 @@ function generateTriageResponse(
 function generateUserFriendlySummary(state: ConversationState): string {
   const data = state.collectedData;
   const parts: string[] = [];
+  // ... (rest of the code remains the same)
   
   if (data.area) parts.push(`Área: ${getAreaNome(data.area)}`);
   if (data.problema_principal) parts.push(`Situação: ${data.problema_principal.substring(0, 80)}${data.problema_principal.length > 80 ? '...' : ''}`);
@@ -1323,6 +1944,7 @@ export async function answerNoemia(
   sessionId?: string,
   urlContext?: unknown
 ) {
+  // ... (rest of the code remains the same)
   const input = askNoemiaSchema.parse(rawInput) as {
     audience: NoemiaUserType;
     message: string;
