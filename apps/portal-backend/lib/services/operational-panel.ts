@@ -221,7 +221,7 @@ class OperationalPanel {
 
     // Preparar mensagem sugerida
     let suggestedMessage;
-    if (priority.priorityLabel !== 'low') {
+    if (priority.label !== 'low') {
       suggestedMessage = await this.prepareSuggestedMessage(client.id, pipeline.id, pipeline.source_channel);
     }
 
@@ -470,7 +470,7 @@ class OperationalPanel {
         const nextFollowUpToday = pipeline.next_follow_up_at ? pipeline.next_follow_up_at.split('T')[0] === today : false;
 
         // Contadores básicos
-        if (!pipeline.clients.is_client) {
+        if (!pipeline.clients[0]?.is_client) {
           metrics.totalLeads++;
         } else {
           metrics.totalClients++;

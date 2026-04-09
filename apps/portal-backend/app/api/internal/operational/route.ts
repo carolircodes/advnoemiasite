@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { operationalPanel } from "@/lib/services/operational-panel";
+import { assistedFollowUpService } from "@/lib/services/assisted-follow-up";
+import { followUpResponseHandler } from "@/lib/services/follow-up-response-handler";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const { action, clientId, pipelineId, filters, limit, offset, actionType, value, notes } = body;
+    const { action, clientId, pipelineId, filters, limit, offset, actionType, value, notes, channel, content, approvedBy, followUpMessageId } = body;
 
     if (action === 'getPanelData') {
       // Obter dados completos do painel
@@ -95,9 +97,59 @@ export async function POST(request: NextRequest) {
         }
       });
 
+    } else if (action === 'sendAssistedFollowUp') {
+      // Enviar follow-up assistido
+      if (!clientId || !pipelineId || !channel || !content || !approvedBy) {
+        return NextResponse.json(
+          { error: 'clientId, pipelineId, channel, content, and approvedBy are required for sendAssistedFollowUp' },
+          { status: 400 }
+        );
+      }
+
+      const result = await assistedFollowUpService.sendAssistedFollowUp({
+        clientId,
+        pipelineId,
+        channel,
+        content,
+        approvedBy,
+        followUpMessageId
+      });
+
+      return NextResponse.json({
+        success: result.success,
+        data: result,
+        message: result.success ? 'Follow-up enviado com sucesso' : 'Falha ao enviar follow-up'
+      });
+
+    } else if (action === 'getClientChannels') {
+      // Obter canais disponíveis para um cliente
+      if (!clientId) {
+        return NextResponse.json(
+          { error: 'clientId is required for getClientChannels' },
+          { status: 400 }
+        );
+      }
+
+      const channelsResult = await assistedFollowUpService.getClientAvailableChannels(clientId);
+      
+      return NextResponse.json({
+        success: channelsResult.success,
+        data: channelsResult.channels,
+        error: channelsResult.error
+      });
+
+    } else if (action === 'getFollowUpMetrics') {
+      // Obter métricas de follow-up
+      const stats = await followUpResponseHandler.getFollowUpResponseStats(clientId);
+      
+      return NextResponse.json({
+        success: true,
+        data: stats
+      });
+
     } else {
       return NextResponse.json(
-        { error: 'Invalid action. Supported actions: getPanelData, getContacts, getMetrics, applyAction, generateSuggestedMessage' },
+        { error: 'Invalid action. Supported actions: getPanelData, getContacts, getMetrics, applyAction, generateSuggestedMessage, sendAssistedFollowUp, getClientChannels, getFollowUpMetrics' },
         { status: 400 }
       );
     }

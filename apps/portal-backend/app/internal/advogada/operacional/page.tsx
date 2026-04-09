@@ -221,6 +221,10 @@ export default function OperationalPanel() {
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [selectedContact, setSelectedContact] = useState<OperationalContact | null>(null);
   const [showSuggestedMessage, setShowSuggestedMessage] = useState(false);
+  const [showAssistedSend, setShowAssistedSend] = useState(false);
+  const [availableChannels, setAvailableChannels] = useState<Array<{ channel: string; externalUserId: string; lastContactAt?: string }>>([]);
+  const [selectedChannel, setSelectedChannel] = useState<'whatsapp' | 'instagram' | ''>('');
+  const [messageContent, setMessageContent] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -343,6 +347,97 @@ export default function OperationalPanel() {
     } finally {
       setActionLoading(null);
     }
+  }
+
+  async function loadClientChannels(contact: OperationalContact) {
+    setActionLoading(`${contact.clientId}:loadChannels`);
+
+    try {
+      const response = await fetch('/api/internal/operational', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'getClientChannels',
+          clientId: contact.clientId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result?.success) {
+        setAvailableChannels(result.data || []);
+        setSelectedContact(contact);
+        setShowAssistedSend(true);
+        
+        // Pré-selecionar canal se houver apenas um
+        if (result.data && result.data.length === 1) {
+          setSelectedChannel(result.data[0].channel as 'whatsapp' | 'instagram');
+        }
+        
+        // Pré-preencher conteúdo se houver mensagem sugerida
+        if (contact.suggestedMessage?.content) {
+          setMessageContent(contact.suggestedMessage.content);
+          if (contact.suggestedMessage.channel) {
+            setSelectedChannel(contact.suggestedMessage.channel as 'whatsapp' | 'instagram');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading client channels:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function sendAssistedFollowUp() {
+    if (!selectedContact || !selectedChannel || !messageContent.trim()) {
+      alert('Preencha todos os campos antes de enviar.');
+      return;
+    }
+
+    setActionLoading(`${selectedContact.clientId}:sendAssistedFollowUp`);
+
+    try {
+      const response = await fetch('/api/internal/operational', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sendAssistedFollowUp',
+          clientId: selectedContact.clientId,
+          pipelineId: selectedContact.clientId,
+          channel: selectedChannel,
+          content: messageContent.trim(),
+          approvedBy: 'staff_user', // TODO: pegar do contexto de autenticação
+          followUpMessageId: selectedContact.suggestedMessage ? undefined : undefined
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result?.success) {
+        // Fechar modal e recarregar dados
+        setShowAssistedSend(false);
+        setSelectedContact(null);
+        setSelectedChannel('');
+        setMessageContent('');
+        setAvailableChannels([]);
+        await loadPanelData();
+        
+        alert('Mensagem enviada com sucesso!');
+      } else {
+        alert(`Erro ao enviar mensagem: ${result?.error || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      console.error('Error sending assisted follow-up:', error);
+      alert('Erro ao enviar mensagem. Tente novamente.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function openAssistedSendModal(contact: OperationalContact) {
+    // Carregar canais disponíveis antes de abrir modal
+    void loadClientChannels(contact);
   }
 
   function getPriorityTone(priority: string): 'red' | 'orange' | 'gray' {
@@ -687,6 +782,15 @@ export default function OperationalPanel() {
 
                   <ActionButton
                     variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:loadChannels`}
+                    onClick={() => void openAssistedSendModal(contact)}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Enviar mensagem
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
                     disabled={actionLoading === `${contact.clientId}:mark_consultation_offered`}
                     onClick={() => void applyOperationalAction(contact, 'mark_consultation_offered')}
                   >
@@ -775,9 +879,139 @@ export default function OperationalPanel() {
                 <ActionButton variant="outline" onClick={() => setShowSuggestedMessage(false)}>
                   Fechar
                 </ActionButton>
-                <ActionButton variant="primary">
+                <ActionButton variant="primary" onClick={() => {
+                  setShowSuggestedMessage(false);
+                  void openAssistedSendModal(selectedContact);
+                }}>
                   <Send className="mr-2 h-4 w-4" />
                   Enviar mensagem
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showAssistedSend && selectedContact ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[#ddd4c3] bg-white shadow-[0_25px_60px_rgba(0,0,0,0.18)]">
+            <div className="flex items-center justify-between border-b border-[#eee7da] px-6 py-5">
+              <div>
+                <h3 className="text-lg font-semibold text-[#10261d]">Enviar mensagem assistida</h3>
+                <p className="mt-1 text-sm text-[#64746d]">
+                  Revise e edite o conteúdo antes de enviar.
+                </p>
+              </div>
+
+              <ActionButton variant="ghost" onClick={() => {
+                setShowAssistedSend(false);
+                setSelectedContact(null);
+                setSelectedChannel('');
+                setMessageContent('');
+                setAvailableChannels([]);
+              }}>
+                <X className="h-4 w-4" />
+              </ActionButton>
+            </div>
+
+            <div className="space-y-5 px-6 py-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-[#ece4d5] bg-[#faf7f0] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">Cliente</p>
+                  <p className="mt-2 text-sm font-medium text-[#10261d]">{selectedContact.fullName}</p>
+                  <p className="mt-1 text-xs text-[#6a7a73]">{selectedContact.phone}</p>
+                </div>
+                <div className="rounded-2xl border border-[#ece4d5] bg-[#faf7f0] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">Estágio atual</p>
+                  <p className="mt-2 text-sm font-medium text-[#10261d]">{formatStageLabel(selectedContact.pipelineStage)}</p>
+                  <StatusChip tone={getTemperatureTone(selectedContact.leadTemperature)}>
+                    {selectedContact.leadTemperature === 'hot' ? 'Quente' : selectedContact.leadTemperature === 'warm' ? 'Morno' : 'Frio'}
+                  </StatusChip>
+                </div>
+              </div>
+
+              <div>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-[#6b614c]">Canal de envio</span>
+                  {availableChannels.length === 0 ? (
+                    <div className="rounded-xl border border-[#d8d2c4] bg-[#fff8f0] p-4">
+                      <p className="text-sm text-[#9a5d09]">
+                        Nenhum canal disponível para este cliente. O cliente precisa ter WhatsApp ou Instagram cadastrado.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableChannels.map((channel) => (
+                        <label key={channel.channel} className="flex items-center gap-3 rounded-xl border border-[#d8d2c4] bg-white p-4 cursor-pointer hover:bg-[#f8f4ec] transition">
+                          <input
+                            type="radio"
+                            name="channel"
+                            value={channel.channel}
+                            checked={selectedChannel === channel.channel}
+                            onChange={(e) => setSelectedChannel(e.target.value as 'whatsapp' | 'instagram')}
+                            className="text-[#10261d]"
+                          />
+                          <div className="flex items-center gap-2">
+                            {getChannelIcon(channel.channel)}
+                            <span className="text-sm font-medium text-[#10261d] capitalize">{channel.channel}</span>
+                          </div>
+                          {channel.lastContactAt && (
+                            <span className="text-xs text-[#6a7a73] ml-auto">
+                              Último contato: {formatDate(channel.lastContactAt)}
+                            </span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              <div>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-[#6b614c]">Mensagem</span>
+                  <textarea
+                    className="w-full rounded-xl border border-[#d8d2c4] bg-white px-4 py-3 text-sm text-[#10261d] outline-none transition focus:border-[#b58d49] focus:ring-2 focus:ring-[#eadcb8] resize-none"
+                    rows={6}
+                    placeholder="Digite sua mensagem aqui..."
+                    value={messageContent}
+                    onChange={(e) => setMessageContent(e.target.value)}
+                  />
+                  <p className="text-xs text-[#6a7a73]">
+                    {messageContent.length} caracteres
+                  </p>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <ActionButton 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowAssistedSend(false);
+                    setSelectedContact(null);
+                    setSelectedChannel('');
+                    setMessageContent('');
+                    setAvailableChannels([]);
+                  }}
+                >
+                  Cancelar
+                </ActionButton>
+                <ActionButton 
+                  variant="primary"
+                  disabled={!selectedChannel || !messageContent.trim() || actionLoading === `${selectedContact.clientId}:sendAssistedFollowUp`}
+                  onClick={() => void sendAssistedFollowUp()}
+                >
+                  {actionLoading === `${selectedContact.clientId}:sendAssistedFollowUp` ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Enviar mensagem
+                    </>
+                  )}
                 </ActionButton>
               </div>
             </div>
