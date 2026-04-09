@@ -6,6 +6,7 @@ import { antiSpamGuard } from "../../../../lib/services/anti-spam-guard";
 import { instagramCommentAutomation } from "../../../../lib/services/instagram-comment-automation";
 import { instagramCommentContext } from "../../../../lib/services/instagram-comment-context";
 import { instagramMessageGuard } from "../../../../lib/services/instagram-message-guard";
+import { instagramKeywordAutomation } from "../../../../lib/services/instagram-keyword-automation";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -497,7 +498,11 @@ export async function POST(request: NextRequest) {
   console.log("=== META WEBHOOK POST REQUEST ===");
   console.log("META_WEBHOOK_URL:", request.url);
   console.log("META_WEBHOOK_METHOD:", request.method);
-  console.log("META_WEBHOOK_HEADERS:", Object.fromEntries(request.headers.entries()));
+  const headersObj: Record<string, string> = {};
+  request.headers.forEach((value, key) => {
+    headersObj[key] = value;
+  });
+  console.log("META_WEBHOOK_HEADERS:", headersObj);
 
   try {
     const rawBuffer = Buffer.from(await request.arrayBuffer());
@@ -596,7 +601,40 @@ export async function POST(request: NextRequest) {
               console.log("  - COMMENT_TEXT:", comment.text);
               console.log("  - POST_ID:", comment.media?.id || "N/A");
 
-              // FASE 2, 3, 4, 6, 7: Processar com sistema completo de automação
+              // FASE 1: Processar automação por palavra-chave
+              try {
+                const keywordResult = await instagramKeywordAutomation.processKeywordAutomation(
+                  comment.id,
+                  comment.from.id,
+                  comment.text,
+                  comment.media?.id || '',
+                  comment.from.username
+                );
+
+                if (keywordResult.success) {
+                  console.log("KEYWORD_AUTOMATION_SUCCESS", {
+                    commentId: comment.id,
+                    userId: comment.from.id,
+                    keyword: keywordResult.keyword,
+                    theme: keywordResult.theme,
+                    dmSent: keywordResult.dmSent,
+                    sessionCreated: keywordResult.sessionCreated
+                  });
+                } else {
+                  console.log("KEYWORD_AUTOMATION_SKIPPED", {
+                    commentId: comment.id,
+                    userId: comment.from.id,
+                    reason: keywordResult.error
+                  });
+                }
+              } catch (keywordError) {
+                console.log("KEYWORD_AUTOMATION_ERROR", {
+                  commentId: comment.id,
+                  error: keywordError instanceof Error ? keywordError.message : String(keywordError)
+                });
+              }
+
+              // FASE 2: Processar com sistema completo de automação (campanhas existentes)
               await processInstagramCommentWithAutomation(comment);
             }
             

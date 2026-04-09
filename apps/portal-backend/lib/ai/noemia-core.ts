@@ -480,30 +480,30 @@ function generateTriageResponse(
 
   switch (state.currentStep) {
     case "acolhimento":
-      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta, de forma simples, o que aconteceu no seu caso?`;
+      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta rapidinho o que aconteceu no seu caso?`;
 
     case "identificacao_area":
       const areaNome = classification.theme === "previdenciario" ? "previdenciária" : classification.theme === "bancario" ? "bancária" : classification.theme === "familia" ? "de família" : classification.theme === "civil" ? "cível" : "jurídica";
       return `Olha... o interessante é que cada área tem detalhes que pouca gente conhece.\n\nPelo que você descreveu, seu caso parece estar na área ${areaNome}.\n\nO que mais te preocupa nessa história toda?`;
 
     case "entendimento_situacao":
-      return `Entendi... Geralmente o que mais surpreende é que o momento certo de agir faz toda a diferença.\n\nIsso que você mencionou aconteceu há quanto tempo?`;
+      return `Entendi... O momento certo de agir faz toda a diferença.\n\nIsso que você mencionou aconteceu há quanto tempo?`;
 
     case "identificacao_urgencia":
       if (state.isHotLead) {
         return `Pelo que você me contou, isso realmente precisa de atenção rápida.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVocê prefere atendimento online agora mesmo ou presencial?`;
       }
 
-      return `Perfeito... Já estou entendendo melhor o seu cenário.\n\nVocê está começando a entender isso agora ou já chegou a ver algo sobre o seu caso antes?`;
+      return `Perfeito... Já estou entendendo melhor seu cenário.\n\nVocê está começando a entender isso agora ou já pesquisou algo sobre seu caso antes?`;
 
     case "conducao_proximo_passo":
-      return `Obrigada por compartilhar isso comigo.\n\nO que pouca gente sabe é que existem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
+      return `Obrigada por compartilhar isso comigo.\n\nExistem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
 
     case "conversao":
-      return `Perfeito. O melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia.\n\nGeralmente o que mais surpreende é que a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
+      return `Perfeito. O melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia.\n\nGeralmente a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
 
     default:
-      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia.\n\nMe conta, de forma simples, o que aconteceu?`;
+      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nMe conta rapidinho o que aconteceu?`;
   }
 }
 
@@ -575,10 +575,10 @@ function buildSystemPrompt(
     "- 'Isso está acontecendo agora ou já faz algum tempo?'",
     "",
     "RESPOSTAS ESPECIAIS:",
-    "- Para 'oi': 'Olá! Que bom que você chegou. Faço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia. Como posso ajudar você hoje?'",
-    "- Para 'boa tarde': 'Boa tarde! Faço parte da equipe do escritório Noêmia Paixão Advocacia. Conte-me, o que está acontecendo?'",
-    "- Para 'você é advogada?': 'Faço parte da equipe de atendimento do escritório, aqui para te ajudar a organizar tudo. A Dra. Noêmia é nossa advogada especialista. Sobre o seu caso, o que aconteceu?'",
-    "- Para 'quero saber se tenho direito': 'Faz sentido você querer entender seus direitos. Dependendo da situação, pode existir algo que ainda não foi reconhecido. Me conta o que aconteceu?'",
+    "- Para 'oi': 'Olá! Que bom que você chegou por aqui. Faço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia. Me conta rapidinho o que está acontecendo...'",
+    "- Para 'boa tarde': 'Boa tarde! Estou aqui para te ajudar. Faço parte da equipe do escritório Noêmia Paixão Advocacia. O que está acontecendo no seu caso?'",
+    "- Para 'você é advogada?': 'Faço parte da equipe de atendimento do escritório, aqui para te organizar tudo. A Dra. Noêmia é nossa advogada especialista. Me conta o que aconteceu no seu caso?'",
+    "- Para 'quero saber se tenho direito': 'Faz sentido você querer entender seus direitos. Dependendo da situação, pode existir algo que ainda não foi reconhecido. Quero entender melhor seu caso para te orientar com precisão.'",
     "- Para respostas curtas ('não', 'sim', 'quero'): retome contexto + continue conduzindo",
     "",
     "O QUE NUNCA FAZER:",
@@ -737,26 +737,26 @@ function generateFallbackResponse(
   const saudacao = getSaudacao();
 
   if (intent === "greeting") {
-    return `Olá! Que bom que você chegou. Faço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nFaz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nMe conta, de forma simples, o que aconteceu no seu caso?`;
+    return `Olá! Que bom que você chegou por aqui. Faço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nFaz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nMe conta rapidinho o que está acontecendo...`;
   }
 
   if (intent === "agenda_request") {
-    return `Claro... O interessante é que cada caso tem o melhor momento para agir.\n\nVocê está querendo agendar agora ou entender melhor sua situação primeiro?`;
+    return `Claro... Cada caso tem o melhor momento para agir.\n\nVocê quer agendar agora ou entender melhor sua situação primeiro?`;
   }
 
   if (intent === "case_request" && userType !== "visitor") {
-    return `Entendi... Geralmente o que mais surpreende é que pequenos detalhes podem mudar tudo.\n\nVocê quer saber sobre andamento, documentos ou próximo passo?`;
+    return `Entendi... Pequenos detalhes podem mudar tudo.\n\nVocê quer saber sobre andamento, documentos ou próximo passo?`;
   }
 
   if (intent === "document_request" && userType !== "visitor") {
-    return `Perfeito... O que pouca gente sabe é que os documentos certos fazem toda a diferença.\n\nVocê precisa enviar algo agora ou quer saber o que é necessário?`;
+    return `Perfeito... Os documentos certos fazem toda a diferença.\n\nVocê precisa enviar algo agora ou quer saber o que é necessário?`;
   }
 
   if (detectedTheme) {
-    return `Olha... o interessante é que cada área tem detalhes que pouca gente conhece.\n\nSeu caso parece estar relacionado a ${detectedTheme}.\n\nO que mais te preocupa nessa história?`;
+    return `Olha... cada área tem detalhes que pouca gente conhece.\n\nSeu caso parece estar relacionado a ${detectedTheme}.\n\nO que mais te preocupa nessa história?`;
   }
 
-  return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia.\n\nMe conta, de forma simples, o que aconteceu?`;
+  return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nMe conta rapidinho o que aconteceu?`;
 }
 
 export async function processNoemiaCore(
