@@ -17,7 +17,6 @@ export interface ClientChannel {
   channel: 'whatsapp' | 'instagram' | 'site' | 'portal';
   external_user_id: string;
   external_thread_id?: string;
-  is_active: boolean;
   last_contact_at: string;
   created_at: string;
   updated_at: string;
@@ -79,7 +78,6 @@ class ClientIdentityService {
         `)
         .eq('channel', input.channel)
         .eq('external_user_id', input.externalUserId)
-        .eq('is_active', true)
         .single();
 
       if (channelError && channelError.code !== 'PGRST116') { // PGRST116 = not found
@@ -131,7 +129,7 @@ class ClientIdentityService {
       // 3. Se NÃO encontrar, criar novo fluxo
       console.log('CLIENT_CHANNEL_NOT_FOUND - CREATING NEW');
 
-      // 3.1 Criar novo client
+      // 3.1 Criar novo client (sem profile_id - apenas para identidade)
       const newClientData: any = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -377,7 +375,6 @@ class ClientIdentityService {
         .from('client_channels')
         .select('*')
         .eq('client_id', clientId)
-        .eq('is_active', true)
         .order('last_contact_at', { ascending: false });
 
       if (error) {
