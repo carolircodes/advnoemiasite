@@ -10,14 +10,31 @@ import { PortalProfile } from "../auth/guards";
 import { askNoemiaSchema } from "../domain/portal";
 
 // Types
+type NoemiaChannel = "site" | "portal" | "whatsapp" | "instagram";
+type NoemiaUserType = "visitor" | "client" | "staff" | "unknown";
+
+type ConversationStep = "acolhimento" | "identificacao_area" | "entendimento_situacao" | "identificacao_urgencia" | "conducao_proximo_passo" | "conversao";
+
+interface ConversationState {
+  currentStep: ConversationStep;
+  collectedData: {
+    area?: string;
+    situacao?: string;
+    urgencia?: string;
+    detalhes?: string[];
+  };
+  isHotLead: boolean;
+}
+
 interface NoemiaCoreInput {
-  channel: "site" | "portal" | "whatsapp" | "instagram";
-  userType: "visitor" | "client" | "staff" | "unknown";
+  channel: NoemiaChannel;
+  userType: NoemiaUserType;
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   context?: any;
   metadata?: any;
   profile?: PortalProfile | null;
+  conversationState?: ConversationState;
 }
 
 interface NoemiaCoreOutput {
@@ -38,6 +55,7 @@ interface NoemiaCoreOutput {
       intent: "curiosity" | "lead_interest" | "support" | "appointment_interest";
       leadTemperature: "cold" | "warm" | "hot";
     };
+    conversationState?: ConversationState;
   };
 }
 
@@ -162,6 +180,94 @@ function classifyMessage(message: string): {
   }
   
   return { theme, intent, leadTemperature };
+}
+
+// Funções de triagem inteligente
+function initializeConversationState(): ConversationState {
+  return {
+    currentStep: "acolhimento",
+    collectedData: {},
+    isHotLead: false
+  };
+}
+
+function updateConversationState(state: ConversationState, message: string, classification: any): ConversationState {
+  const newState = { ...state };
+  
+  // Atualizar dados coletados baseado no step atual
+  switch (state.currentStep) {
+    case "acolhimento":
+      newState.currentStep = "identificacao_area";
+      newState.collectedData.area = classification.theme;
+      break;
+      
+    case "identificacao_area":
+      newState.currentStep = "entendimento_situacao";
+      newState.collectedData.situacao = message;
+      break;
+      
+    case "entendimento_situacao":
+      newState.currentStep = "identificacao_urgencia";
+      newState.collectedData.urgencia = classification.leadTemperature;
+      newState.isHotLead = classification.leadTemperature === "hot";
+      break;
+      
+    case "identificacao_urgencia":
+      newState.currentStep = newState.isHotLead ? "conversao" : "conducao_proximo_passo";
+      break;
+      
+    case "conducao_proximo_passo":
+      // Continuar coletando detalhes
+      if (!newState.collectedData.detalhes) {
+        newState.collectedData.detalhes = [];
+      }
+      newState.collectedData.detalhes.push(message);
+      break;
+      
+    case "conversao":
+      newState.currentStep = "conversao";
+      break;
+  }
+  
+  return newState;
+}
+
+function generateTriageResponse(state: ConversationState, message: string, classification: any): string {
+  const saudacao = getSaudacao();
+  
+  switch (state.currentStep) {
+    case "acolhimento":
+      return `${saudacao}! Entendi... obrigada por me contar isso \nSou a assistente virtual do escritório da Dra. Noêmia. Para começar nossa triagem, me conte um pouco sobre o que está acontecendo.`;
+      
+    case "identificacao_area":
+      return `Entendi... parece que seu caso está relacionado à área de ${state.collectedData.area || 'direito geral'}.\nEssa é uma área importante e precisa ser analisada com cuidado.\nPara eu entender melhor sua situação específica, você poderia me dar mais detalhes sobre o que aconteceu?`;
+      
+    case "entendimento_situacao":
+      return `Certo... estou compreendendo sua situação.\n${state.collectedData.area === 'previdenciario' ? 'No direito previdenciário, existem diferentes caminhos...' : state.collectedData.area === 'bancario' ? 'Em questões bancárias, podemos ter várias abordagens...' : 'Em casos como o seu, precisamos analisar os detalhes...'}\nPara eu te ajudar melhor, qual é o nível de urgência dessa situação para você?`;
+      
+    case "identificacao_urgencia":
+      if (state.isHotLead) {
+        return `Entendi... percebo que isso é urgente e está te causando preocupação \nSituações como essa precisam de atenção imediata da Dra. Noêmia.\nPara te atender com a prioridade necessária, posso agendar uma consulta emergencial para hoje ou amanhã. Você prefere atendimento online ou presencial?`;
+      } else {
+        return `Entendi... anotei a importância disso para você.\nVamos continuar com a triagem para entender todos os aspectos do seu caso.\nAlém do que você já me contou, existe algum outro detalhe relevante que eu deva saber?`;
+      }
+      
+    case "conducao_proximo_passo":
+      return `Obrigada por esse detalhe adicional... estou montando um quadro completo da sua situação.\n${state.isHotLead ? 'Pelo que você me descreveu, realmente precisa de atenção especializada. Posso te conectar diretamente com a Dra. Noêmia para uma consulta prioritária?' : 'Com base no que você compartilhou, o próximo passo seria uma análise mais aprofundada. Você gostaria de agendar uma consulta para discutirmos seu caso detalhadamente?'}`;
+      
+    case "conversao":
+      return `Perfeito! Vou te conectar agora com a equipe da Dra. Noêmia.\nSua consulta será priorizada e você receberá uma ligação em até 30 minutos para confirmar o horário.\nEnquanto aguardam, tenha à mão seus documentos básicos (RG, CPF, comprovante de residência).`;
+      
+    default:
+      return `${saudacao}! Sou a assistente virtual do escritório da Dra. Noêmia. Como posso te ajudar hoje? `;
+  }
+}
+
+function getSaudacao(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
 }
 
 function buildSystemPrompt(channel: string, userType: string, context?: string): string {
@@ -390,8 +496,13 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
   // Classificação estruturada
   const classification = classifyMessage(input.message);
   
-  // Log padronizado com classificação
+  // Obter ou inicializar estado da conversação
+  const conversationState = input.conversationState || initializeConversationState();
+  const newConversationState = updateConversationState(conversationState, input.message, classification);
+  
+  // Log padronizado com classificação e estado
   console.log(`NOEMIA_CORE_START: ${input.channel} | ${input.userType} | ${classification.theme} | ${classification.intent} | ${classification.leadTemperature}`);
+  console.log(`NOEMIA_CORE_STEP: ${conversationState.currentStep} -> ${newConversationState.currentStep}`);
   console.log(`NOEMIA_CORE_MESSAGE: ${input.message.substring(0, 100)}...`);
   
   try {
@@ -424,7 +535,9 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
           responseTime: Date.now() - startTime,
           detectedTheme: detectedTheme || undefined,
           channel: input.channel,
-          openaiUsed: false
+          openaiUsed: false,
+          classification,
+          conversationState: newConversationState
         }
       };
     }
@@ -451,18 +564,19 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
           detectedTheme: detectedTheme || undefined,
           channel: input.channel,
           openaiUsed: true,
-          classification
+          classification,
+          conversationState: newConversationState
         }
       };
     }
     
-    // Fallback se OpenAI falhar
+    // Fallback se OpenAI falhar - usar triagem inteligente
     console.log(`NOEMIA_CORE_FALLBACK: ${input.channel} | ${openaiResult.error}`);
     
-    const fallbackResponse = generateFallbackResponse(intent, effectiveAudience, input.channel, detectedTheme || undefined);
+    const triageResponse = generateTriageResponse(newConversationState, input.message, classification);
     
     return {
-      reply: fallbackResponse,
+      reply: triageResponse,
       intent,
       audience: effectiveAudience,
       source: 'fallback',
@@ -473,7 +587,8 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
         detectedTheme: detectedTheme || undefined,
         channel: input.channel,
         openaiUsed: false,
-        classification
+        classification,
+        conversationState: newConversationState
       }
     };
     
@@ -493,15 +608,9 @@ export async function processNoemiaCore(input: NoemiaCoreInput): Promise<NoemiaC
       error: errorMessage,
       metadata: {
         responseTime: Date.now() - startTime,
+        detectedTheme: detectLegalTheme(input.message) || undefined,
         channel: input.channel,
         openaiUsed: false,
-        classification
-      }
-    };
-  }
-}
-
-// Função para processar comentários do Instagram/Facebook
 export async function processComment(
   commentText: string,
   platform: 'instagram' | 'facebook',
