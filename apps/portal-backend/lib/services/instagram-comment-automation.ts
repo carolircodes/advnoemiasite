@@ -23,6 +23,7 @@ export interface CommentEvent {
   keyword_matched: string;
   public_replied: boolean;
   dm_sent: boolean;
+  session_created: boolean;
   campaign_id: string;
   username?: string;
   user_full_name?: string;

@@ -24,16 +24,17 @@ export async function POST(request: Request) {
     // Usar o Noemia Core centralizado
     try {
       const coreResponse = await processNoemiaCore({
-        channel: 'site', // ou 'portal' dependendo do contexto
-        userType: profile?.role === 'cliente' ? 'client' : profile?.role !== 'cliente' ? 'staff' : 'visitor',
+        channel: payload.channel || 'site', // ou 'portal' dependendo do contexto
+        userType: payload.userType || (profile?.role === 'cliente' ? 'client' : profile?.role !== 'cliente' ? 'staff' : 'visitor'),
         message: payload.message,
-        history: [], // TODO: implementar histórico se necessário
+        history: payload.history || [], // TODO: implementar histórico se necessário
         context: metaContext,
         metadata: { 
           currentPath: payload.currentPath,
           url: request.url 
         },
-        profile
+        profile,
+        conversationState: payload.conversationState
       });
 
       // Converter para formato compatível

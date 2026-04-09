@@ -1,27 +1,11 @@
 /**
- * DASHBOARD DE TRIAGEM DA NOEMIA
+ * DASHBOARD DE TRIAGEM DA NOEMIA - VERSÃO SIMPLIFICADA
  * 
  * Dashboard para visualização e gestão das triagens conversacionais
+ * Versão sem dependências externas de UI components
  */
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle, 
-  User, 
-  Calendar,
-  FileText,
-  TrendingUp,
-  Filter,
-  Download,
-  Eye
-} from 'lucide-react';
 
 // Tipos para os dados da triagem
 interface TriageSummary {
@@ -69,6 +53,7 @@ export default function TriageDashboard() {
   const [report, setReport] = useState<TriageReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTriage, setSelectedTriage] = useState<TriageSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<'needs-attention' | 'hot-leads' | 'all'>('needs-attention');
 
   // Carregar dados
   useEffect(() => {
@@ -124,10 +109,10 @@ export default function TriageDashboard() {
 
   const getUrgencyColor = (urgency?: string) => {
     switch (urgency) {
-      case 'alta': return 'destructive';
-      case 'media': return 'default';
-      case 'baixa': return 'secondary';
-      default: return 'secondary';
+      case 'alta': return '#dc2626';
+      case 'media': return '#2563eb';
+      case 'baixa': return '#6b7280';
+      default: return '#6b7280';
     }
   };
 
@@ -166,177 +151,159 @@ export default function TriageDashboard() {
           <p className="text-gray-600 mt-1">Gerenciamento das triagens conversacionais da NoemIA</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </Button>
-          <Button onClick={loadTriageData} size="sm">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
+          <button 
+            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            onClick={() => {/* TODO: export */}}
+          >
+            ð Exportar
+          </button>
+          <button 
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={loadTriageData}
+          >
+            ð Atualizar
+          </button>
         </div>
       </div>
 
       {/* Cards de Métricas */}
       {report && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total de Triagens</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{report.total}</div>
-              <p className="text-xs text-gray-500 mt-1">Últimos 30 dias</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Total de Triagens</h3>
+            <div className="text-2xl font-bold">{report.total}</div>
+            <p className="text-xs text-gray-500 mt-1">Últimos 30 dias</p>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Hot Leads</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{report.hotLeads}</div>
-              <p className="text-xs text-gray-500 mt-1">Atenção prioritária</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Hot Leads</h3>
+            <div className="text-2xl font-bold text-red-600">{report.hotLeads}</div>
+            <p className="text-xs text-gray-500 mt-1">Atenção prioritária</p>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Precisam Atenção</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{report.needsAttention}</div>
-              <p className="text-xs text-gray-500 mt-1">Aguardando análise</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Precisam Atenção</h3>
+            <div className="text-2xl font-bold text-orange-600">{report.needsAttention}</div>
+            <p className="text-xs text-gray-500 mt-1">Aguardando análise</p>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Completude Média</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{report.averageCompleteness}%</div>
-              <p className="text-xs text-gray-500 mt-1">Qualidade das triagens</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Completude Média</h3>
+            <div className="text-2xl font-bold">{report.averageCompleteness}%</div>
+            <p className="text-xs text-gray-500 mt-1">Qualidade das triagens</p>
+          </div>
         </div>
       )}
 
       {/* Gráficos e Estatísticas */}
       {report && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Por Área Jurídica</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {Object.entries(report.byArea).map(([area, count]) => (
-                  <div key={area} className="flex justify-between items-center">
-                    <span className="text-sm capitalize">{area}</span>
-                    <Badge variant="outline">{count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-lg font-semibold mb-4">Por Área Jurídica</h3>
+            <div className="space-y-2">
+              {Object.entries(report.byArea).map(([area, count]) => (
+                <div key={area} className="flex justify-between items-center">
+                  <span className="text-sm capitalize">{area}</span>
+                  <span className="px-2 py-1 bg-gray-100 rounded text-xs">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Por Canal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {Object.entries(report.byChannel).map(([channel, count]) => (
-                  <div key={channel} className="flex justify-between items-center">
-                    <span className="text-sm">{getChannelIcon(channel)} {channel}</span>
-                    <Badge variant="outline">{count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-lg font-semibold mb-4">Por Canal</h3>
+            <div className="space-y-2">
+              {Object.entries(report.byChannel).map(([channel, count]) => (
+                <div key={channel} className="flex justify-between items-center">
+                  <span className="text-sm">{getChannelIcon(channel)} {channel}</span>
+                  <span className="px-2 py-1 bg-gray-100 rounded text-xs">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Por Urgência</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {Object.entries(report.byUrgency).map(([urgency, count]) => (
-                  <div key={urgency} className="flex justify-between items-center">
-                    <span className="text-sm capitalize">{urgency}</span>
-                    <Badge variant={getUrgencyColor(urgency)}>{count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-lg font-semibold mb-4">Por Urgência</h3>
+            <div className="space-y-2">
+              {Object.entries(report.byUrgency).map(([urgency, count]) => (
+                <div key={urgency} className="flex justify-between items-center">
+                  <span className="text-sm capitalize">{urgency}</span>
+                  <span 
+                    className="px-2 py-1 rounded text-xs text-white"
+                    style={{ backgroundColor: getUrgencyColor(urgency) }}
+                  >
+                    {count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Tabs com Listagens */}
-      <Tabs defaultValue="needs-attention" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="needs-attention">
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            Precisam Atenção ({needsAttention.length})
-          </TabsTrigger>
-          <TabsTrigger value="hot-leads">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Hot Leads ({hotLeads.length})
-          </TabsTrigger>
-          <TabsTrigger value="all">
-            <FileText className="w-4 h-4 mr-2" />
-            Todas ({triages.length})
-          </TabsTrigger>
-        </TabsList>
+      <div className="bg-white rounded-lg shadow border">
+        <div className="border-b">
+          <div className="flex">
+            <button
+              className={`px-4 py-3 font-medium ${
+                activeTab === 'needs-attention' 
+                  ? 'border-b-2 border-blue-500 text-blue-600' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setActiveTab('needs-attention')}
+            >
+              ð Precisam Atenção ({needsAttention.length})
+            </button>
+            <button
+              className={`px-4 py-3 font-medium ${
+                activeTab === 'hot-leads' 
+                  ? 'border-b-2 border-blue-500 text-blue-600' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setActiveTab('hot-leads')}
+            >
+              ð Hot Leads ({hotLeads.length})
+            </button>
+            <button
+              className={`px-4 py-3 font-medium ${
+                activeTab === 'all' 
+                  ? 'border-b-2 border-blue-500 text-blue-600' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setActiveTab('all')}
+            >
+              ð Todas ({triages.length})
+            </button>
+          </div>
+        </div>
 
-        <TabsContent value="needs-attention">
-          <Card>
-            <CardHeader>
-              <CardTitle>Triagens que Precisam de Atenção Humana</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TriageList 
-                triages={needsAttention} 
-                onAttend={markAsAttended}
-                onSelect={setSelectedTriage}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="hot-leads">
-          <Card>
-            <CardHeader>
-              <CardTitle>Hot Leads - Prioridade Máxima</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TriageList 
-                triages={hotLeads} 
-                onAttend={markAsAttended}
-                onSelect={setSelectedTriage}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="all">
-          <Card>
-            <CardHeader>
-              <CardTitle>Todas as Triagens</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TriageList 
-                triages={triages} 
-                onAttend={markAsAttended}
-                onSelect={setSelectedTriage}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        <div className="p-6">
+          {activeTab === 'needs-attention' && (
+            <TriageList 
+              triages={needsAttention} 
+              onAttend={markAsAttended}
+              onSelect={setSelectedTriage}
+            />
+          )}
+          
+          {activeTab === 'hot-leads' && (
+            <TriageList 
+              triages={hotLeads} 
+              onAttend={markAsAttended}
+              onSelect={setSelectedTriage}
+            />
+          )}
+          
+          {activeTab === 'all' && (
+            <TriageList 
+              triages={triages} 
+              onAttend={markAsAttended}
+              onSelect={setSelectedTriage}
+            />
+          )}
+        </div>
+      </div>
 
       {/* Modal de Detalhes */}
       {selectedTriage && (
@@ -375,10 +342,10 @@ function TriageList({
 
   const getUrgencyColor = (urgency?: string) => {
     switch (urgency) {
-      case 'alta': return 'destructive';
-      case 'media': return 'default';
-      case 'baixa': return 'secondary';
-      default: return 'secondary';
+      case 'alta': return '#dc2626';
+      case 'media': return '#2563eb';
+      case 'baixa': return '#6b7280';
+      default: return '#6b7280';
     }
   };
 
@@ -396,7 +363,7 @@ function TriageList({
   if (triages.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+        <div className="text-4xl mb-4">ð</div>
         <p>Nenhuma triagem encontrada</p>
       </div>
     );
@@ -410,13 +377,16 @@ function TriageList({
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{getChannelIcon(triage.channel)}</span>
-                <Badge variant="outline">{triage.channel}</Badge>
-                {triage.isHotLead && <Badge variant="destructive">Hot Lead</Badge>}
-                {triage.needsHumanAttention && <Badge variant="default">Precisa Atenção</Badge>}
-                {triage.triageData.nivel_urgency && (
-                  <Badge variant={getUrgencyColor(triage.triageData.nivel_urgency)}>
+                <span className="px-2 py-1 bg-gray-100 rounded text-xs">{triage.channel}</span>
+                {triage.isHotLead && <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Hot Lead</span>}
+                {triage.needsHumanAttention && <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Precisa Atenção</span>}
+                {triage.triageData.nivel_urgencia && (
+                  <span 
+                    className="px-2 py-1 rounded text-xs text-white"
+                    style={{ backgroundColor: getUrgencyColor(triage.triageData.nivel_urgencia) }}
+                  >
                     Urgência: {triage.triageData.nivel_urgencia}
-                  </Badge>
+                  </span>
                 )}
               </div>
               
@@ -446,12 +416,10 @@ function TriageList({
               
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatTimeAgo(triage.createdAt)}
+                  ð {formatTimeAgo(triage.createdAt)}
                 </span>
                 <span className="flex items-center gap-1">
-                  <User className="w-3 h-3" />
-                  {triage.userId}
+                  ð {triage.userId}
                 </span>
                 {triage.triageData.completude && (
                   <span>Completude: {triage.triageData.completude}%</span>
@@ -460,22 +428,19 @@ function TriageList({
             </div>
             
             <div className="flex flex-col gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
+              <button 
+                className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50"
                 onClick={() => onSelect(triage)}
               >
-                <Eye className="w-4 h-4 mr-1" />
-                Ver
-              </Button>
+                ð Ver
+              </button>
               {!triage.attendedAt && (
-                <Button 
-                  size="sm"
+                <button 
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                   onClick={() => onAttend(triage.sessionId)}
                 >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Atender
-                </Button>
+                  ð Atender
+                </button>
               )}
             </div>
           </div>
@@ -511,10 +476,15 @@ function TriageDetailModal({
               <h2 className="text-xl font-bold">Detalhes da Triagem</h2>
               <p className="text-gray-600">Sessão: {triage.sessionId}</p>
             </div>
-            <Button variant="ghost" onClick={onClose}>×</Button>
+            <button 
+              className="text-gray-500 hover:text-gray-700"
+              onClick={onClose}
+            >
+              ×
+            </button>
           </div>
           
-          <Separator />
+          <div className="border-t pt-4"></div>
           
           {/* Informações Básicas */}
           <div className="grid grid-cols-2 gap-4">
@@ -600,15 +570,20 @@ function TriageDetailModal({
           )}
           
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button 
+              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              onClick={onClose}
+            >
               Fechar
-            </Button>
+            </button>
             {!triage.attendedAt && (
-              <Button onClick={onAttend}>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Marcar como Atendido
-              </Button>
+              <button 
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={onAttend}
+              >
+                ð Marcar como Atendido
+              </button>
             )}
           </div>
         </div>

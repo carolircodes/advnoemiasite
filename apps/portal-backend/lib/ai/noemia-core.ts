@@ -7,7 +7,8 @@
 
 import { OpenAI } from "openai";
 import { clientContextService } from "../services/client-context";
-import { triagePersistence, TriageData } from "../services/triage-persistence";
+import { conversationPersistence } from "../services/conversation-persistence";
+import { saveTriageData } from "./triage-persistence";
 import { PortalProfile } from "../auth/guards";
 import { askNoemiaSchema } from "../domain/portal";
 
@@ -34,10 +35,9 @@ type ConversationStep =
   | "documentos_provas"      // Verificar existência de provas
   | "objetivo_cliente"       // O que o cliente quer alcançar
   | "avaliacao_urgencia"     // Classificar nível de urgência
-  | "resumo_encaminhamento"  // Resumir e decidir próximo passo
-  | "conversao";            // Momento de conversão
+  | "resumo_encaminhamento"; // Resumir e decidir próximo passo
 
-interface ConversationState {
+export interface ConversationState {
   currentStep: ConversationStep;
   collectedData: {
     // Bloco A - Tema Principal
@@ -73,7 +73,7 @@ interface ConversationState {
   triageCompleteness: number; // 0-100%
 }
 
-interface NoemiaCoreInput {
+export interface NoemiaCoreInput {
   channel: NoemiaChannel;
   userType: NoemiaUserType;
   message: string;
@@ -516,13 +516,9 @@ function updateConversationState(
       newState.needsHumanAttention = handoffDecision.needsAttention;
       newState.handoffReason = handoffDecision.reason;
       
-      newState.currentStep = newState.needsHumanAttention ? "conversao" : "conducao_proximo_passo";
+      newState.currentStep = "resumo_encaminhamento";
       break;
 
-    case "conducao_proximo_passo":
-    case "conversao":
-      newState.collectedData.detalhes?.push(message);
-      break;
   }
 
   return newState;
@@ -695,13 +691,6 @@ function generateTriageResponse(
       
       return `Entendi... Já estou organizando suas informações.\n\n${generateUserFriendlySummary(state)}\n\nPara te dar a melhor orientação possível, preciso mais alguns detalhes. Podemos continuar conversando ou você prefere já agendar uma análise com a Dra. Noêmia?`;
 
-    case "conducao_proximo_passo":
-    case "conversao":
-      if (isShortResponse) {
-        return `Perfeito! Isso mostra que você está no caminho certo para resolver isso.\n\nO melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia. Geralmente a solução pode ser mais simples do que parece. Você prefere agendar online ou falar primeiro por WhatsApp?`;
-      }
-      return `Perfeito. O melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia.\n\nGeralmente a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
-
     default:
       return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nFaço parte da equipe de atendimento do escritório Noêmia Paixão Advocacia.\n\nMe conta rapidinho o que aconteceu?`;
   }
@@ -714,7 +703,7 @@ function generateUserFriendlySummary(state: ConversationState): string {
   if (data.area) parts.push(`Área: ${getAreaNome(data.area)}`);
   if (data.problema_principal) parts.push(`Situação: ${data.problema_principal.substring(0, 80)}${data.problema_principal.length > 80 ? '...' : ''}`);
   if (data.timeframe && data.timeframe !== 'não especificado') parts.push(`Quando: ${data.timeframe}`);
-  if (data.tem_documentos) parts.push(`Documentos: ${data.tipos_documentos.length > 0 ? data.tipos_documentos.join(', ') : 'disponíveis'}`);
+  if (data.tem_documentos) parts.push(`Documentos: ${data.tipos_documentos && data.tipos_documentos.length > 0 ? data.tipos_documentos.join(', ') : 'disponíveis'}`);
   if (data.objetivo_cliente) parts.push(`Objetivo: ${data.objetivo_cliente.substring(0, 60)}${data.objetivo_cliente.length > 60 ? '...' : ''}`);
   if (data.nivel_urgencia && data.nivel_urgencia !== 'baixa') parts.push(`Urgência: ${data.nivel_urgencia}`);
   
