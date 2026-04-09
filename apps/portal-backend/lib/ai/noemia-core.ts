@@ -507,6 +507,7 @@ function generateTriageResponse(
   }
 }
 
+function buildSystemPrompt(
   channel: NoemiaChannel,
   userType: NoemiaUserType,
   context?: unknown
@@ -816,9 +817,9 @@ export async function processNoemiaCore(
           
           // Enriquecer o contexto existente
           enrichedContext = {
-            ...(input.context || {}),
+            ...(input.context ? (input.context as Record<string, unknown>) : {}),
             clientContext: formattedContext
-          };
+          } as any;
         }
       } catch (contextError) {
         console.error('CLIENT_CONTEXT_ENRICHMENT_ERROR', contextError);
