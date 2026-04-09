@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
-import { answerNoemia } from "../../../../lib/services/noemia";
+import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
 
 // Configurações
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "noeminha_verify_2026";
@@ -402,59 +402,54 @@ async function processTextMessage(messageInfo: any) {
     console.log('WHATSAPP_OPENAI_MODEL:', openAIModel);
     console.log('WHATSAPP_OPENAI_ATTEMPTED: true');
 
-    // Usar a lógica centralizada da NoemIA
-    const response = await answerNoemia({
+    // Usar o Noemia Core centralizado
+    const coreResponse = await processNoemiaCore({
+      channel: 'whatsapp',
+      userType: 'visitor',
       message: messageInfo.content,
-      audience: "visitor",
-      history: []
-    }, null);
+      history: [],
+      metadata: { from: messageInfo.from }
+    });
 
-    console.log('WHATSAPP_NOEMIA_RESPONSE_RECEIVED');
-    console.log('RESPONSE_LENGTH:', response.answer?.length || 0);
-    console.log('RESPONSE_SOURCE:', response.meta?.source || 'unknown');
+    console.log('WHATSAPP_NOEMIA_CORE_RESPONSE_RECEIVED');
+    console.log('RESPONSE_LENGTH:', coreResponse.reply.length);
+    console.log('RESPONSE_SOURCE:', coreResponse.source);
+    console.log('USED_FALLBACK:', coreResponse.usedFallback);
+    console.log('OPENAI_USED:', coreResponse.metadata.openaiUsed);
+    console.log('CLASSIFICATION:', coreResponse.metadata.classification);
     
-    // Detectar tipo de resposta
-    const isTemplateResponse = response.answer?.includes('Olá! Sou a NoemIA');
-    const isTriageResponse = response.answer?.includes('posso me aposentar') || 
-                           response.answer?.includes('área de atuação') ||
-                           response.answer?.includes('posso ajudar');
-    
-    console.log('WHATSAPP_TEMPLATE_USED:', isTemplateResponse);
-    console.log('WHATSAPP_TRIAGE_USED:', isTriageResponse);
-    console.log('WHATSAPP_OPENAI_RESULT:', response.meta?.source || 'unknown');
-    console.log('WHATSAPP_FINAL_RESPONSE_SOURCE:', isTemplateResponse ? 'template' : 
-                                               isTriageResponse ? 'triage' : 
-                                               response.meta?.source || 'unknown');
-    
-    logEvent('WHATSAPP_NOEMIA_RESPONSE', {
+    logEvent('WHATSAPP_NOEMIA_CORE_RESPONSE', {
       from: messageInfo.from,
-      responseLength: response.answer?.length || 0,
-      audience: response.audience,
-      source: response.meta?.source
+      responseLength: coreResponse.reply.length,
+      audience: coreResponse.audience,
+      source: coreResponse.source,
+      usedFallback: coreResponse.usedFallback,
+      responseTime: coreResponse.metadata.responseTime,
+      classification: coreResponse.metadata.classification
     });
     
     // Log específico baseado na fonte
-    if (response.meta?.source === 'openai') {
+    if (coreResponse.source === 'openai') {
       console.log('WHATSAPP_OPENAI_SUCCESS: OpenAI responded successfully');
-    } else if (response.meta?.source === 'fallback') {
+    } else if (coreResponse.source === 'fallback') {
       console.log('WHATSAPP_FALLBACK_USED: Fallback was used');
-    } else {
-      console.log('WHATSAPP_SOURCE_UNKNOWN: Unknown response source');
+    } else if (coreResponse.source === 'triage') {
+      console.log('WHATSAPP_TRIAGE_USED: Legal advice blocked for visitor');
     }
     
-    const sent = await sendWhatsAppResponse(messageInfo.from, response.answer || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
+    const sent = await sendWhatsAppResponse(messageInfo.from, coreResponse.reply || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
     if (sent) {
       console.log('WHATSAPP_RESPONSE_SENT: Message sent successfully');
       logEvent('WHATSAPP_RESPONSE_SENT', {
         from: messageInfo.from,
-        responseLength: response.answer?.length || 0
+        responseLength: coreResponse.reply.length
       });
     } else {
       console.log('WHATSAPP_RESPONSE_FAILED: Failed to send message');
       logEvent('WHATSAPP_RESPONSE_FAILED', {
         from: messageInfo.from,
-        responseLength: response.answer?.length || 0
+        error: 'Failed to send WhatsApp message'
       }, 'error');
     }
   } catch (error) {

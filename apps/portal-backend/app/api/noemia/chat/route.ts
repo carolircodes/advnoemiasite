@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentProfile } from "../../../../lib/auth/guards";
-import { answerNoemia } from "../../../../lib/services/noemia";
+import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
 import { recordProductEvent } from "../../../../lib/services/public-intake";
 import { getServerEnv } from "../../../../lib/config/env";
 
@@ -21,24 +21,49 @@ export async function POST(request: Request) {
     // Verificar se OPENAI_API_KEY está disponível
     const env = getServerEnv();
     
-    // Tentar usar a API principal (agora não vai lançar erro se não tiver chave)
+    // Usar o Noemia Core centralizado
     try {
-      const result = await answerNoemia({
-        ...payload,
-        metaContext // Adicionar contexto da Meta ao payload
-      }, profile, request.url);
+      const coreResponse = await processNoemiaCore({
+        channel: 'site', // ou 'portal' dependendo do contexto
+        userType: profile?.role === 'cliente' ? 'client' : profile?.role !== 'cliente' ? 'staff' : 'visitor',
+        message: payload.message,
+        history: [], // TODO: implementar histórico se necessário
+        context: metaContext,
+        metadata: { 
+          currentPath: payload.currentPath,
+          url: request.url 
+        },
+        profile
+      });
+
+      // Converter para formato compatível
+      const result = {
+        audience: coreResponse.audience,
+        answer: coreResponse.reply,
+        message: coreResponse.reply,
+        actions: coreResponse.actions || [],
+        meta: {
+          intent: coreResponse.intent,
+          profile: coreResponse.audience,
+          source: coreResponse.source,
+          usedFallback: coreResponse.usedFallback,
+          responseTime: coreResponse.metadata.responseTime
+        }
+      };
 
       try {
         await recordProductEvent({
-          eventKey: "noemia_message_sent",
+          eventKey: coreResponse.source === 'openai' ? "noemia_message_sent" : "noemia_fallback_used",
           eventGroup: "ai",
-          pagePath:
-            typeof payload?.currentPath === "string" ? payload.currentPath : "/noemia",
+          pagePath: typeof payload?.currentPath === "string" ? payload.currentPath : "/noemia",
           profileId: profile?.id,
           payload: {
             metaContext,
             hasMetaContext: !!metaContext,
-            source: metaContext?.origem || 'web'
+            source: metaContext?.origem || 'web',
+            openaiUsed: coreResponse.metadata.openaiUsed,
+            responseTime: coreResponse.metadata.responseTime,
+            classification: coreResponse.metadata.classification
           }
         });
       } catch (trackingError) {
@@ -46,32 +71,33 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json(result);
-    } catch (openaiError) {
-      console.warn("⚠️ Falha na API OpenAI, usando fallback:", openaiError);
+    } catch (error) {
+      console.warn("⚠️ Erro no Noemia Core, usando fallback básico:", error);
       
-      // Fallback inteligente já implementado no answerNoemia
-      const fallbackResult = await answerNoemia({
-        ...payload,
-        metaContext,
-        fallback: true
-      }, profile, request.url);
+      // Fallback básico em caso de erro crítico
+      const fallbackResult = {
+        audience: profile ? "client" : "visitor",
+        answer: "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes.",
+        message: "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes.",
+        actions: [],
+        meta: {
+          source: 'emergency_fallback',
+          usedFallback: true
+        }
+      };
 
       try {
         await recordProductEvent({
-          eventKey: "noemia_fallback_used",
+          eventKey: "noemia_emergency_fallback",
           eventGroup: "ai",
-          pagePath:
-            typeof payload?.currentPath === "string" ? payload.currentPath : "/noemia",
+          pagePath: typeof payload?.currentPath === "string" ? payload.currentPath : "/noemia",
           profileId: profile?.id,
           payload: {
-            metaContext,
-            hasMetaContext: !!metaContext,
-            source: metaContext?.origem || 'web',
-            error: openaiError instanceof Error ? openaiError.message : 'OpenAI API Error'
+            error: error instanceof Error ? error.message : 'Noemia Core Error'
           }
         });
       } catch (trackingError) {
-        console.warn("⚠️ Erro ao registrar evento fallback:", trackingError);
+        console.warn("⚠️ Erro ao registrar evento emergência:", trackingError);
       }
 
       return NextResponse.json(fallbackResult);

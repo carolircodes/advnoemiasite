@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
-import { answerNoemia } from "../../../../lib/services/noemia";
+import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -269,45 +269,54 @@ async function processMessageWithNoemia(senderId: string, messageText: string) {
     console.log('INSTAGRAM_OPENAI_KEY_EXISTS:', hasOpenAIKey);
     console.log('INSTAGRAM_OPENAI_MODEL:', openAIModel);
 
-    const response = await answerNoemia({
+    // Usar o Noemia Core centralizado
+    const coreResponse = await processNoemiaCore({
+      channel: 'instagram',
+      userType: 'visitor',
       message: messageText,
-      audience: "visitor",
-      history: []
-    }, null);
-
-    console.log('INSTAGRAM_NOEMIA_RESPONSE_RECEIVED');
-    console.log('RESPONSE_LENGTH:', response.answer?.length || 0);
-    console.log('RESPONSE_SOURCE:', response.meta?.source || 'unknown');
-    
-    logEvent("INSTAGRAM_NOEMIA_RESPONSE", {
-      senderId,
-      responseLength: response.answer?.length || 0,
-      audience: response.audience,
-      source: response.meta?.source
+      history: [],
+      metadata: { senderId }
     });
 
-    if (response.meta?.source === 'openai') {
+    console.log('INSTAGRAM_NOEMIA_CORE_RESPONSE_RECEIVED');
+    console.log('RESPONSE_LENGTH:', coreResponse.reply.length);
+    console.log('RESPONSE_SOURCE:', coreResponse.source);
+    console.log('USED_FALLBACK:', coreResponse.usedFallback);
+    console.log('OPENAI_USED:', coreResponse.metadata.openaiUsed);
+    console.log('CLASSIFICATION:', coreResponse.metadata.classification);
+    
+    logEvent("INSTAGRAM_NOEMIA_CORE_RESPONSE", {
+      senderId,
+      responseLength: coreResponse.reply.length,
+      audience: coreResponse.audience,
+      source: coreResponse.source,
+      usedFallback: coreResponse.usedFallback,
+      responseTime: coreResponse.metadata.responseTime,
+      classification: coreResponse.metadata.classification
+    });
+
+    if (coreResponse.source === 'openai') {
       console.log('INSTAGRAM_OPENAI_SUCCESS: OpenAI responded successfully');
-    } else if (response.meta?.source === 'fallback') {
+    } else if (coreResponse.source === 'fallback') {
       console.log('INSTAGRAM_FALLBACK_USED: Fallback was used');
-    } else {
-      console.log('INSTAGRAM_SOURCE_UNKNOWN: Unknown response source');
+    } else if (coreResponse.source === 'triage') {
+      console.log('INSTAGRAM_TRIAGE_USED: Legal advice blocked for visitor');
     }
 
     console.log('=== INSTAGRAM_SEND_ATTEMPT ===');
-    const sent = await sendInstagramMessage(senderId, response.answer || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
+    const sent = await sendInstagramMessage(senderId, coreResponse.reply || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
     
     if (sent) {
       console.log('INSTAGRAM_SEND_SUCCESS: Message sent successfully');
       logEvent("INSTAGRAM_RESPONSE_SENT", {
         senderId,
-        responseLength: response.answer?.length || 0
+        responseLength: coreResponse.reply.length
       });
     } else {
       console.log('INSTAGRAM_SEND_FAILED: Failed to send message');
       logEvent("INSTAGRAM_RESPONSE_FAILED", {
         senderId,
-        responseLength: response.answer?.length || 0
+        error: 'Failed to send Instagram message'
       }, "error");
     }
   } catch (error) {
@@ -441,6 +450,12 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
+          // Ignorar mensagens echo (próprias mensagens da página)
+          if (messaging.message?.is_echo) {
+            console.log("EVENT_IGNORED_ECHO_MESSAGE: Ignoring own message");
+            continue;
+          }
+
           // Verificar se é mensagem de texto
           if (!messaging.message?.text) {
             console.log("EVENT_IGNORED_NO_MESSAGE: messaging structure without message.text");
@@ -545,6 +560,12 @@ export async function POST(request: NextRequest) {
           for (const message of messages) {
             if (!message.from?.id) {
               console.log("EVENT_IGNORED_MISSING_SENDER: changes message without from.id");
+              continue;
+            }
+
+            // Ignorar mensagens echo (próprias mensagens da página)
+            if (message.is_echo) {
+              console.log("EVENT_IGNORED_ECHO_MESSAGE: Ignoring own message (changes)");
               continue;
             }
 
