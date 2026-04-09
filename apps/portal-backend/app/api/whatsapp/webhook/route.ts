@@ -245,16 +245,19 @@ async function sendTypingIndicator(to: string) {
   try {
     const typingUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
     
+    // Formato oficial da Meta para typing indicator
     const payload = {
       messaging_product: "whatsapp",
-      status: "typing",
-      to: to
+      to: to,
+      typing_indicator: {
+        type: "text"
+      }
     };
 
     logEvent('WHATSAPP_TYPING_INDICATOR_API_CALL', {
       url: typingUrl,
       to,
-      payloadSize: JSON.stringify(payload).length
+      payload: JSON.stringify(payload)
     });
 
     const response = await fetch(typingUrl, {
@@ -278,7 +281,8 @@ async function sendTypingIndicator(to: string) {
         httpStatus: response.status,
         metaError: data.error?.message,
         errorCode: data.error?.code,
-        to
+        to,
+        payload: JSON.stringify(payload)
       }, 'error');
       return false;
     }
