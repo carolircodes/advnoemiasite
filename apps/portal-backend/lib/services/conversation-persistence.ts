@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "../supabase/server";
+import { createWebhookSupabaseClient } from "../supabase/webhook";
 
 export interface ConversationSession {
   id: string;
@@ -39,7 +39,7 @@ export interface ProcessedWebhookEvent {
 }
 
 class ConversationPersistenceService {
-  private supabase = createServerSupabaseClient();
+  private supabase = createWebhookSupabaseClient();
 
   // Verificar se evento já foi processado (idempotência)
   async isEventProcessed(
@@ -47,8 +47,7 @@ class ConversationPersistenceService {
     externalEventId: string
   ): Promise<boolean> {
     try {
-      const supabase = await this.supabase;
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase
         .from('processed_webhook_events')
         .select('id')
         .eq('channel', channel)
@@ -76,8 +75,7 @@ class ConversationPersistenceService {
     payloadHash?: string
   ): Promise<void> {
     try {
-      const supabase = await this.supabase;
-      const { error } = await supabase
+      const { error } = await this.supabase
         .from('processed_webhook_events')
         .insert({
           channel,
@@ -102,9 +100,8 @@ class ConversationPersistenceService {
     externalThreadId?: string
   ): Promise<ConversationSession> {
     try {
-      const client = await this.supabase;
       // Tentar encontrar sessão existente
-      const { data: existingSession, error: findError } = await client
+      const { data: existingSession, error: findError } = await this.supabase
         .from('conversation_sessions')
         .select('*')
         .eq('channel', channel)
@@ -120,7 +117,7 @@ class ConversationPersistenceService {
       }
 
       // Criar nova sessão
-      const { data: newSession, error: createError } = await client
+      const { data: newSession, error: createError } = await this.supabase
         .from('conversation_sessions')
         .insert({
           channel,
@@ -155,8 +152,7 @@ class ConversationPersistenceService {
     updates: Partial<Omit<ConversationSession, 'id' | 'created_at' | 'updated_at'>>
   ): Promise<void> {
     try {
-      const supabase = await this.supabase;
-      const { error } = await supabase
+      const { error } = await this.supabase
         .from('conversation_sessions')
         .update({
           ...updates,
@@ -184,8 +180,7 @@ class ConversationPersistenceService {
     metadata?: Record<string, any>
   ): Promise<void> {
     try {
-      const supabase = await this.supabase;
-      const { error } = await supabase
+      const { error } = await this.supabase
         .from('conversation_messages')
         .insert({
           session_id: sessionId,
@@ -212,8 +207,7 @@ class ConversationPersistenceService {
     limit: number = 20
   ): Promise<ConversationMessage[]> {
     try {
-      const supabase = await this.supabase;
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase
         .from('conversation_messages')
         .select('*')
         .eq('session_id', sessionId)
@@ -238,10 +232,9 @@ class ConversationPersistenceService {
     secondsThreshold: number = 15
   ): Promise<boolean> {
     try {
-      const supabase = await this.supabase;
       const cutoffTime = new Date(Date.now() - secondsThreshold * 1000).toISOString();
 
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase
         .from('conversation_messages')
         .select('id')
         .eq('session_id', sessionId)
