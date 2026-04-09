@@ -1,0 +1,156 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { clientMergeService } from '../../../../../lib/services/client-merge';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    const { action, sourceClientId, targetClientId, clientId, channel, externalUserId, externalThreadId } = body;
+
+    if (action === 'merge') {
+      // Merge de clientes
+      if (!sourceClientId || !targetClientId) {
+        return NextResponse.json(
+          { error: 'sourceClientId and targetClientId are required for merge action' },
+          { status: 400 }
+        );
+      }
+
+      const result = await clientMergeService.mergeClients({
+        sourceClientId,
+        targetClientId,
+        reason: body.reason,
+        mergeBy: body.mergeBy
+      });
+
+      return NextResponse.json(result);
+    } else if (action === 'linkChannel') {
+      // Vincular canal a cliente existente
+      if (!clientId || !channel || !externalUserId) {
+        return NextResponse.json(
+          { error: 'clientId, channel, and externalUserId are required for linkChannel action' },
+          { status: 400 }
+        );
+      }
+
+      const result = await clientMergeService.linkChannelToExistingClient({
+        clientId,
+        channel,
+        externalUserId,
+        externalThreadId,
+        linkBy: body.linkBy
+      });
+
+      return NextResponse.json(result);
+    } else if (action === 'getCanonical') {
+      // Obter cliente canônico
+      if (!clientId) {
+        return NextResponse.json(
+          { error: 'clientId is required for getCanonical action' },
+          { status: 400 }
+        );
+      }
+
+      const canonicalClientId = await clientMergeService.getCanonicalClientId(clientId);
+      
+      return NextResponse.json({
+        originalClientId: clientId,
+        canonicalClientId
+      });
+    } else if (action === 'getClientChannels') {
+      // Buscar canais canônicos do cliente
+      if (!clientId) {
+        return NextResponse.json(
+          { error: 'clientId is required for getClientChannels action' },
+          { status: 400 }
+        );
+      }
+
+      const channels = await clientMergeService.getClientCanonicalChannels(clientId);
+      
+      return NextResponse.json({
+        clientId,
+        canonicalChannels: channels
+      });
+    } else if (action === 'getClientPipeline') {
+      // Buscar pipeline canônico do cliente
+      if (!clientId) {
+        return NextResponse.json(
+          { error: 'clientId is required for getClientPipeline action' },
+          { status: 400 }
+        );
+      }
+
+      const pipeline = await clientMergeService.getClientCanonicalPipeline(clientId);
+      
+      return NextResponse.json({
+        clientId,
+        canonicalPipeline: pipeline
+      });
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid action. Supported actions: merge, linkChannel, getCanonical, getClientChannels, getClientPipeline' },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error('CLIENT_MERGE_API_ERROR', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// GET para consulta de cliente canônico
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const clientId = searchParams.get('clientId');
+    const action = searchParams.get('action');
+
+    if (!clientId) {
+      return NextResponse.json(
+        { error: 'clientId query parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'getCanonical') {
+      const canonicalClientId = await clientMergeService.getCanonicalClientId(clientId);
+      
+      return NextResponse.json({
+        originalClientId: clientId,
+        canonicalClientId
+      });
+    } else if (action === 'getClientChannels') {
+      const channels = await clientMergeService.getClientCanonicalChannels(clientId);
+      
+      return NextResponse.json({
+        clientId,
+        canonicalChannels: channels
+      });
+    } else if (action === 'getClientPipeline') {
+      const pipeline = await clientMergeService.getClientCanonicalPipeline(clientId);
+      
+      return NextResponse.json({
+        clientId,
+        canonicalPipeline: pipeline
+      });
+    } else {
+      // Default: retornar cliente canônico
+      const canonicalClientId = await clientMergeService.getCanonicalClientId(clientId);
+      
+      return NextResponse.json({
+        originalClientId: clientId,
+        canonicalClientId
+      });
+    }
+  } catch (error) {
+    console.error('CLIENT_MERGE_API_GET_ERROR', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

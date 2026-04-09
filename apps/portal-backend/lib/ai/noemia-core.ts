@@ -5,7 +5,8 @@
  * Usado por: site, portal, WhatsApp, Instagram
  */
 
-import OpenAI from "openai";
+import { OpenAI } from "openai";
+import { clientContextService } from "../services/client-context";
 import { PortalProfile } from "../auth/guards";
 import { askNoemiaSchema } from "../domain/portal";
 
@@ -479,29 +480,30 @@ function generateTriageResponse(
 
   switch (state.currentStep) {
     case "acolhimento":
-      return `${saudacao}! Eu sou a assistente virtual do escritório da Dra. Noêmia. Estou aqui para entender melhor seu caso, fazer essa triagem inicial e te orientar nos próximos passos.\n\nPode me contar, de forma simples, o que aconteceu?`;
+      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia e estou aqui para te ajudar a organizar isso.\n\nMe conta, de forma simples, o que aconteceu no seu caso?`;
 
     case "identificacao_area":
-      return `Entendi. Obrigada por me contar isso.\n\nPelo que você descreveu, seu caso parece estar ligado à área ${classification.theme === "previdenciario" ? "previdenciária" : classification.theme === "bancario" ? "bancária" : classification.theme === "familia" ? "de família" : classification.theme === "civil" ? "cível" : "jurídica"}.\n\nPara eu te orientar melhor nessa triagem inicial, você consegue me explicar um pouco mais do que aconteceu?`;
+      const areaNome = classification.theme === "previdenciario" ? "previdenciária" : classification.theme === "bancario" ? "bancária" : classification.theme === "familia" ? "de família" : classification.theme === "civil" ? "cível" : "jurídica";
+      return `Olha... o interessante é que cada área tem detalhes que pouca gente conhece.\n\nPelo que você descreveu, seu caso parece estar na área ${areaNome}.\n\nO que mais te preocupa nessa história toda?`;
 
     case "entendimento_situacao":
-      return `Entendi. Já consegui ter uma noção melhor da sua situação.\n\nAgora, para eu te orientar com mais segurança, me conta uma coisa: isso está acontecendo há quanto tempo ou existe alguma urgência maior no seu caso neste momento?`;
+      return `Entendi... Geralmente o que mais surpreende é que o momento certo de agir faz toda a diferença.\n\nIsso que você mencionou aconteceu há quanto tempo?`;
 
     case "identificacao_urgencia":
       if (state.isHotLead) {
-        return `Entendi. Pelo que você me contou, isso merece uma atenção mais rápida.\n\nO ideal agora é avançar para um atendimento com a Dra. Noêmia, para analisar seu caso com mais cuidado.\n\nVocê prefere seguir por atendimento online ou presencial?`;
+        return `Pelo que você me contou, isso realmente precisa de atenção rápida.\n\nO que poucos entendem é que agir agora pode mudar completamente o resultado.\n\nVocê prefere atendimento online agora mesmo ou presencial?`;
       }
 
-      return `Perfeito. Já estou entendendo melhor o seu cenário.\n\nExiste algum outro detalhe importante que você acha que eu preciso saber para te orientar melhor no próximo passo?`;
+      return `Perfeito... Já estou entendendo melhor o seu cenário.\n\nVocê está começando a entender isso agora ou já chegou a ver algo sobre o seu caso antes?`;
 
     case "conducao_proximo_passo":
-      return `Obrigada por me contar isso.\n\nCom base no que você compartilhou até aqui, o próximo passo mais seguro é uma análise mais cuidadosa do seu caso.\n\nSe você quiser, eu posso te orientar sobre como seguir para atendimento com a Dra. Noêmia.`;
+      return `Obrigada por compartilhar isso comigo.\n\nO que pouca gente sabe é que existem diferentes caminhos para resolver isso, mas cada caso tem o melhor momento para agir.\n\nVocê já pensou em como seria ter uma análise profissional do seu caso?`;
 
     case "conversao":
-      return `Perfeito. O melhor próximo passo agora é seguir para atendimento com a Dra. Noêmia, para analisar sua situação com mais segurança.\n\nSe quiser, eu posso te orientar agora sobre a melhor forma de continuar esse atendimento.`;
+      return `Perfeito. O melhor próximo passo agora é uma análise cuidadosa com a Dra. Noêmia.\n\nGeralmente o que mais surpreende é que a solução pode ser mais simples do que parece.\n\nVocê prefere agendar online ou falar primeiro por WhatsApp?`;
 
     default:
-      return `${saudacao}! Eu sou a assistente virtual do escritório da Dra. Noêmia. Estou aqui para entender seu caso e te orientar nos próximos passos.\n\nComo posso te ajudar hoje?`;
+      return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia.\n\nMe conta, de forma simples, o que aconteceu?`;
   }
 }
 
@@ -529,12 +531,29 @@ function buildSystemPrompt(
     "- conduzir naturalmente para uma análise profissional quando necessário",
     "- NUNCA dar consultoria completa gratuita",
     "",
-    "COMO FALAR:",
+    "COMO FALAR - ESTRATÉGIA DE CONVERSÃO:",
+    "- SEMPRE inclua um insight leve que gere curiosidade",
+    "- EVITE linguagem formal genérica ('Você já tem alguma informação específica em mente')",
+    "- USE inícios mais naturais ('Faz sentido você ter essa dúvida' em vez de 'Entendi')",
+    "- FAÇA UMA PERGUNTA POR VEZ - nunca múltiplas perguntas técnicas",
+    "- NÃO entregue explicação completa - crie valor percebido",
+    "- MANTENHA tom: humano, acolhedor, leve, elegante, não robótico",
     "- reconheça o que a pessoa disse antes de responder",
     "- use frases curtas e naturais",
-    "- faça uma pergunta de cada vez quando precisar de mais informações",
     "- evite repetir as mesmas frases",
     "- não diga 'no momento este atendimento está habilitado apenas para mensagens escritas'",
+    "",
+    "EXEMPLOS DE INSIGHTS LEVES:",
+    "- 'Muita gente nessa situação acaba deixando de investigar possibilidades justamente por achar que não se encaixa...'",
+    "- 'O interessante é que a maioria das pessoas não sabe que existem diferentes caminhos para isso...'",
+    "- 'Geralmente o que mais surpreende é que a solução pode ser mais simples do que parece...'",
+    "- 'O que poucos entendem é que o momento certo de agir faz toda a diferença...'",
+    "",
+    "EXEMPLOS DE PERGUNTAS NATURAIS:",
+    "- 'Você está começando a entender isso agora ou já chegou a ver algo sobre o seu caso antes?'",
+    "- 'Isso que você mencionou aconteceu há quanto tempo?'",
+    "- 'Você já passou por alguma situação parecida antes?'",
+    "- 'O que mais te preocupa nessa história toda?'",
     "",
     "O QUE NUNCA FAZER:",
     "- não invente fatos ou documentos",
@@ -543,12 +562,15 @@ function buildSystemPrompt(
     "- não repita 'posso ajudar' ou 'como posso ajudar'",
     "- não use respostas genéricas que não se conectam com o contexto",
     "- não se apresente como 'assistente virtual' ou 'inteligência artificial'",
+    "- não use linguagem corporativa ou formal demais",
+    "- não faça múltiplas perguntas técnicas na mesma mensagem",
     "",
     "FLUXO IDEAL:",
-    "1. Acolha e reconheça o que foi dito",
-    "2. Mostre que entendeu a situação específica",
-    "3. Dê uma orientação inicial útil, mas limitada",
-    "4. Faça uma pergunta estratégica para continuar",
+    "1. Acolha com reconhecimento natural ('Faz sentido você ter essa dúvida')",
+    "2. Adicione um insight leve que gera curiosidade",
+    "3. Mostre que entendeu a situação específica",
+    "4. Dê uma orientação inicial útil, mas limitada",
+    "5. Faça UMA pergunta estratégica natural para continuar",
     "",
     "SEMPRE termine com uma pergunta aberta ou direção clara, exceto se a pessoa já estiver encaminhada para consulta.",
   ];
@@ -592,6 +614,8 @@ function buildSystemPrompt(
       "TIPO DE USUÁRIO: cliente",
       "- responder com mais segurança operacional",
       "- ajudar com clareza, acompanhamento e próximos passos",
+      "- reconhecer que já existe vínculo com o escritório",
+      "- evitar abordagem de prospecção",
     ],
     staff: [
       "TIPO DE USUÁRIO: equipe",
@@ -685,26 +709,26 @@ function generateFallbackResponse(
   const saudacao = getSaudacao();
 
   if (intent === "greeting") {
-    return `${saudacao}! Eu sou a assistente virtual do escritório da Dra. Noêmia. Estou aqui para entender melhor seu caso e te orientar nos próximos passos.\n\nPode me contar, de forma simples, o que aconteceu?`;
+    return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia.\n\nMe conta, de forma simples, o que aconteceu?`;
   }
 
   if (intent === "agenda_request") {
-    return `Claro. Posso te orientar sobre o próximo passo para atendimento com a Dra. Noêmia.\n\nVocê está querendo agendar uma consulta ou entender primeiro melhor a sua situação?`;
+    return `Claro... O interessante é que cada caso tem o melhor momento para agir.\n\nVocê está querendo agendar agora ou entender melhor sua situação primeiro?`;
   }
 
   if (intent === "case_request" && userType !== "visitor") {
-    return `Entendi. Posso te ajudar com o acompanhamento.\n\nVocê quer saber sobre andamento, documentos ou próximo passo do seu caso?`;
+    return `Entendi... Geralmente o que mais surpreende é que pequenos detalhes podem mudar tudo.\n\nVocê quer saber sobre andamento, documentos ou próximo passo?`;
   }
 
   if (intent === "document_request" && userType !== "visitor") {
-    return `Perfeito. Posso te orientar com isso.\n\nVocê quer enviar documentos novos ou entender quais documentos são necessários?`;
+    return `Perfeito... O que pouca gente sabe é que os documentos certos fazem toda a diferença.\n\nVocê precisa enviar algo agora ou quer saber o que é necessário?`;
   }
 
   if (detectedTheme) {
-    return `Entendi. Seu relato parece estar relacionado a ${detectedTheme}.\n\nPara eu te orientar melhor nessa triagem inicial, me conta um pouco mais do que aconteceu no seu caso.`;
+    return `Olha... o interessante é que cada área tem detalhes que pouca gente conhece.\n\nSeu caso parece estar relacionado a ${detectedTheme}.\n\nO que mais te preocupa nessa história?`;
   }
 
-  return `${saudacao}! Eu sou a assistente virtual do escritório da Dra. Noêmia. Estou aqui para entender seu caso e te orientar nos próximos passos.\n\nMe conta, de forma simples, o que aconteceu?`;
+  return `Faz sentido você ter essa dúvida... Muita gente acaba adiando justamente por não saber por onde começar.\n\nEu sou a atendente virtual do escritório Noêmia Paixão Advocacia.\n\nMe conta, de forma simples, o que aconteceu?`;
 }
 
 export async function processNoemiaCore(
@@ -732,6 +756,49 @@ export async function processNoemiaCore(
   );
 
   try {
+    // Fase 4.2 - Buscar contexto do cliente
+    let clientContext = null;
+    let enrichedContext = input.context;
+
+    if (input.channel === 'whatsapp' || input.channel === 'instagram') {
+      try {
+        // Tentar obter clientId do metadata ou context
+        const clientId = (input.metadata?.clientId as string) || 
+                        (input.context as any)?.clientId ||
+                        (input.conversationState as any)?.clientId;
+
+        const sessionId = (input.metadata?.sessionId as string) ||
+                        (input.context as any)?.sessionId;
+
+        clientContext = await clientContextService.getClientContextForAI({
+          clientId,
+          sessionId,
+          channel: input.channel
+        });
+
+        if (clientContext) {
+          console.log('AI_CONTEXT_ENRICHED', {
+            clientId: clientContext.client.id,
+            isClient: clientContext.client.is_client,
+            pipelineStage: clientContext.pipeline?.stage,
+            leadTemperature: clientContext.pipeline?.lead_temperature
+          });
+
+          // Formatar contexto para a IA
+          const formattedContext = clientContextService.formatContextForAI(clientContext);
+          
+          // Enriquecer o contexto existente
+          enrichedContext = {
+            ...(input.context || {}),
+            clientContext: formattedContext
+          };
+        }
+      } catch (contextError) {
+        console.error('CLIENT_CONTEXT_ENRICHMENT_ERROR', contextError);
+        // Continuar sem contexto enriquecido
+      }
+    }
+
     const intent = detectUserIntent(input.message);
     const detectedTheme = detectLegalTheme(input.message);
 
@@ -748,10 +815,15 @@ export async function processNoemiaCore(
       effectiveAudience = "visitor";
     }
 
+    // Ajustar audience baseado no contexto do cliente
+    if (clientContext && clientContext.client.is_client) {
+      effectiveAudience = "client";
+    }
+
     const systemPrompt = buildSystemPrompt(
       input.channel,
       effectiveAudience,
-      input.context
+      enrichedContext
     );
 
     console.log(
@@ -766,6 +838,24 @@ export async function processNoemiaCore(
 
     if (openaiResult.success && openaiResult.response) {
       console.log(`NOEMIA_CORE_OPENAI_SUCCESS: ${input.channel}`);
+
+      // Fase 4.5 - Atualizar pipeline automaticamente após interação
+      if (clientContext && (input.channel === 'whatsapp' || input.channel === 'instagram')) {
+        try {
+          await clientContextService.updatePipelineFromInteraction(
+            clientContext.client.id,
+            {
+              messageText: input.message,
+              currentIntent: intent,
+              caseArea: detectedTheme || undefined,
+              leadTemperature: classification.leadTemperature
+            }
+          );
+        } catch (pipelineError) {
+          console.error('PIPELINE_AUTO_UPDATE_ERROR', pipelineError);
+          // Não quebrar o fluxo se a atualização do pipeline falhar
+        }
+      }
 
       return {
         reply: openaiResult.response,

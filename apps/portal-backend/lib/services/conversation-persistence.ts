@@ -1,4 +1,6 @@
 import { createWebhookSupabaseClient } from "../supabase/webhook";
+import { clientService } from "./client-service";
+import { clientIdentityService } from "./client-identity";
 
 export interface ConversationSession {
   id: string;
@@ -13,6 +15,7 @@ export interface ConversationSession {
   handoff_to_human?: boolean;
   last_inbound_at?: string;
   last_outbound_at?: string;
+  client_id?: string; // Fase 1.2 - Vínculo com tabela unificada de clientes
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -99,13 +102,37 @@ class ConversationPersistenceService {
     }
   }
 
-  // Obter ou criar sessão de conversação
+  // Obter ou criar sessão de conversação (Fase 2.3 - Integrado com clientIdentityService)
   async getOrCreateSession(
     channel: 'instagram' | 'whatsapp' | 'site' | 'portal',
     externalUserId: string,
     externalThreadId?: string
   ): Promise<ConversationSession> {
     try {
+      // Fase 2.2 - Primeiro, obter/criar identidade do cliente e canal
+      let clientIdentity = null;
+      
+      if (channel === 'whatsapp' || channel === 'instagram') {
+        try {
+          clientIdentity = await clientIdentityService.getOrCreateClientAndChannel({
+            channel,
+            externalUserId,
+            externalThreadId
+          });
+          
+          console.log('CLIENT_IDENTITY_PROCESSED', {
+            clientId: clientIdentity.client.id,
+            channelId: clientIdentity.clientChannel.id,
+            isNewClient: clientIdentity.isNewClient,
+            isNewChannel: clientIdentity.isNewChannel,
+            pipelineUpdated: clientIdentity.pipelineUpdated
+          });
+        } catch (identityError) {
+          console.error('CLIENT_IDENTITY_ERROR', identityError);
+          // Continuar sem client_id para não quebrar o fluxo
+        }
+      }
+
       // Tentar encontrar sessão existente
       const { data: existingSession, error: findError } = await this.supabase
         .from('conversation_sessions')
@@ -119,18 +146,52 @@ class ConversationPersistenceService {
       }
 
       if (existingSession) {
+        // Fase 2.3 - Se sessão existe mas não tem client_id, vincular agora
+        if (!existingSession.client_id && clientIdentity) {
+          try {
+            await clientIdentityService.linkClientToSession(existingSession.id, clientIdentity.client.id);
+            
+            // Atualizar objeto local com client_id
+            existingSession.client_id = clientIdentity.client.id;
+            
+            console.log('CLIENT_LINKED_TO_EXISTING_SESSION', {
+              sessionId: existingSession.id,
+              clientId: clientIdentity.client.id,
+              channel,
+              externalUserId
+            });
+          } catch (linkError) {
+            console.error('ERROR_LINKING_CLIENT_TO_EXISTING_SESSION', linkError);
+            // Continuar sem client_id para não quebrar o fluxo
+          }
+        }
+        
         return existingSession;
       }
 
       // Criar nova sessão
+      let newSessionData: any = {
+        channel,
+        external_user_id: externalUserId,
+        external_thread_id: externalThreadId,
+        lead_stage: 'initial'
+      };
+
+      // Fase 2.3 - Para WhatsApp e Instagram, vincular client_id se disponível
+      if (clientIdentity) {
+        newSessionData.client_id = clientIdentity.client.id;
+        
+        console.log('CLIENT_LINKED_TO_NEW_SESSION', {
+          clientId: clientIdentity.client.id,
+          channelId: clientIdentity.clientChannel.id,
+          channel,
+          externalUserId
+        });
+      }
+
       const { data: newSession, error: createError } = await this.supabase
         .from('conversation_sessions')
-        .insert({
-          channel,
-          external_user_id: externalUserId,
-          external_thread_id: externalThreadId,
-          lead_stage: 'initial'
-        })
+        .insert(newSessionData)
         .select()
         .single();
 
@@ -142,7 +203,8 @@ class ConversationPersistenceService {
       console.log('CONVERSATION_SESSION_CREATED', {
         channel,
         externalUserId,
-        sessionId: newSession.id
+        sessionId: newSession.id,
+        clientId: newSession.client_id
       });
 
       return newSession;
