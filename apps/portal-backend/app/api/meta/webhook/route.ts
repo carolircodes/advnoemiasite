@@ -3,6 +3,8 @@ import { createHmac } from "crypto";
 import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
 import { conversationPersistence } from "../../../../lib/services/conversation-persistence";
 import { antiSpamGuard } from "../../../../lib/services/anti-spam-guard";
+import { instagramCommentAutomation } from "../../../../lib/services/instagram-comment-automation";
+import { instagramCommentContext } from "../../../../lib/services/instagram-comment-context";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -252,6 +254,118 @@ async function handleUnsupportedInstagramMessage(senderId: string, messageType: 
   return await sendInstagramMessage(senderId, unsupportedMessage);
 }
 
+// FASE 2, 3, 4, 6, 7: Processamento completo de comentários com logs
+async function processInstagramCommentWithAutomation(comment: any): Promise<void> {
+  try {
+    logEvent("INSTAGRAM_COMMENT_RECEIVED", {
+      commentId: comment.id,
+      userId: comment.from?.id,
+      username: comment.from?.username,
+      commentText: comment.text,
+      mediaId: comment.media?.id
+    });
+
+    const commentData = {
+      id: comment.id,
+      from: {
+        id: comment.from?.id,
+        username: comment.from?.username,
+        full_name: comment.from?.full_name
+      },
+      text: comment.text,
+      media: comment.media ? {
+        id: comment.media.id
+      } : undefined
+    };
+
+    // Processar comentário com automação
+    const result = await instagramCommentAutomation.processComment(commentData);
+
+    if (result.success && result.campaign && result.event) {
+      logEvent("COMMENT_CAMPAIGN_FOUND", {
+        commentId: comment.id,
+        campaignId: result.campaign.id,
+        keyword: result.campaign.keyword,
+        theme: result.campaign.theme,
+        area: result.campaign.area
+      });
+
+      logEvent("COMMENT_KEYWORD_MATCHED", {
+        commentId: comment.id,
+        keyword: result.campaign.keyword,
+        commentText: comment.text
+      });
+
+      // FASE 5: Criar contexto de memória
+      if (result.dmSent) {
+        try {
+          const session = await instagramCommentContext.createSessionWithCommentContext(
+            comment.from?.id,
+            {
+              source: 'instagram_comment',
+              media_id: comment.media?.id || '',
+              keyword: result.campaign.keyword,
+              theme: result.campaign.theme,
+              area: result.campaign.area,
+              campaign_id: result.campaign.id,
+              comment_id: comment.id,
+              comment_text: comment.text
+            }
+          );
+
+          logEvent("COMMENT_CONTEXT_CREATED", {
+            commentId: comment.id,
+            userId: comment.from?.id,
+            sessionId: session.id,
+            theme: result.campaign.theme
+          });
+        } catch (contextError) {
+          logEvent("COMMENT_CONTEXT_ERROR", {
+            commentId: comment.id,
+            error: contextError instanceof Error ? contextError.message : String(contextError)
+          }, "error");
+        }
+      }
+
+      if (result.publicReplySent) {
+        logEvent("COMMENT_PUBLIC_REPLY_SENT", {
+          commentId: comment.id,
+          replyTemplate: result.campaign.public_reply_template
+        });
+      }
+
+      if (result.dmSent) {
+        logEvent("COMMENT_DM_SENT", {
+          commentId: comment.id,
+          userId: comment.from?.id,
+          dmTemplate: result.campaign.dm_opening_template.substring(0, 100) + '...'
+        });
+      }
+
+      logEvent("COMMENT_FLOW_COMPLETED", {
+        commentId: comment.id,
+        userId: comment.from?.id,
+        campaignId: result.campaign.id,
+        publicReplySent: result.publicReplySent,
+        dmSent: result.dmSent
+      });
+
+    } else {
+      logEvent("COMMENT_FLOW_SKIPPED", {
+        commentId: comment.id,
+        userId: comment.from?.id,
+        reason: result.error || 'No matching campaign'
+      });
+    }
+  } catch (error) {
+    logEvent("COMMENT_PROCESSING_ERROR", {
+      commentId: comment.id,
+      error: error instanceof Error ? error.message : String(error)
+    }, "error");
+  }
+}
+
+
 async function processMessageWithNoemia(
   senderId: string, 
   messageText: string,
@@ -345,7 +459,7 @@ async function processMessageWithNoemia(
     );
 
     // 7. Construir contexto para a IA
-    const context = {
+    let context = {
       sessionId: session.id,
       leadStage: session.lead_stage,
       caseArea: session.case_area,
@@ -354,17 +468,34 @@ async function processMessageWithNoemia(
       conversationHistory: summary
     };
 
+    // FASE 5: Enriquecer contexto se vier de comentário
+    const enrichedContext = await instagramCommentContext.enrichNoemiaContext(
+      session.id,
+      context
+    );
+    
+    if (enrichedContext.isFromComment) {
+      console.log('USING_COMMENT_CONTEXT_FOR_NOEMIA:', {
+        sessionId: session.id,
+        theme: enrichedContext.commentTheme,
+        keyword: enrichedContext.commentKeyword
+      });
+    }
+
     // 8. Processar com Noemia Core
     const coreResponse = await processNoemiaCore({
       channel: 'instagram',
       userType: 'visitor',
       message: messageText,
       history,
-      context,
+      context: enrichedContext, // Usar contexto enriquecido
       metadata: { 
         senderId,
         sessionId: session.id,
-        externalMessageId
+        externalMessageId,
+        isFromComment: enrichedContext.isFromComment || false,
+        commentTheme: enrichedContext.commentTheme,
+        commentKeyword: enrichedContext.commentKeyword
       }
     });
 
@@ -605,7 +736,7 @@ export async function POST(request: NextRequest) {
         for (const change of entry.changes || []) {
           console.log("INSTAGRAM_STRUCTURE_MATCHED: changes");
           
-          // Processar comentários
+          // FASE 2: Processar comentários com automação completa
           if (change.field === "comments") {
             console.log("INSTAGRAM_COMMENT_STRUCTURE_DETECTED: comments");
             
@@ -622,59 +753,8 @@ export async function POST(request: NextRequest) {
             console.log("  - COMMENT_TEXT:", comment.text);
             console.log("  - POST_ID:", comment.media?.id || "N/A");
 
-            // Detectar palavra-chave (case-insensitive)
-            const commentTextLower = comment.text.toLowerCase();
-            const keywordDetected = commentTextLower.includes(PALAVRA_CHAVE_INSTAGRAM.toLowerCase());
-            
-            console.log("INSTAGRAM_KEYWORD_DETECTION:");
-            console.log("  - KEYWORD:", PALAVRA_CHAVE_INSTAGRAM);
-            console.log("  - DETECTED:", keywordDetected);
-            console.log("  - COMMENT_TEXT_LOWER:", commentTextLower);
-
-            if (keywordDetected) {
-              console.log("INSTAGRAM_KEYWORD_MATCHED: sending private reply");
-              
-              await processMessageWithNoemia(
-                comment.from.id, 
-                comment.text,
-                comment.id,
-                `comment_${comment.id}_${Date.now()}`
-              );
-
-              const replySent = true; // Se chegou aqui, o processamento foi iniciado
-
-              if (replySent) {
-                console.log("INSTAGRAM_PRIVATE_REPLY_SUCCESS: Comment triggered DM sent");
-                logEvent("INSTAGRAM_PRIVATE_REPLY_SUCCESS", {
-                  commentId: comment.id,
-                  userId: comment.from.id,
-                  username: comment.from.username,
-                  postId: comment.media?.id,
-                  keyword: PALAVRA_CHAVE_INSTAGRAM,
-                  commentText: comment.text
-                });
-              } else {
-                console.log("INSTAGRAM_PRIVATE_REPLY_FAILED: Could not send DM to commenter");
-                logEvent("INSTAGRAM_PRIVATE_REPLY_FAILED", {
-                  commentId: comment.id,
-                  userId: comment.from.id,
-                  username: comment.from.username,
-                  postId: comment.media?.id,
-                  keyword: PALAVRA_CHAVE_INSTAGRAM,
-                  commentText: comment.text
-                }, "error");
-              }
-            } else {
-              console.log("INSTAGRAM_KEYWORD_NOT_MATCHED: no action taken");
-              logEvent("INSTAGRAM_KEYWORD_NOT_MATCHED", {
-                commentId: comment.id,
-                userId: comment.from.id,
-                username: comment.from.username,
-                postId: comment.media?.id,
-                keyword: PALAVRA_CHAVE_INSTAGRAM,
-                commentText: comment.text
-              });
-            }
+            // FASE 2, 3, 4, 6, 7: Processar com sistema completo de automação
+            await processInstagramCommentWithAutomation(comment);
           }
           
           // Processar mensagens (código existente)

@@ -13,6 +13,7 @@ export interface ConversationSession {
   handoff_to_human?: boolean;
   last_inbound_at?: string;
   last_outbound_at?: string;
+  metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +41,11 @@ export interface ProcessedWebhookEvent {
 
 class ConversationPersistenceService {
   private supabase = createWebhookSupabaseClient();
+
+  // Método público para acessar supabase
+  get supabaseClient() {
+    return this.supabase;
+  }
 
   // Verificar se evento já foi processado (idempotência)
   async isEventProcessed(
