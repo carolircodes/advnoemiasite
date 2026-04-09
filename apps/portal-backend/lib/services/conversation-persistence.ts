@@ -109,10 +109,13 @@ class ConversationPersistenceService {
     externalThreadId?: string
   ): Promise<ConversationSession> {
     try {
-      // Fase 2.2 - Primeiro, obter/criar identidade do cliente e canal
+      // Fase 2.2 - Para WhatsApp/Instagram, tratar como visitor/lead sem criar client
+      // Isso evita o erro de profile_id NOT NULL na tabela clients
       let clientIdentity = null;
       
-      if (channel === 'whatsapp' || channel === 'instagram') {
+      // Apenas tentar criar client para canais que não sejam WhatsApp/Instagram
+      // pois esses canais devem tratar usuários como visitors até conversão
+      if (channel !== 'whatsapp' && channel !== 'instagram') {
         try {
           clientIdentity = await clientIdentityService.getOrCreateClientAndChannel({
             channel,
@@ -131,6 +134,12 @@ class ConversationPersistenceService {
           console.error('CLIENT_IDENTITY_ERROR', identityError);
           // Continuar sem client_id para não quebrar o fluxo
         }
+      } else {
+        console.log('VISITOR_FLOW_SKIP_CLIENT_CREATION', {
+          channel,
+          externalUserId,
+          reason: 'WhatsApp/Instagram users treated as visitors until conversion'
+        });
       }
 
       // Tentar encontrar sessão existente
@@ -146,8 +155,9 @@ class ConversationPersistenceService {
       }
 
       if (existingSession) {
-        // Fase 2.3 - Se sessão existe mas não tem client_id, vincular agora
-        if (!existingSession.client_id && clientIdentity) {
+        // Fase 2.3 - Se sessão existe mas não tem client_id, vincular agora (apenas para não WhatsApp/Instagram)
+        // WhatsApp/Instagram devem permanecer como visitors até conversão manual
+        if (!existingSession.client_id && clientIdentity && channel !== 'whatsapp' && channel !== 'instagram') {
           try {
             await clientIdentityService.linkClientToSession(existingSession.id, clientIdentity.client.id);
             
@@ -164,6 +174,13 @@ class ConversationPersistenceService {
             console.error('ERROR_LINKING_CLIENT_TO_EXISTING_SESSION', linkError);
             // Continuar sem client_id para não quebrar o fluxo
           }
+        } else if (channel === 'whatsapp' || channel === 'instagram') {
+          console.log('VISITOR_SESSION_MAINTAINED', {
+            sessionId: existingSession.id,
+            channel,
+            externalUserId,
+            reason: 'WhatsApp/Instagram session maintained without client_id'
+          });
         }
         
         return existingSession;
@@ -177,8 +194,9 @@ class ConversationPersistenceService {
         lead_stage: 'initial'
       };
 
-      // Fase 2.3 - Para WhatsApp e Instagram, vincular client_id se disponível
-      if (clientIdentity) {
+      // Fase 2.3 - Apenas vincular client_id para canais que não são WhatsApp/Instagram
+      // WhatsApp/Instagram permanecem como visitors até conversão
+      if (clientIdentity && channel !== 'whatsapp' && channel !== 'instagram') {
         newSessionData.client_id = clientIdentity.client.id;
         
         console.log('CLIENT_LINKED_TO_NEW_SESSION', {
@@ -186,6 +204,12 @@ class ConversationPersistenceService {
           channelId: clientIdentity.clientChannel.id,
           channel,
           externalUserId
+        });
+      } else if (channel === 'whatsapp' || channel === 'instagram') {
+        console.log('VISITOR_SESSION_CREATED', {
+          channel,
+          externalUserId,
+          reason: 'WhatsApp/Instagram session created without client_id'
         });
       }
 
