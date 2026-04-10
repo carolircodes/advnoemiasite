@@ -4,6 +4,7 @@ import { AppFrame } from "@/components/app-frame";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
+import { SiteCTA } from "@/components/SmartCTA";
 import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
 import {
   appendEntryContextToPath,
@@ -90,12 +91,15 @@ export default async function HomePage({
           { label: "Operacao organizada", value: "Fluxo ponta a ponta" }
         ]}
         actions={[
-          {
-            href: triageHref,
-            label: "Iniciar atendimento",
-            trackingEventKey: "cta_start_triage_clicked",
-            trackingPayload: { location: "home_hero", ...entryContextPayload }
-          },
+          <SiteCTA
+            key="home-cta"
+            label="Iniciar atendimento"
+            campaign="homepage_main"
+            topic="geral"
+            variant="primary"
+            size="lg"
+            className="w-full"
+          />,
           {
             href: clientLoginHref,
             label: "Entrar na area do cliente",

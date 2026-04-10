@@ -12,6 +12,7 @@ import {
   getEntryContextPayload,
   readEntryContext
 } from "../../lib/entry-context";
+import { injectAcquisitionContext } from "@/lib/middleware/acquisition-middleware";
 
 export const metadata: Metadata = {
   title: "Noemia",

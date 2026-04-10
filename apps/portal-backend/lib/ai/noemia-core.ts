@@ -2407,6 +2407,45 @@ function buildSystemPrompt(
 
   if (context) {
     prompts.push("", "CONTEXTO DISPONÍVEL:", JSON.stringify(context));
+    
+    // Adicionar contexto de aquisição se presente
+    if (context.acquisition) {
+      const acquisition = context.acquisition;
+      prompts.push("", "CONTEXTO DE AQUISIÇÃO:");
+      
+      if (acquisition.ai_context) {
+        prompts.push(acquisition.ai_context);
+      }
+      
+      if (acquisition.language_adaptation) {
+        prompts.push("", "ADAPTAÇÃO DE LINGUAGEM:");
+        prompts.push(acquisition.language_adaptation);
+      }
+      
+      // Adicionar instruções específicas baseadas na origem
+      if (acquisition.source === 'instagram') {
+        prompts.push("- Mantenha tom mais caloroso e próximo, próprio do Instagram");
+        prompts.push("- Use linguagem mais informal e acolhedora");
+      } else if (acquisition.source === 'whatsapp') {
+        prompts.push("- Respostas mais diretas e objetivas");
+        prompts.push("- Pode usar emojis com moderação");
+      } else if (acquisition.source === 'ads') {
+        prompts.push("- Lead veio de anúncio, focar em clareza e valor");
+        prompts.push("- Ser mais direto na condução para consulta");
+      }
+      
+      // Adicionar instruções específicas baseadas no tema
+      if (acquisition.topic === 'previdenciario') {
+        prompts.push("- Priorizar perguntas sobre INSS, tempo de contribuição, benefícios");
+        prompts.push("- Focar em aposentadoria e auxílios");
+      } else if (acquisition.topic === 'bancario') {
+        prompts.push("- Priorizar perguntas sobre contratos, juros, cobranças");
+        prompts.push("- Focar em direitos do consumidor bancário");
+      } else if (acquisition.topic === 'familia') {
+        prompts.push("- Priorizar perguntas sobre divórcio, pensão, guarda");
+        prompts.push("- Abordar com sensibilidade questões familiares");
+      }
+    }
   }
 
   prompts.push(

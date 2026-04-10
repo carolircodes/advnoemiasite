@@ -4,6 +4,7 @@ import { getCurrentProfile } from "../../../../lib/auth/guards";
 import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
 import { recordProductEvent } from "../../../../lib/services/public-intake";
 import { getServerEnv } from "../../../../lib/config/env";
+import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-middleware";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,15 @@ export async function POST(request: Request) {
     // Extrair contexto da Meta se presente
     const metaContext = extractMetaContext(payload);
 
+    // Extrair contexto de aquisição se presente
+    const acquisitionContext = extractAcquisitionFromRequest(request);
+
+    // Combinar contextos
+    const combinedContext = {
+      ...metaContext,
+      acquisition: acquisitionContext
+    };
+
     // Verificar se OPENAI_API_KEY está disponível
     const env = getServerEnv();
     
@@ -28,10 +38,12 @@ export async function POST(request: Request) {
         userType: payload.userType || (profile?.role === 'cliente' ? 'client' : profile?.role !== 'cliente' ? 'staff' : 'visitor'),
         message: payload.message,
         history: payload.history || [], // TODO: implementar histórico se necessário
-        context: metaContext,
+        context: combinedContext,
         metadata: { 
           currentPath: payload.currentPath,
-          url: request.url 
+          url: request.url,
+          acquisition_source: acquisitionContext?.source,
+          acquisition_topic: acquisitionContext?.topic
         },
         profile,
         conversationState: payload.conversationState
