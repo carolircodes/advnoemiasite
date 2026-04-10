@@ -6,6 +6,7 @@ import { AppFrame } from "@/components/app-frame";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
 import {
@@ -77,15 +78,33 @@ export default async function ClientPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  console.log("[cliente.page] Iniciando carregamento da página do cliente");
+  
   const profile = await requireProfile(["cliente"]);
+  console.log("[cliente.page] Profile carregado:", {
+    id: profile.id,
+    email: profile.email,
+    role: profile.role,
+    first_login_completed_at: profile.first_login_completed_at,
+    is_active: profile.is_active
+  });
 
   if (!profile.first_login_completed_at) {
+    console.log("[cliente.page] Redirecionando para primeiro acesso - first_login_completed_at é null");
     redirect("/auth/primeiro-acesso");
   }
 
   let workspace;
   try {
+    console.log("[cliente.page] Buscando workspace do cliente...");
     workspace = await getClientWorkspace(profile);
+    console.log("[cliente.page] Workspace carregado com sucesso:", {
+      clientRecord: workspace.clientRecord,
+      documentsCount: workspace.documents?.length || 0,
+      appointmentsCount: workspace.appointments?.length || 0,
+      casesCount: workspace.cases?.length || 0,
+      eventsCount: workspace.events?.length || 0
+    });
   } catch (error) {
     console.error("[cliente.page] Erro ao carregar workspace do cliente", {
       profileId: profile.id,
@@ -95,10 +114,12 @@ export default async function ClientPage({
     
     // Se não encontrar o registro do cliente, redirecionar para primeiro acesso
     if (error instanceof Error && error.message.includes("Nao foi possivel localizar o cadastro do cliente")) {
+      console.log("[cliente.page] Cliente não encontrado, redirecionando para primeiro acesso");
       redirect("/auth/primeiro-acesso");
     }
     
     // Para outros erros, redirecionar para login com erro genérico
+    console.log("[cliente.page] Erro genérico, redirecionando para login");
     redirect("/portal/login?error=erro-carregar-dados");
   }
   const params = await searchParams;
@@ -106,12 +127,23 @@ export default async function ClientPage({
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
   const now = new Date();
+  
+  console.log("[cliente.page] Processando dados do workspace...");
+  
   // Verificações de segurança para evitar undefined/null
   const documents = workspace.documents || [];
   const documentRequests = workspace.documentRequests || [];
   const appointments = workspace.appointments || [];
   const cases = workspace.cases || [];
   const events = workspace.events || [];
+
+  console.log("[cliente.page] Arrays verificados:", {
+    documentsLength: documents.length,
+    documentRequestsLength: documentRequests.length,
+    appointmentsLength: appointments.length,
+    casesLength: cases.length,
+    eventsLength: events.length
+  });
 
   const availableDocuments = documents.filter(
     (document) => document && (document.status === "recebido" || document.status === "revisado")
@@ -130,6 +162,17 @@ export default async function ClientPage({
     !documents.length &&
     !documentRequests.length &&
     !appointments.length;
+
+  console.log("[cliente.page] Dados processados:", {
+    availableDocumentsLength: availableDocuments.length,
+    pendingDocumentsLength: pendingDocuments.length,
+    openRequestsLength: openRequests.length,
+    upcomingAppointmentsLength: upcomingAppointments.length,
+    mainCase: mainCase ? mainCase.title : 'null',
+    showOnboardingGuide
+  });
+
+  console.log("[cliente.page] Iniciando renderização do AppFrame...");
   const importantNotices = [
     mainCase && mainCase.statusLabel
       ? {
@@ -175,8 +218,17 @@ export default async function ClientPage({
       : null
   ].filter(Boolean) as NoticeItem[];
 
+  console.log("[cliente.page] Verificando propriedades críticas:", {
+    profileFullName: profile.full_name,
+    profileEmail: profile.email,
+    profileRole: profile.role,
+    workspaceClientRecord: workspace.clientRecord,
+    mainCaseStatusLabel: mainCase?.statusLabel,
+    mainCaseTitle: mainCase?.title
+  });
+
   return (
-    <>
+    <ErrorBoundary>
       <ProductEventBeacon
         eventKey="client_portal_viewed"
         eventGroup="portal"
@@ -188,13 +240,13 @@ export default async function ClientPage({
       />
       <AppFrame
         eyebrow="Area do cliente"
-        title={`Seu caso em um painel claro, organizado e facil de acompanhar, ${profile.full_name}.`}
+        title={`Seu caso em um painel claro, organizado e facil de acompanhar, ${profile.full_name || ""}.`}
         description="Aqui voce encontra o status atual do caso, as proximas datas, os documentos liberados e os avisos que realmente importam no acompanhamento do dia a dia."
         utilityContent={
           <PortalSessionBanner
             role={profile.role}
-            fullName={profile.full_name}
-            email={profile.email}
+            fullName={profile.full_name || ""}
+            email={profile.email || ""}
             workspaceLabel="Portal autenticado"
             workspaceHint="Sessao ativa para acompanhar o proprio atendimento com seguranca."
           />
@@ -482,6 +534,6 @@ export default async function ClientPage({
           )}
       </SectionCard>
       </AppFrame>
-    </>
+    </ErrorBoundary>
   );
 }
