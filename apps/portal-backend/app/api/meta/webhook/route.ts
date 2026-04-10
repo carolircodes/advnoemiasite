@@ -9,6 +9,7 @@ import { instagramMessageGuard } from "../../../../lib/services/instagram-messag
 import { instagramKeywordAutomation } from "../../../../lib/services/instagram-keyword-automation";
 import { leadCaptureService } from "../../../../lib/services/lead-capture";
 import { abTestingService } from "../../../../lib/services/ab-testing";
+import { detectKeywords, generateAutoDM, shouldSendDM, markDMAsSent } from "../../../../lib/services/instagram-keyword-automation";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -355,101 +356,102 @@ async function processInstagramCommentWithAutomation(comment: any): Promise<void
       mediaId: comment.media?.id
     });
 
-    const commentData = {
-      id: comment.id,
-      from: {
-        id: comment.from?.id,
-        username: comment.from?.username,
-        full_name: comment.from?.full_name
-      },
-      text: comment.text,
-      media: comment.media ? {
-        id: comment.media.id
-      } : undefined
-    };
-
     // Usar novas funções de detecção expandida
     const analysis = detectKeywords(comment.text);
-    
-    // Verificar se deve enviar DM
     const shouldSend = shouldSendDM(comment.from?.id, comment.media?.id || comment.id);
-    
-    if (analysis.hasKeyword && shouldSend) {
-      logEvent("COMMENT_KEYWORD_DETECTED", {
+
+    if (!analysis.hasKeyword) {
+      logEvent("COMMENT_FLOW_SKIPPED", {
         commentId: comment.id,
         userId: comment.from?.id,
-        detectedTopic: analysis.detectedTopic,
-        detectedKeywords: analysis.detectedKeywords,
+        reason: "No keyword detected"
+      });
+      return;
+    }
+
+    logEvent("COMMENT_KEYWORD_DETECTED", {
+      commentId: comment.id,
+      userId: comment.from?.id,
+      detectedTopic: analysis.detectedTopic,
+      detectedKeywords: analysis.detectedKeywords,
+      priority: analysis.priority,
+      intentLevel: analysis.intentLevel,
+      confidence: analysis.confidence
+    });
+
+    if (!shouldSend) {
+      logEvent("DM_NOT_SENT", {
+        commentId: comment.id,
+        userId: comment.from?.id,
+        reason: "spam_prevention",
+        hasKeyword: analysis.hasKeyword,
+        shouldSend
+      });
+      return;
+    }
+
+    const autoDM = generateAutoDM(analysis, comment.media?.id || comment.id);
+    const dmResult = await sendInstagramMessage(comment.from?.id, autoDM);
+
+    if (dmResult.success) {
+      logEvent("DM_AUTO_SENT", {
+        userId: comment.from?.id,
+        postId: comment.media?.id || comment.id,
+        keyword: analysis.detectedKeywords.join(", "),
+        topic: analysis.detectedTopic,
+        campaign: "comment_auto_dm",
         priority: analysis.priority,
         intentLevel: analysis.intentLevel,
         confidence: analysis.confidence
       });
 
-      // Gerar DM automática com link rastreado
-      const autoDM = generateAutoDM(analysis, comment.media?.id || comment.id);
-      
-      // Enviar DM
-      const dmResult = await sendInstagramMessage(comment.from?.id, autoDM);
-      
-      if (dmResult.success) {
-        logEvent("DM_AUTO_SENT", {
+      markDMAsSent(comment.from?.id, comment.media?.id || comment.id);
+
+      try {
+        const session = await instagramCommentContext.createSessionWithCommentContext(
+          comment.from?.id,
+          {
+            source: "instagram_comment",
+            media_id: comment.media?.id || "",
+            keyword: analysis.detectedKeywords.join(", "),
+            theme: analysis.detectedTopic || "geral",
+            area: analysis.detectedTopic || "geral",
+            campaign_id: "comment_auto_dm",
+            comment_id: comment.id,
+            comment_text: comment.text,
+            detected_topic: analysis.detectedTopic,
+            detected_keywords: analysis.detectedKeywords,
+            priority: analysis.priority,
+            intent_level: analysis.intentLevel,
+            confidence: analysis.confidence
+          }
+        );
+
+        logEvent("COMMENT_CONTEXT_CREATED", {
+          commentId: comment.id,
           userId: comment.from?.id,
-          postId: comment.media?.id || comment.id,
-          keyword: analysis.detectedKeywords.join(', '),
-          topic: analysis.detectedTopic,
-          campaign: 'comment_auto_dm',
-          priority: analysis.priority,
-          intentLevel: analysis.intentLevel,
-          confidence: analysis.confidence
+          sessionId: session.id,
+          theme: analysis.detectedTopic,
+          keywords: analysis.detectedKeywords
         });
-
-        // Marcar DM como enviada
-        markDMAsSent(comment.from?.id, comment.media?.id || comment.id);
-
-        // FASE 5: Criar contexto de memória
-        try {
-          const session = await instagramCommentContext.createSessionWithCommentContext(
-            comment.from?.id,
-            {
-              source: 'instagram_comment',
-              media_id: comment.media?.id || '',
-              keyword: analysis.detectedKeywords.join(', '),
-              theme: analysis.detectedTopic || 'geral',
-              area: analysis.detectedTopic || 'geral',
-              campaign_id: 'comment_auto_dm',
-              comment_id: comment.id,
-              comment_text: comment.text,
-              detected_topic: analysis.detectedTopic,
-              detected_keywords: analysis.detectedKeywords,
-              priority: analysis.priority,
-              intent_level: analysis.intentLevel,
-              confidence: analysis.confidence
-            }
-          );
-
-          logEvent("COMMENT_CONTEXT_CREATED", {
-            commentId: comment.id,
-            userId: comment.from?.id,
-            sessionId: session.id,
-            theme: analysis.detectedTopic,
-            keywords: analysis.detectedKeywords
-          });
-        } catch (contextError) {
-          logEvent("COMMENT_CONTEXT_ERROR", {
+      } catch (contextError) {
+        logEvent(
+          "COMMENT_CONTEXT_ERROR",
+          {
             commentId: comment.id,
             error: contextError instanceof Error ? contextError.message : String(contextError)
-          }, "error");
-        }
+          },
+          "error"
+        );
       }
-
-      } else {
-      // Log quando não envia DM (spam ou já enviado)
+    } else {
       logEvent("DM_NOT_SENT", {
         commentId: comment.id,
         userId: comment.from?.id,
-        reason: shouldSend ? 'dm_send_failed' : 'spam_prevention',
+        reason: "dm_send_failed",
         hasKeyword: analysis.hasKeyword,
-        shouldSend: shouldSend
+        shouldSend,
+        error: dmResult.error
       });
     }
 
@@ -461,20 +463,16 @@ async function processInstagramCommentWithAutomation(comment: any): Promise<void
       topic: analysis.detectedTopic,
       priority: analysis.priority,
       intentLevel: analysis.intentLevel
-      });
-
-    } else {
-      logEvent("COMMENT_FLOW_SKIPPED", {
-        commentId: comment.id,
-        userId: comment.from?.id,
-        reason: 'No keyword detected'
-      });
-    }
+    });
   } catch (error) {
-    logEvent("COMMENT_PROCESSING_ERROR", {
-      commentId: comment.id,
-      error: error instanceof Error ? error.message : String(error)
-    }, "error");
+    logEvent(
+      "COMMENT_PROCESSING_ERROR",
+      {
+        commentId: comment.id,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "error"
+    );
   }
 }
 

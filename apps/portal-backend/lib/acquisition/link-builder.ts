@@ -142,12 +142,16 @@ export function generateWhatsAppLink(
   };
 
   if (message) {
-    return `${whatsappUrl}?text=${encodeURIComponent(message)}&${new URLSearchParams({
-      ...trackingParams,
-      ...Object.fromEntries(
-        Object.entries(trackingParams).map(([k, v]) => [k, v as string])
-      )
-    ).toString()}`;
+    const queryString = new URLSearchParams(
+      Object.entries(trackingParams).reduce((acc, [k, v]) => {
+        if (v !== undefined && v !== null) {
+          acc[k] = String(v);
+        }
+        return acc;
+      }, {} as Record<string, string>)
+    ).toString();
+    
+    return `${whatsappUrl}?text=${encodeURIComponent(message)}&${queryString}`;
   }
 
   return generateTrackingLink(trackingParams, {
