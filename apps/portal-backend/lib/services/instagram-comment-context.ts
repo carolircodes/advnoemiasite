@@ -9,10 +9,16 @@ export interface CommentContext {
   campaign_id: string;
   comment_id: string;
   comment_text: string;
+
+  // 🔥 CORREÇÃO DO ERRO + EXPANSÃO INTELIGENTE
+  detected_topic?: string;
+  detected_keywords?: string[];
+  priority?: 'low' | 'medium' | 'high';
+  intent_level?: 'low' | 'medium' | 'high';
+  confidence?: number;
 }
 
 class InstagramCommentContextService {
-  // FASE 5: Memória - Criar ou recuperar sessão com contexto de comentário
   async createSessionWithCommentContext(
     userId: string,
     commentContext: CommentContext
@@ -26,19 +32,17 @@ class InstagramCommentContextService {
       console.log('THEME:', commentContext.theme);
       console.log('AREA:', commentContext.area);
 
-      // Criar ou obter sessão existente
       const session = await conversationPersistence.getOrCreateSession(
         'instagram',
         userId
       );
 
-      // Atualizar sessão com contexto do comentário
       await conversationPersistence.updateSession(session.id, {
         lead_stage: 'engaged',
         case_area: commentContext.area,
         current_intent: `comment_${commentContext.keyword}`,
         last_inbound_at: new Date().toISOString(),
-        // Metadados do contexto
+
         metadata: {
           source: commentContext.source,
           media_id: commentContext.media_id,
@@ -48,14 +52,21 @@ class InstagramCommentContextService {
           campaign_id: commentContext.campaign_id,
           comment_id: commentContext.comment_id,
           comment_text: commentContext.comment_text,
+
+          // 🔥 NOVOS CAMPOS SALVOS (IMPORTANTE)
+          detected_topic: commentContext.detected_topic,
+          detected_keywords: commentContext.detected_keywords,
+          priority: commentContext.priority,
+          intent_level: commentContext.intent_level,
+          confidence: commentContext.confidence,
+
           context_created_at: new Date().toISOString()
         }
       });
 
-      // Salvar mensagem inicial do contexto
       await conversationPersistence.saveMessage(
         session.id,
-        commentContext.comment_id, // Usar comment_id como external_message_id
+        commentContext.comment_id,
         'user',
         commentContext.comment_text,
         'inbound',
@@ -85,7 +96,6 @@ class InstagramCommentContextService {
     }
   }
 
-  // Recuperar contexto da sessão
   async getSessionCommentContext(sessionId: string): Promise<CommentContext | null> {
     try {
       const { data: session, error } = await conversationPersistence.supabaseClient
@@ -110,7 +120,14 @@ class InstagramCommentContextService {
           area: metadata.area,
           campaign_id: metadata.campaign_id,
           comment_id: metadata.comment_id,
-          comment_text: metadata.comment_text
+          comment_text: metadata.comment_text,
+
+          // 🔥 manter compatibilidade ao recuperar
+          detected_topic: metadata.detected_topic,
+          detected_keywords: metadata.detected_keywords,
+          priority: metadata.priority,
+          intent_level: metadata.intent_level,
+          confidence: metadata.confidence
         };
       }
 
@@ -121,13 +138,11 @@ class InstagramCommentContextService {
     }
   }
 
-  // Verificar se sessão tem contexto de comentário
   async hasCommentContext(sessionId: string): Promise<boolean> {
     const context = await this.getSessionCommentContext(sessionId);
     return context !== null;
   }
 
-  // Enriquecer contexto da Noêmia com informações do comentário
   async enrichNoemiaContext(
     sessionId: string,
     baseContext: any
@@ -149,9 +164,7 @@ class InstagramCommentContextService {
         commentCampaignId: commentContext.campaign_id,
         commentId: commentContext.comment_id,
         commentText: commentContext.comment_text,
-        // Indica que a conversa veio de um comentário
         isFromComment: true,
-        // Contexto personalizado para respostas
         personalizedContext: {
           origin: 'comment',
           triggerKeyword: commentContext.keyword,
@@ -165,7 +178,6 @@ class InstagramCommentContextService {
     }
   }
 
-  // Gerar mensagem de contexto inicial para a Noêmia
   generateContextualSystemMessage(commentContext: CommentContext): string {
     return `O usuário iniciou esta conversa a partir de um comentário em um conteúdo sobre ${commentContext.theme}.
 
