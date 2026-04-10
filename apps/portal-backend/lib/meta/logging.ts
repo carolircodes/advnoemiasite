@@ -145,7 +145,14 @@ async function persistLog(logEntry: MetaLogEntry): Promise<void> {
  */
 async function sendToAnalytics(logEntry: MetaLogEntry): Promise<void> {
   try {
-    const response = await fetch(process.env.META_ANALYTICS_WEBHOOK!, {
+    const webhookUrl = process.env.META_ANALYTICS_WEBHOOK;
+    
+    if (!webhookUrl) {
+      console.warn("META_ANALYTICS_WEBHOOK não configurado, ignorando analytics");
+      return;
+    }
+    
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

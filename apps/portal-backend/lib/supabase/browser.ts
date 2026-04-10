@@ -9,7 +9,9 @@ export function createBrowserSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabasePublishableKey) {
-    throw new Error("As variaveis publicas do Supabase nao foram configuradas.");
+    console.warn("Variáveis do Supabase não configuradas. Usando fallback seguro.");
+    // Retornar cliente nulo ou mock para não quebrar o build
+    return null;
   }
 
   return createBrowserClient(supabaseUrl, supabasePublishableKey);

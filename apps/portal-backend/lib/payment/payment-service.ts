@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+
+// Proteção contra variáveis não configuradas
+if (!supabaseUrl || !supabaseSecretKey) {
+  console.warn("Variáveis do Supabase não configuradas em payment-service.ts");
+  throw new Error("Configuração do Supabase é obrigatória para pagamentos");
+}
+
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
 
 export interface PaymentRequest {
   leadId: string;

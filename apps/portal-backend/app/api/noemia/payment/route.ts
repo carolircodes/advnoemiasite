@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generatePaymentLink, generatePaymentMessage } from '@/lib/payment/payment-service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+
+if (!supabaseUrl || !supabaseSecretKey) {
+  console.error("Variáveis do Supabase não configuradas em noemia payment route");
+  throw new Error("Configuração do Supabase é obrigatória para pagamentos da NoemIA");
+}
+
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
 
 export async function POST(request: NextRequest) {
   try {

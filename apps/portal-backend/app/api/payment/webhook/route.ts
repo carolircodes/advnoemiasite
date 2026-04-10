@@ -2,19 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 
-// Configuração do Mercado Pago
+// Configuração do Mercado Pago com proteção
+const mercadoPagoAccessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+
+if (!mercadoPagoAccessToken || !supabaseUrl || !supabaseSecretKey) {
+  console.error("Variáveis obrigatórias não configuradas para pagamento webhook");
+  throw new Error("Configuração obrigatória ausente para webhook de pagamento");
+}
+
 const mercadopago = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
+  accessToken: mercadoPagoAccessToken,
 });
 
-// Configuração do Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
-
-// Webhook secret para validação (opcional, mas recomendado)
-const WEBHOOK_SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET!;
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
+const WEBHOOK_SECRET = webhookSecret;
 
 export async function POST(request: NextRequest) {
   try {
