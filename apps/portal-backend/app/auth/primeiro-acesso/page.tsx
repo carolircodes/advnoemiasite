@@ -4,12 +4,9 @@ import { redirect } from "next/navigation";
 
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { passwordSchema } from "@/lib/domain/portal";
-import { 
-  getCurrentProfile, 
-  markClientFirstAccessCompleted, 
-  getLinkedIntakeRequestId 
-} from "@/lib/auth/guards";
+import { getCurrentProfile } from "@/lib/auth/guards";
 import { recordProductEvent } from "@/lib/services/public-intake";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
