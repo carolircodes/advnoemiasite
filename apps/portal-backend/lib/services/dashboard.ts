@@ -1095,12 +1095,23 @@ export async function getClientWorkspace(profile: PortalProfile) {
     .from("clients")
     .select("id,status,notes,created_at")
     .eq("profile_id", profile.id)
-    .single();
+    .maybeSingle();
 
-  if (clientError || !clientRecord) {
-    throw new Error(
-      clientError?.message || "Nao foi possivel localizar o cadastro do cliente."
-    );
+  if (clientError) {
+    console.error("[dashboard.getClientWorkspace] Erro ao buscar cliente", {
+      profileId: profile.id,
+      error: clientError.message,
+      details: clientError
+    });
+    throw new Error(`Erro ao buscar dados do cliente: ${clientError.message}`);
+  }
+
+  if (!clientRecord) {
+    console.warn("[dashboard.getClientWorkspace] Cliente não encontrado para profile", {
+      profileId: profile.id,
+      profileEmail: profile.email
+    });
+    throw new Error("Nao foi possivel localizar o cadastro do cliente.");
   }
 
   const { data: cases, error: casesError } = await supabase

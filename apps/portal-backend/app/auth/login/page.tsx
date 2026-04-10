@@ -93,6 +93,8 @@ function getLoginErrorMessage(error: string) {
       return "O link de acesso expirou. Solicite um novo envio.";
     case "sessao-nao-disponivel":
       return "Sua sessão não ficou disponível. Entre novamente.";
+    case "erro-carregar-dados":
+      return "Não foi possível carregar seus dados. Tente novamente ou entre em contato com o suporte.";
     default:
       return error ? "Não foi possível concluir o acesso agora." : "";
   }

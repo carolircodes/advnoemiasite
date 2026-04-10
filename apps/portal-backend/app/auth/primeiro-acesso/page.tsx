@@ -25,29 +25,77 @@ async function markClientFirstAccessCompleted(
 ) {
   const admin = createAdminSupabaseClient();
 
+  console.log("[auth.first-access] Marcando primeiro acesso como concluído", {
+    profileId,
+    completedAt
+  });
+
+  // 1. Atualizar o perfil
   const { error: profileError } = await admin
     .from("profiles")
     .update({ first_login_completed_at: completedAt })
     .eq("id", profileId);
 
   if (profileError) {
+    console.error("[auth.first-access] Erro ao atualizar perfil", {
+      profileId,
+      error: profileError.message,
+      details: profileError
+    });
     throw new Error(
       `Não foi possível concluir o primeiro acesso no perfil: ${profileError.message}`
     );
   }
 
-  const { error: clientError } = await admin
-    .from("clients")
-    .update({ status: "ativo" })
-    .eq("profile_id", profileId)
-    .in("status", ["convite-enviado", "aguardando-primeiro-acesso"]);
+  console.log("[auth.first-access] Perfil atualizado com sucesso");
 
-  if (clientError) {
-    throw new Error(
-      `Não foi possível atualizar o status do cliente: ${clientError.message}`
-    );
+  // 2. Verificar se o cliente existe antes de atualizar
+  const { data: existingClient, error: checkError } = await admin
+    .from("clients")
+    .select("id, status")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error("[auth.first-access] Erro ao verificar cliente existente", {
+      profileId,
+      error: checkError.message
+    });
   }
 
+  if (!existingClient) {
+    console.warn("[auth.first-access] Cliente não encontrado para o profile", {
+      profileId
+    });
+    // Não falhar completamente se o cliente não existir, apenas registrar
+  } else {
+    console.log("[auth.first-access] Cliente encontrado, atualizando status", {
+      clientId: existingClient.id,
+      currentStatus: existingClient.status
+    });
+
+    // 3. Atualizar status do cliente se existir e estiver em status adequado
+    const { error: clientError } = await admin
+      .from("clients")
+      .update({ status: "ativo" })
+      .eq("profile_id", profileId)
+      .in("status", ["convite-enviado", "aguardando-primeiro-acesso"]);
+
+    if (clientError) {
+      console.error("[auth.first-access] Erro ao atualizar status do cliente", {
+        profileId,
+        error: clientError.message,
+        details: clientError
+      });
+      throw new Error(
+        `Não foi possível atualizar o status do cliente: ${clientError.message}`
+      );
+    }
+
+    console.log("[auth.first-access] Status do cliente atualizado com sucesso");
+  }
+
+  // 4. Registrar auditoria (não crítico se falhar)
   const { error: auditError } = await admin.from("audit_logs").insert({
     actor_profile_id: profileId,
     action: "auth.first_access.completed",
@@ -55,14 +103,82 @@ async function markClientFirstAccessCompleted(
     entity_id: profileId,
     payload: {
       completedAt,
+      clientExisted: !!existingClient,
+      clientStatus: existingClient?.status
     },
   });
 
   if (auditError) {
-    throw new Error(
-      `Não foi possível registrar a auditoria do primeiro acesso: ${auditError.message}`
-    );
+    console.error("[auth.first-access] Erro ao registrar auditoria (não crítico)", {
+      profileId,
+      error: auditError.message
+    });
+    // Não falhar completamente por erro de auditoria
+  } else {
+    console.log("[auth.first-access] Auditoria registrada com sucesso");
   }
+}
+
+async function ensureClientExists(profileId: string, profileEmail: string) {
+  const admin = createAdminSupabaseClient();
+
+  // Verificar se cliente já existe
+  const { data: existingClient, error: checkError } = await admin
+    .from("clients")
+    .select("id, status")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error("[auth.first-access] Erro ao verificar cliente existente", {
+      profileId,
+      error: checkError.message
+    });
+  }
+
+  if (existingClient) {
+    console.log("[auth.first-access] Cliente já existe", {
+      profileId,
+      clientId: existingClient.id,
+      status: existingClient.status
+    });
+    return existingClient;
+  }
+
+  // Criar cliente se não existir
+  console.log("[auth.first-access] Criando registro de cliente", {
+    profileId,
+    profileEmail
+  });
+
+  const { data: newClient, error: createError } = await admin
+    .from("clients")
+    .insert({
+      profile_id: profileId,
+      email: profileEmail,
+      status: "aguardando-primeiro-acesso",
+      notes: "Cliente criado automaticamente durante o primeiro acesso."
+    })
+    .select("id, status")
+    .single();
+
+  if (createError) {
+    console.error("[auth.first-access] Erro ao criar cliente", {
+      profileId,
+      profileEmail,
+      error: createError.message,
+      details: createError
+    });
+    throw new Error(`Não foi possível criar o cadastro do cliente: ${createError.message}`);
+  }
+
+  console.log("[auth.first-access] Cliente criado com sucesso", {
+    profileId,
+    clientId: newClient.id,
+    status: newClient.status
+  });
+
+  return newClient;
 }
 
 async function getLinkedIntakeRequestId(profileId: string) {
@@ -94,6 +210,18 @@ async function firstAccessAction(formData: FormData) {
     redirect("/portal/login?error=acesso-negado");
   }
 
+  // Garantir que o registro do cliente exista
+  try {
+    await ensureClientExists(profile.id, profile.email);
+  } catch (error) {
+    console.error("[auth.first-access] Erro ao garantir cliente existente", {
+      profileId: profile.id,
+      profileEmail: profile.email,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    redirect("/auth/primeiro-acesso?error=erro-criar-cliente");
+  }
+
   const parsed = passwordSchema.safeParse({
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
@@ -104,13 +232,43 @@ async function firstAccessAction(formData: FormData) {
   }
 
   const supabase = await createServerSupabaseClient();
+  
+  // Verificar se temos uma sessão válida antes de tentar updateUser
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    console.error("[auth.first-access] Sessão inválida ao tentar definir senha", {
+      userError: userError?.message,
+      userId: profile.id,
+      profileEmail: profile.email
+    });
+    redirect("/auth/primeiro-acesso?error=sessao-invalida");
+  }
+
+  console.log("[auth.first-access] Tentando atualizar senha do usuário", {
+    userId: user.id,
+    userEmail: user.email,
+    profileId: profile.id
+  });
+
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
   });
 
   if (error) {
+    console.error("[auth.first-access] Erro ao atualizar senha no Supabase", {
+      error: error.message,
+      status: error.status,
+      userId: user.id,
+      profileId: profile.id
+    });
     redirect("/auth/primeiro-acesso?error=nao-foi-possivel-definir-senha");
   }
+
+  console.log("[auth.first-access] Senha atualizada com sucesso", {
+    userId: user.id,
+    profileId: profile.id
+  });
 
   const completedAt = new Date().toISOString();
 
@@ -148,8 +306,12 @@ function getErrorMessage(error: string) {
   switch (error) {
     case "senha-invalida":
       return "Use uma senha válida e confirme a mesma combinação nos dois campos.";
+    case "sessao-invalida":
+      return "Sua sessão expirou. Por favor, solicite um novo convite por e-mail ou tente fazer login normalmente.";
+    case "erro-criar-cliente":
+      return "Não foi possível criar seu cadastro de cliente. Entre em contato com o suporte.";
     case "nao-foi-possivel-definir-senha":
-      return "Não foi possível salvar sua senha agora. Tente novamente em instantes.";
+      return "Não foi possível salvar sua senha agora. Verifique o console para detalhes técnicos ou tente novamente em instantes.";
     case "nao-foi-possivel-finalizar":
       return "Sua senha foi atualizada, mas o primeiro acesso não terminou corretamente. Tente novamente para concluir.";
     default:

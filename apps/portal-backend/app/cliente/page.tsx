@@ -83,7 +83,24 @@ export default async function ClientPage({
     redirect("/auth/primeiro-acesso");
   }
 
-  const workspace = await getClientWorkspace(profile);
+  let workspace;
+  try {
+    workspace = await getClientWorkspace(profile);
+  } catch (error) {
+    console.error("[cliente.page] Erro ao carregar workspace do cliente", {
+      profileId: profile.id,
+      profileEmail: profile.email,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Se não encontrar o registro do cliente, redirecionar para primeiro acesso
+    if (error instanceof Error && error.message.includes("Nao foi possivel localizar o cadastro do cliente")) {
+      redirect("/auth/primeiro-acesso");
+    }
+    
+    // Para outros erros, redirecionar para login com erro genérico
+    redirect("/portal/login?error=erro-carregar-dados");
+  }
   const params = await searchParams;
   const success = typeof params.success === "string" ? params.success : "";
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
