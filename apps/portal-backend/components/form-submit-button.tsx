@@ -22,7 +22,11 @@ export function FormSubmitButton({
 }: FormSubmitButtonProps) {
   const { pending } = useFormStatus();
   const defaultClassName =
-    tone === "secondary" ? "button secondary" : tone === "danger" ? "button danger" : "button";
+    tone === "secondary" 
+      ? "bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300" 
+      : tone === "danger" 
+        ? "bg-red-600 hover:bg-red-700 text-white border border-red-700" 
+        : "bg-[#8e6a3b] hover:bg-[#7a5a33] text-white border border-[#8e6a3b]";
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     if (!confirmMessage || pending) {
@@ -36,7 +40,7 @@ export function FormSubmitButton({
 
   return (
     <button
-      className={`${defaultClassName} ${className}`}
+      className={`w-full h-14 px-6 py-3 font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-base ${defaultClassName} ${className}`}
       type="submit"
       disabled={disabled || pending}
       onClick={handleClick}

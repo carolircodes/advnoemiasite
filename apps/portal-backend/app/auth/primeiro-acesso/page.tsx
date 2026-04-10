@@ -302,7 +302,6 @@ export default async function FirstAccessPage({
                   <div className="pt-4">
                     <FormSubmitButton 
                       pendingLabel="Salvando senha..."
-                      className="w-full h-14 bg-[#8e6a3b] hover:bg-[#7a5a33] text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-base"
                     >
                       Salvar e acessar o portal
                     </FormSubmitButton>
