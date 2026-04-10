@@ -548,11 +548,11 @@ export default async function ClientPage({
                 {documents.length > 0 ? (
                   documents.slice(0, 5).map((document, index) => (
                     <div
-                      key={`${document.id ?? index}-${document.title ?? index}`}
+                      key={`${document.id ?? index}-${document.file_name ?? index}`}
                       className="rounded-[20px] border border-[#ece5d9] bg-white px-4 py-4"
                     >
                       <p className="text-sm font-semibold text-[#10261d]">
-                        {document.title || "Documento sem titulo"}
+                        {document.file_name || document.description || "Documento sem titulo"}
                       </p>
                       <p className="mt-1 text-sm leading-6 text-[#66766f]">
                         Status: {document.status || "Sem status"}.
