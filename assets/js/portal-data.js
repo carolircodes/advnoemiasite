@@ -155,7 +155,7 @@
         tags: ["Cadastro interno", "Gestão de casos"],
         action: {
           label: "Abrir painel interno",
-          href: "https://portal.advnoemia.com.br/internal/advogada",
+          href: "/internal/advogada",
           variant: "secondary"
         }
       }
