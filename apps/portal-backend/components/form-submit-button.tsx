@@ -20,7 +20,16 @@ export function FormSubmitButton({
   disabled = false,
   className = ""
 }: FormSubmitButtonProps) {
-  const { pending } = useFormStatus();
+  // Proteção contra useFormStatus fora de contexto de formulário
+  let pending = false;
+  try {
+    const status = useFormStatus();
+    pending = status.pending;
+  } catch (error) {
+    // Se useFormStatus falhar (estiver fora de um form), usar fallback
+    console.warn("[FormSubmitButton] useFormStatus não disponível, usando fallback");
+    pending = false;
+  }
   const defaultClassName =
     tone === "secondary" 
       ? "bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300" 
@@ -33,7 +42,8 @@ export function FormSubmitButton({
       return;
     }
 
-    if (!window.confirm(confirmMessage)) {
+    // Proteção contra window.confirm durante SSR
+    if (typeof window !== "undefined" && !window.confirm(confirmMessage)) {
       event.preventDefault();
     }
   }

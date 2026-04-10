@@ -24,6 +24,11 @@ export function getProductSessionId() {
   }
 
   try {
+    // Verificar se localStorage está disponível
+    const testKey = "__test__";
+    window.localStorage.setItem(testKey, "test");
+    window.localStorage.removeItem(testKey);
+    
     const existingSessionId = window.localStorage.getItem(SESSION_STORAGE_KEY);
 
     if (existingSessionId) {
@@ -33,7 +38,8 @@ export function getProductSessionId() {
     const nextSessionId = createSessionId();
     window.localStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
     return nextSessionId;
-  } catch {
+  } catch (error) {
+    console.warn("[Analytics] localStorage não disponível, usando session ID temporário");
     return createSessionId();
   }
 }
@@ -76,13 +82,18 @@ export function trackProductEventOncePerSession(input: ProductEventPayload) {
   const flagKey = `${SESSION_FLAG_PREFIX}${input.eventKey}`;
 
   try {
+    // Verificar se sessionStorage está disponível
+    const testKey = "__test__";
+    window.sessionStorage.setItem(testKey, "test");
+    window.sessionStorage.removeItem(testKey);
+    
     if (window.sessionStorage.getItem(flagKey)) {
       return;
     }
 
     window.sessionStorage.setItem(flagKey, "1");
-  } catch {
-    // Continue and track even if sessionStorage is unavailable.
+  } catch (error) {
+    console.warn("[Analytics] sessionStorage não disponível, tracking mesmo assim");
   }
 
   trackProductEvent(input);

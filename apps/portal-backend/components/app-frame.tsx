@@ -43,6 +43,8 @@ export function AppFrame({
   utilityContent,
   children
 }: AppFrameProps) {
+  console.log("[AppFrame] Renderizando com:", { eyebrow, title, hasActions: actions.length > 0, hasNavigation: navigation.length > 0, hasHighlights: highlights.length > 0, hasUtilityContent: !!utilityContent });
+  
   return (
     <div className="portal-root">
       <header className="hero-shell">

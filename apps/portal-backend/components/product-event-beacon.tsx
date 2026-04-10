@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
   trackProductEvent,
@@ -20,20 +20,39 @@ export function ProductEventBeacon({
   payload,
   oncePerSession = false
 }: ProductEventBeaconProps) {
+  const [isClient, setIsClient] = useState(false);
+  
+  // Aguardar hidratação completa antes de executar qualquer código client-side
   useEffect(() => {
-    const input = {
-      eventKey,
-      eventGroup,
-      payload
-    };
+    setIsClient(true);
+  }, []);
 
-    if (oncePerSession) {
-      trackProductEventOncePerSession(input);
+  useEffect(() => {
+    // Só executar após hidratação e se estiver no client-side
+    if (!isClient || typeof window === "undefined") {
       return;
     }
 
-    trackProductEvent(input);
-  }, [eventGroup, eventKey, oncePerSession, payload]);
+    try {
+      console.log("[ProductEventBeacon] useEffect executado no client-side");
+      const input = {
+        eventKey,
+        eventGroup,
+        payload
+      };
 
+      if (oncePerSession) {
+        trackProductEventOncePerSession(input);
+        return;
+      }
+
+      trackProductEvent(input);
+    } catch (error) {
+      console.error("[ProductEventBeacon] Erro ao rastrear evento:", error);
+      // Não quebrar a aplicação se tracking falhar
+    }
+  }, [isClient, eventGroup, eventKey, oncePerSession, payload]);
+
+  // Não renderizar nada durante SSR/hidratação
   return null;
 }
