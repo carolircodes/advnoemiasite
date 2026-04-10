@@ -2424,41 +2424,39 @@ function buildSystemPrompt(
   ];
 
   if (context) {
-    prompts.push("", "CONTEXTO DISPONÍVEL:", JSON.stringify(context));
-    
-    // Adicionar contexto de aquisição se presente
-    
-    const acquisition = (context as NoemiaContext | undefined)?.acquisition;
+  prompts.push("", "CONTEXTO DISPONÍVEL:", JSON.stringify(context));
 
-     const acquisition = (context as NoemiaContext | undefined)?.acquisition;
+  const acquisition = (context as NoemiaContext | undefined)?.acquisition;
 
-if (acquisition) {
-  prompts.push("", "CONTEXTO DE AQUISIÇÃO:");
+  if (acquisition) {
+    prompts.push("", "CONTEXTO DE AQUISIÇÃO:");
 
-  if (acquisition.ai_context) {
-    prompts.push(acquisition.ai_context);
-  }
+    if (acquisition.ai_context) {
+      prompts.push(acquisition.ai_context);
+    }
 
-  if (acquisition.language_adaptation) {
-    prompts.push(`Adaptação de linguagem: ${acquisition.language_adaptation}`);
-  }
+    if (acquisition.language_adaptation) {
+      prompts.push(`Adaptação de linguagem: ${acquisition.language_adaptation}`);
+    }
 
-  if (acquisition.source) {
-    prompts.push(`Origem: ${acquisition.source}`);
-  }
+    if (acquisition.source) {
+      prompts.push(`Origem: ${acquisition.source}`);
+    }
 
-  if (acquisition.campaign) {
-    prompts.push(`Campanha: ${acquisition.campaign}`);
-  }
+    if (acquisition.campaign) {
+      prompts.push(`Campanha: ${acquisition.campaign}`);
+    }
 
-  if (acquisition.topic) {
-    prompts.push(`Tema: ${acquisition.topic}`);
-  }
+    if (acquisition.topic) {
+      prompts.push(`Tema: ${acquisition.topic}`);
+    }
 
-  if (acquisition.content_id) {
-    prompts.push(`Conteúdo: ${acquisition.content_id}`);
+    if (acquisition.content_id) {
+      prompts.push(`Conteúdo: ${acquisition.content_id}`);
+    }
   }
 }
+
 
   prompts.push(
     "",
