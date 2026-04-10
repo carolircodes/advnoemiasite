@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   color-scheme: light;
   --bg: #f5f1ea;
@@ -34,10 +38,6 @@ body {
   font-family: "Georgia", "Times New Roman", serif;
 }
 
-body.auth-page {
-  background: #f7f4ee;
-  font-family: system-ui, -apple-system, sans-serif;
-}
 
 a {
   color: inherit;
