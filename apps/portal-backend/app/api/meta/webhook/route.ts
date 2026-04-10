@@ -8,6 +8,7 @@ import { instagramCommentContext } from "../../../../lib/services/instagram-comm
 import { instagramMessageGuard } from "../../../../lib/services/instagram-message-guard";
 import { instagramKeywordAutomation } from "../../../../lib/services/instagram-keyword-automation";
 import { leadCaptureService } from "../../../../lib/services/lead-capture";
+import { abTestingService } from "../../../../lib/services/ab-testing";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "noeminia_verify_2026";
 const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
@@ -604,12 +605,36 @@ export async function POST(request: NextRequest) {
               console.log("  - COMMENT_TEXT:", comment.text);
               console.log("  - POST_ID:", comment.media?.id || "N/A");
 
-              // FASE 1: Capturar lead com sistema de aquisição
+              // FASE 1: Verificar A/B tests para este conteúdo
+              let abTestVariation = null;
+              try {
+                // Verificar se há testes A/B ativos para o conteúdo
+                const activeTests = abTestingService.getActiveTests();
+                for (const test of activeTests) {
+                  const variation = abTestingService.getVariationForUser(test.id, comment.from.id);
+                  if (variation && test.contentId === comment.media?.id) {
+                    abTestVariation = { test, variation };
+                    console.log("AB_TEST_VARIATION_SELECTED", {
+                      testId: test.id,
+                      variationId: variation.id,
+                      userId: comment.from.id
+                    });
+                    break;
+                  }
+                }
+              } catch (abError) {
+                console.log("AB_TEST_ERROR", {
+                  error: abError instanceof Error ? abError.message : String(abError)
+                });
+              }
+
+              // FASE 2: Capturar lead com sistema de aquisição
               try {
                 console.log("LEAD_CAPTURE_START", {
                   commentId: comment.id,
                   userId: comment.from.id,
-                  commentText: comment.text
+                  commentText: comment.text,
+                  hasABTest: !!abTestVariation
                 });
 
                 const captureResult = await leadCaptureService.captureFromComment(
@@ -620,7 +645,13 @@ export async function POST(request: NextRequest) {
                   {
                     userAgent: 'Instagram Webhook',
                     ipAddress: 'Instagram',
-                    referrer: 'Instagram Comment'
+                    referrer: 'Instagram Comment',
+                    abTestVariation: abTestVariation ? {
+                      testId: abTestVariation.test.id,
+                      variationId: abTestVariation.variation.id,
+                      variationType: abTestVariation.variation.variationType,
+                      variationValue: abTestVariation.variation.value
+                    } : undefined
                   }
                 );
 
@@ -633,19 +664,62 @@ export async function POST(request: NextRequest) {
                     contentTitle: captureResult.lead?.content.title
                   });
 
+                  // Registrar métricas do A/B test se aplicável
+                  if (abTestVariation) {
+                    try {
+                      await abTestingService.recordLeadGenerated(
+                        abTestVariation.test.id,
+                        abTestVariation.variation.id,
+                        comment.from.id,
+                        captureResult.lead?.sessionId || '',
+                        {
+                          platform: 'instagram',
+                          source: 'comment',
+                          theme: captureResult.lead?.content.theme,
+                          contentId: captureResult.lead?.content.id
+                        }
+                      );
+
+                      console.log("AB_TEST_LEAD_RECORDED", {
+                        testId: abTestVariation.test.id,
+                        variationId: abTestVariation.variation.id,
+                        userId: comment.from.id,
+                        sessionId: captureResult.lead?.sessionId
+                      });
+                    } catch (metricError) {
+                      console.log("AB_TEST_METRIC_ERROR", {
+                        error: metricError instanceof Error ? metricError.message : String(metricError)
+                      });
+                    }
+                  }
+
                   // Enviar DM inicial se gerado
-                  if (captureResult.noemiaResponse && INSTAGRAM_ACCESS_TOKEN) {
+                  let dmMessage = captureResult.noemiaResponse;
+                  
+                  // Usar variação do A/B test se for tipo 'dm_message'
+                  if (abTestVariation && abTestVariation.variation.variationType === 'dm_message') {
+                    dmMessage = abTestVariation.variation.value;
+                    console.log("AB_TEST_DM_VARIATION_USED", {
+                      testId: abTestVariation.test.id,
+                      variationId: abTestVariation.variation.id,
+                      originalMessage: captureResult.noemiaResponse?.substring(0, 50),
+                      testMessage: dmMessage.substring(0, 50)
+                    });
+                  }
+
+                  if (dmMessage && INSTAGRAM_ACCESS_TOKEN) {
                     try {
                       const dmResponse = await sendInstagramMessage(
                         comment.from.id,
-                        captureResult.noemiaResponse
+                        dmMessage
                       );
 
                       if (dmResponse.success) {
                         console.log("LEAD_CAPTURE_DM_SENT", {
                           commentId: comment.id,
                           userId: comment.from.id,
-                          sessionId: captureResult.lead?.sessionId
+                          sessionId: captureResult.lead?.sessionId,
+                          usedABTest: !!abTestVariation
                         });
                       } else {
                         console.log("LEAD_CAPTURE_DM_ERROR", {
