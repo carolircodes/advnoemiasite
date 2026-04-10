@@ -10,7 +10,8 @@ import {
   Bot, 
   Smartphone, 
   Brain, 
-  Settings
+  Settings,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
