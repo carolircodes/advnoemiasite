@@ -106,25 +106,32 @@ export default async function ClientPage({
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
   const now = new Date();
-  const availableDocuments = workspace.documents.filter(
-    (document) => document.status === "recebido" || document.status === "revisado"
+  // Verificações de segurança para evitar undefined/null
+  const documents = workspace.documents || [];
+  const documentRequests = workspace.documentRequests || [];
+  const appointments = workspace.appointments || [];
+  const cases = workspace.cases || [];
+  const events = workspace.events || [];
+
+  const availableDocuments = documents.filter(
+    (document) => document && (document.status === "recebido" || document.status === "revisado")
   );
-  const pendingDocuments = workspace.documents.filter(
-    (document) => document.status === "pendente" || document.status === "solicitado"
+  const pendingDocuments = documents.filter(
+    (document) => document && (document.status === "pendente" || document.status === "solicitado")
   );
-  const openRequests = workspace.documentRequests.filter((request) => request.status === "pending");
-  const upcomingAppointments = workspace.appointments
-    .filter((appointment) => isUpcomingAppointment(appointment, now))
+  const openRequests = documentRequests.filter((request) => request && request.status === "pending");
+  const upcomingAppointments = appointments
+    .filter((appointment) => appointment && isUpcomingAppointment(appointment, now))
     .slice(0, 4);
   const nextAppointment = upcomingAppointments[0] || null;
-  const mainCase = workspace.cases[0] || null;
+  const mainCase = cases[0] || null;
   const showOnboardingGuide =
-    !workspace.events.length &&
-    !workspace.documents.length &&
-    !workspace.documentRequests.length &&
-    !workspace.appointments.length;
+    !events.length &&
+    !documents.length &&
+    !documentRequests.length &&
+    !appointments.length;
   const importantNotices = [
-    mainCase
+    mainCase && mainCase.statusLabel
       ? {
           title: `Status atual: ${mainCase.statusLabel}`,
           body: getCaseStatusSummary(mainCase.status),
@@ -132,7 +139,7 @@ export default async function ClientPage({
           cta: "Ver status do caso"
         }
       : null,
-    nextAppointment
+    nextAppointment && nextAppointment.starts_at
       ? {
           title: "Proxima data importante",
           body: `${formatPortalDateTime(nextAppointment.starts_at)} - ${nextAppointment.title}.`,
@@ -140,7 +147,7 @@ export default async function ClientPage({
           cta: "Abrir agenda"
         }
       : null,
-    openRequests.length
+    openRequests.length > 0
       ? {
           title: "Documentos aguardando voce",
           body: `Ha ${openRequests.length} solicitacao(oes) documental(is) aberta(s) no seu portal.`,
@@ -148,7 +155,7 @@ export default async function ClientPage({
           cta: "Abrir documentos"
         }
       : null,
-    !openRequests.length && pendingDocuments.length
+    openRequests.length === 0 && pendingDocuments.length > 0
       ? {
           title: "Documentos em acompanhamento",
           body: `A equipe segue acompanhando ${pendingDocuments.length} documento(s) pendente(s) ou solicitado(s).`,
@@ -156,11 +163,11 @@ export default async function ClientPage({
           cta: "Ver documentos"
         }
       : null,
-    workspace.events[0]
+    events.length > 0 && events[0]
       ? {
           title: "Ultima atualizacao liberada",
           body:
-            workspace.events[0].public_summary ||
+            events[0].public_summary ||
             "A equipe registrou um novo andamento visivel no seu portal.",
           href: "#historico-atualizacoes",
           cta: "Ler historico"
@@ -198,16 +205,17 @@ export default async function ClientPage({
           { href: "/agenda", label: "Agenda" }
         ]}
         highlights={[
-          { label: "Status do caso", value: mainCase ? mainCase.statusLabel : "Em preparacao" },
-          { label: "Proximas datas", value: String(upcomingAppointments.length) },
-          { label: "Documentos liberados", value: String(availableDocuments.length) },
+          { label: "Status do caso", value: mainCase?.statusLabel || "Em preparacao" },
+          { label: "Proximas datas", value: String(upcomingAppointments?.length || 0) },
+          { label: "Documentos liberados", value: String(availableDocuments?.length || 0) },
           {
             label: "Pendencias abertas",
-            value: String(openRequests.length + pendingDocuments.length)
+            value: String((openRequests?.length || 0) + (pendingDocuments?.length || 0))
           }
         ]}
         actions={[
-          { href: "/documentos", label: "Ver documentos" },
+          { href: "/cliente", label: "Meu painel" },
+          { href: "/documentos", label: "Documentos" },
           { href: "/agenda", label: "Ver agenda", tone: "secondary" }
         ]}
       >
@@ -231,7 +239,7 @@ export default async function ClientPage({
                   <div>
                     <strong>{mainCase.title}</strong>
                     <span className="item-meta">
-                      {caseAreaLabels[mainCase.area as keyof typeof caseAreaLabels]}
+                      {mainCase.area ? caseAreaLabels[mainCase.area as keyof typeof caseAreaLabels] : ""}
                     </span>
                   </div>
                   <span className="tag soft">{mainCase.statusLabel}</span>
@@ -240,7 +248,7 @@ export default async function ClientPage({
                 <div className="pill-row">
                   <span className="pill success">Caso ativo no portal</span>
                   <span className="pill muted">
-                    Aberto em {formatPortalDateTime(mainCase.created_at)}
+                    Aberto em {mainCase.created_at ? formatPortalDateTime(mainCase.created_at) : ""}
                   </span>
                 </div>
               </div>
@@ -248,21 +256,22 @@ export default async function ClientPage({
               <div className="support-panel">
                 <div className="support-row">
                   <span className="support-label">E-mail de login</span>
-                  <strong>{profile.email}</strong>
+                  <strong>{profile.email || ""}</strong>
                 </div>
                 <div className="support-row">
                   <span className="support-label">Status do cadastro</span>
                   <strong>
-                    {
-                      clientStatusLabels[
-                        workspace.clientRecord.status as keyof typeof clientStatusLabels
-                      ]
+                    {workspace.clientRecord?.status 
+                      ? clientStatusLabels[
+                          workspace.clientRecord.status as keyof typeof clientStatusLabels
+                        ]
+                      : ""
                     }
                   </strong>
                 </div>
                 <div className="support-row">
                   <span className="support-label">Situacao atual</span>
-                  <strong>{getStatusSummary(workspace.clientRecord.status)}</strong>
+                  <strong>{workspace.clientRecord?.status ? getStatusSummary(workspace.clientRecord.status) : ""}</strong>
                 </div>
               </div>
             </div>
@@ -277,7 +286,7 @@ export default async function ClientPage({
           title="Avisos importantes"
           description="Este espaco destaca o que merece sua atencao agora, sem voce precisar procurar em varias telas."
         >
-          {importantNotices.length ? (
+          {importantNotices && importantNotices.length > 0 ? (
             <div className="notice-grid">
               {importantNotices.slice(0, 4).map((notice) => (
                 <Link key={`${notice.title}-${notice.href}`} href={notice.href} className="notice-card">
@@ -342,24 +351,24 @@ export default async function ClientPage({
           title="Proximas datas e compromissos"
           description="Compromissos futuros e proximos passos visiveis ao cliente, em ordem da data mais proxima para a mais distante."
         >
-          {upcomingAppointments.length ? (
+          {upcomingAppointments && upcomingAppointments.length > 0 ? (
             <ul className="update-feed">
               {upcomingAppointments.map((appointment) => (
                 <li key={appointment.id} className="update-card">
                   <div className="update-head">
                     <div>
                       <strong>{appointment.title}</strong>
-                      <span className="item-meta">{appointment.caseTitle}</span>
+                      <span className="item-meta">{appointment.caseTitle || ""}</span>
                     </div>
-                    <span className="tag soft">{appointment.typeLabel}</span>
+                    <span className="tag soft">{appointment.typeLabel || ""}</span>
                   </div>
                   <p className="update-body">
                     {appointment.description || "Compromisso registrado pela equipe para o seu caso."}
                   </p>
                   <div className="pill-row">
-                    <span className="pill success">{appointment.statusLabel}</span>
+                    <span className="pill success">{appointment.statusLabel || ""}</span>
                     <span className="pill muted">
-                      {formatPortalDateTime(appointment.starts_at)}
+                      {appointment.starts_at ? formatPortalDateTime(appointment.starts_at) : ""}
                     </span>
                   </div>
                 </li>
@@ -394,13 +403,13 @@ export default async function ClientPage({
             </Link>
           </div>
 
-          {openRequests.length || pendingDocuments.length ? (
+          {(openRequests && openRequests.length > 0) || (pendingDocuments && pendingDocuments.length > 0) ? (
             <ul className="list">
-              {openRequests.slice(0, 2).map((request) => (
+              {openRequests && openRequests.slice(0, 2).map((request) => (
                 <li key={request.id}>
                   <div className="item-head">
                     <strong>{request.title}</strong>
-                    <span className="tag soft">{request.statusLabel}</span>
+                    <span className="tag soft">{request.statusLabel || ""}</span>
                   </div>
                   <span className="item-meta">
                     {request.due_at
@@ -409,13 +418,13 @@ export default async function ClientPage({
                   </span>
                 </li>
               ))}
-              {pendingDocuments.slice(0, 2).map((document) => (
+              {pendingDocuments && pendingDocuments.slice(0, 2).map((document) => (
                 <li key={document.id}>
                   <div className="item-head">
                     <strong>{document.file_name}</strong>
-                    <span className="tag soft">{document.statusLabel}</span>
+                    <span className="tag soft">{document.statusLabel || ""}</span>
                   </div>
-                  <span className="item-meta">{document.caseTitle}</span>
+                  <span className="item-meta">{document.caseTitle || ""}</span>
                 </li>
               ))}
             </ul>
@@ -437,23 +446,23 @@ export default async function ClientPage({
         title="Historico de atualizacoes"
         description="As ultimas movimentacoes liberadas pela equipe aparecem em ordem da mais recente para a mais antiga."
       >
-        {workspace.events.length ? (
+        {events && events.length > 0 ? (
           <ul className="update-feed">
-            {workspace.events.map((event) => (
+            {events.map((event) => (
               <li key={event.id} className="update-card featured">
                 <div className="update-head">
                   <div>
                     <strong>{event.title}</strong>
-                    <span className="item-meta">{event.caseTitle}</span>
+                    <span className="item-meta">{event.caseTitle || ""}</span>
                   </div>
-                  <span className="tag soft">{event.eventLabel}</span>
+                  <span className="tag soft">{event.eventLabel || ""}</span>
                 </div>
                 <p className="update-body">
                   {event.public_summary || "Nova atualizacao registrada no seu portal."}
                 </p>
                 <div className="pill-row">
                   <span className="pill success">Atualizacao liberada</span>
-                  <span className="pill muted">{formatPortalDateTime(event.occurred_at)}</span>
+                  <span className="pill muted">{event.occurred_at ? formatPortalDateTime(event.occurred_at) : ""}</span>
                 </div>
               </li>
             ))}
