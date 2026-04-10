@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { FormSubmitButton } from "@/components/form-submit-button";
 import { getCurrentProfile } from "@/lib/auth/guards";
 import { passwordSchema } from "@/lib/domain/portal";
 import { recordProductEvent } from "@/lib/services/public-intake";
@@ -14,12 +14,16 @@ export const metadata: Metadata = {
     "Defina sua senha inicial e conclua o primeiro acesso ao portal do cliente.",
   robots: {
     index: false,
-    follow: false
-  }
+    follow: false,
+  },
 };
 
-async function markClientFirstAccessCompleted(profileId: string, completedAt: string) {
+async function markClientFirstAccessCompleted(
+  profileId: string,
+  completedAt: string
+) {
   const admin = createAdminSupabaseClient();
+
   const { error: profileError } = await admin
     .from("profiles")
     .update({ first_login_completed_at: completedAt })
@@ -49,8 +53,8 @@ async function markClientFirstAccessCompleted(profileId: string, completedAt: st
     entity_type: "profiles",
     entity_id: profileId,
     payload: {
-      completedAt
-    }
+      completedAt,
+    },
   });
 
   if (auditError) {
@@ -62,6 +66,7 @@ async function markClientFirstAccessCompleted(profileId: string, completedAt: st
 
 async function getLinkedIntakeRequestId(profileId: string) {
   const admin = createAdminSupabaseClient();
+
   const { data, error } = await admin
     .from("clients")
     .select("source_intake_request_id")
@@ -71,7 +76,7 @@ async function getLinkedIntakeRequestId(profileId: string) {
   if (error) {
     console.error("[auth.first-access] Failed to load linked intake request", {
       profileId,
-      message: error.message
+      message: error.message,
     });
     return null;
   }
@@ -83,14 +88,14 @@ async function firstAccessAction(formData: FormData) {
   "use server";
 
   const profile = await getCurrentProfile();
-  
+
   if (!profile || profile.role !== "cliente") {
     redirect("/portal/login?error=acesso-negado");
   }
-  
+
   const parsed = passwordSchema.safeParse({
     password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword")
+    confirmPassword: formData.get("confirmPassword"),
   });
 
   if (!parsed.success) {
@@ -99,7 +104,7 @@ async function firstAccessAction(formData: FormData) {
 
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.updateUser({
-    password: parsed.data.password
+    password: parsed.data.password,
   });
 
   if (error) {
@@ -107,6 +112,7 @@ async function firstAccessAction(formData: FormData) {
   }
 
   const completedAt = new Date().toISOString();
+
   try {
     await markClientFirstAccessCompleted(profile.id, completedAt);
   } catch {
@@ -121,13 +127,16 @@ async function firstAccessAction(formData: FormData) {
       intakeRequestId: (await getLinkedIntakeRequestId(profile.id)) || undefined,
       payload: {
         role: profile.role,
-        source: "first-access"
-      }
+        source: "first-access",
+      },
     });
   } catch (trackingError) {
     console.error("[auth.first-access] Failed to record portal access event", {
       profileId: profile.id,
-      message: trackingError instanceof Error ? trackingError.message : String(trackingError)
+      message:
+        trackingError instanceof Error
+          ? trackingError.message
+          : String(trackingError),
     });
   }
 
@@ -147,67 +156,60 @@ function getErrorMessage(error: string) {
   }
 }
 
+function CheckIcon({
+  className = "h-4 w-4",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        fillRule="evenodd"
+        d="M16.704 5.29a1 1 0 0 1 .006 1.414l-8 8.08a1 1 0 0 1-1.42.007l-4.01-3.99a1 1 0 0 1 1.41-1.42l3.3 3.285 7.296-7.37a1 1 0 0 1 1.418-.006Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function AlertIcon({
+  className = "h-5 w-5",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        fillRule="evenodd"
+        d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-1 4a1 1 0 0 0 0 2v2a1 1 0 1 0 2 0v-2a1 1 0 0 0-1-1H9Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 export default async function FirstAccessPage({
-  searchParams
+  searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const profile = await getCurrentProfile();
 
-  // Se não está autenticado, mostrar página explicativa
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
-        {/* Background Pattern */}
-        <div className="fixed inset-0 opacity-50" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239ca3af' fill-opacity='0.03'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }} />
-        
-        {/* Main Container */}
-        <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
-          <div className="w-full max-w-md">
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-4">
-                  Acesso restrito
-                </h1>
-                <p className="text-gray-600 mb-6 leading-relaxed">
-                  Esta página é apenas para clientes que receberam um convite por e-mail para criar seu primeiro acesso ao portal.
-                </p>
-                <div className="space-y-3">
-                  <a 
-                    href="/portal/login" 
-                    className="block w-full text-center px-6 py-3 bg-[#8e6a3b] hover:bg-[#7a5a33] text-white font-semibold rounded-xl transition-all duration-200"
-                  >
-                    Fazer login
-                  </a>
-                  <a 
-                    href="/" 
-                    className="block w-full text-center px-6 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-xl transition-all duration-200"
-                  >
-                    Voltar ao site
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se não for cliente, negar acesso
-  if (profile.role !== "cliente") {
+  if (profile && profile.role !== "cliente") {
     redirect("/portal/login?error=acesso-negado");
   }
 
-  // Se já completou primeiro acesso, redirecionar
-  if (profile.first_login_completed_at) {
+  if (profile?.first_login_completed_at) {
     redirect("/cliente");
   }
 
@@ -215,211 +217,257 @@ export default async function FirstAccessPage({
   const error = typeof params.error === "string" ? params.error : "";
   const errorMessage = getErrorMessage(error);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-50" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239ca3af' fill-opacity='0.03'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-      }} />
-      
-      {/* Main Container */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
-        <div className="w-full max-w-5xl">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16">
-            
-            {/* Left Column - Form (58%) */}
-            <div className="lg:col-span-7">
-              <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 lg:p-12">
-                {/* Header */}
-                <div className="mb-8">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-3">
-                    Definir acesso ao portal
-                  </h1>
-                  <p className="text-lg text-gray-600 leading-relaxed">
-                    Crie uma senha segura para acessar seu ambiente.
-                  </p>
-                </div>
-
-                {/* Error Message */}
-                {errorMessage && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-sm text-red-800 font-medium">{errorMessage}</p>
-                  </div>
-                )}
-
-                {/* Form */}
-                <form action={firstAccessAction} className="space-y-6">
-                  <div className="space-y-5">
-                    <div>
-                      <label htmlFor="password" className="block text-sm font-semibold text-gray-900 mb-2">
-                        Nova senha
-                      </label>
-                      <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        required
-                        placeholder="Digite sua senha segura"
-                        className="w-full h-14 px-4 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8e6a3b] focus:border-[#8e6a3b] transition-all duration-200 text-base"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-900 mb-2">
-                        Confirmar senha
-                      </label>
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        required
-                        placeholder="Confirme sua senha"
-                        className="w-full h-14 px-4 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8e6a3b] focus:border-[#8e6a3b] transition-all duration-200 text-base"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Security Notice */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-5 h-5 bg-amber-100 rounded-full flex items-center justify-center mt-0.5">
-                        <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm text-amber-800 font-medium">
-                          Sua senha é exclusiva para o portal.
-                        </p>
-                        <p className="text-sm text-amber-700 mt-1">
-                          Seus dados pessoais permanecem protegidos.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="pt-4">
-                    <FormSubmitButton 
-                      pendingLabel="Salvando senha..."
-                    >
-                      Salvar e acessar o portal
-                    </FormSubmitButton>
-                  </div>
-
-                  {/* Help Link */}
-                  <div className="text-center pt-2">
-                    <a 
-                      href="/auth/esqueci-senha" 
-                      className="text-sm text-gray-500 hover:text-[#8e6a3b] transition-colors duration-200"
-                    >
-                      Preciso de novo link
-                    </a>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            {/* Right Column - Content (42%) */}
-            <div className="lg:col-span-5 space-y-6">
-              {/* What you'll have access */}
-              <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-[#8e6a3b] rounded-full"></div>
-                  O que você terá acesso
-                </h2>
-                
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-[#8e6a3b] rounded-full flex items-center justify-center mt-0.5">
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-900 font-medium">Status atual do caso</p>
-                      <p className="text-sm text-gray-600 mt-1">Acompanhamento claro da fase do atendimento</p>
-                    </div>
-                  </li>
-                  
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-[#8e6a3b] rounded-full flex items-center justify-center mt-0.5">
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-900 font-medium">Documentos</p>
-                      <p className="text-sm text-gray-600 mt-1">Disponíveis, pendências e solicitações</p>
-                    </div>
-                  </li>
-                  
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-[#8e6a3b] rounded-full flex items-center justify-center mt-0.5">
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-900 font-medium">Agenda</p>
-                      <p className="text-sm text-gray-600 mt-1">Próximas datas e histórico completo</p>
-                    </div>
-                  </li>
-                  
-                  <li className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-[#8e6a3b] rounded-full flex items-center justify-center mt-0.5">
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-900 font-medium">Atualizações</p>
-                      <p className="text-sm text-gray-600 mt-1">Comunicações da equipe em ordem cronológica</p>
-                    </div>
-                  </li>
-                </ul>
+  if (!profile) {
+    return (
+      <main className="min-h-screen bg-[#f7f4ee] text-[#10261d]">
+        <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 sm:px-8 lg:px-10">
+          <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
+            <section className="rounded-[32px] border border-[#e9e2d6] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.06)] sm:p-10 lg:p-12">
+              <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f6ecd9] text-[#8e6a3b]">
+                <AlertIcon className="h-7 w-7" />
               </div>
 
-              {/* Security & Privacy */}
-              <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-3xl border border-gray-200 p-8">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                  Segurança e privacidade
-                </h3>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-gray-700">Seus dados são protegidos</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-gray-700">Comunicação segura</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-gray-700">Acesso exclusivo</p>
-                  </div>
-                </div>
+              <h1 className="max-w-xl text-3xl font-semibold tracking-[-0.02em] text-[#10261d] sm:text-4xl">
+                Acesso restrito ao primeiro cadastro
+              </h1>
+
+              <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f6f68] sm:text-lg">
+                Esta área é destinada apenas a clientes que receberam um convite
+                para ativar o portal. Se você já possui acesso, entre com seu
+                e-mail e senha normalmente.
+              </p>
+
+              <div className="mt-8 rounded-2xl border border-[#eee6da] bg-[#fbf8f3] p-5">
+                <p className="text-sm leading-6 text-[#5f6f68]">
+                  O primeiro acesso serve para criar sua senha inicial e liberar
+                  seu ambiente privado de acompanhamento.
+                </p>
               </div>
-            </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/portal/login"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white transition hover:bg-[#7b5c31]"
+                >
+                  Fazer login
+                </Link>
+
+                <Link
+                  href="/"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] transition hover:bg-[#faf7f2]"
+                >
+                  Voltar ao site
+                </Link>
+              </div>
+            </section>
+
+            <aside className="rounded-[32px] border border-[#e9e2d6] bg-[linear-gradient(180deg,#fffdf9_0%,#f8f4ec_100%)] p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)] sm:p-10">
+              <div className="inline-flex rounded-full border border-[#eadfcf] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
+                Portal do cliente
+              </div>
+
+              <h2 className="mt-5 text-2xl font-semibold tracking-[-0.02em] text-[#10261d]">
+                O que você encontra depois do acesso
+              </h2>
+
+              <div className="mt-8 space-y-5">
+                {[
+                  "Status do caso com explicação mais clara do andamento.",
+                  "Documentos liberados, solicitações e pendências em aberto.",
+                  "Agenda com próximos passos e histórico recente.",
+                  "Atualizações organizadas em ordem da mais recente.",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-start gap-3 rounded-2xl border border-[#ede7dc] bg-white/80 p-4"
+                  >
+                    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8e6a3b] text-white">
+                      <CheckIcon className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-sm leading-6 text-[#41524b]">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </aside>
           </div>
         </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f7f4ee] text-[#10261d]">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 sm:px-8 lg:px-10">
+        <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="rounded-[32px] border border-[#e9e2d6] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.06)] sm:p-10 lg:p-12">
+            <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
+              Primeiro acesso
+            </div>
+
+            <div className="mt-6">
+              <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#10261d] sm:text-4xl">
+                Definir acesso ao portal
+              </h1>
+              <p className="mt-3 max-w-xl text-base leading-7 text-[#5f6f68] sm:text-lg">
+                Crie uma senha segura para acessar seu ambiente privado de
+                acompanhamento.
+              </p>
+            </div>
+
+            {errorMessage ? (
+              <div className="mt-8 rounded-2xl border border-[#f1c9c9] bg-[#fff4f4] p-4">
+                <p className="text-sm font-medium leading-6 text-[#8a3b3b]">
+                  {errorMessage}
+                </p>
+              </div>
+            ) : null}
+
+            <form action={firstAccessAction} className="mt-8 space-y-6">
+              <div className="space-y-5">
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="mb-2 block text-sm font-semibold text-[#10261d]"
+                  >
+                    Nova senha
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    autoComplete="new-password"
+                    placeholder="Digite sua senha segura"
+                    className="h-14 w-full rounded-2xl border border-[#ddd6ca] bg-white px-4 text-base text-[#10261d] outline-none transition placeholder:text-[#96a19d] focus:border-[#8e6a3b] focus:ring-2 focus:ring-[#d4b78a]"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="mb-2 block text-sm font-semibold text-[#10261d]"
+                  >
+                    Confirmar senha
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    required
+                    autoComplete="new-password"
+                    placeholder="Confirme sua senha"
+                    className="h-14 w-full rounded-2xl border border-[#ddd6ca] bg-white px-4 text-base text-[#10261d] outline-none transition placeholder:text-[#96a19d] focus:border-[#8e6a3b] focus:ring-2 focus:ring-[#d4b78a]"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#ead8b0] bg-[#fff8e9] p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#f3e2bd] text-[#8e6a3b]">
+                    <AlertIcon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#6f542d]">
+                      Sua senha é exclusiva para o portal.
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-[#7b6b4d]">
+                      Seus dados pessoais permanecem protegidos e o acesso é
+                      vinculado ao seu ambiente privado.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-base font-semibold text-white shadow-[0_12px_30px_rgba(142,106,59,0.25)] transition hover:bg-[#7b5c31]"
+                >
+                  Salvar e acessar o portal
+                </button>
+              </div>
+
+              <div className="pt-1 text-center">
+                <Link
+                  href="/auth/esqueci-senha"
+                  className="text-sm font-medium text-[#6a7973] transition hover:text-[#8e6a3b]"
+                >
+                  Preciso de novo link
+                </Link>
+              </div>
+            </form>
+          </section>
+
+          <aside className="space-y-6">
+            <section className="rounded-[32px] border border-[#e9e2d6] bg-[linear-gradient(180deg,#fffdf9_0%,#f8f4ec_100%)] p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)] sm:p-10">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-[-0.02em] text-[#10261d]">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#8e6a3b]" />
+                O que você terá acesso
+              </h2>
+
+              <div className="mt-8 space-y-5">
+                {[
+                  {
+                    title: "Status atual do caso",
+                    text: "Acompanhamento claro da fase do atendimento e dos próximos passos.",
+                  },
+                  {
+                    title: "Documentos e solicitações",
+                    text: "Arquivos liberados, pendências e pedidos da equipe em um só lugar.",
+                  },
+                  {
+                    title: "Agenda do atendimento",
+                    text: "Próximas datas, retornos e histórico recente organizados.",
+                  },
+                  {
+                    title: "Atualizações da equipe",
+                    text: "Comunicações exibidas em ordem cronológica, com mais clareza.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="flex items-start gap-3 rounded-2xl border border-[#ede7dc] bg-white/80 p-4"
+                  >
+                    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8e6a3b] text-white">
+                      <CheckIcon className="h-3.5 w-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[#10261d]">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-[#5f6f68]">
+                        {item.text}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[32px] border border-[#dde7df] bg-[#f8fbf8] p-8 shadow-[0_20px_60px_rgba(16,38,29,0.04)]">
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-[#10261d]">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#2f7a52]" />
+                Segurança e privacidade
+              </h3>
+
+              <div className="mt-5 space-y-3">
+                {[
+                  "Seus dados são protegidos no ambiente do portal.",
+                  "A comunicação é centralizada e mais segura.",
+                  "O acesso é exclusivo e vinculado ao seu cadastro.",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-3">
+                    <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#dcf2e3] text-[#2f7a52]">
+                      <CheckIcon className="h-3 w-3" />
+                    </div>
+                    <p className="text-sm leading-6 text-[#4e5f58]">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </aside>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
