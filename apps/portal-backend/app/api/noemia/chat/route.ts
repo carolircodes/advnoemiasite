@@ -24,9 +24,9 @@ export async function POST(request: NextRequest) {
 
     // Combinar contextos
     const combinedContext = {
-      ...metaContext,
-      acquisition: acquisitionContext
-    };
+  ...metaContext,
+  acquisition: acquisitionContext ?? undefined
+};
 
     // Verificar se OPENAI_API_KEY está disponível
     const env = getServerEnv();
