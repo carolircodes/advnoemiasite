@@ -3,7 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "cd apps/portal-backend && npm run build",
+    "build": "echo static-root",
+    "build:portal": "cd apps/portal-backend && npm run build",
     "start": "cd apps/portal-backend && npm start",
     "dev": "cd apps/portal-backend && npm run dev"
   },
