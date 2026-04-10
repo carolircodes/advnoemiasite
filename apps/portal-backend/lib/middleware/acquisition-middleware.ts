@@ -1,5 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { extractAcquisitionParams, createAcquisitionContext, inferSourceFromContext } from '@/lib/acquisition/acquisition-service';
+import { NextRequest } from 'next/server';
+import {
+  extractAcquisitionParams,
+  createAcquisitionContext,
+  inferSourceFromContext,
+  generateAIContext,
+  adaptLanguageForTopic
+} from '@/lib/acquisition/acquisition-service';
 
 export interface AcquisitionContext {
   source: string;
@@ -20,8 +26,11 @@ export function processAcquisitionData(request: NextRequest): AcquisitionContext
 
     // Se não há parâmetros de aquisição, tentar inferir
     if (!acquisitionData.source && !acquisitionData.utm_source) {
-      const inferredSource = inferSourceFromContext(request.headers, request.headers.get('user-agent') || undefined);
-      
+      const inferredSource = inferSourceFromContext(
+        request.headers,
+        request.headers.get('user-agent') || undefined
+      );
+
       // Apenas criar contexto se houver alguma informação de origem
       if (inferredSource !== 'organic') {
         acquisitionData.source = inferredSource;
@@ -37,7 +46,6 @@ export function processAcquisitionData(request: NextRequest): AcquisitionContext
     const acquisitionContext = createAcquisitionContext(acquisitionData);
 
     // Gerar contexto para IA
-    const { generateAIContext, adaptLanguageForTopic } = require('@/lib/acquisition/acquisition-service');
     const aiContext = generateAIContext(acquisitionContext);
     const languageAdaptation = adaptLanguageForTopic(acquisitionContext.topic);
 
@@ -59,7 +67,6 @@ export function processAcquisitionData(request: NextRequest): AcquisitionContext
       ai_context: aiContext,
       language_adaptation: languageAdaptation
     };
-
   } catch (error) {
     console.error('ACQUISITION_TRACKING: Erro no middleware de aquisição:', error);
     return null;
@@ -67,24 +74,23 @@ export function processAcquisitionData(request: NextRequest): AcquisitionContext
 }
 
 // Função para injetar contexto de aquisição no request
-export function injectAcquisitionContext(request: NextRequest): NextRequest {
+export function injectAcquisitionContext(request: NextRequest): Request {
   const acquisitionContext = processAcquisitionData(request);
-  
+
   if (acquisitionContext) {
     // Adicionar contexto aos headers para uso posterior
     const headers = new Headers(request.headers);
     headers.set('x-acquisition-source', acquisitionContext.source);
     headers.set('x-acquisition-context', JSON.stringify(acquisitionContext));
-    
+
     // Criar novo request com contexto enriquecido
     return new Request(request.url, {
       method: request.method,
-      headers: headers,
-      body: request.body,
-      duplex: request.duplex
+      headers,
+      body: request.body
     });
   }
-  
+
   return request;
 }
 
@@ -93,8 +99,8 @@ export function extractAcquisitionFromRequest(request: NextRequest): Acquisition
   try {
     const contextHeader = request.headers.get('x-acquisition-context');
     if (!contextHeader) return null;
-    
-    return JSON.parse(contextHeader);
+
+    return JSON.parse(contextHeader) as AcquisitionContext;
   } catch (error) {
     console.error('ACQUISITION_TRACKING: Erro ao extrair contexto do request:', error);
     return null;
