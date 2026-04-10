@@ -344,7 +344,7 @@ async function processMessageWithNoemia(
   }
 }
 
-// FASE 2, 3, 4, 6, 7: Processamento completo de comentários com logs
+// FASE 2, 3, 4, 6, 7: Processamento completo de comentários com automação expandida
 async function processInstagramCommentWithAutomation(comment: any): Promise<void> {
   try {
     logEvent("INSTAGRAM_COMMENT_RECEIVED", {
@@ -368,38 +368,62 @@ async function processInstagramCommentWithAutomation(comment: any): Promise<void
       } : undefined
     };
 
-    // Processar comentário com automação
-    const result = await instagramCommentAutomation.processComment(commentData);
-
-    if (result.success && result.campaign && result.event) {
-      logEvent("COMMENT_CAMPAIGN_FOUND", {
+    // Usar novas funções de detecção expandida
+    const analysis = detectKeywords(comment.text);
+    
+    // Verificar se deve enviar DM
+    const shouldSend = shouldSendDM(comment.from?.id, comment.media?.id || comment.id);
+    
+    if (analysis.hasKeyword && shouldSend) {
+      logEvent("COMMENT_KEYWORD_DETECTED", {
         commentId: comment.id,
-        campaignId: result.campaign.id,
-        keyword: result.campaign.keyword,
-        theme: result.campaign.theme,
-        area: result.campaign.area
+        userId: comment.from?.id,
+        detectedTopic: analysis.detectedTopic,
+        detectedKeywords: analysis.detectedKeywords,
+        priority: analysis.priority,
+        intentLevel: analysis.intentLevel,
+        confidence: analysis.confidence
       });
 
-      logEvent("COMMENT_KEYWORD_MATCHED", {
-        commentId: comment.id,
-        keyword: result.campaign.keyword,
-        commentText: comment.text
-      });
+      // Gerar DM automática com link rastreado
+      const autoDM = generateAutoDM(analysis, comment.media?.id || comment.id);
+      
+      // Enviar DM
+      const dmResult = await sendInstagramMessage(comment.from?.id, autoDM);
+      
+      if (dmResult.success) {
+        logEvent("DM_AUTO_SENT", {
+          userId: comment.from?.id,
+          postId: comment.media?.id || comment.id,
+          keyword: analysis.detectedKeywords.join(', '),
+          topic: analysis.detectedTopic,
+          campaign: 'comment_auto_dm',
+          priority: analysis.priority,
+          intentLevel: analysis.intentLevel,
+          confidence: analysis.confidence
+        });
 
-      // FASE 5: Criar contexto de memória
-      if (result.dmSent) {
+        // Marcar DM como enviada
+        markDMAsSent(comment.from?.id, comment.media?.id || comment.id);
+
+        // FASE 5: Criar contexto de memória
         try {
           const session = await instagramCommentContext.createSessionWithCommentContext(
             comment.from?.id,
             {
               source: 'instagram_comment',
               media_id: comment.media?.id || '',
-              keyword: result.campaign.keyword,
-              theme: result.campaign.theme,
-              area: result.campaign.area,
-              campaign_id: result.campaign.id,
+              keyword: analysis.detectedKeywords.join(', '),
+              theme: analysis.detectedTopic || 'geral',
+              area: analysis.detectedTopic || 'geral',
+              campaign_id: 'comment_auto_dm',
               comment_id: comment.id,
-              comment_text: comment.text
+              comment_text: comment.text,
+              detected_topic: analysis.detectedTopic,
+              detected_keywords: analysis.detectedKeywords,
+              priority: analysis.priority,
+              intent_level: analysis.intentLevel,
+              confidence: analysis.confidence
             }
           );
 
@@ -407,7 +431,8 @@ async function processInstagramCommentWithAutomation(comment: any): Promise<void
             commentId: comment.id,
             userId: comment.from?.id,
             sessionId: session.id,
-            theme: result.campaign.theme
+            theme: analysis.detectedTopic,
+            keywords: analysis.detectedKeywords
           });
         } catch (contextError) {
           logEvent("COMMENT_CONTEXT_ERROR", {
@@ -417,34 +442,32 @@ async function processInstagramCommentWithAutomation(comment: any): Promise<void
         }
       }
 
-      if (result.publicReplySent) {
-        logEvent("COMMENT_PUBLIC_REPLY_SENT", {
-          commentId: comment.id,
-          replyTemplate: result.campaign.public_reply_template
-        });
-      }
-
-      if (result.dmSent) {
-        logEvent("COMMENT_DM_SENT", {
-          commentId: comment.id,
-          userId: comment.from?.id,
-          dmTemplate: result.campaign.dm_opening_template.substring(0, 100) + '...'
-        });
-      }
-
-      logEvent("COMMENT_FLOW_COMPLETED", {
+      } else {
+      // Log quando não envia DM (spam ou já enviado)
+      logEvent("DM_NOT_SENT", {
         commentId: comment.id,
         userId: comment.from?.id,
-        campaignId: result.campaign.id,
-        publicReplySent: result.publicReplySent,
-        dmSent: result.dmSent
+        reason: shouldSend ? 'dm_send_failed' : 'spam_prevention',
+        hasKeyword: analysis.hasKeyword,
+        shouldSend: shouldSend
+      });
+    }
+
+    logEvent("COMMENT_FLOW_COMPLETED", {
+      commentId: comment.id,
+      userId: comment.from?.id,
+      hasKeyword: analysis.hasKeyword,
+      dmSent: dmResult.success,
+      topic: analysis.detectedTopic,
+      priority: analysis.priority,
+      intentLevel: analysis.intentLevel
       });
 
     } else {
       logEvent("COMMENT_FLOW_SKIPPED", {
         commentId: comment.id,
         userId: comment.from?.id,
-        reason: result.error || 'No matching campaign'
+        reason: 'No keyword detected'
       });
     }
   } catch (error) {
