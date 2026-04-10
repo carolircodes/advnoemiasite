@@ -219,7 +219,7 @@ export default async function FirstAccessPage({
 
   if (!profile) {
     return (
-      <main className="min-h-screen bg-[#f7f4ee] text-[#10261d]">
+      <main className="auth-page min-h-screen bg-[#f7f4ee] text-[#10261d]">
         <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 sm:px-8 lg:px-10">
           <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
             <section className="rounded-[32px] border border-[#e9e2d6] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.06)] sm:p-10 lg:p-12">
@@ -296,7 +296,7 @@ export default async function FirstAccessPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#10261d]">
+    <main className="auth-page min-h-screen bg-[#f7f4ee] text-[#10261d]">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 sm:px-8 lg:px-10">
         <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
           <section className="rounded-[32px] border border-[#e9e2d6] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.06)] sm:p-10 lg:p-12">

@@ -34,15 +34,20 @@ body {
   font-family: "Georgia", "Times New Roman", serif;
 }
 
+body.auth-page {
+  background: #f7f4ee;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
 a {
   color: inherit;
   text-decoration: none;
 }
 
-button,
-input,
-select,
-textarea {
+body:not(.auth-page) button,
+body:not(.auth-page) input,
+body:not(.auth-page) select,
+body:not(.auth-page) textarea {
   font: inherit;
 }
 
@@ -196,7 +201,7 @@ textarea {
   text-transform: uppercase;
 }
 
-.button {
+body:not(.auth-page) .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -361,12 +366,12 @@ textarea {
   font-weight: 700;
 }
 
-.field input,
-.field select,
-.field textarea,
-.field-full input,
-.field-full select,
-.field-full textarea {
+body:not(.auth-page) .field input,
+body:not(.auth-page) .field select,
+body:not(.auth-page) .field textarea,
+body:not(.auth-page) .field-full input,
+body:not(.auth-page) .field-full select,
+body:not(.auth-page) .field-full textarea {
   width: 100%;
   min-height: 52px;
   padding: 14px 16px;
