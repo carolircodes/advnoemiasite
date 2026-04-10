@@ -196,7 +196,14 @@ export default async function LoginPage({
   const nextPath = typeof params.next === "string" ? normalizeNextPath(params.next) : null;
 
   if (currentProfile?.is_active) {
-    redirect(getPostAuthDestination(currentProfile, nextPath));
+    // Se for cliente e não tiver primeiro acesso, mas já estiver na página de login,
+    // permitir que faça login normalmente em vez de redirecionar automaticamente
+    if (currentProfile.role === "cliente" && !currentProfile.first_login_completed_at) {
+      // Permanece na página de login para permitir acesso manual
+      // O usuário pode fazer login se já tiver credenciais funcionais
+    } else {
+      redirect(getPostAuthDestination(currentProfile, nextPath));
+    }
   }
 
   const error = typeof params.error === "string" ? params.error : "";
@@ -223,7 +230,28 @@ export default async function LoginPage({
               </p>
             </div>
 
-            {errorMessage ? (
+            {currentProfile?.role === "cliente" && !currentProfile.first_login_completed_at ? (
+              <div className="mt-8 rounded-2xl border border-[#f0e6d6] bg-gradient-to-r from-[#fff9f4] via-[#fff7f2] to-[#fff9f4] p-5 shadow-[0_4px_16px_rgba(142,106,59,0.04)]">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#f8e6d7] to-[#f1d5c5] text-[#d97757]">
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium leading-[1.6] text-[#9b7757]">
+                      Detectamos que seu primeiro acesso ainda não foi concluído
+                    </p>
+                    <p className="mt-2 text-sm leading-[1.6] text-[#7a6a5a]">
+                      Se você já recebeu suas credenciais por e-mail, tente fazer login abaixo. Caso contrário, 
+                      <Link href="/auth/primeiro-acesso" className="font-medium text-[#8e6a3b] hover:text-[#7b5c31] underline">
+                        clique aqui para completar seu primeiro acesso
+                      </Link>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : errorMessage ? (
               <div className="mt-8 rounded-2xl border border-[#f5e6e6] bg-gradient-to-r from-[#fff9f9] via-[#fff7f7] to-[#fff9f9] p-5 shadow-[0_4px_16px_rgba(239,68,68,0.04)]">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#f8d7d7] to-[#f1c5c5] text-[#d97777]">
