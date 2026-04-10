@@ -2914,7 +2914,7 @@ export async function answerNoemia(
 
   const coreInput = {
   channel: "site",
-  userType: input.userType,
+  userType: input.audience,
   message: input.message,
   history: [],
   context: (urlContext as NoemiaContext | undefined),
