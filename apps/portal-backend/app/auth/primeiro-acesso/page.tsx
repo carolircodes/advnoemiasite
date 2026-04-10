@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { getCurrentProfile } from "@/lib/auth/guards";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { passwordSchema } from "@/lib/domain/portal";
+import { 
+  getCurrentProfile, 
+  markClientFirstAccessCompleted, 
+  getLinkedIntakeRequestId 
+} from "@/lib/auth/guards";
 import { recordProductEvent } from "@/lib/services/public-intake";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -31,7 +35,7 @@ async function markClientFirstAccessCompleted(
 
   if (profileError) {
     throw new Error(
-      `Nao foi possivel concluir o primeiro acesso no perfil: ${profileError.message}`
+      `Não foi possível concluir o primeiro acesso no perfil: ${profileError.message}`
     );
   }
 
@@ -43,7 +47,7 @@ async function markClientFirstAccessCompleted(
 
   if (clientError) {
     throw new Error(
-      `Nao foi possivel atualizar o status do cliente: ${clientError.message}`
+      `Não foi possível atualizar o status do cliente: ${clientError.message}`
     );
   }
 
@@ -59,7 +63,7 @@ async function markClientFirstAccessCompleted(
 
   if (auditError) {
     throw new Error(
-      `Nao foi possivel registrar a auditoria do primeiro acesso: ${auditError.message}`
+      `Não foi possível registrar a auditoria do primeiro acesso: ${auditError.message}`
     );
   }
 }
@@ -146,13 +150,13 @@ async function firstAccessAction(formData: FormData) {
 function getErrorMessage(error: string) {
   switch (error) {
     case "senha-invalida":
-      return "Use uma senha valida e confirme a mesma combinacao nos dois campos.";
+      return "Use uma senha válida e confirme a mesma combinação nos dois campos.";
     case "nao-foi-possivel-definir-senha":
-      return "Nao foi possivel salvar sua senha agora. Tente novamente em instantes.";
+      return "Não foi possível salvar sua senha agora. Tente novamente em instantes.";
     case "nao-foi-possivel-finalizar":
-      return "Sua senha foi atualizada, mas o primeiro acesso nao terminou corretamente. Tente novamente para concluir.";
+      return "Sua senha foi atualizada, mas o primeiro acesso não terminou corretamente. Tente novamente para concluir.";
     default:
-      return error ? "Nao foi possivel concluir o primeiro acesso." : "";
+      return error ? "Não foi possível concluir o primeiro acesso." : "";
   }
 }
 
@@ -228,19 +232,36 @@ export default async function FirstAccessPage({
               </div>
 
               <h1 className="max-w-xl text-3xl font-semibold tracking-[-0.025em] leading-[1.1] text-[#10261d] sm:text-4xl sm:leading-[1.08]">
-                Acesso restrito ao primeiro cadastro
+                Acesso exclusivo por convite
               </h1>
 
               <p className="mt-5 max-w-2xl text-base leading-[1.65] text-[#6a7973] sm:text-lg sm:leading-[1.62]">
-                Esta área é destinada apenas a clientes que receberam um convite
-                para ativar o portal. Se você já possui acesso, entre com seu
-                e-mail e senha normalmente.
+                Esta área é destinada apenas a clientes que receberam um <strong className="text-[#8e6a3b]">convite por e-mail</strong> para ativar o portal. 
+                O primeiro acesso deve ser iniciado através do link enviado no seu e-mail.
               </p>
 
-              <div className="mt-9 rounded-2xl border border-[#eee6da] bg-gradient-to-r from-[#fbf8f3] via-[#f9f5ed] to-[#fbf8f3] p-6 shadow-[0_2px_8px_rgba(142,106,59,0.03)]">
-                <p className="text-sm leading-[1.6] text-[#6a7973]">
-                  O primeiro acesso serve para criar sua senha inicial e liberar
-                  seu ambiente privado de acompanhamento.
+              <div className="mt-9 rounded-2xl border border-[#f4e4d1] bg-gradient-to-r from-[#fff8e9] via-[#fff5e4] to-[#fff8e9] p-6 shadow-[0_2px_8px_rgba(142,106,59,0.04)]">
+                <div className="flex items-start gap-4">
+                  <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#f3e2bd] to-[#e8d4b3] text-[#8e6a3b] shadow-[0_2px_6px_rgba(142,106,59,0.15)]">
+                    <AlertIcon className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#6f542d] leading-[1.45]">
+                      Como funciona o primeiro acesso
+                    </p>
+                    <p className="mt-2 text-sm leading-[1.6] text-[#7b6b4d]">
+                      1. Você recebe um e-mail de convite com link personalizado<br />
+                      2. Clica no link para confirmar sua identidade<br />
+                      3. Define sua senha segura e acessa o portal
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-9 rounded-2xl border border-[#e8d4ca] bg-gradient-to-r from-[#f0f7f2] via-[#e8f4ec] to-[#f0f7f2] p-6 shadow-[0_2px_8px_rgba(47,122,82,0.03)]">
+                <p className="text-sm leading-[1.6] text-[#4e5f58]">
+                  <strong className="text-[#2f7a52]">Não recebeu o convite?</strong> Verifique sua caixa de spam ou 
+                  entre em contato com a equipe para solicitar um novo envio.
                 </p>
               </div>
 
@@ -249,7 +270,7 @@ export default async function FirstAccessPage({
                   href="/portal/login"
                   className="inline-flex h-[56px] items-center justify-center rounded-2xl bg-gradient-to-r from-[#8e6a3b] via-[#957342] to-[#8e6a3b] px-8 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(142,106,59,0.2),0_2px_8px_rgba(142,106,59,0.15)] transition-all duration-200 hover:from-[#7b5c31] hover:via-[#856538] hover:to-[#7b5c31] hover:shadow-[0_12px_32px_rgba(142,106,59,0.25),0_4px_12px_rgba(142,106,59,0.2)] hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-[#d4b78a] focus:ring-opacity-50"
                 >
-                  Fazer login
+                  Já tenho acesso
                 </Link>
 
                 <Link
@@ -261,31 +282,48 @@ export default async function FirstAccessPage({
               </div>
             </section>
 
-            <aside className="rounded-[32px] border border-[#e9e2d6] bg-[linear-gradient(180deg,#fffdf9_0%,#f8f4ec_100%)] p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)] sm:p-10">
+            <aside className="rounded-[32px] border border-[#e9e2d6] bg-gradient-to-br from-[#fffdf9] via-[#faf8f4] to-[#f8f4ec] p-10 shadow-[0_24px_72px_rgba(16,38,29,0.03),0_4px_24px_rgba(142,106,59,0.01)] sm:p-12">
               <div className="inline-flex rounded-full border border-[#eadfcf] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
                 Portal do cliente
               </div>
 
-              <h2 className="mt-5 text-2xl font-semibold tracking-[-0.02em] text-[#10261d]">
-                O que você encontra depois do acesso
+              <h2 className="mt-5 text-2xl font-semibold tracking-[-0.025em] leading-[1.2] text-[#10261d]">
+                O que você terá acesso após o convite
               </h2>
 
-              <div className="mt-9 space-y-6">
+              <div className="mt-8 space-y-5">
                 {[
-                  "Status do caso com explicação mais clara do andamento.",
-                  "Documentos liberados, solicitações e pendências em aberto.",
-                  "Agenda com próximos passos e histórico recente.",
-                  "Atualizações organizadas em ordem da mais recente.",
+                  {
+                    title: "Status atual do caso",
+                    text: "Acompanhamento claro da fase do atendimento e dos próximos passos.",
+                  },
+                  {
+                    title: "Documentos e solicitações",
+                    text: "Arquivos liberados, pendências e pedidos da equipe em um só lugar.",
+                  },
+                  {
+                    title: "Agenda do atendimento",
+                    text: "Próximas datas, retornos e histórico recente organizados.",
+                  },
+                  {
+                    title: "Atualizações da equipe",
+                    text: "Comunicações exibidas em ordem cronológica, com mais clareza.",
+                  },
                 ].map((item) => (
                   <div
-                    key={item}
+                    key={item.title}
                     className="flex items-start gap-4 rounded-2xl border border-[#ede7dc] bg-gradient-to-r from-white/90 to-white/80 backdrop-blur-sm p-5 shadow-[0_2px_8px_rgba(16,38,29,0.02)] transition-all duration-200 hover:shadow-[0_4px_16px_rgba(16,38,29,0.04)] hover:bg-white/95"
                   >
                     <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8e6a3b] to-[#7b5c31] text-white shadow-[0_2px_6px_rgba(142,106,59,0.15)]">
                       <CheckIcon className="h-4 w-4" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm leading-[1.6] text-[#41524b]">{item}</p>
+                      <p className="text-sm font-semibold text-[#10261d] leading-[1.45]">
+                        {item.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-[1.6] text-[#5f6f68]">
+                        {item.text}
+                      </p>
                     </div>
                   </div>
                 ))}
