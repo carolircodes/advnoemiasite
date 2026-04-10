@@ -222,39 +222,39 @@ export default async function FirstAccessPage({
       <main className="auth-page min-h-screen bg-[#f7f4ee] text-[#10261d]">
         <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 sm:px-8 lg:px-10">
           <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-            <section className="rounded-[32px] border border-[#e9e2d6] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.06)] sm:p-10 lg:p-12">
-              <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f6ecd9] text-[#8e6a3b]">
+            <section className="rounded-[32px] border border-[#e9e2d6] bg-gradient-to-br from-white via-white to-[#fafbfb] p-10 shadow-[0_24px_72px_rgba(16,38,29,0.04),0_4px_24px_rgba(142,106,59,0.02)] sm:p-12 lg:p-14">
+              <div className="mb-9 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f6ecd9] to-[#e8d4b3] text-[#8e6a3b] shadow-[0_4px_12px_rgba(142,106,59,0.15)]">
                 <AlertIcon className="h-7 w-7" />
               </div>
 
-              <h1 className="max-w-xl text-3xl font-semibold tracking-[-0.02em] text-[#10261d] sm:text-4xl">
+              <h1 className="max-w-xl text-3xl font-semibold tracking-[-0.025em] leading-[1.1] text-[#10261d] sm:text-4xl sm:leading-[1.08]">
                 Acesso restrito ao primeiro cadastro
               </h1>
 
-              <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f6f68] sm:text-lg">
+              <p className="mt-5 max-w-2xl text-base leading-[1.65] text-[#6a7973] sm:text-lg sm:leading-[1.62]">
                 Esta área é destinada apenas a clientes que receberam um convite
                 para ativar o portal. Se você já possui acesso, entre com seu
                 e-mail e senha normalmente.
               </p>
 
-              <div className="mt-8 rounded-2xl border border-[#eee6da] bg-[#fbf8f3] p-5">
-                <p className="text-sm leading-6 text-[#5f6f68]">
+              <div className="mt-9 rounded-2xl border border-[#eee6da] bg-gradient-to-r from-[#fbf8f3] via-[#f9f5ed] to-[#fbf8f3] p-6 shadow-[0_2px_8px_rgba(142,106,59,0.03)]">
+                <p className="text-sm leading-[1.6] text-[#6a7973]">
                   O primeiro acesso serve para criar sua senha inicial e liberar
                   seu ambiente privado de acompanhamento.
                 </p>
               </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/portal/login"
-                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white transition hover:bg-[#7b5c31]"
+                  className="inline-flex h-[56px] items-center justify-center rounded-2xl bg-gradient-to-r from-[#8e6a3b] via-[#957342] to-[#8e6a3b] px-8 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(142,106,59,0.2),0_2px_8px_rgba(142,106,59,0.15)] transition-all duration-200 hover:from-[#7b5c31] hover:via-[#856538] hover:to-[#7b5c31] hover:shadow-[0_12px_32px_rgba(142,106,59,0.25),0_4px_12px_rgba(142,106,59,0.2)] hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-[#d4b78a] focus:ring-opacity-50"
                 >
                   Fazer login
                 </Link>
 
                 <Link
                   href="/"
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] transition hover:bg-[#faf7f2]"
+                  className="inline-flex h-[56px] items-center justify-center rounded-2xl border border-[#d8d2c8] bg-gradient-to-br from-white via-white to-[#fafbfb] px-8 text-sm font-semibold text-[#10261d] shadow-[0_2px_8px_rgba(16,38,29,0.04)] transition-all duration-200 hover:bg-white hover:shadow-[0_4px_16px_rgba(16,38,29,0.08)] hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-[#d4b78a] focus:ring-opacity-30"
                 >
                   Voltar ao site
                 </Link>
@@ -270,7 +270,7 @@ export default async function FirstAccessPage({
                 O que você encontra depois do acesso
               </h2>
 
-              <div className="mt-8 space-y-5">
+              <div className="mt-9 space-y-6">
                 {[
                   "Status do caso com explicação mais clara do andamento.",
                   "Documentos liberados, solicitações e pendências em aberto.",
@@ -279,12 +279,14 @@ export default async function FirstAccessPage({
                 ].map((item) => (
                   <div
                     key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-[#ede7dc] bg-white/80 p-4"
+                    className="flex items-start gap-4 rounded-2xl border border-[#ede7dc] bg-gradient-to-r from-white/90 to-white/80 backdrop-blur-sm p-5 shadow-[0_2px_8px_rgba(16,38,29,0.02)] transition-all duration-200 hover:shadow-[0_4px_16px_rgba(16,38,29,0.04)] hover:bg-white/95"
                   >
-                    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8e6a3b] text-white">
-                      <CheckIcon className="h-3.5 w-3.5" />
+                    <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8e6a3b] to-[#7b5c31] text-white shadow-[0_2px_6px_rgba(142,106,59,0.15)]">
+                      <CheckIcon className="h-4 w-4" />
                     </div>
-                    <p className="text-sm leading-6 text-[#41524b]">{item}</p>
+                    <div className="flex-1">
+                      <p className="text-sm leading-[1.6] text-[#41524b]">{item}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -304,11 +306,11 @@ export default async function FirstAccessPage({
               Primeiro acesso
             </div>
 
-            <div className="mt-6">
-              <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#10261d] sm:text-4xl">
+            <div className="mt-8">
+              <h1 className="text-3xl font-semibold tracking-[-0.025em] leading-[1.1] text-[#10261d] sm:text-4xl sm:leading-[1.08]">
                 Definir acesso ao portal
               </h1>
-              <p className="mt-3 max-w-xl text-base leading-7 text-[#5f6f68] sm:text-lg">
+              <p className="mt-4 max-w-xl text-base leading-[1.65] text-[#6a7973] sm:text-lg sm:leading-[1.62]">
                 Crie uma senha segura para acessar seu ambiente privado de
                 acompanhamento.
               </p>
@@ -337,8 +339,8 @@ export default async function FirstAccessPage({
                     type="password"
                     required
                     autoComplete="new-password"
-                    placeholder="Digite sua senha segura"
-                    className="h-14 w-full rounded-2xl border border-[#ddd6ca] bg-white px-4 text-base text-[#10261d] outline-none transition placeholder:text-[#96a19d] focus:border-[#8e6a3b] focus:ring-2 focus:ring-[#d4b78a]"
+                    placeholder="Crie uma senha forte"
+                    className="h-[56px] w-full rounded-2xl border border-[#e5ddd4] bg-white px-5 text-base text-[#10261d] outline-none transition-all duration-200 placeholder:text-[#9ca3a0] focus:border-[#8e6a3b] focus:shadow-[0_0_0_3px_rgba(142,106,59,0.1)] focus:ring-[3px] focus:ring-[#d4b78a] focus:ring-opacity-20"
                   />
                 </div>
 
@@ -355,33 +357,33 @@ export default async function FirstAccessPage({
                     type="password"
                     required
                     autoComplete="new-password"
-                    placeholder="Confirme sua senha"
-                    className="h-14 w-full rounded-2xl border border-[#ddd6ca] bg-white px-4 text-base text-[#10261d] outline-none transition placeholder:text-[#96a19d] focus:border-[#8e6a3b] focus:ring-2 focus:ring-[#d4b78a]"
+                    placeholder="Confirme sua senha forte"
+                    className="h-[56px] w-full rounded-2xl border border-[#e5ddd4] bg-white px-5 text-base text-[#10261d] outline-none transition-all duration-200 placeholder:text-[#9ca3a0] focus:border-[#8e6a3b] focus:shadow-[0_0_0_3px_rgba(142,106,59,0.1)] focus:ring-[3px] focus:ring-[#d4b78a] focus:ring-opacity-20"
                   />
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#ead8b0] bg-[#fff8e9] p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#f3e2bd] text-[#8e6a3b]">
+              <div className="rounded-2xl border border-[#ead8b0] bg-gradient-to-r from-[#fff8e9] via-[#fff5e4] to-[#fff8e9] p-5 shadow-[0_2px_8px_rgba(142,106,59,0.04)]">
+                <div className="flex items-start gap-4">
+                  <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#f3e2bd] to-[#e8d4b3] text-[#8e6a3b] shadow-[0_2px_6px_rgba(142,106,59,0.15)]">
                     <AlertIcon className="h-4 w-4" />
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[#6f542d]">
-                      Sua senha é exclusiva para o portal.
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#6f542d] leading-[1.45]">
+                      Sua senha é exclusiva e protegida.
                     </p>
-                    <p className="mt-1 text-sm leading-6 text-[#7b6b4d]">
-                      Seus dados pessoais permanecem protegidos e o acesso é
+                    <p className="mt-2 text-sm leading-[1.6] text-[#7b6b4d]">
+                      Seus dados permanecem seguros com criptografia e acesso
                       vinculado ao seu ambiente privado.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-4">
                 <button
                   type="submit"
-                  className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-base font-semibold text-white shadow-[0_12px_30px_rgba(142,106,59,0.25)] transition hover:bg-[#7b5c31]"
+                  className="inline-flex h-[56px] w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#8e6a3b] via-[#957342] to-[#8e6a3b] px-8 text-base font-semibold text-white shadow-[0_8px_24px_rgba(142,106,59,0.2),0_2px_8px_rgba(142,106,59,0.15)] transition-all duration-200 hover:from-[#7b5c31] hover:via-[#856538] hover:to-[#7b5c31] hover:shadow-[0_12px_32px_rgba(142,106,59,0.25),0_4px_12px_rgba(142,106,59,0.2)] hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-[#d4b78a] focus:ring-opacity-50"
                 >
                   Salvar e acessar o portal
                 </button>
@@ -398,10 +400,10 @@ export default async function FirstAccessPage({
             </form>
           </section>
 
-          <aside className="space-y-6">
-            <section className="rounded-[32px] border border-[#e9e2d6] bg-[linear-gradient(180deg,#fffdf9_0%,#f8f4ec_100%)] p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)] sm:p-10">
-              <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-[-0.02em] text-[#10261d]">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#8e6a3b]" />
+          <aside className="space-y-8">
+            <section className="rounded-[32px] border border-[#e9e2d6] bg-gradient-to-br from-[#fffdf9] via-[#faf8f4] to-[#f8f4ec] p-10 shadow-[0_24px_72px_rgba(16,38,29,0.03),0_4px_24px_rgba(142,106,59,0.01)] sm:p-12">
+              <h2 className="flex items-center gap-3 text-2xl font-semibold tracking-[-0.025em] leading-[1.2] text-[#10261d]">
+                <span className="h-3 w-3 rounded-full bg-gradient-to-br from-[#8e6a3b] to-[#7b5c31] shadow-[0_2px_4px_rgba(142,106,59,0.2)]" />
                 O que você terá acesso
               </h2>
 
@@ -426,16 +428,16 @@ export default async function FirstAccessPage({
                 ].map((item) => (
                   <div
                     key={item.title}
-                    className="flex items-start gap-3 rounded-2xl border border-[#ede7dc] bg-white/80 p-4"
+                    className="flex items-start gap-4 rounded-2xl border border-[#ede7dc] bg-gradient-to-r from-white/90 to-white/80 backdrop-blur-sm p-5 shadow-[0_2px_8px_rgba(16,38,29,0.02)] transition-all duration-200 hover:shadow-[0_4px_16px_rgba(16,38,29,0.04)] hover:bg-white/95"
                   >
-                    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8e6a3b] text-white">
-                      <CheckIcon className="h-3.5 w-3.5" />
+                    <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8e6a3b] to-[#7b5c31] text-white shadow-[0_2px_6px_rgba(142,106,59,0.15)]">
+                      <CheckIcon className="h-4 w-4" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#10261d]">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-[#10261d] leading-[1.45]">
                         {item.title}
                       </p>
-                      <p className="mt-1 text-sm leading-6 text-[#5f6f68]">
+                      <p className="mt-2 text-sm leading-[1.6] text-[#5f6f68]">
                         {item.text}
                       </p>
                     </div>
@@ -444,23 +446,23 @@ export default async function FirstAccessPage({
               </div>
             </section>
 
-            <section className="rounded-[32px] border border-[#dde7df] bg-[#f8fbf8] p-8 shadow-[0_20px_60px_rgba(16,38,29,0.04)]">
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-[#10261d]">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#2f7a52]" />
+            <section className="rounded-[32px] border border-[#dde7df] bg-gradient-to-br from-[#f8fbf8] via-[#f4f9f5] to-[#f0f7f2] p-10 shadow-[0_24px_72px_rgba(16,38,29,0.03),0_4px_24px_rgba(47,122,82,0.01)]">
+              <h3 className="flex items-center gap-3 text-lg font-semibold tracking-[-0.025em] leading-[1.2] text-[#10261d]">
+                <span className="h-3 w-3 rounded-full bg-gradient-to-br from-[#2f7a52] to-[#246342] shadow-[0_2px_4px_rgba(47,122,82,0.2)]" />
                 Segurança e privacidade
               </h3>
 
-              <div className="mt-5 space-y-3">
+              <div className="mt-6 space-y-4">
                 {[
                   "Seus dados são protegidos no ambiente do portal.",
                   "A comunicação é centralizada e mais segura.",
                   "O acesso é exclusivo e vinculado ao seu cadastro.",
                 ].map((item) => (
-                  <div key={item} className="flex items-center gap-3">
-                    <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#dcf2e3] text-[#2f7a52]">
-                      <CheckIcon className="h-3 w-3" />
+                  <div key={item} className="flex items-center gap-4 rounded-2xl bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-sm p-4 shadow-[0_2px_8px_rgba(47,122,82,0.02)] transition-all duration-200 hover:shadow-[0_4px_16px_rgba(47,122,82,0.04)] hover:bg-white/70">
+                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#dcf2e3] to-[#c8e8d4] text-[#2f7a52] shadow-[0_2px_6px_rgba(47,122,82,0.15)]">
+                      <CheckIcon className="h-3.5 w-3.5" />
                     </div>
-                    <p className="text-sm leading-6 text-[#4e5f58]">{item}</p>
+                    <p className="text-sm leading-[1.6] text-[#4e5f58]">{item}</p>
                   </div>
                 ))}
               </div>
