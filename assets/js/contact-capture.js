@@ -4,7 +4,7 @@
   var TRIAGE_API_PATH = "/api/public/triage";
   var EVENTS_API_PATH = "/api/public/events";
   /** Produção: triagem/eventos no portal; local: mesma origem quando host é localhost. */
-  var PORTAL_API_ORIGIN_DEFAULT = "https://portal.advnoemia.com.br";
+  var PORTAL_API_ORIGIN_DEFAULT = "";
 
   function getPortalApiOrigin() {
     if (typeof window !== "undefined" && window.__ADV_PORTAL_ORIGIN__) {
