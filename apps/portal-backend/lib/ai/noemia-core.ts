@@ -2912,7 +2912,7 @@ export async function answerNoemia(
     message: string;
   };
 
-  const coreInput = {
+  const coreInput: NoemiaCoreInput = {
   channel: "site",
   userType: input.audience,
   message: input.message,
