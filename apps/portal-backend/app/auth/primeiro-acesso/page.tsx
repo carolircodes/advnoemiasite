@@ -223,7 +223,7 @@ export default async function FirstAccessPage({
       <main className="auth-page min-h-screen bg-[#f7f4ee] text-[#10261d]">
         <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 sm:px-8 lg:px-10">
           <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-            <section className="rounded-[32px] border border-[#e9e2d6] bg-gradient-to-br from-white via-white to-[#fafbfb] p-10 shadow-[0_24px_72px_rgba(16,38,29,0.04),0_4px_24px_rgba(142,106,59,0.02)] sm:p-12 lg:p-14">
+            <section className="rounded-[32px] border border-[#f0ebe5] bg-gradient-to-br from-white via-white to-[#fafbff] p-12 shadow-[0_32px_96px_rgba(16,38,29,0.04),0_8px_32px_rgba(142,106,59,0.02),0_2px_8px_rgba(16,38,29,0.02)] backdrop-blur-sm sm:p-14 lg:p-16">
               <div className="mb-9 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f6ecd9] to-[#e8d4b3] text-[#8e6a3b] shadow-[0_4px_12px_rgba(142,106,59,0.15)]">
                 <AlertIcon className="h-7 w-7" />
               </div>
