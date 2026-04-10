@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Sidebar, Topbar, PageContainer } from '@/components/layout';
 
@@ -29,7 +29,7 @@ export default function InternalLayout({ children }: LayoutProps) {
     { id: 'configuracoes', label: 'Configurações', href: '/internal/advogada/configuracoes' },
   ];
 
-  React.useEffect(() => {
+  useEffect(() => {
     const currentItem = menuItems.find(item => 
       item.href === currentPath || 
       (item.href === '/internal/advogada/leads' && currentPath.startsWith('/internal/advogada/leads')) ||
