@@ -2912,15 +2912,15 @@ export async function answerNoemia(
     message: string;
   };
 
-  const coreInput: NoemiaCoreInput = {
-    channel: "portal",
-    userType: input.audience,
-    message: input.message,
-    history: [],
-    context: urlContext,
-    metadata: { sessionId, urlContext },
-    profile,
-  };
+  const coreInput = {
+  channel: "site",
+  userType,
+  message: input.message,
+  history: [],
+  context: (urlContext as NoemiaContext | undefined),
+  metadata: { sessionId, urlContext },
+  profile,
+};
 
   const result = await processNoemiaCore(coreInput);
 
