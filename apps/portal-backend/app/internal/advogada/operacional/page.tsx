@@ -531,19 +531,8 @@ export default function OperationalPanel() {
 
   return (
     <div className="space-y-6 text-[#10261d]">
-      <div className="flex flex-col gap-4 rounded-3xl border border-[#d8d2c4] bg-[linear-gradient(135deg,#f8f4ec_0%,#ffffff_100%)] p-6 shadow-[0_18px_45px_rgba(16,38,29,0.08)] md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8f7746]">
-            Operação comercial
-          </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#10261d]">
-            Painel operacional
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#5f6f68]">
-            Gestão de leads, prioridades, follow-ups e avanço comercial em um só lugar.
-          </p>
-        </div>
-
+      {/* Botão de atualização */}
+      <div className="flex justify-end">
         <ActionButton onClick={() => void loadPanelData()} variant="outline">
           <Activity className="mr-2 h-4 w-4" />
           Atualizar
