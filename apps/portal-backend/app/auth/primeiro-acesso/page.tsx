@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { FormSubmitButton } from "@/components/form-submit-button";
-import { requireProfile } from "@/lib/auth/guards";
+import { getCurrentProfile } from "@/lib/auth/guards";
 import { passwordSchema } from "@/lib/domain/portal";
 import { recordProductEvent } from "@/lib/services/public-intake";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -82,7 +82,12 @@ async function getLinkedIntakeRequestId(profileId: string) {
 async function firstAccessAction(formData: FormData) {
   "use server";
 
-  const profile = await requireProfile(["cliente"]);
+  const profile = await getCurrentProfile();
+  
+  if (!profile || profile.role !== "cliente") {
+    redirect("/portal/login?error=acesso-negado");
+  }
+  
   const parsed = passwordSchema.safeParse({
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword")
@@ -147,8 +152,61 @@ export default async function FirstAccessPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const profile = await requireProfile(["cliente"]);
+  const profile = await getCurrentProfile();
 
+  // Se não está autenticado, mostrar página explicativa
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
+        {/* Background Pattern */}
+        <div className="fixed inset-0 opacity-50" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239ca3af' fill-opacity='0.03'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }} />
+        
+        {/* Main Container */}
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-8 h-8 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                  Acesso restrito
+                </h1>
+                <p className="text-gray-600 mb-6 leading-relaxed">
+                  Esta página é apenas para clientes que receberam um convite por e-mail para criar seu primeiro acesso ao portal.
+                </p>
+                <div className="space-y-3">
+                  <a 
+                    href="/portal/login" 
+                    className="block w-full text-center px-6 py-3 bg-[#8e6a3b] hover:bg-[#7a5a33] text-white font-semibold rounded-xl transition-all duration-200"
+                  >
+                    Fazer login
+                  </a>
+                  <a 
+                    href="/" 
+                    className="block w-full text-center px-6 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-xl transition-all duration-200"
+                  >
+                    Voltar ao site
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não for cliente, negar acesso
+  if (profile.role !== "cliente") {
+    redirect("/portal/login?error=acesso-negado");
+  }
+
+  // Se já completou primeiro acesso, redirecionar
   if (profile.first_login_completed_at) {
     redirect("/cliente");
   }
