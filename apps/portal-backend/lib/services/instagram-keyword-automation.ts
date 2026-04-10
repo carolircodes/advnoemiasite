@@ -325,7 +325,10 @@ export function generateAutoDM(analysis: CommentAnalysis, postId: string): strin
   let valueProposition = '';
 
   if (detectedTopic && detectedTopic in ENHANCED_KEYWORD_CONFIG) {
-    const config = ENHANCED_KEYWORD_CONFIG[detectedTopic as keyof typeof ENHANCED_KEYWORD_CONFIG];
+  const config =
+    ENHANCED_KEYWORD_CONFIG[
+      detectedTopic as keyof typeof ENHANCED_KEYWORD_CONFIG
+    ];
     contextualMessage = config.contextualMessage;
     valueProposition = config.valueProposition;
 
