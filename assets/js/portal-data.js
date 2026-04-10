@@ -29,11 +29,11 @@
       site: "https://advnoemia.com.br/",
       blog: "https://advnoemia.com.br/blog.html",
       triagem: "https://advnoemia.com.br/triagem.html?area=geral&origem=portal-login&pagina=portal/login",
-      login: "https://portal.advnoemia.com.br/portal/login",
-      painelAdvogada: "https://portal.advnoemia.com.br/internal/advogada",
-      painelCliente: "https://portal.advnoemia.com.br/cliente",
-      documentos: "https://portal.advnoemia.com.br/documentos",
-      agenda: "https://portal.advnoemia.com.br/agenda"
+      login: "/portal/login",
+      painelAdvogada: "/internal/advogada",
+      painelCliente: "/cliente",
+      documentos: "/documentos",
+      agenda: "/agenda"
     },
     statusMap: {
       confirmed: { label: "Confirmado", tone: "success" },

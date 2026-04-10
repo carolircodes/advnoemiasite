@@ -8,7 +8,7 @@
     if (host === "localhost" || host === "127.0.0.1") {
       w.__ADV_PORTAL_ORIGIN__ = w.location.origin;
     } else {
-      w.__ADV_PORTAL_ORIGIN__ = "https://portal.advnoemia.com.br";
+      w.__ADV_PORTAL_ORIGIN__ = "";
     }
   }
 })(typeof window !== "undefined" ? window : this);
