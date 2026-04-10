@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentProfile } from "../../../../lib/auth/guards";
 import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
@@ -9,7 +9,7 @@ import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-midd
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   let profile: any = null;
   
   try {
@@ -34,10 +34,16 @@ export async function POST(request: Request) {
     // Usar o Noemia Core centralizado
     try {
       const coreResponse = await processNoemiaCore({
-        channel: payload.channel || 'site', // ou 'portal' dependendo do contexto
-        userType: payload.userType || (profile?.role === 'cliente' ? 'client' : profile?.role !== 'cliente' ? 'staff' : 'visitor'),
+        channel: payload.channel || "site",
+        userType:
+          payload.userType ||
+          (profile?.role === "cliente"
+            ? "client"
+            : profile?.role !== "cliente"
+              ? "staff"
+              : "visitor"),
         message: payload.message,
-        history: payload.history || [], // TODO: implementar histórico se necessário
+        history: payload.history || [],
         context: combinedContext,
         metadata: { 
           currentPath: payload.currentPath,
@@ -49,7 +55,6 @@ export async function POST(request: Request) {
         conversationState: payload.conversationState
       });
 
-      // Converter para formato compatível
       const result = {
         audience: coreResponse.audience,
         answer: coreResponse.reply,
@@ -66,14 +71,14 @@ export async function POST(request: Request) {
 
       try {
         await recordProductEvent({
-          eventKey: coreResponse.source === 'openai' ? "noemia_message_sent" : "noemia_fallback_used",
+          eventKey: coreResponse.source === "openai" ? "noemia_message_sent" : "noemia_fallback_used",
           eventGroup: "ai",
           pagePath: typeof payload?.currentPath === "string" ? payload.currentPath : "/noemia",
           profileId: profile?.id,
           payload: {
             metaContext,
             hasMetaContext: !!metaContext,
-            source: metaContext?.origem || 'web',
+            source: metaContext?.origem || "web",
             openaiUsed: coreResponse.metadata.openaiUsed,
             responseTime: coreResponse.metadata.responseTime,
             classification: coreResponse.metadata.classification
@@ -87,14 +92,13 @@ export async function POST(request: Request) {
     } catch (error) {
       console.warn("⚠️ Erro no Noemia Core, usando fallback básico:", error);
       
-      // Fallback básico em caso de erro crítico
       const fallbackResult = {
         audience: profile ? "client" : "visitor",
         answer: "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes.",
         message: "A NoemIA está temporariamente indisponível. Tente novamente em alguns instantes.",
         actions: [],
         meta: {
-          source: 'emergency_fallback',
+          source: "emergency_fallback",
           usedFallback: true
         }
       };
@@ -106,7 +110,7 @@ export async function POST(request: Request) {
           pagePath: typeof payload?.currentPath === "string" ? payload.currentPath : "/noemia",
           profileId: profile?.id,
           payload: {
-            error: error instanceof Error ? error.message : 'Noemia Core Error'
+            error: error instanceof Error ? error.message : "Noemia Core Error"
           }
         });
       } catch (trackingError) {
@@ -134,19 +138,17 @@ export async function POST(request: Request) {
  * Extrai contexto da Meta do payload
  */
 function extractMetaContext(payload: any): MetaContext | null {
-  // Verificar se há contexto da Meta no payload
   if (payload?.metaContext) {
     return payload.metaContext;
   }
 
-  // Verificar se há parâmetros de URL com contexto
   if (payload?.urlParams) {
     return {
-      tema: payload.urlParams.tema || '',
-      origem: payload.urlParams.origem || 'web',
-      campanha: payload.urlParams.campanha || '',
-      video: payload.urlParams.video || '',
-      sessionId: payload.urlParams.sessionId || '',
+      tema: payload.urlParams.tema || "",
+      origem: payload.urlParams.origem || "web",
+      campanha: payload.urlParams.campanha || "",
+      video: payload.urlParams.video || "",
+      sessionId: payload.urlParams.sessionId || "",
       timestamp: Date.now()
     };
   }
@@ -154,7 +156,6 @@ function extractMetaContext(payload: any): MetaContext | null {
   return null;
 }
 
-// Types
 interface MetaContext {
   tema: string;
   origem: string;
