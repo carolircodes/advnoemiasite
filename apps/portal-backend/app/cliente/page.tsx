@@ -478,7 +478,7 @@ export default async function ClientPage({
                 <div className="space-y-4">
                   {recentEvents.map((event, index) => (
                     <div
-                      key={`${event.id ?? index}-${event.created_at ?? index}`}
+                      key={`${event.id ?? index}-${event.occurred_at ?? index}`}
                       className="rounded-[22px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -486,8 +486,8 @@ export default async function ClientPage({
                           Atualizacao {index + 1}
                         </p>
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-                          {event.created_at
-                            ? formatPortalDateTime(event.created_at)
+                          {event.occurred_at
+                            ? formatPortalDateTime(event.occurred_at)
                             : "Sem data registrada"}
                         </p>
                       </div>
