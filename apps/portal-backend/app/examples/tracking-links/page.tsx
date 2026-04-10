@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SmartCTA, InstagramCTA, WhatsAppCTA, AdsCTA } from '@/components/SmartCTA';
-import { 
-  generateTrackingLink, 
-  generateInstagramBioLink, 
-  generateContentLink, 
-  generateWhatsAppLink, 
+import { SmartCTA, InstagramCTA, WhatsAppCTA, AdsCTA, SiteCTA } from '@/components/SmartCTA';
+import {
+  generateTrackingLink,
+  generateInstagramBioLink,
+  generateContentLink,
+  generateWhatsAppLink,
   generateAdLink,
-  generateSiteLink 
+  generateSiteLink
 } from '@/lib/acquisition/link-builder';
-import { LEGAL_TOPICS, TOPIC_NAMES, getAvailableTopics } from '@/lib/acquisition/topics';
+import { getAvailableTopics } from '@/lib/acquisition/topics';
 
 export default function TrackingLinksExamples() {
   const [selectedTopic, setSelectedTopic] = useState<string>('previdenciario');
@@ -57,7 +57,7 @@ export default function TrackingLinksExamples() {
       campaign: customCampaign || 'custom_campaign',
       topic: selectedTopic
     };
-    
+
     return generateTrackingLink(params);
   };
 
@@ -74,12 +74,11 @@ export default function TrackingLinksExamples() {
           </p>
         </div>
 
-        {/* Gerador Customizado */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             Gerar Link Customizado
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -97,7 +96,7 @@ export default function TrackingLinksExamples() {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Campanha (opcional)
@@ -110,7 +109,7 @@ export default function TrackingLinksExamples() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            
+
             <div className="flex items-end">
               <SmartCTA
                 label="Gerar Link"
@@ -126,7 +125,7 @@ export default function TrackingLinksExamples() {
               />
             </div>
           </div>
-          
+
           {customCampaign && selectedTopic && (
             <div className="bg-gray-50 rounded p-4">
               <p className="text-sm text-gray-600 mb-2">Link gerado:</p>
@@ -137,12 +136,11 @@ export default function TrackingLinksExamples() {
           )}
         </div>
 
-        {/* Exemplos Pré-definidos */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             Exemplos de Links
           </h2>
-          
+
           <div className="space-y-6">
             {exampleLinks.map((example, index) => (
               <div key={index} className="border-b border-gray-200 pb-6 last:border-0">
@@ -174,7 +172,7 @@ export default function TrackingLinksExamples() {
                     />
                   </div>
                 </div>
-                
+
                 <div className="bg-gray-50 rounded p-3">
                   <p className="text-xs text-gray-500 mb-1">URL:</p>
                   <code className="block bg-white px-2 py-1 rounded border text-xs break-all mb-2">
@@ -190,12 +188,11 @@ export default function TrackingLinksExamples() {
           </div>
         </div>
 
-        {/* Componentes React */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             Componentes React
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">
@@ -215,7 +212,7 @@ export default function TrackingLinksExamples() {
                 />
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">
                 WhatsApp CTA
@@ -236,7 +233,7 @@ export default function TrackingLinksExamples() {
                 />
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">
                 Anúncio CTA
@@ -259,7 +256,7 @@ export default function TrackingLinksExamples() {
                 />
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">
                 Site CTA
@@ -281,12 +278,11 @@ export default function TrackingLinksExamples() {
           </div>
         </div>
 
-        {/* Documentação */}
         <div className="bg-blue-50 rounded-lg p-6 mt-8">
           <h2 className="text-xl font-semibold text-blue-900 mb-4">
             📚 Como Usar
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
             <div>
               <h3 className="font-medium text-blue-800 mb-2">1. Importe os componentes:</h3>
@@ -295,7 +291,7 @@ export default function TrackingLinksExamples() {
 import { generateTrackingLink } from '@/lib/acquisition/link-builder';`}
               </code>
             </div>
-            
+
             <div>
               <h3 className="font-medium text-blue-800 mb-2">2. Use nos seus componentes:</h3>
               <code className="block bg-white px-3 py-2 rounded border text-xs">
@@ -307,7 +303,7 @@ import { generateTrackingLink } from '@/lib/acquisition/link-builder';`}
 />`}
               </code>
             </div>
-            
+
             <div>
               <h3 className="font-medium text-blue-800 mb-2">3. Ou gere links dinamicamente:</h3>
               <code className="block bg-white px-3 py-2 rounded border text-xs">
@@ -318,7 +314,7 @@ import { generateTrackingLink } from '@/lib/acquisition/link-builder';`}
 });`}
               </code>
             </div>
-            
+
             <div>
               <h3 className="font-medium text-blue-800 mb-2">4. Temas disponíveis:</h3>
               <ul className="list-disc list-inside text-blue-800 space-y-1">
