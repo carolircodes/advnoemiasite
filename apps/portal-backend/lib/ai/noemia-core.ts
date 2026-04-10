@@ -28,6 +28,24 @@ type ClassifiedIntent =
 type LeadTemperature = "cold" | "warm" | "hot";
 type PriorityLevel = "low" | "medium" | "high" | "urgent";
 type RecommendedAction = "continue_triage" | "schedule_consultation" | "human_handoff" | "send_info";
+type AcquisitionContext = {
+  source?: string;
+  campaign?: string;
+  topic?: string;
+  content_id?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  ai_context?: string;
+  language_adaptation?: string;
+};
+
+type NoemiaContext = {
+  acquisition?: AcquisitionContext;
+  [key: string]: unknown;
+};
 
 // Tipos para Follow-up Inteligente
 export type FollowUpTrigger = 'inactivity' | 'post_handoff' | 'consultation_proposed' | 'follow_up_needed';
@@ -1129,7 +1147,7 @@ export interface NoemiaCoreInput {
   userType: NoemiaUserType;
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
-  context?: unknown;
+  context?: NoemiaContext;
   metadata?: Record<string, unknown>;
   profile?: PortalProfile | null;
   conversationState?: ConversationState;
@@ -2409,44 +2427,38 @@ function buildSystemPrompt(
     prompts.push("", "CONTEXTO DISPONÍVEL:", JSON.stringify(context));
     
     // Adicionar contexto de aquisição se presente
-    if (context.acquisition) {
-      const acquisition = context.acquisition;
-      prompts.push("", "CONTEXTO DE AQUISIÇÃO:");
-      
-      if (acquisition.ai_context) {
-        prompts.push(acquisition.ai_context);
-      }
-      
-      if (acquisition.language_adaptation) {
-        prompts.push("", "ADAPTAÇÃO DE LINGUAGEM:");
-        prompts.push(acquisition.language_adaptation);
-      }
-      
-      // Adicionar instruções específicas baseadas na origem
-      if (acquisition.source === 'instagram') {
-        prompts.push("- Mantenha tom mais caloroso e próximo, próprio do Instagram");
-        prompts.push("- Use linguagem mais informal e acolhedora");
-      } else if (acquisition.source === 'whatsapp') {
-        prompts.push("- Respostas mais diretas e objetivas");
-        prompts.push("- Pode usar emojis com moderação");
-      } else if (acquisition.source === 'ads') {
-        prompts.push("- Lead veio de anúncio, focar em clareza e valor");
-        prompts.push("- Ser mais direto na condução para consulta");
-      }
-      
-      // Adicionar instruções específicas baseadas no tema
-      if (acquisition.topic === 'previdenciario') {
-        prompts.push("- Priorizar perguntas sobre INSS, tempo de contribuição, benefícios");
-        prompts.push("- Focar em aposentadoria e auxílios");
-      } else if (acquisition.topic === 'bancario') {
-        prompts.push("- Priorizar perguntas sobre contratos, juros, cobranças");
-        prompts.push("- Focar em direitos do consumidor bancário");
-      } else if (acquisition.topic === 'familia') {
-        prompts.push("- Priorizar perguntas sobre divórcio, pensão, guarda");
-        prompts.push("- Abordar com sensibilidade questões familiares");
-      }
-    }
+    
+    const acquisition = (context as NoemiaContext | undefined)?.acquisition;
+
+     const acquisition = (context as NoemiaContext | undefined)?.acquisition;
+
+if (acquisition) {
+  prompts.push("", "CONTEXTO DE AQUISIÇÃO:");
+
+  if (acquisition.ai_context) {
+    prompts.push(acquisition.ai_context);
   }
+
+  if (acquisition.language_adaptation) {
+    prompts.push(`Adaptação de linguagem: ${acquisition.language_adaptation}`);
+  }
+
+  if (acquisition.source) {
+    prompts.push(`Origem: ${acquisition.source}`);
+  }
+
+  if (acquisition.campaign) {
+    prompts.push(`Campanha: ${acquisition.campaign}`);
+  }
+
+  if (acquisition.topic) {
+    prompts.push(`Tema: ${acquisition.topic}`);
+  }
+
+  if (acquisition.content_id) {
+    prompts.push(`Conteúdo: ${acquisition.content_id}`);
+  }
+}
 
   prompts.push(
     "",
@@ -2623,10 +2635,10 @@ export async function processNoemiaCore(
           const formattedContext = clientContextService.formatContextForAI(clientContext);
           
           // Enriquecer o contexto existente
-          enrichedContext = {
-            ...(input.context ? (input.context as Record<string, unknown>) : {}),
-            clientContext: formattedContext
-          } as any;
+            enrichedContext = {
+             ...(input.context ? (input.context as Record<string, unknown>) : {}),
+              clientContext: formattedContext
+               } as any;
         }
       } catch (contextError) {
         console.error('CLIENT_CONTEXT_ENRICHMENT_ERROR', contextError);
