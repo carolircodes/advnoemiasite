@@ -43,13 +43,13 @@ export const ENHANCED_KEYWORD_CONFIG = {
     priority: 'high',
     contextualMessage: 'vi que você demonstrou interesse em previdenciário',
     valueProposition: 'muita gente passa por isso sem saber que pode ter um direito que não foi reconhecido, especialmente em casos de benefício negado ou tempo de contribuição',
-    autoDMMessage: 'Oi! Vi que você comentou no vídeo 👩‍⚖️✨
+    autoDMMessage: `Oi! Vi que você comentou no vídeo 👩‍⚖️✨
 
 Muita gente passa por isso sem saber que pode ter um direito que não foi reconhecido, especialmente em casos como esse.
 
 Se você quiser, posso entender melhor o seu caso e te orientar com mais precisão.
 
-Vou te deixar um acesso direto aqui 👇'
+Vou te deixar um acesso direto aqui 👇`
   },
   [LEGAL_TOPICS.BANCARIO]: {
     keywords: [
@@ -64,13 +64,13 @@ Vou te deixar um acesso direto aqui 👇'
     priority: 'high',
     contextualMessage: 'vi que você demonstrou interesse em direito bancário',
     valueProposition: 'é muito comum haver abusos em juros, cobranças indevidas ou cláusulas abusivas em contratos',
-    autoDMMessage: 'Oi! Vi que você comentou no vídeo 🏦💳
+    autoDMMessage: `Oi! Vi que você comentou no vídeo 🏦💳
 
 É muito comum haver abusos em juros, cobranças indevidas ou cláusulas abusivas em contratos.
 
 Se você quiser, posso analisar seu caso e te orientar sobre seus direitos.
 
-Vou te deixar um acesso direto aqui 👇'
+Vou te deixar um acesso direto aqui 👇`
   },
   [LEGAL_TOPICS.FAMILIA]: {
     keywords: [
@@ -84,13 +84,13 @@ Vou te deixar um acesso direto aqui 👇'
     priority: 'high',
     contextualMessage: 'vi que você demonstrou interesse em direito de família',
     valueProposition: 'questões familiares envolvem muitos detalhes importantes como guarda, pensão e partilha de bens',
-    autoDMMessage: 'Oi! Vi que você comentou no vídeo 👨‍👩‍👧‍👦
+    autoDMMessage: `Oi! Vi que você comentou no vídeo 👨‍👩‍👧‍👦
 
 Questões familiares envolvem muitos detalhes importantes como guarda, pensão e partilha de bens.
 
 Se você quiser, posso te ajudar a entender seus direitos e o melhor caminho para sua situação.
 
-Vou te deixar um acesso direto aqui 👇'
+Vou te deixar um acesso direto aqui 👇`
   },
   [LEGAL_TOPICS.CIVIL]: {
     keywords: [
@@ -104,13 +104,13 @@ Vou te deixar um acesso direto aqui 👇'
     priority: 'medium',
     contextualMessage: 'vi que você demonstrou interesse em direito civil',
     valueProposition: 'contratos, responsabilidade civil e indenizações são áreas onde muitos direitos são desrespeitados',
-    autoDMMessage: 'Oi! Vi que você comentou no vídeo ⚖️
+    autoDMMessage: `Oi! Vi que você comentou no vídeo ⚖️
 
 Contratos, responsabilidade civil e indenizações são áreas onde muitos direitos são desrespeitados.
 
 Se você quiser, posso te ajudar a entender seus direitos e como buscar reparação.
 
-Vou te deixar um acesso direto aqui 👇'
+Vou te deixar um acesso direto aqui 👇`
   },
   [LEGAL_TOPICS.TRABALHISTA]: {
     keywords: [
@@ -124,13 +124,13 @@ Vou te deixar um acesso direto aqui 👇'
     priority: 'high',
     contextualMessage: 'vi que você demonstrou interesse em direito trabalhista',
     valueProposition: 'demissões, verbas rescisórias e direitos trabalhistas são áreas onde muitos trabalhadores perdem benefícios importantes',
-    autoDMMessage: 'Oi! Vi que você comentou no vídeo 💼
+    autoDMMessage: `Oi! Vi que você comentou no vídeo 💼
 
 Demissões, verbas rescisórias e direitos trabalhistas são áreas onde muitos trabalhadores perdem benefícios importantes.
 
 Se você quiser, posso te ajudar a garantir seus direitos e buscar o que você tem direito.
 
-Vou te deixar um acesso direto aqui 👇'
+Vou te deixar um acesso direto aqui 👇`
   },
   [LEGAL_TOPICS.CONSUMIDOR]: {
     keywords: [
@@ -143,13 +143,13 @@ Vou te deixar um acesso direto aqui 👇'
     priority: 'medium',
     contextualMessage: 'vi que você demonstrou interesse em direito do consumidor',
     valueProposition: 'produtos defeituosos, serviços mal prestados ou publicidade enganosa geram direito à reparação',
-    autoDMMessage: 'Oi! Vi que você comentou no vídeo 🛍️
+    autoDMMessage: `Oi! Vi que você comentou no vídeo 🛍️
 
 Produtos defeituosos, serviços mal prestados ou publicidade enganosa geram direito à reparação.
 
 Se você quiser, posso te ajudar a entender seus direitos como consumidor.
 
-Vou te deixar um acesso direto aqui 👇'
+Vou te deixar um acesso direto aqui 👇`
   }
 } as const;
 
@@ -206,14 +206,13 @@ function normalizeText(text: string): string {
  */
 export function detectKeywords(comment: string): CommentAnalysis {
   const normalizedComment = normalizeText(comment);
-  const words = normalizedComment.split(/\s+/);
-  
+
   const detectedKeywords: string[] = [];
   let detectedTopic: string | undefined;
   let priority: 'low' | 'medium' | 'high' = 'low';
   let intentLevel: 'low' | 'medium' | 'high' = 'low';
   let confidence = 0;
-  
+
   // Verificar palavras-chave gerais
   for (const keyword of GENERAL_KEYWORDS) {
     if (normalizedComment.includes(keyword)) {
@@ -221,7 +220,7 @@ export function detectKeywords(comment: string): CommentAnalysis {
       confidence += 0.3;
     }
   }
-  
+
   // Verificar palavras-chave de alta intenção
   for (const keyword of HIGH_INTENT_KEYWORDS) {
     if (normalizedComment.includes(keyword)) {
@@ -230,7 +229,7 @@ export function detectKeywords(comment: string): CommentAnalysis {
       confidence += 0.5;
     }
   }
-  
+
   // Verificar palavras-chave por tema (configuração expandida)
   for (const [topic, config] of Object.entries(ENHANCED_KEYWORD_CONFIG)) {
     for (const keyword of config.keywords) {
@@ -239,7 +238,7 @@ export function detectKeywords(comment: string): CommentAnalysis {
         detectedTopic = topic;
         priority = config.priority;
         confidence += 0.4;
-        
+
         // Se encontrou palavra-chave de tema específico, aumentar confiança
         if (config.priority === 'high') {
           confidence += 0.2;
@@ -247,17 +246,17 @@ export function detectKeywords(comment: string): CommentAnalysis {
       }
     }
   }
-  
+
   // Limitar confiança máxima
   confidence = Math.min(confidence, 1.0);
-  
+
   // Ajustar nível de intenção baseado na confiança
   if (confidence > 0.7) {
     intentLevel = 'high';
   } else if (confidence > 0.4) {
     intentLevel = 'medium';
   }
-  
+
   return {
     hasKeyword: detectedKeywords.length > 0,
     detectedTopic,
@@ -274,17 +273,17 @@ export function detectKeywords(comment: string): CommentAnalysis {
 export function shouldSendDM(userId: string, postId: string): boolean {
   const cacheKey = `${userId}_${postId}`;
   const cached = userCommentCache.get(cacheKey);
-  
+
   if (!cached) {
     return true;
   }
-  
+
   // Não enviar se já enviou nas últimas 24 horas
   const hoursSinceLastSent = (Date.now() - cached.timestamp) / (1000 * 60 * 60);
   if (hoursSinceLastSent < 24) {
     return false;
   }
-  
+
   return !cached.sent;
 }
 
@@ -297,7 +296,7 @@ export function markDMAsSent(userId: string, postId: string): void {
     timestamp: Date.now(),
     sent: true
   });
-  
+
   // Limpar cache antigo (mais de 7 dias)
   const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
   for (const [key, value] of userCommentCache.entries()) {
@@ -311,8 +310,8 @@ export function markDMAsSent(userId: string, postId: string): void {
  * Gera mensagem automática baseada na análise expandida
  */
 export function generateAutoDM(analysis: CommentAnalysis, postId: string): string {
-  const { detectedTopic, detectedKeywords, intentLevel, confidence } = analysis;
-  
+  const { detectedTopic, intentLevel } = analysis;
+
   // Gerar link rastreado
   const trackingLink = generateTrackingLink({
     source: 'instagram',
@@ -320,30 +319,30 @@ export function generateAutoDM(analysis: CommentAnalysis, postId: string): strin
     topic: detectedTopic || 'geral',
     content_id: postId
   });
-  
+
   // Mensagem baseada no tópico detectado (configuração expandida)
   let contextualMessage = '';
   let valueProposition = '';
-  
+
   if (detectedTopic && ENHANCED_KEYWORD_CONFIG[detectedTopic]) {
     const config = ENHANCED_KEYWORD_CONFIG[detectedTopic];
     contextualMessage = config.contextualMessage;
     valueProposition = config.valueProposition;
-    
+
     // Usar mensagem automática personalizada do tópico
     return `${config.autoDMMessage}
 
 Acesse aqui: ${trackingLink}`;
   }
-  
+
   // Mensagem genérica para casos sem tema específico
   contextualMessage = 'vi que você está buscando ajuda jurídica';
   valueProposition = 'cada caso tem suas particularidades e merece uma análise cuidadosa para garantir seus direitos';
-  
+
   // Ajustar tom baseado no nível de intenção
   let opening = '';
   let urgency = '';
-  
+
   if (intentLevel === 'high') {
     opening = 'Oi! Vi seu comentário e parece ser algo importante 👋';
     urgency = 'Se for urgente, posso te ajudar a entender os próximos passos imediatamente.';
@@ -351,7 +350,7 @@ Acesse aqui: ${trackingLink}`;
     opening = 'Oi! Vi seu comentário 👋';
     urgency = '';
   }
-  
+
   // Construir mensagem final
   const message = `${opening}
 
@@ -390,7 +389,7 @@ export function analyzeMultipleComments(comments: Array<{ id: string; from: { id
  */
 export function cleanupCommentCache(): void {
   const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-  
+
   for (const [key, value] of userCommentCache.entries()) {
     if (value.timestamp < sevenDaysAgo) {
       userCommentCache.delete(key);
@@ -400,6 +399,8 @@ export function cleanupCommentCache(): void {
 
 class InstagramKeywordAutomationService {
   private supabase = createWebhookSupabaseClient();
+
+  private keywordMappings: KeywordMapping[] = [
     {
       keyword: 'benefício',
       theme: 'previdenciario',
@@ -476,7 +477,7 @@ class InstagramKeywordAutomationService {
   detectKeyword(commentText: string): KeywordDetectionResult {
     try {
       const normalizedText = commentText.toLowerCase().trim();
-      
+
       console.log('KEYWORD_DETECTION_START', {
         commentText: normalizedText,
         keywordsCount: this.keywordMappings.length
@@ -484,7 +485,7 @@ class InstagramKeywordAutomationService {
 
       for (const mapping of this.keywordMappings) {
         if (!mapping.isActive) continue;
-        
+
         if (normalizedText.includes(mapping.keyword.toLowerCase())) {
           console.log('KEYWORD_DETECTED', {
             keyword: mapping.keyword,
@@ -538,7 +539,7 @@ class InstagramKeywordAutomationService {
       }
 
       const apiUrl = `https://graph.facebook.com/v19.0/${INSTAGRAM_BUSINESS_ACCOUNT_ID}/messages?access_token=${INSTAGRAM_ACCESS_TOKEN}`;
-      
+
       const payload = {
         recipient: {
           id: userId
@@ -570,7 +571,7 @@ class InstagramKeywordAutomationService {
 
       const responseText = await response.text();
       const result = responseText ? JSON.parse(responseText) : {};
-      
+
       if (!response.ok) {
         console.log('AUTO_DM_SEND_ERROR', {
           status: response.status,
@@ -583,7 +584,7 @@ class InstagramKeywordAutomationService {
         });
         return false;
       }
-      
+
       console.log('AUTO_DM_SENT', {
         userId,
         messageId: result.message_id,
@@ -683,7 +684,7 @@ class InstagramKeywordAutomationService {
           commentId,
           action: 'Table does not exist, assuming not processed'
         });
-        return false; // Tabela não existe, assume que não foi processado
+        return false;
       }
 
       // Outros erros de banco
@@ -694,7 +695,7 @@ class InstagramKeywordAutomationService {
           commentId,
           action: 'Database error, assuming not processed to avoid blocking'
         });
-        return false; // Em caso de erro, permite processamento para não bloquear
+        return false;
       }
 
       return !!data;
@@ -704,7 +705,7 @@ class InstagramKeywordAutomationService {
         commentId,
         action: 'Exception, assuming not processed to avoid blocking'
       });
-      return false; // Em caso de exceção, permite processamento
+      return false;
     }
   }
 
@@ -743,10 +744,8 @@ class InstagramKeywordAutomationService {
           action: 'Attempting to create table and retry'
         });
 
-        // Tentar criar a tabela
         const tableCreated = await this.createKeywordAutomationTable();
         if (tableCreated) {
-          // Tentar inserir novamente
           const { error: retryError } = await this.supabase
             .from('keyword_automation_events')
             .insert(eventData);
