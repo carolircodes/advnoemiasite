@@ -9,6 +9,7 @@ type FormSubmitButtonProps = {
   tone?: "primary" | "secondary" | "danger";
   confirmMessage?: string;
   disabled?: boolean;
+  className?: string;
 };
 
 export function FormSubmitButton({
@@ -16,10 +17,11 @@ export function FormSubmitButton({
   pendingLabel,
   tone = "primary",
   confirmMessage,
-  disabled = false
+  disabled = false,
+  className = ""
 }: FormSubmitButtonProps) {
   const { pending } = useFormStatus();
-  const className =
+  const defaultClassName =
     tone === "secondary" ? "button secondary" : tone === "danger" ? "button danger" : "button";
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
@@ -34,7 +36,7 @@ export function FormSubmitButton({
 
   return (
     <button
-      className={className}
+      className={`${defaultClassName} ${className}`}
       type="submit"
       disabled={disabled || pending}
       onClick={handleClick}
