@@ -4,14 +4,14 @@
 /portal/login https://portal.advnoemia.com.br/portal/login 302
 /portal/login.html https://portal.advnoemia.com.br/portal/login 302
 /auth/login https://portal.advnoemia.com.br/portal/login 302
-/cliente https://portal.advnoemia.com.br/cliente 302
-/documentos https://portal.advnoemia.com.br/documentos 302
-/agenda https://portal.advnoemia.com.br/agenda 302
-/portal/painel-cliente https://portal.advnoemia.com.br/cliente 302
-/portal/painel-cliente.html https://portal.advnoemia.com.br/cliente 302
-/portal/documentos https://portal.advnoemia.com.br/documentos 302
-/portal/documentos.html https://portal.advnoemia.com.br/documentos 302
-/portal/agenda https://portal.advnoemia.com.br/agenda 302
-/portal/agenda.html https://portal.advnoemia.com.br/agenda 302
+# /cliente https://portal.advnoemia.com.br/cliente 302 # COMENTADO - USAR ROTA INTERNA
+# /documentos https://portal.advnoemia.com.br/documentos 302 # COMENTADO - USAR ROTA INTERNA
+# /agenda https://portal.advnoemia.com.br/agenda 302 # COMENTADO - USAR ROTA INTERNA
+# /portal/painel-cliente https://portal.advnoemia.com.br/cliente 302 # COMENTADO - USAR ROTA INTERNA
+# /portal/painel-cliente.html https://portal.advnoemia.com.br/cliente 302 # COMENTADO - USAR ROTA INTERNA
+# /portal/documentos https://portal.advnoemia.com.br/documentos 302 # COMENTADO - USAR ROTA INTERNA
+# /portal/documentos.html https://portal.advnoemia.com.br/documentos 302 # COMENTADO - USAR ROTA INTERNA
+# /portal/agenda https://portal.advnoemia.com.br/agenda 302 # COMENTADO - USAR ROTA INTERNA
+# /portal/agenda.html https://portal.advnoemia.com.br/agenda 302 # COMENTADO - USAR ROTA INTERNA
 /portal/painel-advogada https://portal.advnoemia.com.br/internal/advogada 302
 /portal/painel-advogada.html https://portal.advnoemia.com.br/internal/advogada 302
