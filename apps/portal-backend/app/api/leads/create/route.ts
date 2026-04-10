@@ -3,7 +3,6 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { 
   extractAcquisitionParams, 
   createAcquisitionContext, 
-  updateLeadWithAcquisitionData,
   logAcquisitionEvent,
   generateAIContext,
   adaptLanguageForTopic
@@ -13,11 +12,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     
-    // Extrair dados do corpo da requisição
     const body = await request.json();
     const { name, email, phone, message, ...otherData } = body;
 
-    // Validar campos obrigatórios
     if (!name || !email || !phone) {
       return NextResponse.json(
         { error: 'Nome, email e telefone são obrigatórios' },
@@ -25,30 +22,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extrair parâmetros de aquisição da URL
     const { searchParams } = new URL(request.url);
     const acquisitionData = extractAcquisitionParams(searchParams);
     
-    // Criar contexto de aquisição
     const acquisitionContext = createAcquisitionContext(acquisitionData);
     
-    // Gerar contexto para IA e adaptação de linguagem
     const aiContext = generateAIContext(acquisitionContext);
     const languageAdaptation = adaptLanguageForTopic(acquisitionContext.topic);
 
-    // Inserir lead com dados de aquisição
     const { data: lead, error: leadError } = await supabase
       .from('noemia_leads')
       .insert({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        phone: phone.replace(/\D/g, ''), // Apenas números
+        phone: phone.replace(/\D/g, ''),
         message: message || '',
         status: 'new',
         lead_status: 'new',
         funnel_stage: 'top',
         urgency: 'medium',
-        // Dados de aquisição
+
         source: acquisitionContext.source,
         campaign: acquisitionContext.campaign,
         topic: acquisitionContext.topic,
@@ -60,15 +53,16 @@ export async function POST(request: NextRequest) {
         utm_campaign: acquisitionContext.utm_campaign,
         utm_term: acquisitionContext.utm_term,
         utm_content: acquisitionContext.utm_content,
-        // Metadados adicionais
+
         metadata: {
           ...otherData,
           acquisition_context: {
-            ai_context,
-            language_adaptation,
+            ai_context: aiContext,
+            language_adaptation: languageAdaptation,
             detected_at: new Date().toISOString()
           }
         },
+
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -83,25 +77,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Registrar evento de criação do lead
     try {
       await logAcquisitionEvent({
         lead_id: lead.id,
         event_type: 'lead_created',
         metadata: {
           acquisition_data: acquisitionData,
-          ai_context,
-          language_adaptation,
+          ai_context: aiContext,
+          language_adaptation: languageAdaptation,
           user_agent: request.headers.get('user-agent'),
           referer: request.headers.get('referer')
         }
       });
     } catch (eventError) {
       console.error('ACQUISITION_TRACKING: Erro ao registrar evento (não crítico):', eventError);
-      // Não falhar a requisição por erro no evento
     }
 
-    // Log de sucesso
     console.log('ACQUISITION_TRACKING: Lead criado com sucesso:', {
       leadId: lead.id,
       source: acquisitionContext.source,
@@ -128,8 +119,8 @@ export async function POST(request: NextRequest) {
         source: acquisitionContext.source,
         topic: acquisitionContext.topic,
         campaign: acquisitionContext.campaign,
-        ai_context,
-        language_adaptation
+        ai_context: aiContext,
+        language_adaptation: languageAdaptation
       },
       message: 'Lead criado com sucesso'
     });
@@ -143,7 +134,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Método GET para obter insights de aquisição
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -160,7 +150,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Processar insights para dashboard
     const processedInsights = {
       total_events: insights.length,
       events_by_type: insights.reduce((acc: any, event: any) => {
