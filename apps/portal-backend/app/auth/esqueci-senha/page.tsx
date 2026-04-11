@@ -13,7 +13,11 @@ import {
   readEntryContext,
   type EntryContext
 } from "@/lib/entry-context";
-import { getServerEnv } from "@/lib/config/env";
+import {
+  getAuthEnvDiagnostics,
+  getServerEnv,
+  isAuthEnvConfigurationError
+} from "@/lib/config/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -116,20 +120,34 @@ async function forgotPasswordAction(formData: FormData) {
     redirect(buildForgotPasswordPath(entryContext, { error: "dados-invalidos" }));
   }
 
-  const supabase = await createServerSupabaseClient();
-  const env = getServerEnv();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: env.passwordResetRedirectUrl
-  });
-
-  // Sempre redireciona para sucesso por segurança (não revela se e-mail existe)
-  if (error) {
-    console.error("[auth.forgot-password] Failed to request password reset", {
-      email,
-      message: error.message
+  try {
+    const supabase = await createServerSupabaseClient();
+    const env = getServerEnv();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: env.passwordResetRedirectUrl
     });
 
-    redirect(buildForgotPasswordPath(entryContext, { error: "erro-interno" }));
+  // Sempre redireciona para sucesso por segurança (não revela se e-mail existe)
+    if (error) {
+      console.error("[auth.forgot-password] Failed to request password reset", {
+        email,
+        message: error.message
+      });
+
+      redirect(buildForgotPasswordPath(entryContext, { error: "erro-interno" }));
+    }
+  } catch (error) {
+    console.error("[auth.forgot-password] Auth flow unavailable", {
+      email,
+      message: error instanceof Error ? error.message : String(error),
+      authEnv: getAuthEnvDiagnostics()
+    });
+
+    redirect(
+      buildForgotPasswordPath(entryContext, {
+        error: isAuthEnvConfigurationError(error) ? "auth-indisponivel" : "erro-interno"
+      })
+    );
   }
 
   redirect(buildForgotPasswordPath(entryContext, { success: "email-enviado" }));

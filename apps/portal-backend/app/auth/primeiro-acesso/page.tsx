@@ -3,6 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { FormSubmitButton } from "@/components/form-submit-button";
+import {
+  getAuthEnvDiagnostics,
+  isAuthEnvConfigurationError
+} from "@/lib/config/env";
 import { passwordSchema } from "@/lib/domain/portal";
 import { getCurrentProfile } from "@/lib/auth/guards";
 import { recordProductEvent } from "@/lib/services/public-intake";
@@ -231,7 +235,8 @@ async function firstAccessAction(formData: FormData) {
     redirect("/auth/primeiro-acesso?error=senha-invalida");
   }
 
-  const supabase = await createServerSupabaseClient();
+  try {
+    const supabase = await createServerSupabaseClient();
   
   // Verificar se temos uma sessão válida antes de tentar updateUser
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -300,6 +305,20 @@ async function firstAccessAction(formData: FormData) {
   }
 
   redirect("/cliente?success=primeiro-acesso-concluido");
+  } catch (error) {
+    console.error("[auth.first-access] Auth flow unavailable", {
+      profileId: profile.id,
+      profileEmail: profile.email,
+      message: error instanceof Error ? error.message : String(error),
+      authEnv: getAuthEnvDiagnostics()
+    });
+
+    redirect(
+      `/auth/primeiro-acesso?error=${
+        isAuthEnvConfigurationError(error) ? "auth-indisponivel" : "nao-foi-possivel-definir-senha"
+      }`
+    );
+  }
 }
 
 function getErrorMessage(error: string) {
@@ -310,6 +329,8 @@ function getErrorMessage(error: string) {
       return "Sua sessão expirou. Por favor, solicite um novo convite por e-mail ou tente fazer login normalmente.";
     case "erro-criar-cliente":
       return "Não foi possível criar seu cadastro de cliente. Entre em contato com o suporte.";
+    case "auth-indisponivel":
+      return "A autenticacao do portal esta temporariamente indisponivel. Tente novamente em instantes.";
     case "nao-foi-possivel-definir-senha":
       return "Não foi possível salvar sua senha agora. Verifique o console para detalhes técnicos ou tente novamente em instantes.";
     case "nao-foi-possivel-finalizar":

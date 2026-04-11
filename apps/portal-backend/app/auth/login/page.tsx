@@ -15,6 +15,10 @@ import {
   type EntryContext
 } from "@/lib/entry-context";
 import { ensureProfileForUser, getCurrentProfile } from "@/lib/auth/guards";
+import {
+  getAuthEnvDiagnostics,
+  isAuthEnvConfigurationError
+} from "@/lib/config/env";
 import { loginSchema } from "@/lib/domain/portal";
 import { getPublicMarketingSiteOrigin } from "@/lib/portal/app-urls";
 import { recordProductEvent } from "@/lib/services/public-intake";
@@ -87,6 +91,8 @@ function getLoginErrorMessage(error: string) {
       return "Informe um e-mail válido e uma senha para continuar.";
     case "credenciais-invalidas":
       return "Não foi possível concluir o acesso. Revise o e-mail e a senha informados.";
+    case "erro-encerrar-sessao":
+      return "Nao foi possivel encerrar sua sessao agora. Tente novamente em instantes.";
     case "link-invalido":
       return "O link recebido não é válido para este portal.";
     case "link-expirado":
@@ -152,14 +158,32 @@ async function loginAction(formData: FormData) {
     redirect(buildLoginPath(entryContext, { error: "dados-invalidos", next: requestedPath }));
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
+  let profile;
 
-  if (error || !data.user) {
-    redirect(buildLoginPath(entryContext, { error: "credenciais-invalidas", next: requestedPath }));
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
+
+    if (error || !data.user) {
+      redirect(
+        buildLoginPath(entryContext, { error: "credenciais-invalidas", next: requestedPath })
+      );
+    }
+
+    profile = await ensureProfileForUser(data.user);
+  } catch (error) {
+    console.error("[auth.login] Failed to complete sign-in", {
+      message: error instanceof Error ? error.message : String(error),
+      authEnv: getAuthEnvDiagnostics()
+    });
+
+    redirect(
+      buildLoginPath(entryContext, {
+        error: isAuthEnvConfigurationError(error) ? "auth-indisponivel" : "erro-interno",
+        next: requestedPath
+      })
+    );
   }
-
-  const profile = await ensureProfileForUser(data.user);
 
   try {
     await recordProductEvent({

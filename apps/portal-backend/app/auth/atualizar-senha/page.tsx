@@ -6,6 +6,10 @@ import {
   getDefaultDestinationForProfile,
   requireProfile
 } from "@/lib/auth/guards";
+import {
+  getAuthEnvDiagnostics,
+  isAuthEnvConfigurationError
+} from "@/lib/config/env";
 import { passwordSchema } from "@/lib/domain/portal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -103,7 +107,8 @@ async function updatePasswordAction(formData: FormData) {
     redirect("/auth/atualizar-senha?error=senha-invalida");
   }
 
-  const supabase = await createServerSupabaseClient();
+  try {
+    const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password
   });
@@ -145,6 +150,19 @@ async function updatePasswordAction(formData: FormData) {
   }
 
   redirect(`${getDefaultDestinationForProfile(destinationProfile)}?success=senha-atualizada`);
+  } catch (error) {
+    console.error("[auth.atualizar-senha] Auth flow unavailable", {
+      profileId: profile.id,
+      message: error instanceof Error ? error.message : String(error),
+      authEnv: getAuthEnvDiagnostics()
+    });
+
+    redirect(
+      `/auth/atualizar-senha?error=${
+        isAuthEnvConfigurationError(error) ? "auth-indisponivel" : "nao-foi-possivel-atualizar"
+      }`
+    );
+  }
 }
 
 function getErrorMessage(error: string) {
@@ -153,6 +171,8 @@ function getErrorMessage(error: string) {
       return "Use uma senha válida e confirme a mesma combinação nos dois campos.";
     case "nao-foi-possivel-atualizar":
       return "Não foi possível atualizar sua senha agora. Tente novamente em instantes.";
+    case "auth-indisponivel":
+      return "A autenticacao do portal esta temporariamente indisponivel. Tente novamente em instantes.";
     case "nao-foi-possivel-finalizar":
       return "A senha mudou, mas a sincronização final do acesso não terminou corretamente.";
     case "nao-foi-possivel-registrar-auditoria":

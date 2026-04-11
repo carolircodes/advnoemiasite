@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+const PUBLIC_AUTH_ENV_KEYS = [
+  "NEXT_PUBLIC_APP_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+] as const;
+
+const ADMIN_AUTH_ENV_KEYS = [
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY"
+] as const;
+
+type AuthEnvKey = (typeof PUBLIC_AUTH_ENV_KEYS)[number] | (typeof ADMIN_AUTH_ENV_KEYS)[number];
+const PUBLIC_AUTH_ENV_KEY_SET = new Set<string>(PUBLIC_AUTH_ENV_KEYS);
+const ADMIN_AUTH_ENV_KEY_SET = new Set<string>(ADMIN_AUTH_ENV_KEYS);
+
 function emptyToUndefined(value: unknown) {
   if (typeof value !== "string") {
     return value;
@@ -117,6 +133,15 @@ type NotificationEnv = {
 
 export type { ServerEnv, PublicEnv, AdminEnv, NotificationEnv };
 
+export type AuthEnvDiagnostics = {
+  appUrlConfigured: boolean;
+  supabaseUrlConfigured: boolean;
+  publicKeySource: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY" | null;
+  adminKeySource: "SUPABASE_SECRET_KEY" | "SUPABASE_SERVICE_ROLE_KEY" | null;
+  missingForPublicAuth: AuthEnvKey[];
+  missingForAdminAuth: AuthEnvKey[];
+};
+
 let cachedServerEnv: ServerEnv | null = null;
 let cachedPublicEnv: PublicEnv | null = null;
 let cachedAdminEnv: AdminEnv | null = null;
@@ -131,6 +156,19 @@ function parseOptionalBoolean(value?: string) {
   return value === "true" || value === "1";
 }
 
+function hasNonEmptyEnv(name: AuthEnvKey | "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_APP_URL") {
+  const value = process.env[name];
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function getZodIssueKeys(error: z.ZodError) {
+  return error.issues
+    .flatMap((issue) => issue.path)
+    .filter((pathPart): pathPart is AuthEnvKey | "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_APP_URL" =>
+      typeof pathPart === "string"
+    );
+}
+
 function resolvePublishableKey(parsed: z.infer<typeof envSchema>) {
   return (
     parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
@@ -140,6 +178,86 @@ function resolvePublishableKey(parsed: z.infer<typeof envSchema>) {
 
 function resolveSecretKey(parsed: z.infer<typeof envSchema>) {
   return parsed.SUPABASE_SECRET_KEY || parsed.SUPABASE_SERVICE_ROLE_KEY;
+}
+
+export function getAuthEnvDiagnostics(): AuthEnvDiagnostics {
+  const publicKeySource = hasNonEmptyEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+    ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+    : hasNonEmptyEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+      ? "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      : null;
+
+  const adminKeySource = hasNonEmptyEnv("SUPABASE_SECRET_KEY")
+    ? "SUPABASE_SECRET_KEY"
+    : hasNonEmptyEnv("SUPABASE_SERVICE_ROLE_KEY")
+      ? "SUPABASE_SERVICE_ROLE_KEY"
+      : null;
+
+  const missingForPublicAuth: AuthEnvKey[] = [];
+  const missingForAdminAuth: AuthEnvKey[] = [];
+
+  if (!publicKeySource) {
+    missingForPublicAuth.push(
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    );
+  }
+
+  if (!adminKeySource) {
+    missingForAdminAuth.push("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  return {
+    appUrlConfigured: hasNonEmptyEnv("NEXT_PUBLIC_APP_URL"),
+    supabaseUrlConfigured: hasNonEmptyEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    publicKeySource,
+    adminKeySource,
+    missingForPublicAuth,
+    missingForAdminAuth
+  };
+}
+
+export function isPublicAuthEnvConfigurationError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    const issueKeys = getZodIssueKeys(error);
+
+    return issueKeys.some((key) => PUBLIC_AUTH_ENV_KEY_SET.has(key));
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("Supabase publico nao configurado corretamente.") ||
+    error.message.includes("NEXT_PUBLIC_APP_URL") ||
+    error.message.includes("NEXT_PUBLIC_SUPABASE_URL") ||
+    error.message.includes("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ||
+    error.message.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  );
+}
+
+export function isAdminAuthEnvConfigurationError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    const issueKeys = getZodIssueKeys(error);
+
+    return issueKeys.some((key) => ADMIN_AUTH_ENV_KEY_SET.has(key));
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("SUPABASE_SECRET_KEY") ||
+    error.message.includes("SUPABASE_SERVICE_ROLE_KEY")
+  );
+}
+
+export function isAuthEnvConfigurationError(error: unknown) {
+  return (
+    isPublicAuthEnvConfigurationError(error) || isAdminAuthEnvConfigurationError(error)
+  );
 }
 
 function buildServerEnv() {

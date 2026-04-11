@@ -9,7 +9,25 @@ import {
   isProtectedPortalPath
 } from "../auth/access-control";
 import { isPortalRole } from "../domain/portal";
-import { getPublicEnv } from "../config/env";
+import { getAuthEnvDiagnostics, getPublicEnv } from "../config/env";
+
+function authUnavailableResponse(request: NextRequest, details: Record<string, unknown>) {
+  const pathname = request.nextUrl.pathname;
+
+  console.error("[middleware.auth] Auth validation unavailable", details);
+
+  if (isInternalApiPath(pathname)) {
+    return NextResponse.json(
+      { error: "Autenticacao do portal indisponivel no momento." },
+      { status: 503 }
+    );
+  }
+
+  const loginPath = buildLoginRedirectPath(pathname, "auth-indisponivel");
+  const fallbackOrigin = request.nextUrl.origin;
+
+  return NextResponse.redirect(new URL(loginPath, fallbackOrigin));
+}
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -22,117 +40,125 @@ export async function updateSession(request: NextRequest) {
     });
   }
 
-  const env = getPublicEnv();
-  const appOrigin = env.NEXT_PUBLIC_APP_URL;
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers
-    }
-  });
-
-  const supabase = createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: Parameters<SetAllCookies>[0]) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-
-          response = NextResponse.next({
-            request
-          });
-
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        }
+  try {
+    const env = getPublicEnv();
+    const appOrigin = env.NEXT_PUBLIC_APP_URL;
+    let response = NextResponse.next({
+      request: {
+        headers: request.headers
       }
-    }
-  );
-
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    if (isInternalApiPath(pathname)) {
-      return NextResponse.json(
-        { error: "Faca login para acessar a API interna." },
-        { status: 401 }
-      );
-    }
-
-    return NextResponse.redirect(
-      new URL(buildLoginRedirectPath(pathname, "login-obrigatorio"), appOrigin)
-    );
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role,is_active,first_login_completed_at")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("[middleware.auth] Failed to load profile", {
-      pathname,
-      userId: user.id,
-      message: profileError.message
     });
 
-    if (isInternalApiPath(pathname)) {
-      return NextResponse.json(
-        { error: "Nao foi possivel validar o perfil autenticado." },
-        { status: 500 }
-      );
-    }
+    const supabase = createServerClient(
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet: Parameters<SetAllCookies>[0]) {
+            cookiesToSet.forEach(({ name, value }) => {
+              request.cookies.set(name, value);
+            });
 
-    return NextResponse.redirect(
-      new URL(buildLoginRedirectPath(pathname, "acesso-restrito"), appOrigin)
+            response = NextResponse.next({
+              request
+            });
+
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options);
+            });
+          }
+        }
+      }
     );
-  }
 
-  if (!profile || !isPortalRole(profile.role)) {
-    if (isInternalApiPath(pathname)) {
-      return NextResponse.json(
-        { error: "Perfil do portal nao encontrado para esta sessao." },
-        { status: 403 }
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      if (isInternalApiPath(pathname)) {
+        return NextResponse.json(
+          { error: "Faca login para acessar a API interna." },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.redirect(
+        new URL(buildLoginRedirectPath(pathname, "login-obrigatorio"), appOrigin)
       );
     }
 
-    return NextResponse.redirect(
-      new URL(buildLoginRedirectPath(pathname, "acesso-restrito"), appOrigin)
-    );
-  }
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role,is_active,first_login_completed_at")
+      .eq("id", user.id)
+      .maybeSingle();
 
-  if (!profile.is_active) {
-    if (isInternalApiPath(pathname)) {
-      return NextResponse.json(
-        { error: "Seu perfil do portal esta inativo." },
-        { status: 403 }
+    if (profileError) {
+      console.error("[middleware.auth] Failed to load profile", {
+        pathname,
+        userId: user.id,
+        message: profileError.message
+      });
+
+      if (isInternalApiPath(pathname)) {
+        return NextResponse.json(
+          { error: "Nao foi possivel validar o perfil autenticado." },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.redirect(
+        new URL(buildLoginRedirectPath(pathname, "acesso-restrito"), appOrigin)
       );
     }
 
-    return NextResponse.redirect(
-      new URL(buildLoginRedirectPath(pathname, "perfil-inativo"), appOrigin)
-    );
-  }
+    if (!profile || !isPortalRole(profile.role)) {
+      if (isInternalApiPath(pathname)) {
+        return NextResponse.json(
+          { error: "Perfil do portal nao encontrado para esta sessao." },
+          { status: 403 }
+        );
+      }
 
-  if (!canAccessPortalPath(profile, pathname)) {
-    if (isInternalApiPath(pathname)) {
-      return NextResponse.json(
-        { error: "Voce nao tem permissao para acessar esta API." },
-        { status: 403 }
+      return NextResponse.redirect(
+        new URL(buildLoginRedirectPath(pathname, "acesso-restrito"), appOrigin)
       );
     }
 
-    return NextResponse.redirect(new URL(buildAccessDeniedPath(profile), appOrigin));
-  }
+    if (!profile.is_active) {
+      if (isInternalApiPath(pathname)) {
+        return NextResponse.json(
+          { error: "Seu perfil do portal esta inativo." },
+          { status: 403 }
+        );
+      }
 
-  return response;
+      return NextResponse.redirect(
+        new URL(buildLoginRedirectPath(pathname, "perfil-inativo"), appOrigin)
+      );
+    }
+
+    if (!canAccessPortalPath(profile, pathname)) {
+      if (isInternalApiPath(pathname)) {
+        return NextResponse.json(
+          { error: "Voce nao tem permissao para acessar esta API." },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.redirect(new URL(buildAccessDeniedPath(profile), appOrigin));
+    }
+
+    return response;
+  } catch (error) {
+    return authUnavailableResponse(request, {
+      pathname,
+      message: error instanceof Error ? error.message : String(error),
+      authEnv: getAuthEnvDiagnostics()
+    });
+  }
 }

@@ -10,6 +10,10 @@ import {
   isStaffRole
 } from "./access-control";
 import { isPortalRole, type PortalRole } from "../domain/portal";
+import {
+  getAuthEnvDiagnostics,
+  isPublicAuthEnvConfigurationError
+} from "../config/env";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { createServerSupabaseClient } from "../supabase/server";
 
@@ -94,23 +98,16 @@ export async function ensureProfileForUser(user: User) {
   return data as PortalProfile;
 }
 
-export async function getCurrentProfile() {
+async function loadCurrentProfile(options: { allowVisitorFallback: boolean }) {
   let supabase;
 
   try {
     supabase = await createServerSupabaseClient();
   } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.name === "ZodError" ||
-        error.message.includes("NEXT_PUBLIC_APP_URL") ||
-        error.message.includes("SUPABASE_SERVICE_ROLE_KEY") ||
-        error.message.includes("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ||
-        error.message.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
-        error.message.includes("Supabase nao configurado corretamente"))
-    ) {
+    if (options.allowVisitorFallback && isPublicAuthEnvConfigurationError(error)) {
       console.warn("[auth.getCurrentProfile] Auth env unavailable, falling back to visitor mode", {
-        message: error.message
+        message: error instanceof Error ? error.message : String(error),
+        authEnv: getAuthEnvDiagnostics()
       });
 
       return null;
@@ -142,8 +139,31 @@ export async function getCurrentProfile() {
   return (data as PortalProfile | null) || null;
 }
 
+export async function getCurrentProfile() {
+  return loadCurrentProfile({ allowVisitorFallback: true });
+}
+
+async function getRequiredCurrentProfile() {
+  return loadCurrentProfile({ allowVisitorFallback: false });
+}
+
 export async function requireProfile(allowedRoles?: PortalRole[]) {
-  const profile = await getCurrentProfile();
+  let profile;
+
+  try {
+    profile = await getRequiredCurrentProfile();
+  } catch (error) {
+    if (isPublicAuthEnvConfigurationError(error)) {
+      console.error("[auth.requireProfile] Auth unavailable for protected route", {
+        message: error instanceof Error ? error.message : String(error),
+        authEnv: getAuthEnvDiagnostics()
+      });
+
+      redirect(buildLoginRedirectPath(null, "auth-indisponivel"));
+    }
+
+    throw error;
+  }
 
   if (!profile) {
     redirect(buildLoginRedirectPath(null, "login-obrigatorio"));
@@ -161,7 +181,21 @@ export async function requireProfile(allowedRoles?: PortalRole[]) {
 }
 
 export async function requireInternalApiProfile() {
-  const profile = await getCurrentProfile();
+  let profile;
+
+  try {
+    profile = await getRequiredCurrentProfile();
+  } catch (error) {
+    if (isPublicAuthEnvConfigurationError(error)) {
+      return {
+        ok: false as const,
+        status: 503,
+        error: "Autenticacao do portal indisponivel no momento."
+      };
+    }
+
+    throw error;
+  }
 
   if (!profile) {
     return {

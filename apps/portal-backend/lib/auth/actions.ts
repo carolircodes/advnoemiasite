@@ -3,10 +3,24 @@
 import { redirect } from "next/navigation";
 
 import { CLIENT_LOGIN_PATH } from "../../lib/auth/access-control";
+import {
+  getAuthEnvDiagnostics,
+  isAuthEnvConfigurationError
+} from "../../lib/config/env";
 import { createServerSupabaseClient } from "../../lib/supabase/server";
 
 export async function logoutAction() {
-  const supabase = await createServerSupabaseClient();
-  await supabase.auth.signOut();
-  redirect(`${CLIENT_LOGIN_PATH}?success=sessao-encerrada`);
+  try {
+    const supabase = await createServerSupabaseClient();
+    await supabase.auth.signOut();
+    redirect(`${CLIENT_LOGIN_PATH}?success=sessao-encerrada`);
+  } catch (error) {
+    console.error("[auth.logout] Failed to terminate session", {
+      message: error instanceof Error ? error.message : String(error),
+      authEnv: getAuthEnvDiagnostics()
+    });
+
+    const code = isAuthEnvConfigurationError(error) ? "auth-indisponivel" : "erro-encerrar-sessao";
+    redirect(`${CLIENT_LOGIN_PATH}?error=${code}`);
+  }
 }

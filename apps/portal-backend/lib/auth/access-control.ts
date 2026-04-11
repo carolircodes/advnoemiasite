@@ -144,6 +144,8 @@ export function getAccessMessage(error: string) {
   switch (error) {
     case "login-obrigatorio":
       return "Faca login para continuar no portal.";
+    case "auth-indisponivel":
+      return "A autenticacao do portal esta temporariamente indisponivel. Tente novamente em instantes.";
     case "acesso-negado":
       return "Voce nao tem permissao para acessar esta area.";
     case "acesso-restrito":
