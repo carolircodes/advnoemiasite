@@ -1,44 +1,59 @@
 import { z } from "zod";
 
+function emptyToUndefined(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+const optionalString = () => z.preprocess(emptyToUndefined, z.string().min(1).optional());
+const optionalUrl = () => z.preprocess(emptyToUndefined, z.string().url().optional());
+
 const envSchema = z
   .object({
-    NEXT_PUBLIC_APP_URL: z.string().url(),
+    NEXT_PUBLIC_APP_URL: z.preprocess(emptyToUndefined, z.string().url()),
 
-    NEXT_PUBLIC_PUBLIC_SITE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_PUBLIC_SITE_URL: optionalUrl(),
 
-    NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+    NEXT_PUBLIC_SUPABASE_URL: z.preprocess(emptyToUndefined, z.string().url()),
 
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1).optional(),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: optionalString(),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalString(),
 
-    SUPABASE_SECRET_KEY: z.string().min(1).optional(),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    SUPABASE_SECRET_KEY: optionalString(),
+    SUPABASE_SERVICE_ROLE_KEY: optionalString(),
 
-    INVITE_REDIRECT_URL: z.string().url().optional(),
-    PASSWORD_RESET_REDIRECT_URL: z.string().url().optional(),
+    INVITE_REDIRECT_URL: optionalUrl(),
+    PASSWORD_RESET_REDIRECT_URL: optionalUrl(),
 
-    NOTIFICATIONS_PROVIDER: z.enum(["smtp", "resend"]).optional(),
-    NOTIFICATIONS_WORKER_SECRET: z.string().min(1).optional(),
+    NOTIFICATIONS_PROVIDER: z.preprocess(
+      emptyToUndefined,
+      z.enum(["smtp", "resend"]).optional()
+    ),
+    NOTIFICATIONS_WORKER_SECRET: optionalString(),
 
-    NOTIFICATIONS_SMTP_HOST: z.string().min(1).optional(),
-    NOTIFICATIONS_SMTP_PORT: z.string().min(1).optional(),
-    NOTIFICATIONS_SMTP_USER: z.string().min(1).optional(),
-    NOTIFICATIONS_SMTP_PASS: z.string().min(1).optional(),
-    NOTIFICATIONS_SMTP_SECURE: z.string().min(1).optional(),
+    NOTIFICATIONS_SMTP_HOST: optionalString(),
+    NOTIFICATIONS_SMTP_PORT: optionalString(),
+    NOTIFICATIONS_SMTP_USER: optionalString(),
+    NOTIFICATIONS_SMTP_PASS: optionalString(),
+    NOTIFICATIONS_SMTP_SECURE: optionalString(),
 
-    NOTIFICATIONS_REPLY_TO: z.string().min(1).optional(),
+    NOTIFICATIONS_REPLY_TO: optionalString(),
 
-    RESEND_API_KEY: z.string().min(1).optional(),
-    EMAIL_FROM: z.string().min(1).optional(),
+    RESEND_API_KEY: optionalString(),
+    EMAIL_FROM: optionalString(),
 
-    CRON_SECRET: z.string().min(1).optional(),
+    CRON_SECRET: optionalString(),
 
-    OPENAI_API_KEY: z.string().min(1).optional(),
-    OPENAI_MODEL: z.string().min(1).optional(),
+    OPENAI_API_KEY: optionalString(),
+    OPENAI_MODEL: optionalString(),
 
-    PORTAL_ADMIN_EMAIL: z.string().email().optional(),
-    PORTAL_ADMIN_FULL_NAME: z.string().min(1).optional(),
-    PORTAL_ADMIN_TEMP_PASSWORD: z.string().min(1).optional()
+    PORTAL_ADMIN_EMAIL: z.preprocess(emptyToUndefined, z.string().email().optional()),
+    PORTAL_ADMIN_FULL_NAME: optionalString(),
+    PORTAL_ADMIN_TEMP_PASSWORD: optionalString()
   })
   .superRefine((env, ctx) => {
     if (
@@ -74,14 +89,6 @@ const envSchema = z
         path: ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"]
       });
     }
-
-    if (!env.SUPABASE_SECRET_KEY && !env.SUPABASE_SERVICE_ROLE_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Defina SUPABASE_SECRET_KEY ou SUPABASE_SERVICE_ROLE_KEY.",
-        path: ["SUPABASE_SECRET_KEY"]
-      });
-    }
   });
 
 type ServerEnv = ReturnType<typeof buildServerEnv>;
@@ -89,6 +96,10 @@ type PublicEnv = {
   NEXT_PUBLIC_APP_URL: string;
   NEXT_PUBLIC_SUPABASE_URL: string;
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: string;
+};
+type AdminEnv = {
+  NEXT_PUBLIC_SUPABASE_URL: string;
+  SUPABASE_SECRET_KEY: string;
 };
 
 type NotificationEnv = {
@@ -104,11 +115,11 @@ type NotificationEnv = {
   smtpSecure: boolean;
 };
 
-// Exportar tipos para uso externo
-export type { ServerEnv, PublicEnv, NotificationEnv };
+export type { ServerEnv, PublicEnv, AdminEnv, NotificationEnv };
 
 let cachedServerEnv: ServerEnv | null = null;
 let cachedPublicEnv: PublicEnv | null = null;
+let cachedAdminEnv: AdminEnv | null = null;
 let cachedNotificationEnv: NotificationEnv | null = null;
 
 function parseOptionalInteger(value?: string) {
@@ -120,25 +131,29 @@ function parseOptionalBoolean(value?: string) {
   return value === "true" || value === "1";
 }
 
+function resolvePublishableKey(parsed: z.infer<typeof envSchema>) {
+  return (
+    parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
+
+function resolveSecretKey(parsed: z.infer<typeof envSchema>) {
+  return parsed.SUPABASE_SECRET_KEY || parsed.SUPABASE_SERVICE_ROLE_KEY;
+}
+
 function buildServerEnv() {
   const parsed = envSchema.parse(process.env);
+  const publishableKey = resolvePublishableKey(parsed);
 
-  const publishableKey =
-    parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  const secretKey =
-    parsed.SUPABASE_SECRET_KEY ||
-    parsed.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!publishableKey || !secretKey) {
-    throw new Error("Supabase não configurado corretamente.");
+  if (!publishableKey) {
+    throw new Error("Supabase publico nao configurado corretamente.");
   }
 
   return {
     ...parsed,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableKey,
-    SUPABASE_SECRET_KEY: secretKey,
+    SUPABASE_SECRET_KEY: resolveSecretKey(parsed),
 
     inviteRedirectUrl:
       parsed.INVITE_REDIRECT_URL ||
@@ -150,9 +165,6 @@ function buildServerEnv() {
   };
 }
 
-/**
- * 🔥 EXPORT PRINCIPAL (garante que Vercel reconheça)
- */
 export function getServerEnv() {
   if (!cachedServerEnv) {
     cachedServerEnv = buildServerEnv();
@@ -173,9 +185,26 @@ export function getPublicEnv() {
   return cachedPublicEnv;
 }
 
-/**
- * 🔥 ESSA É A FUNÇÃO QUE ESTAVA QUEBRANDO NO BUILD
- */
+export function getAdminEnv() {
+  if (!cachedAdminEnv) {
+    const parsed = envSchema.parse(process.env);
+    const secretKey = resolveSecretKey(parsed);
+
+    if (!secretKey) {
+      throw new Error(
+        "Defina SUPABASE_SECRET_KEY ou SUPABASE_SERVICE_ROLE_KEY para operacoes administrativas do Supabase."
+      );
+    }
+
+    cachedAdminEnv = {
+      NEXT_PUBLIC_SUPABASE_URL: parsed.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SECRET_KEY: secretKey
+    };
+  }
+
+  return cachedAdminEnv;
+}
+
 export function getNotificationEnv(): NotificationEnv {
   if (!cachedNotificationEnv) {
     const env = getServerEnv();

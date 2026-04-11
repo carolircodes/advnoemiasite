@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
-import { getServerEnv } from "../config/env";
+import { getAdminEnv } from "../config/env";
 
 // Cliente Supabase para webhooks (server-side com service role)
 export function createWebhookSupabaseClient() {
-  const env = getServerEnv();
+  const env = getAdminEnv();
 
   return createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,

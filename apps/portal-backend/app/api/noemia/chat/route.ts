@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentProfile } from "../../../../lib/auth/guards";
 import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
 import { recordProductEvent } from "../../../../lib/services/public-intake";
-import { getServerEnv } from "../../../../lib/config/env";
 import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-middleware";
 
 export const runtime = "nodejs";
@@ -29,7 +28,6 @@ export async function POST(request: NextRequest) {
 };
 
     // Verificar se OPENAI_API_KEY está disponível
-    const env = getServerEnv();
     
     // Usar o Noemia Core centralizado
     try {
