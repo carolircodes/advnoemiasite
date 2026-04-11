@@ -1,123 +1,149 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { MercadoPagoConfig, Payment } from 'mercadopago';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { MercadoPagoConfig, Payment } from "mercadopago";
 
-// Configuração do Mercado Pago com proteção
-const mercadoPagoAccessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
-const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+type PaymentWebhookContext = {
+  mercadopago: MercadoPagoConfig;
+  supabase: any;
+  webhookSecret?: string;
+};
 
-if (!mercadoPagoAccessToken || !supabaseUrl || !supabaseSecretKey) {
-  console.error("Variáveis obrigatórias não configuradas para pagamento webhook");
-  throw new Error("Configuração obrigatória ausente para webhook de pagamento");
+function getWebhookContext():
+  | { ok: true; value: PaymentWebhookContext }
+  | { ok: false; missing: string[] } {
+  const mercadoPagoAccessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseSecretKey =
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim();
+
+  const missing = [
+    !mercadoPagoAccessToken ? "MERCADO_PAGO_ACCESS_TOKEN" : null,
+    !supabaseUrl ? "NEXT_PUBLIC_SUPABASE_URL" : null,
+    !supabaseSecretKey ? "SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY" : null
+  ].filter(Boolean) as string[];
+
+  if (missing.length > 0) {
+    return { ok: false, missing };
+  }
+
+  return {
+    ok: true,
+    value: {
+      mercadopago: new MercadoPagoConfig({
+        accessToken: mercadoPagoAccessToken as string
+      }),
+      supabase: createClient(supabaseUrl as string, supabaseSecretKey as string) as any,
+      webhookSecret
+    }
+  };
 }
 
-const mercadopago = new MercadoPagoConfig({
-  accessToken: mercadoPagoAccessToken,
-});
+function paymentWebhookUnavailableResponse(missing: string[]) {
+  console.error("[payment.webhook] Missing required payment configuration", {
+    missing
+  });
 
-const supabase = createClient(supabaseUrl, supabaseSecretKey);
-const WEBHOOK_SECRET = webhookSecret;
+  return NextResponse.json(
+    {
+      error: "payment_webhook_not_configured",
+      message: "Configuracao obrigatoria ausente para webhook de pagamento.",
+      missing
+    },
+    { status: 503 }
+  );
+}
 
 export async function POST(request: NextRequest) {
+  const context = getWebhookContext();
+
+  if (!context.ok) {
+    return paymentWebhookUnavailableResponse(context.missing);
+  }
+
+  const { mercadopago, supabase } = context.value;
+
   try {
     const body = await request.text();
-    const signature = request.headers.get('x-signature');
-    
-    // Log para debug
-    console.log('🔔 WEBHOOK RECEBIDO - Mercado Pago');
-    console.log('Signature:', signature);
-    console.log('Body:', body);
+    const signature = request.headers.get("x-signature");
 
-    // Parse do body
+    console.log("[payment.webhook] Received Mercado Pago webhook", {
+      hasSignature: !!signature
+    });
+
     let event;
     try {
       event = JSON.parse(body);
     } catch (parseError) {
-      console.error('❌ Erro ao parsear webhook:', parseError);
-      return NextResponse.json(
-        { error: 'Invalid JSON' },
-        { status: 400 }
-      );
+      console.error("[payment.webhook] Invalid JSON payload", { parseError });
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
     }
 
-    // Validar tipo de evento
-    if (event.type !== 'payment') {
-      console.log('⏭️ Ignorando evento não relacionado a pagamento:', event.type);
+    if (event.type !== "payment") {
+      console.log("[payment.webhook] Ignoring non-payment event", {
+        type: event.type
+      });
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    const paymentData = event.data;
-
-    // Buscar informações detalhadas do pagamento
     const payment = new Payment(mercadopago);
-    const paymentInfo = await payment.get({ id: paymentData.id });
+    const paymentInfo = await payment.get({ id: event.data.id });
 
-    console.log('💳 INFORMAÇÕES DO PAGAMENTO:', {
+    console.log("[payment.webhook] Payment fetched", {
       id: paymentInfo.id,
       status: paymentInfo.status,
       status_detail: paymentInfo.status_detail,
-      external_reference: paymentInfo.external_reference,
-      amount: paymentInfo.transaction_amount,
-      payment_method_id: paymentInfo.payment_method_id,
-      payment_type_id: paymentInfo.payment_type_id
+      external_reference: paymentInfo.external_reference
     });
 
-    // Processar apenas pagamentos aprovados
-    if (paymentInfo.status === 'approved') {
-      await handleApprovedPayment(paymentInfo);
-    } else if (paymentInfo.status === 'rejected') {
-      await handleRejectedPayment(paymentInfo);
-    } else if (paymentInfo.status === 'pending') {
-      await handlePendingPayment(paymentInfo);
+    if (paymentInfo.status === "approved") {
+      await handleApprovedPayment(supabase, paymentInfo);
+    } else if (paymentInfo.status === "rejected") {
+      await handleRejectedPayment(supabase, paymentInfo);
+    } else if (paymentInfo.status === "pending") {
+      await handlePendingPayment(supabase, paymentInfo);
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
-
   } catch (error) {
-    console.error('❌ ERRO NO WEBHOOK:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("[payment.webhook] Internal error", { error });
+    return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
   }
 }
 
-// Função para processar pagamento aprovado
-async function handleApprovedPayment(paymentInfo: any) {
-  console.log('✅ PROCESSANDO PAGAMENTO APROVADO');
-
+async function handleApprovedPayment(supabase: any, paymentInfo: any) {
   try {
-    // Extrair informações do external_reference
     const externalReference = paymentInfo.external_reference;
-    const match = externalReference.match(/consultation_(\d+)_\d+/);
-    
+    const match = externalReference?.match(/consultation_(\d+)_\d+/);
+
     if (!match) {
-      console.error('❌ External reference inválido:', externalReference);
+      console.error("[payment.webhook] Invalid external reference", {
+        externalReference
+      });
       return;
     }
 
     const leadId = match[1];
 
-    // Verificar se já foi processado
     const { data: existingPayment } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('external_id', paymentInfo.id)
-      .eq('status', 'approved')
+      .from("payments")
+      .select("*")
+      .eq("external_id", paymentInfo.id)
+      .eq("status", "approved")
       .single();
 
     if (existingPayment) {
-      console.log('⚠️ Pagamento já processado anteriormente');
+      console.log("[payment.webhook] Payment already processed", {
+        paymentId: paymentInfo.id
+      });
       return;
     }
 
-    // Atualizar status do pagamento
     const { data: payment, error: paymentError } = await supabase
-      .from('payments')
+      .from("payments")
       .update({
-        status: 'approved',
+        status: "approved",
         payment_method_id: paymentInfo.payment_method_id,
         payment_type_id: paymentInfo.payment_type_id,
         status_detail: paymentInfo.status_detail,
@@ -130,84 +156,70 @@ async function handleApprovedPayment(paymentInfo: any) {
           mercado_pago_status_detail: paymentInfo.status_detail
         }
       })
-      .eq('external_id', paymentInfo.id)
+      .eq("external_id", paymentInfo.id)
       .select()
       .single();
 
     if (paymentError) {
-      console.error('❌ Erro ao atualizar pagamento:', paymentError);
+      console.error("[payment.webhook] Failed to update payment", { paymentError });
       return;
     }
 
-    // Atualizar status do lead
     const { data: lead, error: leadError } = await supabase
-      .from('noemia_leads')
+      .from("noemia_leads")
       .update({
-        status: 'paid',
-        payment_status: 'confirmed',
+        status: "paid",
+        payment_status: "confirmed",
         payment_confirmed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', leadId)
+      .eq("id", leadId)
       .select()
       .single();
 
     if (leadError) {
-      console.error('❌ Erro ao atualizar lead:', leadError);
+      console.error("[payment.webhook] Failed to update lead", { leadError });
       return;
     }
 
-    // Enviar mensagem automática de confirmação
-    await sendPaymentConfirmationMessage(lead);
+    await sendPaymentConfirmationMessage(supabase, lead);
 
-    // Criar evento de acompanhamento
-    await supabase
-      .from('follow_up_events')
-      .insert({
-        lead_id: leadId,
-        event_type: 'payment_confirmed',
-        trigger: 'automatic',
-        message: 'Pagamento confirmado automaticamente via webhook',
-        metadata: {
-          payment_id: payment.id,
-          mercado_pago_payment_id: paymentInfo.id,
-          amount: paymentInfo.transaction_amount,
-          payment_method: paymentInfo.payment_method_id
-        },
-        sent_at: new Date().toISOString()
-      });
-
-    console.log('✅ PAGAMENTO PROCESSADO COM SUCESSO:', {
-      leadId,
-      paymentId: payment.id,
-      amount: paymentInfo.transaction_amount
+    await supabase.from("follow_up_events").insert({
+      lead_id: leadId,
+      event_type: "payment_confirmed",
+      trigger: "automatic",
+      message: "Pagamento confirmado automaticamente via webhook",
+      metadata: {
+        payment_id: payment.id,
+        mercado_pago_payment_id: paymentInfo.id,
+        amount: paymentInfo.transaction_amount,
+        payment_method: paymentInfo.payment_method_id
+      },
+      sent_at: new Date().toISOString()
     });
-
   } catch (error) {
-    console.error('❌ ERRO AO PROCESSAR PAGAMENTO APROVADO:', error);
+    console.error("[payment.webhook] Error processing approved payment", { error });
   }
 }
 
-// Função para processar pagamento rejeitado
-async function handleRejectedPayment(paymentInfo: any) {
-  console.log('❌ PROCESSANDO PAGAMENTO REJEITADO');
-
+async function handleRejectedPayment(supabase: any, paymentInfo: any) {
   try {
     const externalReference = paymentInfo.external_reference;
-    const match = externalReference.match(/consultation_(\d+)_\d+/);
-    
+    const match = externalReference?.match(/consultation_(\d+)_\d+/);
+
     if (!match) {
-      console.error('❌ External reference inválido:', externalReference);
+      console.error("[payment.webhook] Invalid external reference", {
+        externalReference
+      });
       return;
     }
 
     const leadId = match[1];
 
-    // Atualizar status do pagamento
     await supabase
-      .from('payments')
+      .from("payments")
       .update({
-        status: 'rejected',
+        status: "rejected",
         status_detail: paymentInfo.status_detail,
         rejected_at: new Date().toISOString(),
         metadata: {
@@ -216,49 +228,27 @@ async function handleRejectedPayment(paymentInfo: any) {
           mercado_pago_status_detail: paymentInfo.status_detail
         }
       })
-      .eq('external_id', paymentInfo.id);
+      .eq("external_id", paymentInfo.id);
 
-    // Atualizar status do lead
     await supabase
-      .from('noemia_leads')
+      .from("noemia_leads")
       .update({
-        payment_status: 'rejected',
+        payment_status: "rejected",
         payment_rejected_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', leadId);
-
-    console.log('❌ PAGAMENTO REJEITADO:', {
-      leadId,
-      paymentId: paymentInfo.id,
-      reason: paymentInfo.status_detail
-    });
-
+      .eq("id", leadId);
   } catch (error) {
-    console.error('❌ ERRO AO PROCESSAR PAGAMENTO REJEITADO:', error);
+    console.error("[payment.webhook] Error processing rejected payment", { error });
   }
 }
 
-// Função para processar pagamento pendente
-async function handlePendingPayment(paymentInfo: any) {
-  console.log('⏳ PROCESSANDO PAGAMENTO PENDENTE');
-
+async function handlePendingPayment(supabase: any, paymentInfo: any) {
   try {
-    const externalReference = paymentInfo.external_reference;
-    const match = externalReference.match(/consultation_(\d+)_\d+/);
-    
-    if (!match) {
-      console.error('❌ External reference inválido:', externalReference);
-      return;
-    }
-
-    const leadId = match[1];
-
-    // Atualizar status do pagamento
     await supabase
-      .from('payments')
+      .from("payments")
       .update({
-        status: 'pending',
+        status: "pending",
         status_detail: paymentInfo.status_detail,
         metadata: {
           mercado_pago_payment_id: paymentInfo.id,
@@ -266,55 +256,49 @@ async function handlePendingPayment(paymentInfo: any) {
           mercado_pago_status_detail: paymentInfo.status_detail
         }
       })
-      .eq('external_id', paymentInfo.id);
-
-    console.log('⏳ PAGAMENTO PENDENTE:', {
-      leadId,
-      paymentId: paymentInfo.id,
-      status_detail: paymentInfo.status_detail
-    });
-
+      .eq("external_id", paymentInfo.id);
   } catch (error) {
-    console.error('❌ ERRO AO PROCESSAR PAGAMENTO PENDENTE:', error);
+    console.error("[payment.webhook] Error processing pending payment", { error });
   }
 }
 
-// Função para enviar mensagem de confirmação automática
-async function sendPaymentConfirmationMessage(lead: any) {
+async function sendPaymentConfirmationMessage(
+  supabase: any,
+  lead: any
+) {
   try {
-    const confirmationMessage = `Recebemos a confirmação do seu pagamento.
+    const confirmationMessage = `Recebemos a confirmacao do seu pagamento.
 
 Agora vamos dar andamento ao seu atendimento com prioridade.
 
-Em instantes você receberá as próximas orientações.`;
+Em instantes voce recebera as proximas orientacoes.`;
 
-    // Adicionar mensagem ao histórico do lead
-    await supabase
-      .from('noemia_lead_conversations')
-      .insert({
-        lead_id: lead.id,
-        message: confirmationMessage,
-        sender: 'noemia',
-        message_type: 'payment_confirmation',
-        metadata: {
-          payment_confirmed: true,
-          timestamp: new Date().toISOString()
-        },
-        created_at: new Date().toISOString()
-      });
-
-    console.log('📨 Mensagem de confirmação enviada para o lead:', lead.id);
-
+    await supabase.from("noemia_lead_conversations").insert({
+      lead_id: lead.id,
+      message: confirmationMessage,
+      sender: "noemia",
+      message_type: "payment_confirmation",
+      metadata: {
+        payment_confirmed: true,
+        timestamp: new Date().toISOString()
+      },
+      created_at: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('❌ Erro ao enviar mensagem de confirmação:', error);
+    console.error("[payment.webhook] Failed to send confirmation message", { error });
   }
 }
 
-// Método GET para verificar webhook status
 export async function GET() {
+  const context = getWebhookContext();
+
+  if (!context.ok) {
+    return paymentWebhookUnavailableResponse(context.missing);
+  }
+
   return NextResponse.json({
-    status: 'webhook_active',
+    status: "webhook_active",
     timestamp: new Date().toISOString(),
-    message: 'Webhook do Mercado Pago está ativo'
+    message: "Webhook do Mercado Pago esta ativo"
   });
 }
