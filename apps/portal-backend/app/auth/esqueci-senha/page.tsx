@@ -13,6 +13,7 @@ import {
   readEntryContext,
   type EntryContext
 } from "@/lib/entry-context";
+import { getServerEnv } from "@/lib/config/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -116,11 +117,21 @@ async function forgotPasswordAction(formData: FormData) {
   }
 
   const supabase = await createServerSupabaseClient();
+  const env = getServerEnv();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN}/auth/atualizar-senha`
+    redirectTo: env.passwordResetRedirectUrl
   });
 
   // Sempre redireciona para sucesso por segurança (não revela se e-mail existe)
+  if (error) {
+    console.error("[auth.forgot-password] Failed to request password reset", {
+      email,
+      message: error.message
+    });
+
+    redirect(buildForgotPasswordPath(entryContext, { error: "erro-interno" }));
+  }
+
   redirect(buildForgotPasswordPath(entryContext, { success: "email-enviado" }));
 }
 

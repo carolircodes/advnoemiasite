@@ -12,9 +12,18 @@ import { isPortalRole } from "../domain/portal";
 import { getPublicEnv } from "../config/env";
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  if (!isProtectedPortalPath(pathname)) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers
+      }
+    });
+  }
+
   const env = getPublicEnv();
   const appOrigin = env.NEXT_PUBLIC_APP_URL;
-  const pathname = request.nextUrl.pathname;
   let response = NextResponse.next({
     request: {
       headers: request.headers
@@ -49,10 +58,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-
-  if (!isProtectedPortalPath(pathname)) {
-    return response;
-  }
 
   if (!user) {
     if (isInternalApiPath(pathname)) {
