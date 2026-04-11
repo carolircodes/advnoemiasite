@@ -95,7 +95,30 @@ export async function ensureProfileForUser(user: User) {
 }
 
 export async function getCurrentProfile() {
-  const supabase = await createServerSupabaseClient();
+  let supabase;
+
+  try {
+    supabase = await createServerSupabaseClient();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "ZodError" ||
+        error.message.includes("NEXT_PUBLIC_APP_URL") ||
+        error.message.includes("SUPABASE_SERVICE_ROLE_KEY") ||
+        error.message.includes("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ||
+        error.message.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
+        error.message.includes("Supabase nao configurado corretamente"))
+    ) {
+      console.warn("[auth.getCurrentProfile] Auth env unavailable, falling back to visitor mode", {
+        message: error.message
+      });
+
+      return null;
+    }
+
+    throw error;
+  }
+
   const {
     data: { user }
   } = await supabase.auth.getUser();
