@@ -1,5 +1,3 @@
-import { SectionCard } from "@/components/section-card";
-
 type PortalLoadingProps = {
   eyebrow: string;
   title: string;
@@ -31,7 +29,7 @@ export function PortalLoadingPage({
   navigation
 }: PortalLoadingProps) {
   return (
-    <div className="portal-root">
+    <div className="portal-root" aria-busy="true" aria-live="polite">
       <header className="hero-shell">
         <div className="hero-main">
           {navigation.length ? (
@@ -83,16 +81,25 @@ export function PortalLoadingPage({
         </div>
 
         <div className="grid two">
-          <SectionCard title="Carregando painel">
+          <section className="panel">
+            <div className="section-head">
+              <h2>Carregando painel</h2>
+            </div>
             <SkeletonParagraph lines={4} />
-          </SectionCard>
-          <SectionCard title="Carregando itens importantes">
+          </section>
+          <section className="panel">
+            <div className="section-head">
+              <h2>Carregando itens importantes</h2>
+            </div>
             <SkeletonParagraph lines={4} />
-          </SectionCard>
+          </section>
         </div>
 
         <div className="grid two">
-          <SectionCard title="Carregando lista principal">
+          <section className="panel">
+            <div className="section-head">
+              <h2>Carregando lista principal</h2>
+            </div>
             <div className="skeleton-feed">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="update-card skeleton-card" aria-hidden="true">
@@ -100,8 +107,11 @@ export function PortalLoadingPage({
                 </div>
               ))}
             </div>
-          </SectionCard>
-          <SectionCard title="Carregando detalhes">
+          </section>
+          <section className="panel">
+            <div className="section-head">
+              <h2>Carregando detalhes</h2>
+            </div>
             <div className="skeleton-feed">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="update-card skeleton-card" aria-hidden="true">
@@ -109,7 +119,7 @@ export function PortalLoadingPage({
                 </div>
               ))}
             </div>
-          </SectionCard>
+          </section>
         </div>
       </main>
     </div>
