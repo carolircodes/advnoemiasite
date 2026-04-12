@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar, Topbar, PageContainer } from '@/components/layout';
 
 interface LayoutProps {
@@ -13,7 +14,8 @@ export default function InternalLayout({ children }: LayoutProps) {
   const [currentPage, setCurrentPage] = useState({ title: 'Painel Operacional', subtitle: 'Gestão de leads e operações' });
 
   // Obter o caminho atual
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/internal/advogada/operacional';
+  const pathname = usePathname();
+  const currentPath = pathname || '/internal/advogada/operacional';
 
   // Atualizar título baseado no caminho
   const menuItems = [

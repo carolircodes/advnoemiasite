@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { TrackedLink } from "@/components/tracked-link";
 
@@ -44,7 +45,46 @@ export function AppFrame({
   children
 }: AppFrameProps) {
   console.log("[AppFrame] Renderizando com:", { eyebrow, title, hasActions: actions.length > 0, hasNavigation: navigation.length > 0, hasHighlights: highlights.length > 0, hasUtilityContent: !!utilityContent });
-  
+
+  function renderFrameLink({
+    href,
+    label,
+    className,
+    active,
+    eventKey,
+    eventGroup,
+    trackingPayload
+  }: {
+    href: string;
+    label: string;
+    className: string;
+    active?: boolean;
+    eventKey?: string;
+    eventGroup?: string;
+    trackingPayload?: Record<string, unknown>;
+  }) {
+    if (eventKey) {
+      return (
+        <TrackedLink
+          href={href}
+          className={className}
+          aria-current={active ? "page" : undefined}
+          eventKey={eventKey}
+          eventGroup={eventGroup}
+          trackingPayload={trackingPayload}
+        >
+          {label}
+        </TrackedLink>
+      );
+    }
+
+    return (
+      <Link href={href} className={className} aria-current={active ? "page" : undefined}>
+        {label}
+      </Link>
+    );
+  }
+
   return (
     <div className="portal-root">
       <header className="hero-shell">
@@ -53,14 +93,14 @@ export function AppFrame({
           {navigation.length ? (
             <nav className="workspace-nav" aria-label="Navegacao do portal">
               {navigation.map((item) => (
-                <TrackedLink
-                  key={`${item.href}-${item.label}`}
-                  href={item.href}
-                  className={item.active ? "workspace-link active" : "workspace-link"}
-                  aria-current={item.active ? "page" : undefined}
-                >
-                  {item.label}
-                </TrackedLink>
+                <div key={`${item.href}-${item.label}`}>
+                  {renderFrameLink({
+                    href: item.href,
+                    label: item.label,
+                    className: item.active ? "workspace-link active" : "workspace-link",
+                    active: item.active
+                  })}
+                </div>
               ))}
             </nav>
           ) : null}
@@ -83,16 +123,16 @@ export function AppFrame({
         {actions.length ? (
           <div className="hero-actions">
             {actions.map((action) => (
-              <TrackedLink
-                key={`${action.href}-${action.label}`}
-                href={action.href}
-                className={action.tone === "secondary" ? "button secondary" : "button"}
-                eventKey={action.trackingEventKey}
-                eventGroup={action.trackingEventGroup}
-                trackingPayload={action.trackingPayload}
-              >
-                {action.label}
-              </TrackedLink>
+              <div key={`${action.href}-${action.label}`}>
+                {renderFrameLink({
+                  href: action.href,
+                  label: action.label,
+                  className: action.tone === "secondary" ? "button secondary" : "button",
+                  eventKey: action.trackingEventKey,
+                  eventGroup: action.trackingEventGroup,
+                  trackingPayload: action.trackingPayload
+                })}
+              </div>
             ))}
           </div>
         ) : null}
