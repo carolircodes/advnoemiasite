@@ -91,6 +91,18 @@ function isUpcomingAppointment(appointment: { starts_at: string; status: string 
   );
 }
 
+type ClientTimelineItem = {
+  id: string;
+  occurredAt: string;
+  kicker: string;
+  title: string;
+  detail: string;
+  meta: string[];
+  tone: string;
+  actionHref?: string;
+  actionLabel?: string;
+};
+
 export default async function InternalClientPage({
   params,
   searchParams
@@ -162,6 +174,119 @@ export default async function InternalClientPage({
   const sourceTriageHref = client.sourceIntakeRequestId
     ? `/internal/advogada?intakeRequestId=${client.sourceIntakeRequestId}#triagens-recebidas`
     : null;
+  const nextOperationalItem = clientOperationalItems[0] || null;
+  const latestEvent = recentEvents[0] || null;
+  const nextAppointment = upcomingAppointments[0] || null;
+  const nextOpenRequest =
+    openRequests
+      .slice()
+      .sort((left, right) =>
+        (left.due_at || left.created_at).localeCompare(right.due_at || right.created_at)
+      )[0] || null;
+  const latestDocument = clientDocuments[0] || null;
+  const clientExecutiveSummary = [
+    {
+      label: "Proxima acao recomendada",
+      title: nextOperationalItem?.title || "Atendimento estavel neste momento",
+      detail:
+        nextOperationalItem?.description ||
+        "Sem alerta imediato na fila operacional. A ficha segue pronta para novos movimentos de caso, agenda ou documentos.",
+      meta: nextOperationalItem?.timingLabel || "Sem urgencia ativa"
+    },
+    {
+      label: "Sinal mais recente",
+      title: latestEvent?.title || "Ainda nao ha movimentacao formal recente",
+      detail: latestEvent
+        ? `${latestEvent.caseTitle} em ${formatPortalDateTime(latestEvent.occurred_at)}.`
+        : "Quando o atendimento ganhar novo andamento, ele aparece aqui para orientar o restante do fluxo.",
+      meta: latestEvent?.visible_to_client ? "Tambem visivel ao cliente" : "Uso interno"
+    },
+    {
+      label: "Marco de continuidade",
+      title:
+        nextAppointment?.title ||
+        nextOpenRequest?.title ||
+        latestDocument?.file_name ||
+        "Sem agenda ou documento puxando a fila agora",
+      detail: nextAppointment
+        ? `${nextAppointment.caseTitle} em ${formatPortalDateTime(nextAppointment.starts_at)}.`
+        : nextOpenRequest
+          ? nextOpenRequest.due_at
+            ? `Solicitacao com prazo em ${formatPortalDateTime(nextOpenRequest.due_at)}.`
+            : "Solicitacao documental aberta sem prazo definido."
+          : latestDocument
+            ? `${latestDocument.caseTitle} atualizado em ${formatPortalDateTime(latestDocument.document_date)}.`
+            : "Agenda e documentos continuam disponiveis para estruturar o proximo passo.",
+      meta: nextAppointment
+        ? nextAppointment.statusLabel
+        : nextOpenRequest?.statusLabel || latestDocument?.statusLabel || "Sem alerta de apoio"
+    }
+  ];
+  const clientTimeline: ClientTimelineItem[] = [
+    ...recentEvents.slice(0, 5).map((event) => ({
+      id: `event-${event.id}`,
+      occurredAt: event.occurred_at,
+      kicker: "Andamento",
+      title: event.title,
+      detail: `${event.caseTitle} - ${event.eventLabel}.`,
+      meta: [
+        formatPortalDateTime(event.occurred_at),
+        event.visible_to_client ? "Visivel ao cliente" : "Uso interno"
+      ],
+      tone: event.visible_to_client ? "success" : "muted",
+      actionHref: buildInternalCaseHref(event.case_id),
+      actionLabel: "Abrir caso"
+    })),
+    ...clientDocuments.slice(0, 4).map((document) => ({
+      id: `document-${document.id}`,
+      occurredAt: document.document_date,
+      kicker: "Documento",
+      title: document.file_name,
+      detail: `${document.caseTitle} - ${document.statusLabel}.`,
+      meta: [formatPortalDateTime(document.document_date), document.category || "Categoria nao informada"],
+      tone: document.status === "revisado" || document.status === "recebido" ? "success" : "warning",
+      actionHref: buildInternalDocumentsHref(client.id, document.case_id),
+      actionLabel: "Abrir documentos"
+    })),
+    ...openRequests.slice(0, 4).map((request) => ({
+      id: `request-${request.id}`,
+      occurredAt: request.due_at || request.created_at,
+      kicker: "Solicitacao",
+      title: request.title,
+      detail: request.caseTitle,
+      meta: [
+        request.due_at ? `Prazo ${formatPortalDateTime(request.due_at)}` : "Sem prazo definido",
+        request.statusLabel
+      ],
+      tone: request.due_at ? "warning" : "muted",
+      actionHref: buildInternalDocumentsHref(client.id, request.case_id),
+      actionLabel: "Abrir solicitacao"
+    })),
+    ...upcomingAppointments.slice(0, 4).map((appointment) => ({
+      id: `appointment-${appointment.id}`,
+      occurredAt: appointment.starts_at,
+      kicker: "Agenda",
+      title: appointment.title,
+      detail: `${appointment.caseTitle} - ${appointment.statusLabel}.`,
+      meta: [formatPortalDateTime(appointment.starts_at), appointment.visible_to_client ? "Visivel ao cliente" : "Uso interno"],
+      tone: appointment.visible_to_client ? "success" : "warning",
+      actionHref: buildInternalAgendaHref(client.id, appointment.case_id),
+      actionLabel: "Abrir agenda"
+    })),
+    ...recentAppointmentHistory.slice(0, 3).map((appointment) => ({
+      id: `appointment-history-${appointment.id}`,
+      occurredAt: appointment.starts_at,
+      kicker: "Historico de agenda",
+      title: appointment.title,
+      detail: `${appointment.caseTitle} - ${appointment.statusLabel}.`,
+      meta: [formatPortalDateTime(appointment.starts_at)],
+      tone: "muted",
+      actionHref: buildInternalAgendaHref(client.id, appointment.case_id),
+      actionLabel: "Ver agenda"
+    }))
+  ]
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+    .slice(0, 10);
 
   return (
     <AppFrame
@@ -262,6 +387,14 @@ export default async function InternalClientPage({
                 <span className="support-label">Status do portal</span>
                 <strong>{portalState.label}</strong>
                 <span className="item-meta">{portalState.detail}</span>
+              </div>
+              <div className="support-row">
+                <span className="support-label">Proxima acao recomendada</span>
+                <strong>{nextOperationalItem?.title || "Nenhuma pendencia imediata em aberto"}</strong>
+                <span className="item-meta">
+                  {nextOperationalItem?.description ||
+                    "A ficha segue organizada para abrir caso, atualizar agenda, registrar documento ou revisar o portal quando necessario."}
+                </span>
               </div>
               <div className="support-row">
                 <span className="support-label">Origem do cadastro</span>
@@ -493,7 +626,7 @@ export default async function InternalClientPage({
         <SectionCard
           id="agenda"
           title="Agenda"
-          description="Compromissos proximos e historico recente do cliente aparecem juntos para leitura rapida da rotina."
+          description="Compromissos proximos e historico recente aparecem com contexto suficiente para manter a conducao do atendimento."
         >
           {upcomingAppointments.length || recentAppointmentHistory.length ? (
             <div className="stack">
@@ -553,7 +686,7 @@ export default async function InternalClientPage({
         <SectionCard
           id="documentos"
           title="Documentos"
-          description="Arquivos recentes e solicitacoes abertas ficam acessiveis sem espalhar a leitura por varias telas."
+          description="Arquivos e solicitacoes aparecem em continuidade com o caso, com prazo e contexto minimo para agir sem procurar em outras telas."
         >
           {clientDocuments.length || openRequests.length ? (
             <div className="stack">
@@ -618,11 +751,22 @@ export default async function InternalClientPage({
 
         <SectionCard
           id="pendencias"
-          title="Pendencias e sinais operacionais"
-          description="Esta fila resume o que exige acao, espera ou acompanhamento neste atendimento sem depender do dashboard inteiro."
+          title="Linha do atendimento e sinais operacionais"
+          description="Fila, historico, documentos e agenda se encontram aqui para transformar a ficha do cliente em um hub executivo de acompanhamento."
         >
-          {clientOperationalItems.length || recentEvents.length ? (
+          {clientOperationalItems.length || clientTimeline.length ? (
             <div className="stack">
+              <div className="summary-grid compact">
+                {clientExecutiveSummary.map((item) => (
+                  <div key={item.label} className="summary-card">
+                    <span>{item.label}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <span className="item-meta">{item.meta}</span>
+                  </div>
+                ))}
+              </div>
+
               {clientOperationalItems.length ? (
                 <ul className="update-feed compact">
                   {clientOperationalItems.map((item) => (
@@ -649,19 +793,34 @@ export default async function InternalClientPage({
                 </ul>
               ) : null}
 
-              {recentEvents.length ? (
+              {clientTimeline.length ? (
                 <div className="subtle-panel stack">
-                  <span className="shortcut-kicker">Historico recente</span>
-                  <ul className="list">
-                    {recentEvents.map((event) => (
-                      <li key={event.id}>
-                        <div className="item-head">
-                          <strong>{event.title}</strong>
-                          <span className="tag soft">{event.eventLabel}</span>
+                  <span className="shortcut-kicker">Linha do atendimento</span>
+                  <ul className="update-feed compact">
+                    {clientTimeline.map((item) => (
+                      <li key={item.id} className="update-card">
+                        <div className="update-head">
+                          <div>
+                            <strong>{item.title}</strong>
+                            <span className="item-meta">{item.kicker}</span>
+                          </div>
+                          <span className={`pill ${item.tone}`}>{formatPortalDateTime(item.occurredAt)}</span>
                         </div>
-                        <span className="item-meta">
-                          {event.caseTitle} - {formatPortalDateTime(event.occurred_at)}
-                        </span>
+                        <p className="update-body">{item.detail}</p>
+                        <div className="pill-row">
+                          {item.meta.map((meta) => (
+                            <span key={`${item.id}-${meta}`} className={`pill ${item.tone}`}>
+                              {meta}
+                            </span>
+                          ))}
+                        </div>
+                        {item.actionHref ? (
+                          <div className="form-actions">
+                            <Link className="button secondary" href={item.actionHref}>
+                              {item.actionLabel || "Abrir"}
+                            </Link>
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -670,7 +829,7 @@ export default async function InternalClientPage({
             </div>
           ) : (
             <p className="empty-state">
-              Nenhuma pendencia operacional aberta para este cliente agora. A ficha segue pronta para agenda, documentos e novos movimentos internos.
+              Nenhum sinal operacional relevante foi registrado ainda. Assim que houver agenda, documento, solicitacao ou andamento, esta ficha passa a organizar tudo no mesmo fluxo.
             </p>
           )}
         </SectionCard>

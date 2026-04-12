@@ -76,6 +76,18 @@ function isUpcomingAppointment(appointment: { starts_at: string; status: string 
   );
 }
 
+type OperationalTimelineItem = {
+  id: string;
+  occurredAt: string;
+  kicker: string;
+  title: string;
+  detail: string;
+  meta: string[];
+  tone: string;
+  actionHref?: string;
+  actionLabel?: string;
+};
+
 export default async function InternalCasePage({
   params,
   searchParams
@@ -141,6 +153,118 @@ export default async function InternalCasePage({
   const clientHref = buildInternalClientHref(client.id);
   const casesHref = buildInternalCasesHref(client.id);
   const newCaseHref = buildInternalNewCaseHref(client.id);
+  const nextOperationalItem = operationalItems[0] || null;
+  const latestCaseEvent = caseEvents[0] || null;
+  const nextOpenRequest =
+    openRequests
+      .slice()
+      .sort((left, right) =>
+        (left.due_at || left.created_at).localeCompare(right.due_at || right.created_at)
+      )[0] || null;
+  const nextAppointment = upcomingAppointments[0] || null;
+  const latestDocument = caseDocuments[0] || null;
+  const executiveSummary = [
+    {
+      label: "Direcao imediata",
+      title: nextOperationalItem?.title || "Caso sob controle neste momento",
+      detail:
+        nextOperationalItem?.description ||
+        "Sem alerta imediato na fila operacional. O caso segue pronto para novo andamento, status ou preparo de agenda.",
+      meta: nextOperationalItem?.timingLabel || "Sem travas criticas agora"
+    },
+    {
+      label: "Movimento mais recente",
+      title: latestCaseEvent?.title || "Ainda nao ha andamento formal registrado",
+      detail: latestCaseEvent
+        ? `${latestCaseEvent.eventLabel} em ${formatPortalDateTime(latestCaseEvent.occurred_at)}.`
+        : "O primeiro registro de andamento vai aparecer aqui para orientar o restante da equipe.",
+      meta: latestCaseEvent?.visible_to_client ? "Tambem visivel ao cliente" : "Uso interno"
+    },
+    {
+      label: "Proximo marco",
+      title:
+        nextAppointment?.title ||
+        nextOpenRequest?.title ||
+        latestDocument?.file_name ||
+        "Sem compromisso ou documento puxando a fila agora",
+      detail: nextAppointment
+        ? `Compromisso marcado para ${formatPortalDateTime(nextAppointment.starts_at)}.`
+        : nextOpenRequest
+          ? nextOpenRequest.due_at
+            ? `Solicitacao documental com prazo em ${formatPortalDateTime(nextOpenRequest.due_at)}.`
+            : "Solicitacao documental aberta sem prazo definido."
+          : latestDocument
+            ? `Ultimo documento ligado ao caso em ${formatPortalDateTime(latestDocument.document_date)}.`
+            : "Agenda e documentos seguem disponiveis para o proximo registro deste caso.",
+      meta: nextAppointment
+        ? nextAppointment.statusLabel
+        : nextOpenRequest?.statusLabel || latestDocument?.statusLabel || "Sem alerta de apoio"
+    }
+  ];
+  const operationalTimeline: OperationalTimelineItem[] = [
+    ...caseEvents.slice(0, 6).map((event) => ({
+      id: `event-${event.id}`,
+      occurredAt: event.occurred_at,
+      kicker: "Andamento",
+      title: event.title,
+      detail: `${event.eventLabel}${event.visible_to_client ? " com reflexo no portal" : " para uso interno"}.`,
+      meta: [
+        formatPortalDateTime(event.occurred_at),
+        event.should_notify_client ? "Notificacao preparada" : "Sem notificacao"
+      ],
+      tone: event.visible_to_client ? "success" : "muted",
+      actionHref: buildInternalCaseHref(caseItem.id),
+      actionLabel: "Ver caso"
+    })),
+    ...caseDocuments.slice(0, 4).map((document) => ({
+      id: `document-${document.id}`,
+      occurredAt: document.document_date,
+      kicker: "Documento",
+      title: document.file_name,
+      detail: `${document.statusLabel} no fluxo documental deste caso.`,
+      meta: [formatPortalDateTime(document.document_date), document.category || "Categoria nao informada"],
+      tone: document.status === "revisado" || document.status === "recebido" ? "success" : "warning",
+      actionHref: documentsHref,
+      actionLabel: "Abrir documentos"
+    })),
+    ...openRequests.slice(0, 4).map((request) => ({
+      id: `request-${request.id}`,
+      occurredAt: request.due_at || request.created_at,
+      kicker: "Solicitacao",
+      title: request.title,
+      detail: request.due_at
+        ? `Prazo operacional em ${formatPortalDateTime(request.due_at)}.`
+        : "Solicitacao aberta sem prazo definido.",
+      meta: [request.statusLabel, formatPortalDateTime(request.created_at)],
+      tone: request.due_at ? "warning" : "muted",
+      actionHref: documentsHref,
+      actionLabel: "Abrir solicitacoes"
+    })),
+    ...upcomingAppointments.slice(0, 4).map((appointment) => ({
+      id: `appointment-${appointment.id}`,
+      occurredAt: appointment.starts_at,
+      kicker: "Agenda",
+      title: appointment.title,
+      detail: `${appointment.statusLabel} programado para ${formatPortalDateTime(appointment.starts_at)}.`,
+      meta: [appointment.typeLabel || "Compromisso", appointment.visible_to_client ? "Visivel ao cliente" : "Uso interno"],
+      tone: appointment.visible_to_client ? "success" : "warning",
+      actionHref: agendaHref,
+      actionLabel: "Abrir agenda"
+    })),
+    ...recentAppointmentHistory.slice(0, 3).map((appointment) => ({
+      id: `appointment-history-${appointment.id}`,
+      occurredAt: appointment.created_at,
+      kicker: "Movimento de agenda",
+      title: appointment.title,
+      detail: appointment.changeLabel,
+      meta: [formatPortalDateTime(appointment.created_at)],
+      tone: "muted",
+      actionHref: agendaHref,
+      actionLabel: "Ver historico"
+    }))
+  ]
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+    .slice(0, 10);
 
   return (
     <AppFrame
@@ -248,10 +372,10 @@ export default async function InternalCasePage({
               <div className="support-row">
                 <span className="support-label">Proximo passo</span>
                 <strong>
-                  {operationalItems[0]?.title || "Nenhum alerta imediato na fila operacional"}
+                  {nextOperationalItem?.title || "Nenhum alerta imediato na fila operacional"}
                 </strong>
                 <span className="item-meta">
-                  {operationalItems[0]?.description ||
+                  {nextOperationalItem?.description ||
                     "Use os formularios abaixo para editar, mudar status ou registrar novo andamento."}
                 </span>
               </div>
@@ -488,11 +612,22 @@ export default async function InternalCasePage({
         </SectionCard>
 
         <SectionCard
-          title="Pendencias ligadas"
-          description="Sinais operacionais, agenda e documentos ligados a este caso aparecem juntos para reduzir troca de contexto."
+          title="Direcao executiva do caso"
+          description="A leitura abaixo cruza fila, andamento e marcos de apoio para deixar claro o que precisa andar agora e o que sustenta a proxima decisao."
         >
-          {operationalItems.length || openRequests.length || upcomingAppointments.length ? (
+          {executiveSummary.length || operationalItems.length || openRequests.length || upcomingAppointments.length ? (
             <div className="stack">
+              <div className="summary-grid compact">
+                {executiveSummary.map((item) => (
+                  <div key={item.label} className="summary-card">
+                    <span>{item.label}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <span className="item-meta">{item.meta}</span>
+                  </div>
+                ))}
+              </div>
+
               {operationalItems.length ? (
                 <div className="subtle-panel stack">
                   <span className="shortcut-kicker">Fila operacional</span>
@@ -560,44 +695,72 @@ export default async function InternalCasePage({
 
       <div className="grid two">
         <SectionCard
-          title="Linha do tempo recente"
-          description="Leitura operacional das atualizacoes mais novas deste caso."
+          title="Linha do tempo operacional"
+          description="Eventos, documentos, solicitacoes e agenda aparecem na mesma narrativa para dar continuidade real ao acompanhamento."
         >
-          {caseEvents.length ? (
+          {operationalTimeline.length ? (
             <ul className="update-feed">
-              {caseEvents.map((event) => (
-                <li key={event.id} className="update-card">
+              {operationalTimeline.map((item) => (
+                <li key={item.id} className="update-card">
                   <div className="update-head">
                     <div>
-                      <strong>{event.title}</strong>
-                      <span className="item-meta">{event.eventLabel}</span>
+                      <strong>{item.title}</strong>
+                      <span className="item-meta">{item.kicker}</span>
                     </div>
-                    <span className="tag soft">{formatPortalDateTime(event.occurred_at)}</span>
+                    <span className="tag soft">{formatPortalDateTime(item.occurredAt)}</span>
                   </div>
+                  <p className="update-body">{item.detail}</p>
                   <div className="pill-row">
-                    <span className={`pill ${event.visible_to_client ? "success" : "muted"}`}>
-                      {event.visible_to_client ? "Visivel ao cliente" : "Uso interno"}
-                    </span>
-                    <span className={`pill ${event.should_notify_client ? "warning" : "muted"}`}>
-                      {event.should_notify_client ? "Notificacao preparada" : "Sem notificacao"}
-                    </span>
+                    {item.meta.map((meta) => (
+                      <span key={`${item.id}-${meta}`} className={`pill ${item.tone}`}>
+                        {meta}
+                      </span>
+                    ))}
                   </div>
+                  {item.actionHref ? (
+                    <div className="form-actions">
+                      <Link className="button secondary" href={item.actionHref}>
+                        {item.actionLabel || "Abrir"}
+                      </Link>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
           ) : (
             <p className="empty-state">
-              Ainda nao ha historico registrado para este caso. O primeiro andamento que voce registrar aparecera aqui.
+              Ainda nao ha historico combinado para este caso. O primeiro andamento, documento ou compromisso passara a construir esta linha do tempo automaticamente.
             </p>
           )}
         </SectionCard>
 
         <SectionCard
-          title="Documentos e agenda ligados"
-          description="Resumo curto dos itens conectados ao caso para consulta rapida."
+          title="Documentos, agenda e contexto de apoio"
+          description="Este bloco concentra os materiais e registros de apoio que sustentam o proximo movimento do caso."
         >
           {caseDocuments.length || caseAppointments.length || recentAppointmentHistory.length ? (
             <div className="stack">
+              <div className="support-panel">
+                <div className="support-row">
+                  <span className="support-label">Documento mais recente</span>
+                  <strong>{latestDocument?.file_name || "Nenhum documento registrado ainda"}</strong>
+                  <span className="item-meta">
+                    {latestDocument
+                      ? `${latestDocument.statusLabel} em ${formatPortalDateTime(latestDocument.document_date)}.`
+                      : "Os proximos arquivos do caso aparecerao aqui com contexto operacional."}
+                  </span>
+                </div>
+                <div className="support-row">
+                  <span className="support-label">Agenda mais proxima</span>
+                  <strong>{nextAppointment?.title || "Nenhum compromisso futuro marcado"}</strong>
+                  <span className="item-meta">
+                    {nextAppointment
+                      ? `${nextAppointment.statusLabel} em ${formatPortalDateTime(nextAppointment.starts_at)}.`
+                      : "A agenda deste caso continua disponivel para registrar o proximo marco."}
+                  </span>
+                </div>
+              </div>
+
               {caseDocuments.length ? (
                 <div className="subtle-panel stack">
                   <span className="shortcut-kicker">Documentos recentes</span>

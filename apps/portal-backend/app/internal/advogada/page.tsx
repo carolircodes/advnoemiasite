@@ -134,6 +134,18 @@ function getSuccessMessage(success: string) {
   }
 }
 
+function getIntakeNextStep(status: string, urgencyLabel: string) {
+  if (status === "new") {
+    return `Fazer leitura inicial e definir retorno com prioridade ${urgencyLabel.toLowerCase()}.`;
+  }
+
+  if (status === "in_review") {
+    return "Concluir analise, registrar observacao interna e decidir se a triagem ja vira cliente.";
+  }
+
+  return "Revisar o andamento atual e decidir se ainda existe proximo movimento operacional pendente.";
+}
+
 async function createClientAction(formData: FormData) {
   "use server";
 
@@ -379,6 +391,66 @@ export default async function InternalLawyerPage({
     "Monte um texto-base curto para cobrar documentos do cliente.",
     "Quais casos estao sem atualizacao recente e como eu deveria prioriza-los?"
   ];
+  const executiveFocus = [
+    preferredCase
+      ? {
+          kicker: "Caso que pede conducao",
+          title: preferredCase.title,
+          detail: `${preferredCase.clientName} - ${preferredCase.statusLabel} - ${preferredCase.priorityLabel}.`,
+          body:
+            preferredCase.summary ||
+            "Abra a ficha do caso para consolidar status, andamento e proximo passo no mesmo fluxo.",
+          href: buildInternalCaseHref(preferredCase.id),
+          actionLabel: "Abrir caso"
+        }
+      : null,
+    preferredClient
+      ? {
+          kicker: "Cliente em foco",
+          title: preferredClient.fullName,
+          detail: `${preferredClient.caseCount} caso(s), ${preferredClient.pendingDocumentRequestsCount} pendencia(s) e ${preferredClient.upcomingAppointmentsCount} compromisso(s).`,
+          body:
+            preferredClient.primaryCaseTitle ||
+            "A ficha do cliente concentra portal, documentos, agenda e sinais operacionais.",
+          href: buildInternalClientHref(preferredClient.id),
+          actionLabel: "Abrir ficha"
+        }
+      : null,
+    filteredIntakeRequests[0]
+      ? {
+          kicker: "Triagem que pede decisao",
+          title: filteredIntakeRequests[0].full_name,
+          detail: `${filteredIntakeRequests[0].areaLabel} - ${filteredIntakeRequests[0].urgencyLabel} - ${filteredIntakeRequests[0].statusLabel}.`,
+          body: getIntakeNextStep(
+            filteredIntakeRequests[0].status,
+            filteredIntakeRequests[0].urgencyLabel
+          ),
+          href: `/internal/advogada?intakeRequestId=${filteredIntakeRequests[0].id}#triagens-recebidas`,
+          actionLabel: "Abrir triagem"
+        }
+      : null,
+    suggestedMoves[0]
+      ? {
+          kicker: "Movimento sugerido",
+          title: suggestedMoves[0].title,
+          detail: "Leitura orientada por comportamento real da operacao.",
+          body: suggestedMoves[0].body,
+          href: suggestedMoves[0].href,
+          actionLabel: "Abrir area"
+        }
+      : null
+  ].filter(
+    (
+      item
+    ): item is {
+      kicker: string;
+      title: string;
+      detail: string;
+      body: string;
+      href: string;
+      actionLabel: string;
+    } => item !== null
+  );
 
   return (
     <AppFrame
@@ -524,6 +596,29 @@ export default async function InternalLawyerPage({
             </strong>
           </div>
         </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Direcao executiva da operacao"
+        description="Este bloco costura cliente, caso, triagem e inteligencia em uma leitura unica para a equipe comecar pelo ponto certo."
+      >
+        {executiveFocus.length ? (
+          <div className="grid two">
+            {executiveFocus.map((item) => (
+              <Link key={`${item.kicker}-${item.title}`} href={item.href} className="route-card">
+                <span className="shortcut-kicker">{item.kicker}</span>
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+                <p>{item.body}</p>
+                <span>{item.actionLabel}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">
+            Assim que houver cliente, caso, triagem ou sinal de inteligencia relevante, a direcao executiva aparece aqui com o melhor ponto de entrada.
+          </p>
+        )}
       </SectionCard>
 
       <div className="grid two">
@@ -723,7 +818,7 @@ export default async function InternalLawyerPage({
       <SectionCard
         id="triagens-recebidas"
         title="Triagens recebidas"
-        description="Entradas do site institucional que ja chegaram organizadas para analise inicial e retorno da equipe."
+        description="Entradas novas ja chegam com contexto suficiente para a equipe decidir leitura inicial, retorno e conversao sem perder continuidade."
       >
         {filteredIntakeRequests.length ? (
           <div className="grid two">
@@ -748,6 +843,17 @@ export default async function InternalLawyerPage({
                   {item.city ? `${item.city} - ` : ""}
                   {item.stageLabel} - recebida em {formatPortalDateTime(item.submitted_at)}
                 </span>
+                <div className="support-panel">
+                  <div className="support-row">
+                    <span className="support-label">Direcao recomendada</span>
+                    <strong>{getIntakeNextStep(item.status, item.urgencyLabel)}</strong>
+                    <span className="item-meta">
+                      {item.internal_notes
+                        ? `Ultima observacao interna: ${item.internal_notes}`
+                        : "Ainda nao ha observacao interna registrada para esta triagem."}
+                    </span>
+                  </div>
+                </div>
                 <form action={updateIntakeRequestStatusAction} className="stack">
                   <input type="hidden" name="intakeRequestId" value={item.id} />
                   <div className="fields">
@@ -1030,7 +1136,7 @@ export default async function InternalLawyerPage({
 
       <SectionCard
         title="Ultimas atualizacoes"
-        description="Linha do tempo recente das movimentacoes registradas para os casos."
+        description="Linha do tempo recente da operacao, com leitura curta para entender o que mudou e qual caso merece reentrada."
       >
         {latestEvents.length ? (
           <ul className="update-feed">
@@ -1051,6 +1157,11 @@ export default async function InternalLawyerPage({
                     {event.should_notify_client ? "Notificacao preparada" : "Sem notificacao"}
                   </span>
                 </div>
+                <p className="update-body">
+                  {event.visible_to_client
+                    ? "Este movimento ja ajuda a alinhar o portal com a leitura interna do caso."
+                    : "Atualizacao interna pronta para orientar o proximo movimento da equipe."}
+                </p>
                 <span className="item-meta">{formatPortalDateTime(event.occurred_at)}</span>
                 <div className="form-actions">
                   <Link className="button secondary" href={buildInternalCaseHref(event.case_id)}>
@@ -1110,7 +1221,7 @@ export default async function InternalLawyerPage({
 
       <SectionCard
         title="Casos em foco agora"
-        description="O painel so mostra leitura curta e atalhos. O trabalho detalhado continua dentro da central de casos."
+        description="Leitura executiva dos casos que mais pedem conducao, com atalho direto para a ficha certa e continuidade entre agenda, documentos e cliente."
       >
         {filteredCases.length ? (
           <ul className="update-feed">
@@ -1139,6 +1250,10 @@ export default async function InternalLawyerPage({
                   </span>
                   <span className="pill muted">{formatPortalDateTime(caseItem.updated_at)}</span>
                 </div>
+                <p className="update-body">
+                  {caseItem.summary ||
+                    "Abra a ficha do caso para registrar um resumo executivo, alinhar status e manter a narrativa do atendimento mais clara."}
+                </p>
                 <div className="form-actions">
                   <Link className="button secondary" href={buildInternalCaseHref(caseItem.id)}>
                     Abrir caso
