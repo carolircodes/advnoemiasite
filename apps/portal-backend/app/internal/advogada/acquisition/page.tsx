@@ -4,11 +4,16 @@ import { AppFrame } from "@/components/app-frame";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
+import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
 
 import AcquisitionDashboard from "./dashboard";
 
 export default async function AcquisitionPage() {
   const profile = await requireProfile(["advogada", "admin"]);
+  const intelligence = await getBusinessIntelligenceOverview(30);
+  const topSource = intelligence.acquisition.bySource[0] || null;
+  const topCampaign = intelligence.acquisition.byCampaign[0] || null;
+  const topTopic = intelligence.acquisition.byTopic[0] || null;
 
   return (
     <AppFrame
@@ -31,9 +36,9 @@ export default async function AcquisitionPage() {
         { href: "/internal/advogada/acquisition", label: "Acquisition", active: true }
       ]}
       highlights={[
-        { label: "Papel", value: "Leitura de origem" },
-        { label: "Entrada", value: "Lead e triagem" },
-        { label: "Destino", value: "Cliente e caso" },
+        { label: "Melhor origem", value: topSource?.label || "Sem base suficiente" },
+        { label: "Triagem para cliente", value: `${intelligence.summary.triageToClientRate}%` },
+        { label: "Fila automatica", value: String(intelligence.automation.pendingQueue) },
         { label: "Uso ideal", value: "Decisao de captacao" }
       ]}
       actions={[
@@ -63,6 +68,110 @@ export default async function AcquisitionPage() {
             <span>Para leitura mais consolidada do funil e das automacoes, use o hub de inteligencia como camada executiva.</span>
           </Link>
         </div>
+      </SectionCard>
+
+      <div className="grid two">
+        <SectionCard
+          title="Motores de origem mais fortes"
+          description="Os cards abaixo mostram onde a captacao ja esta virando triagem e cliente com mais consistencia."
+        >
+          <div className="summary-grid compact">
+            <div className="summary-card">
+              <span>Origem mais forte</span>
+              <strong>{topSource?.label || "Sem base suficiente"}</strong>
+              <p>
+                {topSource
+                  ? `${topSource.triageSubmitted} triagem(ns) e ${topSource.clientsCreated} cliente(s) no periodo.`
+                  : "Assim que houver volume rastreado suficiente, a melhor origem aparece aqui."}
+              </p>
+              <span className="item-meta">
+                {topSource
+                  ? `${topSource.visitToSubmitRate}% visita para triagem | ${topSource.triageToClientRate}% triagem para cliente`
+                  : "Aguardando historico"}
+              </span>
+            </div>
+            <div className="summary-card">
+              <span>Campanha mais produtiva</span>
+              <strong>{topCampaign?.label || "Sem campanha destacada"}</strong>
+              <p>
+                {topCampaign
+                  ? `${topCampaign.triageSubmitted} triagem(ns) e ${topCampaign.clientsCreated} cliente(s) vinculados.`
+                  : "Quando o tracking de campanha ganhar volume, a melhor leitura aparece aqui."}
+              </p>
+              <span className="item-meta">
+                {topCampaign ? `${topCampaign.triageToClientRate}% avancaram para cliente` : "Aguardando base"}
+              </span>
+            </div>
+            <div className="summary-card">
+              <span>Tema com mais potencial</span>
+              <strong>{topTopic?.label || "Sem tema dominante"}</strong>
+              <p>
+                {topTopic
+                  ? `${topTopic.triageSubmitted} triagem(ns) para este tema no periodo.`
+                  : "Os temas passam a aparecer aqui conforme origem e triagem se consolidam."}
+              </p>
+              <span className="item-meta">
+                {topTopic ? `${topTopic.clientsCreated} cliente(s) vieram desse tema` : "Aguardando base"}
+              </span>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Leituras que pedem acao"
+          description="Quando a captacao gera sinal forte, o sistema deve sugerir o proximo movimento em vez de deixar a equipe apenas observando."
+        >
+          {intelligence.suggestions.length ? (
+            <div className="notice-grid">
+              {intelligence.suggestions.slice(0, 4).map((item) => (
+                <Link key={item.title} href={item.href} className="notice-card">
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                  <span>Abrir area relacionada</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">
+              Nenhuma leitura critica se destacou agora. A camada de acquisition volta a sugerir o proximo movimento quando a origem perder forca ou ganhar tracao relevante.
+            </p>
+          )}
+        </SectionCard>
+      </div>
+
+      <SectionCard
+        title="Origem, triagem e cliente"
+        description="Esta leitura transforma acquisition em motor real: mostra quais origens atraem, quais geram triagem e quais realmente ajudam a abrir cliente."
+      >
+        {intelligence.acquisition.bySource.length ? (
+          <ul className="update-feed">
+            {intelligence.acquisition.bySource.map((item) => (
+              <li key={item.key} className="update-card">
+                <div className="update-head">
+                  <div>
+                    <strong>{item.label}</strong>
+                    <span className="item-meta">
+                      {item.visits} visita(s) rastreadas, {item.ctas} clique(s) no CTA
+                    </span>
+                  </div>
+                  <span className="tag soft">{item.clientsCreated} cliente(s)</span>
+                </div>
+                <div className="pill-row">
+                  <span className="pill muted">{item.triageStarted} triagem(ns) iniciadas</span>
+                  <span className="pill warning">{item.triageSubmitted} triagem(ns) enviadas</span>
+                  <span className="pill success">{item.triageToClientRate}% triagem para cliente</span>
+                </div>
+                <p className="update-body">
+                  {item.visitToSubmitRate}% das visitas dessa origem avancaram ate triagem enviada. Isso ajuda a decidir onde insistir, onde corrigir e onde escalar.
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty-state">
+            Ainda nao ha volume rastreado suficiente por origem para compor esta leitura ponta a ponta.
+          </p>
+        )}
       </SectionCard>
 
       <SectionCard

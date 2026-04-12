@@ -56,6 +56,93 @@ type Suggestion = {
   href: string;
 };
 
+type ProductEventRecord = {
+  id: string;
+  event_key: string;
+  event_group: string;
+  page_path: string | null;
+  session_id: string | null;
+  profile_id: string | null;
+  intake_request_id: string | null;
+  payload: Record<string, unknown> | null;
+  occurred_at: string;
+};
+
+type AcquisitionBucket = {
+  key: string;
+  label: string;
+  visits: Set<string>;
+  ctas: Set<string>;
+  triageStarted: Set<string>;
+  triageSubmitted: Set<string>;
+  clientsCreated: number;
+};
+
+function getPayloadValue(
+  payload: Record<string, unknown> | null | undefined,
+  keys: string[]
+) {
+  if (!payload) {
+    return "";
+  }
+
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function normalizeBucketKey(value: string, fallback = "nao-identificado") {
+  return value.trim().toLowerCase() || fallback;
+}
+
+function formatBucketLabel(value: string, fallback: string) {
+  return value.trim() || fallback;
+}
+
+function getSourceLabel(source: string) {
+  const labels: Record<string, string> = {
+    instagram: "Instagram",
+    whatsapp: "WhatsApp",
+    site: "Site",
+    ads: "Ads",
+    organic: "Organico",
+    referral: "Indicacao",
+    "nao-identificado": "Nao identificado"
+  };
+
+  return labels[source] || source;
+}
+
+function ensureAcquisitionBucket(
+  accumulator: Map<string, AcquisitionBucket>,
+  key: string,
+  label: string
+) {
+  const existing = accumulator.get(key);
+
+  if (existing) {
+    return existing;
+  }
+
+  const bucket: AcquisitionBucket = {
+    key,
+    label,
+    visits: new Set<string>(),
+    ctas: new Set<string>(),
+    triageStarted: new Set<string>(),
+    triageSubmitted: new Set<string>(),
+    clientsCreated: 0
+  };
+
+  accumulator.set(key, bucket);
+  return bucket;
+}
+
 export async function getBusinessIntelligenceOverview(rawDays = 30) {
   const days = clampDays(rawDays);
   const supabase = await createServerSupabaseClient();
@@ -179,7 +266,7 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
     );
   }
 
-  const productEvents = productEventsResult.data || [];
+  const productEvents = (productEventsResult.data || []) as ProductEventRecord[];
   const intakeRequests = intakeRequestsResult.data || [];
   const clients = clientsResult.data || [];
   const profiles = profilesResult.data || [];
@@ -321,6 +408,177 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
     )
   ).sort((left, right) => right.count - left.count);
 
+  const sourceBuckets = new Map<string, AcquisitionBucket>();
+  const campaignBuckets = new Map<string, AcquisitionBucket>();
+  const topicBuckets = new Map<string, AcquisitionBucket>();
+  const contentBuckets = new Map<string, AcquisitionBucket>();
+  const intakeSourceMap = new Map<string, string>();
+  const intakeCampaignMap = new Map<string, string>();
+  const intakeTopicMap = new Map<string, string>();
+  const intakeContentMap = new Map<string, string>();
+
+  for (const event of productEvents) {
+    const sourceValue = normalizeBucketKey(
+      getPayloadValue(event.payload, ["source", "origem"]) ||
+        (event.page_path?.includes("/triagem") ? "site" : "nao-identificado")
+    );
+    const sourceLabel = getSourceLabel(sourceValue);
+    const campaignValue = normalizeBucketKey(
+      getPayloadValue(event.payload, ["campaign", "campanha"]),
+      "sem-campanha"
+    );
+    const campaignLabel = formatBucketLabel(
+      getPayloadValue(event.payload, ["campaign", "campanha"]),
+      "Sem campanha"
+    );
+    const topicValue = normalizeBucketKey(getPayloadValue(event.payload, ["topic", "tema"]), "sem-tema");
+    const topicLabel = formatBucketLabel(
+      getPayloadValue(event.payload, ["topic", "tema"]),
+      "Sem tema"
+    );
+    const contentValue = normalizeBucketKey(
+      getPayloadValue(event.payload, ["content_id", "contentId"]),
+      "sem-conteudo"
+    );
+    const contentLabel = formatBucketLabel(
+      getPayloadValue(event.payload, ["content_id", "contentId"]),
+      "Sem conteudo identificado"
+    );
+
+    const sourceBucket = ensureAcquisitionBucket(sourceBuckets, sourceValue, sourceLabel);
+    const campaignBucket = ensureAcquisitionBucket(campaignBuckets, campaignValue, campaignLabel);
+    const topicBucket = ensureAcquisitionBucket(topicBuckets, topicValue, topicLabel);
+    const contentBucket = ensureAcquisitionBucket(contentBuckets, contentValue, contentLabel);
+
+    const sessionId = event.session_id || "";
+    const recordStep = (collection: Set<string>) => {
+      if (sessionId) {
+        collection.add(sessionId);
+      }
+    };
+
+    if (event.event_key === "site_visit_started") {
+      recordStep(sourceBucket.visits);
+      recordStep(campaignBucket.visits);
+      recordStep(topicBucket.visits);
+      recordStep(contentBucket.visits);
+    }
+
+    if (event.event_key === "cta_start_triage_clicked") {
+      recordStep(sourceBucket.ctas);
+      recordStep(campaignBucket.ctas);
+      recordStep(topicBucket.ctas);
+      recordStep(contentBucket.ctas);
+    }
+
+    if (event.event_key === "triage_started") {
+      recordStep(sourceBucket.triageStarted);
+      recordStep(campaignBucket.triageStarted);
+      recordStep(topicBucket.triageStarted);
+      recordStep(contentBucket.triageStarted);
+    }
+
+    if (event.event_key === "triage_submitted") {
+      recordStep(sourceBucket.triageSubmitted);
+      recordStep(campaignBucket.triageSubmitted);
+      recordStep(topicBucket.triageSubmitted);
+      recordStep(contentBucket.triageSubmitted);
+
+      if (event.intake_request_id) {
+        intakeSourceMap.set(event.intake_request_id, sourceValue);
+        intakeCampaignMap.set(event.intake_request_id, campaignValue);
+        intakeTopicMap.set(event.intake_request_id, topicValue);
+        intakeContentMap.set(event.intake_request_id, contentValue);
+      }
+    }
+  }
+
+  for (const client of linkedClientCreations) {
+    const intakeRequestId = client.source_intake_request_id;
+
+    if (!intakeRequestId) {
+      continue;
+    }
+
+    const sourceKey = intakeSourceMap.get(intakeRequestId);
+    const campaignKey = intakeCampaignMap.get(intakeRequestId);
+    const topicKey = intakeTopicMap.get(intakeRequestId);
+    const contentKey = intakeContentMap.get(intakeRequestId);
+
+    if (sourceKey) {
+      const bucket = sourceBuckets.get(sourceKey);
+      if (bucket) {
+        bucket.clientsCreated += 1;
+      }
+    }
+
+    if (campaignKey) {
+      const bucket = campaignBuckets.get(campaignKey);
+      if (bucket) {
+        bucket.clientsCreated += 1;
+      }
+    }
+
+    if (topicKey) {
+      const bucket = topicBuckets.get(topicKey);
+      if (bucket) {
+        bucket.clientsCreated += 1;
+      }
+    }
+
+    if (contentKey) {
+      const bucket = contentBuckets.get(contentKey);
+      if (bucket) {
+        bucket.clientsCreated += 1;
+      }
+    }
+  }
+
+  const toAcquisitionRows = (buckets: Map<string, AcquisitionBucket>) =>
+    [...buckets.values()]
+      .map((bucket) => {
+        const visits = bucket.visits.size;
+        const ctas = bucket.ctas.size;
+        const triageStarted = bucket.triageStarted.size;
+        const triageSubmitted = bucket.triageSubmitted.size;
+        const clientsCreated = bucket.clientsCreated;
+
+        return {
+          key: bucket.key,
+          label: bucket.label,
+          visits,
+          ctas,
+          triageStarted,
+          triageSubmitted,
+          clientsCreated,
+          visitToSubmitRate:
+            visits > 0 ? Number(((triageSubmitted / visits) * 100).toFixed(1)) : 0,
+          triageToClientRate:
+            triageSubmitted > 0
+              ? Number(((clientsCreated / triageSubmitted) * 100).toFixed(1))
+              : 0
+        };
+      })
+      .filter((item) => item.visits || item.triageStarted || item.triageSubmitted || item.clientsCreated)
+      .sort((left, right) => {
+        if (right.clientsCreated !== left.clientsCreated) {
+          return right.clientsCreated - left.clientsCreated;
+        }
+
+        if (right.triageSubmitted !== left.triageSubmitted) {
+          return right.triageSubmitted - left.triageSubmitted;
+        }
+
+        return right.visits - left.visits;
+      });
+
+  const acquisition = {
+    bySource: toAcquisitionRows(sourceBuckets).slice(0, 6),
+    byCampaign: toAcquisitionRows(campaignBuckets).slice(0, 6),
+    byTopic: toAcquisitionRows(topicBuckets).slice(0, 6),
+    byContent: toAcquisitionRows(contentBuckets).slice(0, 6)
+  };
+
   const portalEvents = productEvents.filter((event) => {
     if (!event.profile_id) {
       return false;
@@ -440,6 +698,27 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
     });
   }
 
+  const strongestSource = acquisition.bySource[0] || null;
+  const weakestSource = acquisition.bySource
+    .filter((item) => item.visits >= 3)
+    .sort((left, right) => left.visitToSubmitRate - right.visitToSubmitRate)[0] || null;
+
+  if (strongestSource && strongestSource.clientsCreated > 0) {
+    suggestions.push({
+      title: `${strongestSource.label} e a origem que mais virou cliente`,
+      body: `${strongestSource.clientsCreated} cliente(s) vieram dessa origem no periodo. Vale aprofundar campanha, tema e conteudo relacionados.`,
+      href: "/internal/advogada/acquisition"
+    });
+  }
+
+  if (weakestSource && weakestSource.visitToSubmitRate < 10) {
+    suggestions.push({
+      title: `${weakestSource.label} traz visitas, mas perde forca antes do envio`,
+      body: `A origem converteu apenas ${weakestSource.visitToSubmitRate}% das visitas em triagens enviadas. Vale revisar CTA, promessa e friccao desse caminho.`,
+      href: "/internal/advogada/performance"
+    });
+  }
+
   return {
     days,
     since,
@@ -473,6 +752,7 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
           item.status
       }))
     },
+    acquisition,
     portalUsage,
     automation: {
       ...automationSummary,
