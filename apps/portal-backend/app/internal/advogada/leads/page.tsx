@@ -337,6 +337,38 @@ export default function LeadsDashboard() {
           </div>
         </SectionCard>
 
+        <SectionCard
+          title="Encadeamento oficial do escritorio"
+          description="Esta cadeia resume como a entrada comercial deve evoluir daqui em diante, sem troca de mundo entre lead, triagem, cliente, caso e acompanhamento."
+        >
+          <div className="funnel-grid">
+            <article className="funnel-card">
+              <span>Lead</span>
+              <strong>Interesse captado</strong>
+              <small>Origem, urgencia, mensagem e sinal comercial inicial.</small>
+              <em>Use esta rota para leitura historica e classificacao.</em>
+            </article>
+            <article className="funnel-card">
+              <span>Triagem</span>
+              <strong>Entrada organizada</strong>
+              <small>O contexto deixa de ser conversa solta e vira triagem com direcao.</small>
+              <em>Fila oficial em triagens recebidas no painel principal.</em>
+            </article>
+            <article className="funnel-card">
+              <span>Cliente</span>
+              <strong>Conversao operacional</strong>
+              <small>Quando a equipe assume, o atendimento ganha ficha, contexto e proximos passos.</small>
+              <em>A ficha do cliente vira o hub do relacionamento.</em>
+            </article>
+            <article className="funnel-card">
+              <span>Caso</span>
+              <strong>Conducao estruturada</strong>
+              <small>O trabalho juridico passa a ser acompanhado em status, timeline, agenda e documentos.</small>
+              <em>A central de casos vira o eixo da operacao.</em>
+            </article>
+          </div>
+        </SectionCard>
+
         {/* Prioridades do Dia */}
         <PrioridadesDoDia leads={leads} />
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { NoemiaAssistant } from "@/components/noemia-assistant";
@@ -190,6 +191,26 @@ export default async function NoemiaPage({
           </SectionCard>
 
           <div className="stack">
+            {isStaffMode ? (
+              <SectionCard
+                title="Onde a Noemia entra no fluxo oficial"
+                description="A assistente deixa de parecer uma area separada quando fica ancorada nas mesmas superficies que organizam triagem, operacao humana e acompanhamento por caso."
+              >
+                <div className="grid two">
+                  <Link className="route-card" href="/internal/advogada#triagens-recebidas">
+                    <span className="shortcut-kicker">Entrada</span>
+                    <strong>Triagens recebidas</strong>
+                    <span>Use a fila principal quando a Noemia apontar que uma triagem precisa de leitura humana imediata.</span>
+                  </Link>
+                  <Link className="route-card" href="/internal/advogada/operacional">
+                    <span className="shortcut-kicker">Continuidade</span>
+                    <strong>Painel operacional</strong>
+                    <span>Quando o caso pedir follow-up, consulta ou contato humano, a conducao oficial segue no operacional.</span>
+                  </Link>
+                </div>
+              </SectionCard>
+            ) : null}
+
             <SectionCard
               title="O que a Noemia faz bem agora"
               description="Esta primeira camada ja foi pensada para ser util desde o primeiro dia, sem prometer mais do que deve."
