@@ -1,733 +1,276 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
-import { processNoemiaCore } from "../../../../lib/ai/noemia-core";
-import { conversationPersistence } from "../../../../lib/services/conversation-persistence";
-import { antiSpamGuard } from "../../../../lib/services/anti-spam-guard";
+import { NextRequest, NextResponse } from "next/server";
 
-// Configurações
+import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
+
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "noeminha_verify_2026";
 const APP_SECRET = process.env.WHATSAPP_APP_SECRET || "noeminha_whatsapp_secret_2026";
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-// Função de log estruturado
-function logEvent(event: string, data?: any, level: 'info' | 'warn' | 'error' = 'info') {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    level,
-    event,
-    data: data || null
-  };
-  
-  console.log(JSON.stringify(logEntry));
+function logEvent(
+  event: string,
+  data?: Record<string, unknown>,
+  level: "info" | "warn" | "error" = "info"
+) {
+  console.log(
+    JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level,
+      event,
+      data: data ?? null
+    })
+  );
 }
 
-// Validar assinatura HMAC-SHA256
-function verifySignature(body: string, signature: string): boolean {
+function verifySignature(body: string, signature: string) {
   if (!signature) {
-    logEvent('SIGNATURE_MISSING', { 
-      hasAppSecret: !!APP_SECRET,
-      appSecretLength: APP_SECRET?.length || 0
-    }, 'error');
     return false;
   }
-  
-  const expectedSignature = `sha256=${createHmac('sha256', APP_SECRET)
-    .update(body, 'utf8')
-    .digest('hex')}`;
-  
-  const isValid = signature === expectedSignature;
-  
-  logEvent('SIGNATURE_VALIDATION_DEBUG', {
-    received: signature?.substring(0, 50) + '...',
-    expected: expectedSignature?.substring(0, 50) + '...',
-    isValid,
-    appSecretSet: !!APP_SECRET,
-    appSecretLength: APP_SECRET?.length || 0,
-    bodyLength: body.length
-  });
-  
-  return isValid;
+
+  const expectedSignature = `sha256=${createHmac("sha256", APP_SECRET)
+    .update(body, "utf8")
+    .digest("hex")}`;
+
+  return signature === expectedSignature;
 }
 
-// Extrair informações da mensagem
-function extractMessageInfo(message: any) {
-  logEvent('EXTRACT_MESSAGE_START_DEBUG', {
-    messageKeys: Object.keys(message),
-    messageFull: message
-  });
+function extractMessageInfo(message: Record<string, any>) {
+  const type = typeof message.type === "string" ? message.type : "unknown";
 
-  const info = {
-    from: message.from || null,
-    messageId: message.id || null,
-    timestamp: message.timestamp || null,
-    type: message.type || 'unknown',
-    content: null as string | null,
-    metadata: {}
+  if (type === "text") {
+    return {
+      from: typeof message.from === "string" ? message.from : "",
+      messageId: typeof message.id === "string" ? message.id : "",
+      timestamp: message.timestamp,
+      type,
+      content: typeof message.text?.body === "string" ? message.text.body : ""
+    };
+  }
+
+  return {
+    from: typeof message.from === "string" ? message.from : "",
+    messageId: typeof message.id === "string" ? message.id : "",
+    timestamp: message.timestamp,
+    type,
+    content: `[${type}]`
   };
-
-  logEvent('EXTRACT_MESSAGE_BASIC_DEBUG', {
-    from: info.from,
-    messageId: info.messageId,
-    timestamp: info.timestamp,
-    type: info.type
-  });
-
-  switch (message.type) {
-    case 'text':
-      info.content = message.text?.body || null;
-      logEvent('EXTRACT_TEXT_DEBUG', {
-        textBody: message.text?.body,
-        extractedContent: info.content
-      });
-      break;
-    case 'image':
-      info.content = message.image?.caption || '[Imagem]';
-      info.metadata = {
-        mimeType: message.image?.mime_type,
-        sha256: message.image?.sha256,
-        id: message.image?.id
-      };
-      logEvent('EXTRACT_IMAGE_DEBUG', {
-        caption: message.image?.caption,
-        metadata: info.metadata
-      });
-      break;
-    case 'audio':
-      info.content = '[Áudio]';
-      info.metadata = {
-        mimeType: message.audio?.mime_type,
-        sha256: message.audio?.sha256,
-        id: message.audio?.id
-      };
-      break;
-    case 'document':
-      info.content = message.document?.caption || '[Documento]';
-      info.metadata = {
-        filename: message.document?.filename,
-        mimeType: message.document?.mime_type,
-        sha256: message.document?.sha256,
-        id: message.document?.id
-      };
-      break;
-    case 'location':
-      info.content = '[Localização]';
-      info.metadata = {
-        latitude: message.location?.latitude,
-        longitude: message.location?.longitude,
-        name: message.location?.name,
-        address: message.location?.address
-      };
-      break;
-    case 'contact':
-      info.content = '[Contato]';
-      info.metadata = {
-        contacts: message.contacts
-      };
-      break;
-    default:
-      info.content = `[${message.type}]`;
-      logEvent('EXTRACT_UNKNOWN_TYPE_DEBUG', {
-        type: message.type,
-        message: message
-      });
-  }
-
-  logEvent('EXTRACT_MESSAGE_FINAL_DEBUG', {
-    finalInfo: info
-  });
-
-  return info;
 }
 
-// Função de proteção global para entradas não suportadas
-async function handleUnsupportedWhatsAppMessage(sender: string, messageType: string): Promise<boolean> {
-  const unsupportedMessage = "No momento, este atendimento está habilitado apenas para mensagens escritas. Pode me contar por texto, de forma simples, o que aconteceu no seu caso?";
-  
-  logEvent('UNSUPPORTED_MESSAGE_HANDLED', {
-    platform: 'whatsapp',
-    sender,
-    messageType,
-    response: unsupportedMessage
-  });
-
-  return await sendWhatsAppResponse(sender, unsupportedMessage);
-}
-
-// Marcar mensagem como lida via WhatsApp API
 async function markAsRead(messageId: string) {
-  logEvent('WHATSAPP_MARK_AS_READ_START', {
-    messageId,
-    hasAccessToken: !!ACCESS_TOKEN,
-    hasPhoneNumberId: !!PHONE_NUMBER_ID
-  });
-
   if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-    logEvent('WHATSAPP_MARK_AS_READ_CREDENTIALS_MISSING', {
-      hasAccessToken: !!ACCESS_TOKEN,
-      hasPhoneNumberId: !!PHONE_NUMBER_ID
-    }, 'error');
     return false;
   }
 
   try {
-    const markReadUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
-    
-    const payload = {
-      messaging_product: "whatsapp",
-      status: "read",
-      message_id: messageId
-    };
-
-    logEvent('WHATSAPP_MARK_AS_READ_API_CALL', {
-      url: markReadUrl,
-      messageId,
-      payloadSize: JSON.stringify(payload).length
-    });
-
-    const response = await fetch(markReadUrl, {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId
+      })
     });
 
-    logEvent('WHATSAPP_MARK_AS_READ_RESPONSE', {
-      httpStatus: response.status,
-      httpOk: response.ok,
-      statusText: response.statusText
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      logEvent('WHATSAPP_MARK_AS_READ_ERROR', {
-        httpStatus: response.status,
-        metaError: data.error?.message,
-        errorCode: data.error?.code,
-        messageId
-      }, 'error');
-      return false;
-    }
-
-    logEvent('WHATSAPP_MARK_AS_READ_SUCCESS', {
-      messageId,
-      httpStatus: response.status
-    });
-
-    return true;
+    return response.ok;
   } catch (error) {
-    logEvent('WHATSAPP_MARK_AS_READ_EXCEPTION', {
-      error: error instanceof Error ? error.message : String(error),
-      messageId
-    }, 'error');
+    logEvent(
+      "WHATSAPP_MARK_AS_READ_ERROR",
+      {
+        messageId,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "warn"
+    );
     return false;
   }
 }
 
-// Enviar indicador de "digitando..." via WhatsApp API
 async function sendTypingIndicator(to: string) {
-  logEvent('WHATSAPP_TYPING_INDICATOR_START', {
-    to,
-    hasAccessToken: !!ACCESS_TOKEN,
-    hasPhoneNumberId: !!PHONE_NUMBER_ID
-  });
-
   if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-    logEvent('WHATSAPP_TYPING_INDICATOR_CREDENTIALS_MISSING', {
-      hasAccessToken: !!ACCESS_TOKEN,
-      hasPhoneNumberId: !!PHONE_NUMBER_ID
-    }, 'error');
     return false;
   }
 
   try {
-    const typingUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
-    
-    // Formato oficial da Meta para typing indicator (sem status)
-    // O typing_indicator é um campo separado, não combinado com status
-    const payload = {
-      messaging_product: "whatsapp",
-      to: to,
-      typing_indicator: {
-        type: "text"
-      }
-    };
-
-    logEvent('WHATSAPP_TYPING_INDICATOR_API_CALL', {
-      url: typingUrl,
-      to,
-      payload: JSON.stringify(payload),
-      method: "official_typing_indicator"
-    });
-
-    const response = await fetch(typingUrl, {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
-    });
-
-    logEvent('WHATSAPP_TYPING_INDICATOR_RESPONSE', {
-      httpStatus: response.status,
-      httpOk: response.ok,
-      statusText: response.statusText
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      logEvent('WHATSAPP_TYPING_INDICATOR_ERROR', {
-        httpStatus: response.status,
-        metaError: data.error?.message,
-        errorCode: data.error?.code,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
         to,
-        payload: JSON.stringify(payload)
-      }, 'error');
-      return false;
-    }
-
-    logEvent('WHATSAPP_TYPING_INDICATOR_SUCCESS', {
-      to,
-      httpStatus: response.status,
-      method: "official_typing_indicator"
+        typing_indicator: {
+          type: "text"
+        }
+      })
     });
 
-    return true;
+    return response.ok;
   } catch (error) {
-    logEvent('WHATSAPP_TYPING_INDICATOR_EXCEPTION', {
-      error: error instanceof Error ? error.message : String(error),
-      to
-    }, 'error');
+    logEvent(
+      "WHATSAPP_TYPING_ERROR",
+      {
+        to,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "warn"
+    );
     return false;
   }
 }
 
-// Enviar resposta via WhatsApp API
 async function sendWhatsAppResponse(to: string, message: string) {
-  logEvent('WHATSAPP_GRAPH_API_STATUS', {
-    to,
-    messageLength: message.length,
-    hasAccessToken: !!ACCESS_TOKEN,
-    hasPhoneNumberId: !!PHONE_NUMBER_ID
-  });
-
   if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-    logEvent('WHATSAPP_CREDENTIALS_MISSING', {
-      hasAccessToken: !!ACCESS_TOKEN,
-      hasPhoneNumberId: !!PHONE_NUMBER_ID
-    }, 'error');
+    logEvent(
+      "WHATSAPP_SEND_SKIPPED_MISSING_CONFIG",
+      {
+        to,
+        hasAccessToken: !!ACCESS_TOKEN,
+        hasPhoneNumberId: !!PHONE_NUMBER_ID
+      },
+      "error"
+    );
     return false;
   }
 
   try {
-    const sendUrl = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
-    
-    const payload = {
-      messaging_product: "whatsapp",
-      to: to,
-      type: "text",
-      text: {
-        body: message
-      }
-    };
-
-    logEvent('WHATSAPP_GRAPH_API_CALL', {
-      url: sendUrl,
-      to,
-      payloadSize: JSON.stringify(payload).length
-    });
-
-    const response = await fetch(sendUrl, {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: {
+          body: message
+        }
+      })
     });
-
-    logEvent('WHATSAPP_GRAPH_API_RESPONSE', {
-      httpStatus: response.status,
-      httpOk: response.ok,
-      statusText: response.statusText
-    });
-
-    const data = await response.json();
 
     if (!response.ok) {
-      logEvent('WHATSAPP_GRAPH_API_ERROR', {
-        httpStatus: response.status,
-        metaError: data.error?.message,
-        errorCode: data.error?.code,
-        to
-      }, 'error');
+      const errorText = await response.text();
+      logEvent(
+        "WHATSAPP_SEND_ERROR",
+        {
+          to,
+          status: response.status,
+          errorText: errorText.slice(0, 500)
+        },
+        "error"
+      );
       return false;
     }
 
-    logEvent('WHATSAPP_GRAPH_API_SUCCESS', {
-      messageId: data.messages?.[0]?.id,
-      to,
-      httpStatus: response.status
-    });
-
     return true;
   } catch (error) {
-    logEvent('WHATSAPP_GRAPH_API_EXCEPTION', {
-      error: error instanceof Error ? error.message : String(error),
-      to
-    }, 'error');
+    logEvent(
+      "WHATSAPP_SEND_EXCEPTION",
+      {
+        to,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "error"
+    );
     return false;
   }
 }
 
-// Handler GET para verificação do webhook
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  logEvent('VERIFICATION_ATTEMPT', {
-    mode,
-    token: token === VERIFY_TOKEN ? 'VALID' : 'INVALID',
-    hasChallenge: !!challenge
-  });
-
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    logEvent('VERIFICATION_SUCCESS', { challenge });
     return new Response(challenge || "", {
       status: 200,
-      headers: { "Content-Type": "text/plain" },
+      headers: { "Content-Type": "text/plain" }
     });
   }
 
-  logEvent('VERIFICATION_FAILED', { mode, token });
   return new Response("Forbidden", { status: 403 });
 }
 
-// Handler POST para processamento de mensagens
 export async function POST(request: NextRequest) {
-  logEvent('WHATSAPP_POST_RECEIVED', {
-    timestamp: new Date().toISOString()
-  });
-  
-  const signature = request.headers.get("x-hub-signature-256");
+  const signature = request.headers.get("x-hub-signature-256") || "";
   const body = await request.text();
-  
-  // Validar assinatura em modo sombra (não bloqueia, apenas registra)
-  const signatureValid = verifySignature(body, signature || "");
-  if (!signatureValid) {
-    logEvent('WHATSAPP_SIGNATURE_INVALID', {
-      signaturePresent: !!signature,
-      bodyLength: body.length
-    }, 'warn');
-  } else {
-    logEvent('WHATSAPP_SIGNATURE_VALID', {
-      bodyLength: body.length
-    });
+
+  if (!verifySignature(body, signature)) {
+    logEvent(
+      "WHATSAPP_SIGNATURE_INVALID_BUT_ACCEPTED",
+      {
+        note: "Webhook kept in shadow validation mode to avoid operational interruption."
+      },
+      "warn"
+    );
   }
 
   try {
     const data = JSON.parse(body);
-    logEvent('WHATSAPP_PAYLOAD_PARSED', {
-      object: data.object,
-      entryCount: data.entry?.length || 0
-    });
 
-    // Processar mensagens
-    if (data.object === "whatsapp_business_account") {
-      logEvent('WHATSAPP_BUSINESS_ACCOUNT_DETECTED');
-      
-      for (const entry of data.entry || []) {
-        for (const change of entry.changes || []) {
-          if (change.field === "messages") {
-            const messages = change.value.messages || [];
-            logEvent('WHATSAPP_MESSAGES_FOUND', {
-              count: messages.length
-            });
-            
-            for (const message of messages) {
-              // Ignorar mensagens enviadas pelo próprio número
-              if (message.from === PHONE_NUMBER_ID) {
-                logEvent('WHATSAPP_OWN_MESSAGE_IGNORED', {
-                  from: message.from,
-                  phoneId: PHONE_NUMBER_ID
-                });
-                continue;
-              }
+    if (data.object !== "whatsapp_business_account") {
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
 
-              logEvent('WHATSAPP_MESSAGE_TYPE', {
-                type: message.type,
-                from: message.from
-              });
+    for (const entry of data.entry || []) {
+      for (const change of entry.changes || []) {
+        if (change.field !== "messages") {
+          continue;
+        }
 
-              const messageInfo = extractMessageInfo(message);
-              
-              logEvent('WHATSAPP_SENDER_EXTRACTED', {
-                from: messageInfo.from,
-                messageId: messageInfo.messageId
-              });
+        for (const rawMessage of change.value?.messages || []) {
+          const message = extractMessageInfo(rawMessage);
 
-              if (messageInfo.type === 'text' && messageInfo.content) {
-                logEvent('WHATSAPP_TEXT_EXTRACTED', {
-                  from: messageInfo.from,
-                  content: messageInfo.content,
-                  length: messageInfo.content?.length || 0
-                });
-                
-                await processTextMessage(messageInfo);
-              } else {
-                logEvent('WHATSAPP_NON_TEXT_SKIPPED', {
-                  type: messageInfo.type,
-                  from: messageInfo.from
-                });
-                
-                // Enviar mensagem de proteção para conteúdo não suportado
-                await handleUnsupportedWhatsAppMessage(messageInfo.from, messageInfo.type);
-              }
-            }
+          if (!message.from || message.from === PHONE_NUMBER_ID) {
+            continue;
           }
+
+          await processChannelConversationEvent(
+            {
+              channel: "whatsapp",
+              source: "whatsapp_inbound",
+              externalUserId: message.from,
+              externalMessageId: message.messageId || undefined,
+              externalEventId: message.messageId || undefined,
+              messageText: message.content,
+              messageType: message.type,
+              timestamp: message.timestamp
+            },
+            {
+              sendText: sendWhatsAppResponse,
+              markAsRead,
+              sendTypingIndicator
+            }
+          );
         }
       }
-    } else {
-      logEvent('WHATSAPP_INVALID_OBJECT', {
-        object: data.object
-      }, 'warn');
     }
 
-    console.log("=== WEBHOOK PROCESSED SUCCESSFULLY ===");
-    return NextResponse.json({ 
-      status: "received", 
-      processed: true,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.log("=== PROCESSING ERROR ===");
-    console.log("ERROR:", error instanceof Error ? error.message : String(error));
-    console.log("STACK:", error instanceof Error ? error.stack : null);
-    
-    logEvent('PROCESSING_ERROR_DEBUG', { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : null,
-      body: body.substring(0, 1000)
-    }, 'error');
-    
     return NextResponse.json(
-      { error: "Failed to process webhook" },
-      { status: 500 }
-    );
-  }
-}
-
-// Processar mensagem de texto usando lógica centralizada da NoemIA
-async function processTextMessage(messageInfo: any) {
-  try {
-    console.log('=== WHATSAPP_MESSAGE_RECEIVED ===');
-    console.log('FROM:', messageInfo.from);
-    console.log('CONTENT:', messageInfo.content);
-    console.log('LENGTH:', messageInfo.content?.length || 0);
-    console.log('MESSAGE_ID:', messageInfo.messageId);
-    
-    logEvent('WHATSAPP_CALLING_NOEMIA', {
-      from: messageInfo.from,
-      messageId: messageInfo.messageId,
-      message: messageInfo.content
-    });
-
-    // 1. Marcar mensagem como lida e enviar indicador de "digitando..."
-    await markAsRead(messageInfo.messageId);
-    await sendTypingIndicator(messageInfo.from);
-
-    // 2. Verificar anti-spam guard
-    const guardResult = await antiSpamGuard.shouldRespondToEvent({
-      channel: 'whatsapp',
-      externalMessageId: messageInfo.messageId,
-      externalUserId: messageInfo.from,
-      messageText: messageInfo.content,
-      isEcho: false,
-      messageType: messageInfo.type
-    });
-
-    if (!guardResult.shouldRespond) {
-      console.log('WHATSAPP_RESPONSE_BLOCKED_BY_GUARD:', guardResult.reason);
-      logEvent("WHATSAPP_RESPONSE_BLOCKED_BY_GUARD", {
-        from: messageInfo.from,
-        reason: guardResult.reason,
-        guardResult
-      });
-      return;
-    }
-
-    // 3. Obter ou criar sessão de conversação
-    const session = await conversationPersistence.getOrCreateSession(
-      'whatsapp',
-      messageInfo.from
-    );
-
-    console.log('WHATSAPP_SESSION_FOUND_OR_CREATED:', {
-      sessionId: session.id,
-      leadStage: session.lead_stage,
-      caseArea: session.case_area
-    });
-
-    // 4. Salvar mensagem do usuário
-    await conversationPersistence.saveMessage(
-      session.id,
-      messageInfo.messageId,
-      'user',
-      messageInfo.content,
-      'inbound',
       {
-        channel: 'whatsapp',
-        externalUserId: messageInfo.from,
-        messageId: messageInfo.messageId,
-        messageType: messageInfo.type,
-        metadata: messageInfo.metadata
-      }
+        status: "received",
+        processed: true
+      },
+      { status: 200 }
     );
-
-    // 5. Obter histórico recente da conversação
-    const recentMessages = await conversationPersistence.getRecentMessages(session.id, 12);
-    
-    // 6. Construir histórico para o Noemia Core
-    const history = recentMessages
-      .reverse()
-      .filter(msg => msg.role !== 'system')
-      .map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content
-      }));
-
-    console.log('WHATSAPP_CONTEXT_LOADED:', {
-      sessionId: session.id,
-      historyLength: history.length,
-      lastSummary: session.last_summary
-    });
-
-    // 7. Gerar resumo se a conversa for longa
-    const summary = await conversationPersistence.generateConversationSummary(
-      session.id,
-      recentMessages
-    );
-
-    // 8. Construir contexto para a IA
-    const context = {
-      sessionId: session.id,
-      leadStage: session.lead_stage,
-      caseArea: session.case_area,
-      currentIntent: session.current_intent,
-      lastSummary: session.last_summary,
-      conversationHistory: summary
-    };
-
-    // 9. Processar com Noemia Core
-    const coreResponse = await processNoemiaCore({
-      channel: 'whatsapp',
-      userType: 'visitor',
-      message: messageInfo.content,
-      history,
-      context,
-      metadata: { 
-        from: messageInfo.from,
-        sessionId: session.id,
-        messageId: messageInfo.messageId
-      }
-    });
-
-    console.log('WHATSAPP_NOEMIA_CORE_RESPONSE_RECEIVED');
-    console.log('RESPONSE_LENGTH:', coreResponse.reply.length);
-    console.log('RESPONSE_SOURCE:', coreResponse.source);
-    console.log('USED_FALLBACK:', coreResponse.usedFallback);
-    console.log('OPENAI_USED:', coreResponse.metadata.openaiUsed);
-    console.log('CLASSIFICATION:', coreResponse.metadata.classification);
-    
-    logEvent("WHATSAPP_NOEMIA_CORE_RESPONSE", {
-      from: messageInfo.from,
-      sessionId: session.id,
-      responseLength: coreResponse.reply.length,
-      audience: coreResponse.audience,
-      source: coreResponse.source,
-      usedFallback: coreResponse.usedFallback,
-      responseTime: coreResponse.metadata.responseTime,
-      classification: coreResponse.metadata.classification
-    });
-
-    // 10. Salvar resposta da IA
-    await conversationPersistence.saveMessage(
-      session.id,
-      undefined, // IA não tem external message ID
-      'assistant',
-      coreResponse.reply,
-      'outbound',
-      {
-        channel: 'whatsapp',
-        source: coreResponse.source,
-        responseTime: coreResponse.metadata.responseTime,
-        classification: coreResponse.metadata.classification
-      }
-    );
-
-    // 11. Atualizar sessão com informações da conversação
-    await conversationPersistence.updateSession(session.id, {
-      lead_stage: 'engaged',
-      case_area: coreResponse.metadata.classification?.theme || session.case_area,
-      current_intent: coreResponse.intent || session.current_intent,
-      last_inbound_at: new Date().toISOString(),
-      last_outbound_at: new Date().toISOString()
-    });
-
-    // 12. Enviar resposta
-    console.log('=== WHATSAPP_SEND_ATTEMPT ===');
-    const sent = await sendWhatsAppResponse(messageInfo.from, coreResponse.reply || "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.");
-    
-    if (sent) {
-      console.log('WHATSAPP_SEND_SUCCESS: Message sent successfully');
-      logEvent("WHATSAPP_RESPONSE_SENT", {
-        from: messageInfo.from,
-        sessionId: session.id,
-        responseLength: coreResponse.reply.length
-      });
-
-      // 13. Marcar evento como processado
-      await antiSpamGuard.markEventProcessed({
-        channel: 'whatsapp',
-        externalMessageId: messageInfo.messageId,
-        externalUserId: messageInfo.from,
-        messageText: messageInfo.content
-      });
-    } else {
-      console.log('WHATSAPP_SEND_FAILED: Failed to send message');
-      logEvent("WHATSAPP_RESPONSE_FAILED", {
-        from: messageInfo.from,
-        sessionId: session.id,
-        error: 'Failed to send WhatsApp message'
-      }, "error");
-    }
   } catch (error) {
-    console.log('WHATSAPP_NOEMIA_ERROR: Error in processTextMessage');
-    console.log('ERROR:', error instanceof Error ? error.message : String(error));
-    
-    logEvent('WHATSAPP_NOEMIA_ERROR', {
-      from: messageInfo.from,
-      error: error instanceof Error ? error.message : String(error)
-    }, 'error');
+    logEvent(
+      "WHATSAPP_WEBHOOK_PROCESSING_ERROR",
+      {
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "error"
+    );
 
-    // Fallback para mensagem fixa em caso de erro
-    const fallbackResponse = "Oi! Vi que você enviou uma mensagem. Vou te explicar de forma simples o que pode estar acontecendo no seu caso. Muitas pessoas passam por isso sem saber que podem ter um direito não reconhecido. Se você quiser, posso entender melhor sua situação.";
-    
-    const sent = await sendWhatsAppResponse(messageInfo.from, fallbackResponse);
-    
-    if (sent) {
-      console.log('WHATSAPP_FALLBACK_SENT: Fallback message sent');
-      logEvent('WHATSAPP_FALLBACK_SENT', {
-        from: messageInfo.from,
-        responseLength: fallbackResponse.length
-      });
-    }
+    return NextResponse.json({ error: "Failed to process WhatsApp webhook" }, { status: 500 });
   }
 }

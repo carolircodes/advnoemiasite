@@ -2477,7 +2477,7 @@ async function callOpenAI(
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5";
+    const model = process.env.OPENAI_MODEL || "gpt-5.4";
 
     if (!apiKey) {
       return { success: false, error: "OPENAI_API_KEY não configurada" };
