@@ -29,7 +29,7 @@
       site: "https://advnoemia.com.br/",
       blog: "https://advnoemia.com.br/blog.html",
       triagem: "https://advnoemia.com.br/triagem.html?area=geral&origem=portal-login&pagina=portal/login",
-      login: "/portal/login",
+      login: "https://portal.advnoemia.com.br/portal/login",
       painelAdvogada: "/internal/advogada",
       painelCliente: "/cliente",
       documentos: "/documentos",
