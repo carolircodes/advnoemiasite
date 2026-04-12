@@ -23,7 +23,8 @@ import {
   buildInternalCaseHref,
   buildInternalClientHref
 } from "@/lib/navigation";
-import { getClientWorkspace, getStaffOverview } from "@/lib/services/dashboard";
+import { getStaffOverview } from "@/lib/services/dashboard";
+import { getClientWorkspace } from "@/lib/services/client-workspace";
 import {
   registerCaseDocument,
   requestCaseDocument,

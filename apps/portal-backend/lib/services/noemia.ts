@@ -4,7 +4,7 @@ import { OpenAI } from "openai";
 import { createServerSupabaseClient } from "../supabase/server";
 import { logger, logNoemia } from "../logging/structured-logger";
 import { PortalProfile } from "../auth/guards";
-import { getClientWorkspace } from "./dashboard";
+import { getClientWorkspace } from "./client-workspace";
 import { caseAreaLabels, askNoemiaSchema } from "../domain/portal";
 import { getStaffOverview } from "./dashboard";
 import { getBusinessIntelligenceOverview } from "./intelligence";

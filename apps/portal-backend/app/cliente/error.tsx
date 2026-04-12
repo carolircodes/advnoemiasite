@@ -26,13 +26,13 @@ export default function ClientError({
           </div>
 
           <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[#10261d]">
-            O painel encontrou um erro, mas a tela branca foi bloqueada.
+            O shell do painel bloqueou uma falha antes que ela virasse tela branca.
           </h1>
 
           <p className="mt-4 text-base leading-8 text-[#5f6f68]">
-            Esta rota agora possui um fallback explicito. Se algo falhar durante
-            a renderizacao, voce continua vendo uma pagina util com acoes de
-            recuperacao.
+            Esta rota continua com fallback local. Mesmo que modulos futuros
+            falhem, a meta permanece a mesma: manter a area autenticada
+            recuperavel e visivel.
           </p>
 
           <div className="mt-6 rounded-3xl border border-[#efe3d1] bg-[#fbf7ef] p-5">
