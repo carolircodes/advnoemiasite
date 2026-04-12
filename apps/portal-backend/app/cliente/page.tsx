@@ -20,6 +20,26 @@ type NoticeItem = {
   cta: string;
 };
 
+function asArray<T>(value: T[] | null | undefined) {
+  return Array.isArray(value) ? value : [];
+}
+
+function asRecord<T extends object>(value: T | null | undefined) {
+  return value && typeof value === "object" ? value : null;
+}
+
+function safePortalDateTime(value: string | null | undefined, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    return formatPortalDateTime(value);
+  } catch {
+    return fallback;
+  }
+}
+
 export const metadata: Metadata = {
   title: "Meu painel",
   robots: {
@@ -164,12 +184,12 @@ export default async function ClientPage({
 
   const now = new Date();
 
-  const documents = workspace.documents ?? [];
-  const documentRequests = workspace.documentRequests ?? [];
-  const appointments = workspace.appointments ?? [];
-  const cases = workspace.cases ?? [];
-  const events = workspace.events ?? [];
-  const clientRecord = workspace.clientRecord ?? null;
+  const documents = asArray(workspace.documents);
+  const documentRequests = asArray(workspace.documentRequests);
+  const appointments = asArray(workspace.appointments);
+  const cases = asArray(workspace.cases);
+  const events = asArray(workspace.events);
+  const clientRecord = asRecord(workspace.clientRecord);
 
   const availableDocuments = documents.filter(
     (document) =>
@@ -208,7 +228,7 @@ export default async function ClientPage({
     nextAppointment?.starts_at
       ? {
           title: "Proxima data importante",
-          body: `${formatPortalDateTime(nextAppointment.starts_at)} - ${
+          body: `${safePortalDateTime(nextAppointment.starts_at, "Data nao informada")} - ${
             nextAppointment.title ?? "Compromisso agendado"
           }.`,
           href: "#agenda",
@@ -329,7 +349,7 @@ export default async function ClientPage({
                   </p>
                   <p className="mt-2 text-lg font-semibold text-[#10261d]">
                     {nextAppointment?.starts_at
-                      ? formatPortalDateTime(nextAppointment.starts_at)
+                      ? safePortalDateTime(nextAppointment.starts_at, "Sem data futura")
                       : "Sem data futura"}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-[#66766f]">
@@ -487,7 +507,7 @@ export default async function ClientPage({
                         </p>
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
                           {event.occurred_at
-                            ? formatPortalDateTime(event.occurred_at)
+                            ? safePortalDateTime(event.occurred_at, "Sem data registrada")
                             : "Sem data registrada"}
                         </p>
                       </div>
@@ -590,7 +610,7 @@ export default async function ClientPage({
                       </p>
                       <p className="mt-2 text-sm leading-6 text-[#66766f]">
                         {appointment.starts_at
-                          ? formatPortalDateTime(appointment.starts_at)
+                          ? safePortalDateTime(appointment.starts_at, "Data nao informada")
                           : "Data nao informada"}
                       </p>
                     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const PUBLIC_NOEMIA_PATHS = ["/", "/triagem", "/noemia"];
 
@@ -15,16 +16,18 @@ function shouldLoadNoemiaScript(pathname: string) {
 }
 
 export function NoemiaScript() {
+  const pathname = usePathname() || "/";
+  const shouldLoad = shouldLoadNoemiaScript(pathname);
+
   useEffect(() => {
-    const pathname = window.location.pathname;
-
-    if (!shouldLoadNoemiaScript(pathname)) {
-      return;
-    }
-
     const existingScript = document.querySelector<HTMLScriptElement>(
       'script[data-noemia-unified="true"]'
     );
+
+    if (!shouldLoad) {
+      existingScript?.remove();
+      return;
+    }
 
     if (existingScript) {
       return;
@@ -47,7 +50,7 @@ export function NoemiaScript() {
         document.head.removeChild(script);
       }
     };
-  }, []);
+  }, [shouldLoad]);
 
   return null;
 }
