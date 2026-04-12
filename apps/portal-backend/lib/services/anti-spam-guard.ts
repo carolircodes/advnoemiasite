@@ -127,17 +127,20 @@ class AntiSpamGuard {
       };
     }
 
-    // 7. Verificar se é mensagem repetida (conteúdo similar)
-    const recentMessages = await conversationPersistence.getRecentMessages(session.id, 5);
-    const isRepeatedContent = this.checkRepeatedContent(event.messageText, recentMessages);
+    // 7. Verificar repetição de conteúdo apenas quando não houver ID determinístico.
+    // Para WhatsApp/Instagram, o message id deve ser a fonte principal de idempotência.
+    if (!event.externalMessageId) {
+      const recentMessages = await conversationPersistence.getRecentMessages(session.id, 5);
+      const isRepeatedContent = this.checkRepeatedContent(event.messageText, recentMessages);
 
-    if (isRepeatedContent) {
-      console.log('EVENT_IGNORED_REPEATED_CONTENT: Similar message sent recently');
-      return {
-        shouldRespond: false,
-        reason: 'repeated_content',
-        sessionExists: true
-      };
+      if (isRepeatedContent) {
+        console.log('EVENT_IGNORED_REPEATED_CONTENT: Similar message without deterministic message id');
+        return {
+          shouldRespond: false,
+          reason: 'repeated_content',
+          sessionExists: true
+        };
+      }
     }
 
     console.log('ANTI_SPAM_GUARD_PASSED', {

@@ -2502,7 +2502,7 @@ async function callOpenAI(
     const response = await openai.chat.completions.create({
       model,
       messages,
-      max_tokens: 500,
+      max_completion_tokens: 500,
       temperature: 0.7,
     });
 

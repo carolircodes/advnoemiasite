@@ -467,6 +467,59 @@ async function saveTriageAndHandoff(
   }
 }
 
+async function safeSaveMessage(
+  sessionId: string,
+  externalMessageId: string | undefined,
+  role: "user" | "assistant" | "system",
+  content: string,
+  direction: "inbound" | "outbound",
+  metadata?: Record<string, unknown>
+) {
+  try {
+    await conversationPersistence.saveMessage(
+      sessionId,
+      externalMessageId,
+      role,
+      content,
+      direction,
+      metadata
+    );
+    return true;
+  } catch (error) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_SAVE_MESSAGE_ERROR",
+      {
+        sessionId,
+        role,
+        direction,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "warn"
+    );
+    return false;
+  }
+}
+
+async function safeUpdateSession(
+  sessionId: string,
+  updates: Partial<Omit<ConversationSession, "id" | "created_at" | "updated_at">>
+) {
+  try {
+    await conversationPersistence.updateSession(sessionId, updates);
+    return true;
+  } catch (error) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_UPDATE_SESSION_ERROR",
+      {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "warn"
+    );
+    return false;
+  }
+}
+
 export async function processChannelConversationEvent(
   event: ChannelConversationEvent,
   transport: RouterTransport
@@ -505,14 +558,16 @@ export async function processChannelConversationEvent(
     const unsupportedReply = buildUnsupportedFallback(event.channel);
     const sent = await transport.sendText(event.externalUserId, unsupportedReply);
 
-    await antiSpamGuard.markEventProcessed({
-      channel: event.channel,
-      externalEventId: eventId,
-      externalMessageId: event.externalMessageId,
-      externalUserId: event.externalUserId,
-      messageText: event.messageText,
-      messageType
-    });
+    if (sent) {
+      await antiSpamGuard.markEventProcessed({
+        channel: event.channel,
+        externalEventId: eventId,
+        externalMessageId: event.externalMessageId,
+        externalUserId: event.externalUserId,
+        messageText: event.messageText,
+        messageType
+      });
+    }
 
     return {
       direction: "fallback",
@@ -572,15 +627,6 @@ export async function processChannelConversationEvent(
   const isCommentSource = event.source === "instagram_comment" && !!event.commentContext;
 
   if (session.handoff_to_human) {
-    await antiSpamGuard.markEventProcessed({
-      channel: event.channel,
-      externalEventId: eventId,
-      externalMessageId: event.externalMessageId,
-      externalUserId: event.externalUserId,
-      messageText: event.messageText,
-      messageType
-    });
-
     return {
       direction: "ignored",
       sessionId: session.id,
@@ -622,21 +668,14 @@ export async function processChannelConversationEvent(
       confidence: 0.7
     });
   } else {
-    await conversationPersistence.saveMessage(
-      session.id,
-      event.externalMessageId,
-      "user",
-      event.messageText,
-      "inbound",
-      {
-        channel: event.channel,
-        source: event.source,
-        eventId,
-        externalUserId: event.externalUserId,
-        externalMessageId: event.externalMessageId,
-        messageType
-      }
-    );
+    await safeSaveMessage(session.id, event.externalMessageId, "user", event.messageText, "inbound", {
+      channel: event.channel,
+      source: event.source,
+      eventId,
+      externalUserId: event.externalUserId,
+      externalMessageId: event.externalMessageId,
+      messageType
+    });
   }
 
   const recentMessages = await conversationPersistence.getRecentMessages(session.id, 12);
@@ -740,28 +779,6 @@ export async function processChannelConversationEvent(
     direction = "handoff";
   }
 
-  await conversationPersistence.saveMessage(
-    session.id,
-    undefined,
-    "assistant",
-    replyText,
-    "outbound",
-    {
-      channel: event.channel,
-      source: coreResponse.source,
-      route: "channel_conversation_router",
-      eventId,
-      usedFallback: coreResponse.usedFallback,
-      handoffTriggered: handoffDecision.shouldHandoff,
-      handoffReason: handoffDecision.reason || null,
-      materialUrl: materialRecommendation?.url || null,
-      triageStatus,
-      leadStage,
-      responseTime: coreResponse.metadata.responseTime,
-      classification: coreResponse.metadata.classification
-    }
-  );
-
   const mergedMetadata = {
     ...(session.metadata || {}),
     router_last_event_id: eventId,
@@ -773,64 +790,92 @@ export async function processChannelConversationEvent(
     last_router_at: new Date().toISOString()
   };
 
-  await conversationPersistence.updateSession(session.id, {
-    lead_stage: leadStage,
-    case_area: detectedTheme || session.case_area,
-    current_intent: coreResponse.intent || session.current_intent || "conversation",
-    handoff_to_human: handoffDecision.shouldHandoff,
-    last_inbound_at: new Date().toISOString(),
-    last_outbound_at: new Date().toISOString(),
-    metadata: mergedMetadata
-  });
-
-  await saveTriageAndHandoff(
-    {
-      ...session,
-      metadata: mergedMetadata
-    },
-    event,
-    detectedTheme,
-    leadStage,
-    handoffDecision.reason
-  );
-
-  const sent = await transport.sendText(event.externalUserId, replyText);
+  let finalReplyText = replyText;
+  let sent = await transport.sendText(event.externalUserId, finalReplyText);
+  let finalUsedFallback = coreResponse.usedFallback;
+  let finalDirection = direction;
 
   if (!sent && channelAutomationFeatures.whatsappEmergencyFallback) {
     const safeFallback = buildSafeFallbackReply();
-    await transport.sendText(event.externalUserId, safeFallback);
+    const fallbackSent = await transport.sendText(event.externalUserId, safeFallback);
+
+    if (fallbackSent) {
+      finalReplyText = safeFallback;
+      finalUsedFallback = true;
+      finalDirection = "fallback";
+      sent = true;
+    }
   }
 
-  await antiSpamGuard.markEventProcessed({
-    channel: event.channel,
-    externalEventId: eventId,
-    externalMessageId: event.externalMessageId,
-    externalUserId: event.externalUserId,
-    messageText: event.messageText,
-    messageType
-  });
+  if (sent) {
+    await safeSaveMessage(session.id, undefined, "assistant", finalReplyText, "outbound", {
+      channel: event.channel,
+      source: finalUsedFallback ? "fallback" : coreResponse.source,
+      route: "channel_conversation_router",
+      eventId,
+      usedFallback: finalUsedFallback,
+      handoffTriggered: handoffDecision.shouldHandoff,
+      handoffReason: handoffDecision.reason || null,
+      materialUrl: materialRecommendation?.url || null,
+      triageStatus,
+      leadStage,
+      responseTime: coreResponse.metadata.responseTime,
+      classification: coreResponse.metadata.classification
+    });
+
+    await safeUpdateSession(session.id, {
+      lead_stage: leadStage,
+      case_area: detectedTheme || session.case_area,
+      current_intent: coreResponse.intent || session.current_intent || "conversation",
+      handoff_to_human: handoffDecision.shouldHandoff,
+      last_inbound_at: new Date().toISOString(),
+      last_outbound_at: new Date().toISOString(),
+      metadata: mergedMetadata
+    });
+
+    await saveTriageAndHandoff(
+      {
+        ...session,
+        metadata: mergedMetadata
+      },
+      event,
+      detectedTheme,
+      leadStage,
+      handoffDecision.reason
+    );
+
+    await antiSpamGuard.markEventProcessed({
+      channel: event.channel,
+      externalEventId: eventId,
+      externalMessageId: event.externalMessageId,
+      externalUserId: event.externalUserId,
+      messageText: event.messageText,
+      messageType
+    });
+  }
 
   logRouterEvent("CHANNEL_ROUTER_COMPLETED", {
     channel: event.channel,
     source: event.source,
     sessionId: session.id,
     eventId,
-    direction,
+    direction: finalDirection,
     detectedTheme,
     currentIntent: coreResponse.intent || "conversation",
     leadStage,
     triageStatus,
-    usedFallback: coreResponse.usedFallback,
+    usedFallback: finalUsedFallback,
     handoffTriggered: handoffDecision.shouldHandoff,
     handoffReason: handoffDecision.reason || null,
-    materialUrl: materialRecommendation?.url || null
+    materialUrl: materialRecommendation?.url || null,
+    replySent: sent
   });
 
   return {
-    direction,
+    direction: finalDirection,
     sessionId: session.id,
     eventId,
-    usedFallback: coreResponse.usedFallback,
+    usedFallback: finalUsedFallback,
     handoffTriggered: handoffDecision.shouldHandoff,
     replySent: sent,
     detectedTheme,

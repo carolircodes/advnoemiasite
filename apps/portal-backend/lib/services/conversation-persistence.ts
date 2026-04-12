@@ -45,6 +45,16 @@ export interface ProcessedWebhookEvent {
 class ConversationPersistenceService {
   private supabase = createWebhookSupabaseClient();
 
+  private isMissingMetadataColumnError(error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message || '')
+          : String(error);
+    return message.toLowerCase().includes("metadata") && message.toLowerCase().includes("column");
+  }
+
   // Método público para acessar supabase
   get supabaseClient() {
     return this.supabase;
@@ -244,15 +254,38 @@ class ConversationPersistenceService {
     updates: Partial<Omit<ConversationSession, 'id' | 'created_at' | 'updated_at'>>
   ): Promise<void> {
     try {
+      const payload = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await this.supabase
         .from('conversation_sessions')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
+        .update(payload)
         .eq('id', sessionId);
 
       if (error) {
+        if ('metadata' in payload && this.isMissingMetadataColumnError(error)) {
+          const { metadata: _metadata, ...safePayload } = payload;
+
+          console.warn('SESSION_UPDATE_METADATA_SKIPPED', {
+            sessionId,
+            reason: 'metadata_column_missing'
+          });
+
+          const { error: retryError } = await this.supabase
+            .from('conversation_sessions')
+            .update(safePayload)
+            .eq('id', sessionId);
+
+          if (!retryError) {
+            return;
+          }
+
+          console.error('ERROR_UPDATING_SESSION_AFTER_METADATA_RETRY:', retryError);
+          throw retryError;
+        }
+
         console.error('ERROR_UPDATING_SESSION:', error);
         throw error;
       }
