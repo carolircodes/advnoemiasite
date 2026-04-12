@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { getAllLeads, getLeadsByPriority, getLeadsByTheme, getLeadsByUrgency, getLeadsStats, type LeadData } from '../../../../lib/services/leads-dashboard';
 
 export async function GET(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const priority = searchParams.get('priority') as 'high' | 'normal' | 'all' || 'all';
@@ -49,6 +56,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await request.json();
     const { sessionId, action } = body;

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Payment } from "mercadopago";
+
+import {
+  computeHmacSha256Hex,
+  parseMercadoPagoSignatureInput,
+  shouldEnforceWebhookSignature,
+  timingSafeEqualText
+} from "@/lib/http/webhook-security";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type PaymentWebhookContext = {
   mercadopago: MercadoPagoConfig;
-  supabase: any;
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
   webhookSecret?: string;
 };
 
@@ -34,7 +41,7 @@ function getWebhookContext():
       mercadopago: new MercadoPagoConfig({
         accessToken: mercadoPagoAccessToken as string
       }),
-      supabase: createClient(supabaseUrl as string, supabaseSecretKey as string) as any,
+      supabase: createAdminSupabaseClient(),
       webhookSecret
     }
   };
@@ -55,6 +62,68 @@ function paymentWebhookUnavailableResponse(missing: string[]) {
   );
 }
 
+function getMercadoPagoWebhookEventId(request: NextRequest, event: any) {
+  return (
+    request.nextUrl.searchParams.get("data.id") ||
+    request.nextUrl.searchParams.get("id") ||
+    (typeof event?.data?.id === "string" || typeof event?.data?.id === "number"
+      ? String(event.data.id)
+      : null) ||
+    (typeof event?.id === "string" || typeof event?.id === "number" ? String(event.id) : null)
+  );
+}
+
+function validateMercadoPagoWebhookSignature(args: {
+  request: NextRequest;
+  event: any;
+  webhookSecret?: string;
+}) {
+  const enforceSignature = shouldEnforceWebhookSignature(
+    "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
+  );
+
+  if (!args.webhookSecret) {
+    return {
+      ok: !enforceSignature,
+      status: enforceSignature ? 503 : 200,
+      code: "missing_secret"
+    } as const;
+  }
+
+  const signatureInput = parseMercadoPagoSignatureInput({
+    header: args.request.headers.get("x-signature"),
+    requestId: args.request.headers.get("x-request-id"),
+    dataId: getMercadoPagoWebhookEventId(args.request, args.event)
+  });
+
+  if (!signatureInput) {
+    return {
+      ok: !enforceSignature,
+      status: 401,
+      code: "invalid_signature_input"
+    } as const;
+  }
+
+  const expectedSignature = computeHmacSha256Hex(
+    args.webhookSecret,
+    signatureInput.manifest
+  );
+
+  if (!timingSafeEqualText(expectedSignature, signatureInput.version)) {
+    return {
+      ok: !enforceSignature,
+      status: 401,
+      code: "invalid_signature"
+    } as const;
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    code: "validated"
+  } as const;
+}
+
 export async function POST(request: NextRequest) {
   const context = getWebhookContext();
 
@@ -62,15 +131,10 @@ export async function POST(request: NextRequest) {
     return paymentWebhookUnavailableResponse(context.missing);
   }
 
-  const { mercadopago, supabase } = context.value;
+  const { mercadopago, supabase, webhookSecret } = context.value;
 
   try {
     const body = await request.text();
-    const signature = request.headers.get("x-signature");
-
-    console.log("[payment.webhook] Received Mercado Pago webhook", {
-      hasSignature: !!signature
-    });
 
     let event;
     try {
@@ -78,6 +142,35 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       console.error("[payment.webhook] Invalid JSON payload", { parseError });
       return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
+    const signatureValidation = validateMercadoPagoWebhookSignature({
+      request,
+      event,
+      webhookSecret
+    });
+
+    if (!signatureValidation.ok) {
+      console.error("[payment.webhook] Signature validation failed", {
+        code: signatureValidation.code,
+        enforceSignature: shouldEnforceWebhookSignature(
+          "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
+        )
+      });
+
+      return NextResponse.json(
+        { error: "invalid_webhook_signature", code: signatureValidation.code },
+        { status: signatureValidation.status }
+      );
+    }
+
+    if (signatureValidation.code !== "validated") {
+      console.warn("[payment.webhook] Signature validation bypassed", {
+        code: signatureValidation.code,
+        enforceSignature: shouldEnforceWebhookSignature(
+          "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
+        )
+      });
     }
 
     if (event.type !== "payment") {
@@ -115,7 +208,7 @@ export async function POST(request: NextRequest) {
 async function handleApprovedPayment(supabase: any, paymentInfo: any) {
   try {
     const externalReference = paymentInfo.external_reference;
-    const match = externalReference?.match(/consultation_(\d+)_\d+/);
+    const match = externalReference?.match(/^consultation_(.+)_\d+$/);
 
     if (!match) {
       console.error("[payment.webhook] Invalid external reference", {
@@ -205,7 +298,7 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
 async function handleRejectedPayment(supabase: any, paymentInfo: any) {
   try {
     const externalReference = paymentInfo.external_reference;
-    const match = externalReference?.match(/consultation_(\d+)_\d+/);
+    const match = externalReference?.match(/^consultation_(.+)_\d+$/);
 
     if (!match) {
       console.error("[payment.webhook] Invalid external reference", {
@@ -299,6 +392,10 @@ export async function GET() {
   return NextResponse.json({
     status: "webhook_active",
     timestamp: new Date().toISOString(),
-    message: "Webhook do Mercado Pago esta ativo"
+    message: "Webhook do Mercado Pago esta ativo",
+    signature: {
+      enforced: shouldEnforceWebhookSignature("MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"),
+      secretConfigured: Boolean(context.value.webhookSecret)
+    }
   });
 }

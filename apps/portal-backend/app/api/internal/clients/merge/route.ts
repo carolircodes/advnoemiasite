@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { clientMergeService } from '../../../../../lib/services/client-merge';
 
 export async function POST(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await request.json();
     
@@ -104,6 +111,12 @@ export async function POST(request: NextRequest) {
 
 // GET para consulta de cliente canônico
 export async function GET(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');

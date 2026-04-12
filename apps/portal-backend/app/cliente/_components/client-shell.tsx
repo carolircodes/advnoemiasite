@@ -72,9 +72,9 @@ export function ClientShell({
         </h1>
 
         <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
-          Este shell autenticado e a parte estavel do painel. Ele nao depende
-          do workspace completo, de analytics, de scripts globais ou de widgets
-          dinamicos para abrir com seguranca.
+          Este painel foi organizado para voce entender rapidamente o que esta
+          acontecendo no seu acompanhamento, quais informacoes ja estao
+          disponiveis e qual e o proximo passo dentro do portal.
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -84,27 +84,27 @@ export function ClientShell({
             </p>
             <p className="mt-2 text-lg font-semibold text-[#10261d]">Ativa</p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              A autenticacao do portal foi validada antes da renderizacao.
+              Seu acesso foi validado antes da abertura desta area.
             </p>
           </div>
 
           <div className="rounded-3xl border border-[#ece5d9] bg-[#fcfaf6] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Shell
+              Acompanhamento
             </p>
-            <p className="mt-2 text-lg font-semibold text-[#10261d]">Server-first</p>
+            <p className="mt-2 text-lg font-semibold text-[#10261d]">Resumo claro</p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              A estrutura principal foi isolada dos modulos variaveis.
+              Caso, documentos, agenda e historico ficam em blocos separados para facilitar a leitura.
             </p>
           </div>
 
           <div className="rounded-3xl border border-[#ece5d9] bg-[#fcfaf6] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Estabilidade
+              Proximo passo
             </p>
-            <p className="mt-2 text-lg font-semibold text-[#10261d]">Prioridade total</p>
+            <p className="mt-2 text-lg font-semibold text-[#10261d]">Tudo em um lugar</p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Modulos futuros poderao falhar isoladamente sem derrubar a rota.
+              Use os modulos abaixo para ver o que ja esta liberado e o que pede sua atencao.
             </p>
           </div>
         </div>
@@ -122,14 +122,13 @@ export function ClientShell({
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <ClientSafeCard title="Boas-vindas e acesso">
           <p>
-            Este painel abre primeiro com o minimo necessario: autenticacao
-            valida, identificacao basica da sessao, boundaries locais e acoes
-            seguras.
+            Esta area foi organizada para abrir com rapidez e mostrar primeiro
+            o que mais ajuda no acompanhamento do seu caso.
           </p>
           <p className="mt-3">
-            O shell termina aqui. Os modulos de caso, documentos, agenda e
-            interacoes voltarao em camadas seguras, cada um com loader e
-            fallback proprios.
+            Quando algum dado ainda nao estiver disponivel, voce continua vendo
+            o restante do painel normalmente e pode seguir pelos links
+            principais sem confusao.
           </p>
         </ClientSafeCard>
 
@@ -200,9 +199,8 @@ export function ClientShell({
           </form>
         </div>
         <p className="mt-4">
-          Este shell permanece util mesmo com dados vazios, ausentes ou
-          inconsistentes. Os modulos futuros so entram quando conseguirem falhar
-          de forma isolada e previsivel.
+          Se algum modulo estiver temporariamente vazio ou indisponivel, o
+          painel continua mostrando o restante do acompanhamento com clareza.
         </p>
       </ClientSafeCard>
     </ClientShellFrame>
@@ -217,11 +215,11 @@ export function ClientShellLoading() {
           Area do cliente
         </div>
         <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[#10261d] sm:text-4xl">
-          Carregando shell estavel do painel.
+          Carregando seu painel do cliente.
         </h1>
         <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
-          Estamos preparando uma versao segura da area autenticada antes de
-          qualquer modulo dinamico entrar em cena.
+          Estamos preparando o resumo do seu acompanhamento antes de carregar os
+          modulos de documentos, agenda e historico.
         </p>
       </section>
 
@@ -254,13 +252,12 @@ export function ClientShellErrorState({
         </div>
 
         <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[#10261d]">
-          O shell do painel bloqueou uma falha antes que ela virasse tela branca.
+          Nao foi possivel carregar todo o painel agora.
         </h1>
 
         <p className="mt-4 text-base leading-8 text-[#5f6f68]">
-          Esta rota possui fallback local. Mesmo que um modulo futuro falhe, o
-          objetivo continua sendo manter a area autenticada renderizando algo
-          util e recuperavel.
+          O portal protege esta area para evitar tela em branco. Tente novamente
+          em instantes ou use os atalhos abaixo para retomar o acesso.
         </p>
 
         <div className="mt-6 rounded-3xl border border-[#efe3d1] bg-[#fbf7ef] p-5">

@@ -77,7 +77,7 @@ function ClientPreparationModuleCard({
       ? "Desligado por flag"
       : reason
         ? "Fallback seguro ativo"
-        : "Base pronta para expansao");
+        : "Dados disponiveis");
 
   return (
     <SafeModuleCard title={title} description={description} tone={tone}>
@@ -197,13 +197,13 @@ export function ClientCaseSummaryModule({
     <SafeModuleCard
       id="client-case-summary"
       title="Resumo do caso"
-      description="Primeiro modulo real da Fase 2. Ele usa loader proprio, normalizacao central e fallback local sem depender da dashboard antiga."
+      description="Visao inicial do seu acompanhamento para voce entender o status atual, a data de entrada no portal e quantos casos estao visiveis."
       tone={tone}
     >
       {!enabled ? (
         <p className="rounded-2xl border border-[#eadfcf] bg-[#fbf7ef] px-4 py-3 text-sm leading-6 text-[#7b5c31]">
-          O resumo do caso esta desligado por flag. O shell continua ativo e a
-          rota segue estavel.
+          O resumo do caso esta temporariamente indisponivel. Os demais modulos
+          do painel continuam acessiveis.
         </p>
       ) : null}
 
@@ -211,7 +211,7 @@ export function ClientCaseSummaryModule({
         <p className="rounded-2xl border border-[#eadfcf] bg-[#fbf7ef] px-4 py-3 text-sm leading-6 text-[#7b5c31]">
           {result.reason === "client_not_found"
             ? "Seu cadastro ainda nao foi vinculado a um caso visivel no portal."
-            : "Ainda nao ha um caso disponivel para resumir nesta area. Quando houver dados validos, este bloco continuara usando fallback seguro."}
+            : "Ainda nao ha um caso disponivel para resumir nesta area. Quando houver atualizacoes visiveis, elas aparecerao aqui."}
         </p>
       ) : null}
 
@@ -247,7 +247,7 @@ export function ClientCaseSummaryModule({
               {normalizeDateLabel(mainCase.created_at)}
             </p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Data normalizada com fallback seguro.
+              Data em que este acompanhamento passou a aparecer no seu portal.
             </p>
           </div>
 
@@ -259,7 +259,7 @@ export function ClientCaseSummaryModule({
               {result.data.totalCases}
             </p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Este modulo falha localmente se o loader perder consistencia.
+              Quantidade de acompanhamentos hoje vinculados ao seu acesso.
             </p>
           </div>
         </div>
@@ -267,7 +267,7 @@ export function ClientCaseSummaryModule({
 
       {enabled && result.reason && hasCase ? (
         <p className="mt-4 rounded-2xl border border-[#eadfcf] bg-[#fbf7ef] px-4 py-3 text-sm leading-6 text-[#7b5c31]">
-          O bloco carregou com fallback parcial: {getFriendlyReason(result.reason)}
+          Parte deste resumo foi carregada com seguranca reduzida: {getFriendlyReason(result.reason)}
         </p>
       ) : null}
     </SafeModuleCard>
@@ -286,7 +286,7 @@ export function ClientDocumentsPreparationCard({
 
   return (
     <ClientPreparationModuleCard
-      title="Documentos simples"
+      title="Documentos do caso"
       href="/documentos"
       ctaLabel="Abrir documentos"
       enabled={enabled}
@@ -298,7 +298,7 @@ export function ClientDocumentsPreparationCard({
             ? "Modulo simples ativo"
             : "Estado vazio seguro"
       }
-      description="Documentos simples agora aparecem como modulo real no shell, com contagem segura, lista curta e CTA para a area completa."
+      description="Veja quantos documentos ja estao disponiveis, quantos ainda estao pendentes e abra a area completa quando precisar."
     >
       <dl className="space-y-3">
         <SummaryMetric label="Total visivel" value={String(result.data.totalCount)} />
@@ -321,8 +321,8 @@ export function ClientDocumentsPreparationCard({
 
       {enabled && !hasDocuments ? (
         <p className="mt-4 rounded-2xl border border-[#ece5d9] bg-[#fcfaf6] px-4 py-3 text-sm leading-6 text-[#5f6f68]">
-          Nenhum documento visivel foi encontrado agora. Quando houver itens
-          validos, este bloco mostra apenas uma lista curta e segura.
+          Nenhum documento visivel foi encontrado agora. Quando a equipe liberar
+          arquivos ou registrar novas pendencias, este bloco sera atualizado.
         </p>
       ) : null}
     </ClientPreparationModuleCard>
@@ -341,7 +341,7 @@ export function ClientAgendaPreparationCard({
 
   return (
     <ClientPreparationModuleCard
-      title="Agenda simples"
+      title="Agenda do acompanhamento"
       href="/agenda"
       ctaLabel="Abrir agenda"
       enabled={enabled}
@@ -353,7 +353,7 @@ export function ClientAgendaPreparationCard({
             ? "Modulo simples ativo"
             : "Estado vazio seguro"
       }
-      description="Agenda simples agora mostra os proximos compromissos com datas normalizadas e fallback local, sem recolocar calendario complexo."
+      description="Veja os proximos compromissos ligados ao seu caso e qual e a proxima data importante ja registrada pela equipe."
     >
       <dl className="space-y-3">
         <SummaryMetric label="Compromissos" value={String(result.data.totalAppointments)} />
@@ -386,8 +386,8 @@ export function ClientAgendaPreparationCard({
 
       {enabled && !hasAppointments ? (
         <p className="mt-4 rounded-2xl border border-[#ece5d9] bg-[#fcfaf6] px-4 py-3 text-sm leading-6 text-[#5f6f68]">
-          Ainda nao ha compromissos futuros cadastrados. O bloco continua ativo
-          e seguro mesmo quando a agenda vier vazia.
+          Ainda nao ha compromissos futuros cadastrados. Quando uma nova data
+          for liberada para voce, ela aparecera aqui.
         </p>
       ) : null}
     </ClientPreparationModuleCard>
@@ -418,7 +418,7 @@ export function ClientRequestsModule({
             ? "Modo leitura ativo"
             : "Estado vazio seguro"
       }
-      description="Este modulo mostra apenas leitura curta e segura das solicitacoes mais recentes, sem upload pesado ou formularios avancados dentro do shell."
+      description="Aqui voce acompanha as solicitacoes recentes e entende rapidamente se ainda existe algo aguardando sua acao."
     >
       <dl className="space-y-3">
         <SummaryMetric label="Total" value={String(result.data.documentRequests.length)} />
@@ -446,8 +446,8 @@ export function ClientRequestsModule({
 
       {enabled && !hasRequests ? (
         <p className="mt-4 rounded-2xl border border-[#ece5d9] bg-[#fcfaf6] px-4 py-3 text-sm leading-6 text-[#5f6f68]">
-          Nenhuma solicitacao recente foi encontrada. O modulo permanece em
-          leitura segura mesmo quando a lista vier vazia.
+          Nenhuma solicitacao recente foi encontrada. Quando a equipe pedir um
+          documento ou registrar uma interacao importante, ela aparecera aqui.
         </p>
       ) : null}
     </ClientPreparationModuleCard>
@@ -466,7 +466,7 @@ export function ClientEventsModule({
 
   return (
     <ClientPreparationModuleCard
-      title="Historico e atividade"
+      title="Historico recente"
       href="/cliente"
       ctaLabel="Atualizar painel"
       enabled={enabled}
@@ -478,7 +478,7 @@ export function ClientEventsModule({
             ? "Resumo recente ativo"
             : "Estado vazio seguro"
       }
-      description="O historico volta nesta onda como resumo enxuto de atividade recente, sem timeline rica ou visualizacao pesada."
+      description="Resumo das ultimas atualizacoes visiveis para voce acompanhar o andamento sem precisar interpretar termos tecnicos."
     >
       <dl className="space-y-3">
         <SummaryMetric label="Eventos recentes" value={String(result.data.recentEvents.length)} />
@@ -501,8 +501,8 @@ export function ClientEventsModule({
 
       {enabled && !hasEvents ? (
         <p className="mt-4 rounded-2xl border border-[#ece5d9] bg-[#fcfaf6] px-4 py-3 text-sm leading-6 text-[#5f6f68]">
-          Ainda nao ha historico recente disponivel para exibir. O shell segue
-          util e o modulo cai em estado vazio explicito.
+          Ainda nao ha historico recente disponivel para exibir. As proximas
+          movimentacoes publicadas pela equipe passarao a aparecer aqui.
         </p>
       ) : null}
     </ClientPreparationModuleCard>

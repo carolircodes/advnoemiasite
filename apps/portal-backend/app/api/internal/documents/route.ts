@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     const result = await registerCaseDocument(
       {
         caseId: formData.get("caseId"),
+        requestId: formData.get("requestId"),
         category: formData.get("category"),
         description: formData.get("description"),
         status: formData.get("status"),

@@ -1,15 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
-
-// Proteção contra variáveis não configuradas
-if (!supabaseUrl || !supabaseSecretKey) {
-  console.warn("Variáveis do Supabase não configuradas em payment-service.ts");
-  throw new Error("Configuração do Supabase é obrigatória para pagamentos");
-}
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey);
+import { createAdminSupabaseClient } from "../supabase/admin";
 
 export interface PaymentRequest {
   leadId: string;
@@ -26,22 +15,33 @@ export interface PaymentResponse {
   error?: string;
 }
 
+function getPaymentApiBaseUrl() {
+  const value =
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (!value) {
+    throw new Error("NEXT_PUBLIC_BASE_URL ou NEXT_PUBLIC_APP_URL precisa estar configurada.");
+  }
+
+  return value.replace(/\/$/, "");
+}
+
 export async function generatePaymentLink(request: PaymentRequest): Promise<PaymentResponse> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/payment/create`, {
-      method: 'POST',
+    const response = await fetch(`${getPaymentApiBaseUrl()}/api/payment/create`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(request)
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || 'Erro ao gerar pagamento'
+        error: data.error || "Erro ao gerar pagamento"
       };
     }
 
@@ -52,24 +52,28 @@ export async function generatePaymentLink(request: PaymentRequest): Promise<Paym
       amount: data.amount,
       message: data.message
     };
-
   } catch (error) {
-    console.error('Erro ao gerar link de pagamento:', error);
+    console.error("[payment.service] Failed to generate payment link", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
     return {
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor"
     };
   }
 }
 
 export async function checkPaymentStatus(paymentId: string): Promise<PaymentResponse> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/payment/create?payment_id=${paymentId}`);
-    
+    const response = await fetch(
+      `${getPaymentApiBaseUrl()}/api/payment/create?payment_id=${paymentId}`
+    );
+
     if (!response.ok) {
       return {
         success: false,
-        error: 'Pagamento não encontrado'
+        error: "Pagamento nao encontrado"
       };
     }
 
@@ -80,12 +84,14 @@ export async function checkPaymentStatus(paymentId: string): Promise<PaymentResp
       paymentId: data.payment.id,
       message: `Status: ${data.payment.status}`
     };
-
   } catch (error) {
-    console.error('Erro ao verificar status do pagamento:', error);
+    console.error("[payment.service] Failed to check payment status", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
     return {
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor"
     };
   }
 }
@@ -97,36 +103,40 @@ export function generatePaymentMessage(paymentResponse: PaymentResponse): string
 
   return `Perfeito. Vou te encaminhar o link para agendamento da consulta.
 
-Assim que o pagamento for confirmado, seguimos com seu atendimento prioritário.
+Assim que o pagamento for confirmado, seguimos com seu atendimento prioritario.
 
-🔗 **Link para pagamento**: ${paymentResponse.paymentUrl}
+Link para pagamento: ${paymentResponse.paymentUrl}
 
-O valor da consulta é de R$ ${paymentResponse.amount?.toFixed(2)} e pode ser pago via Pix ou cartão de crédito.
+O valor da consulta e de R$ ${paymentResponse.amount?.toFixed(2)} e pode ser pago via Pix ou cartao de credito.
 
-Após a confirmação, você receberá as próximas orientações automaticamente.`;
+Apos a confirmacao, voce recebera as proximas orientacoes automaticamente.`;
 }
 
-export async function updateLeadPaymentStatus(leadId: string, status: 'payment_requested' | 'payment_pending' | 'paid' | 'rejected'): Promise<void> {
+export async function updateLeadPaymentStatus(
+  leadId: string,
+  status: "payment_requested" | "payment_pending" | "paid" | "rejected"
+): Promise<void> {
   try {
-    const updateData: any = {
+    const supabase = createAdminSupabaseClient();
+    const updateData: Record<string, string> = {
       status,
       updated_at: new Date().toISOString()
     };
 
-    if (status === 'payment_requested') {
+    if (status === "payment_requested") {
       updateData.payment_requested_at = new Date().toISOString();
-    } else if (status === 'paid') {
+    } else if (status === "paid") {
       updateData.payment_confirmed_at = new Date().toISOString();
-    } else if (status === 'rejected') {
+    } else if (status === "rejected") {
       updateData.payment_rejected_at = new Date().toISOString();
     }
 
-    await supabase
-      .from('noemia_leads')
-      .update(updateData)
-      .eq('id', leadId);
-
+    await supabase.from("noemia_leads").update(updateData).eq("id", leadId);
   } catch (error) {
-    console.error('Erro ao atualizar status do lead:', error);
+    console.error("[payment.service] Failed to update lead payment status", {
+      leadId,
+      status,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }

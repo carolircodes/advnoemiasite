@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { triagePersistence } from '../../../../../lib/services/triage-persistence';
-import { getCurrentProfile } from '../../../../../lib/auth/guards';
+import { requireInternalApiProfile } from '../../../../../lib/auth/guards';
 
 export async function POST(request: Request) {
   try {
-    const profile = await getCurrentProfile();
+    const access = await requireInternalApiProfile();
+
+    if (!access.ok) {
+      return NextResponse.json({ success: false, error: access.error }, { status: access.status });
+    }
+
     const { sessionId } = await request.json();
 
     if (!sessionId) {
@@ -17,14 +22,14 @@ export async function POST(request: Request) {
     // Marcar como atendido por humano
     await triagePersistence.markAsAttendedByHuman(
       sessionId, 
-      profile?.full_name || profile?.email || 'sistema'
+      access.profile.full_name || access.profile.email || 'sistema'
     );
     
     return NextResponse.json({
       success: true,
       message: 'Triagem marcada como atendida com sucesso',
       sessionId,
-      attendedBy: profile?.full_name || profile?.email || 'sistema'
+      attendedBy: access.profile.full_name || access.profile.email || 'sistema'
     });
   } catch (error) {
     console.error('ERROR_MARKING_AS_ATTENDED:', error);

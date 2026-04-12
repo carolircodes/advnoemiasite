@@ -5,10 +5,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { abTestingService } from "../../../../lib/services/ab-testing";
 import { optimizationIntelligenceService } from "../../../../lib/services/optimization-intelligence";
 
 export async function GET(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     console.log("PERFORMANCE_API_REQUEST");
 
@@ -355,6 +362,12 @@ async function getBusinessMetrics(period: 'daily' | 'weekly' | 'monthly') {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await request.json();
     console.log("PERFORMANCE_API_POST_REQUEST", body);

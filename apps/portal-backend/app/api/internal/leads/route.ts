@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { requireProfile } from "@/lib/auth/guards";
 import { getAllLeads } from "@/lib/services/noemia";
 
 // Função interna de sincronização - idempotente e segura
 async function syncLeadsToDatabase() {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createAdminSupabaseClient();
   
   try {
     // Buscar leads reais da NoemIA (sessionContexts)
@@ -120,10 +120,10 @@ async function syncLeadsToDatabase() {
 
 export async function GET(request: NextRequest) {
   try {
-    const profile = await requireProfile(["admin", "advogada"]);
+    await requireProfile(["admin", "advogada"]);
     
     // Apenas ler dados do banco - GET idempotente
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminSupabaseClient();
     
     // Sincronização controlada (apenas se necessário)
     const syncNeeded = request.nextUrl.searchParams.get('sync') === 'true';
@@ -170,9 +170,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await requireProfile(["admin", "advogada"]);
+    await requireProfile(["admin", "advogada"]);
     const body = await request.json();
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminSupabaseClient();
 
     // Atualizar status de um lead
     const { id, lead_status, funnel_stage, urgency, operational_status } = body;

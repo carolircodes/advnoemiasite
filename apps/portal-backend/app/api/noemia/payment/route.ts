@@ -1,54 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { generatePaymentLink, generatePaymentMessage } from '@/lib/payment/payment-service';
+import { NextRequest, NextResponse } from "next/server";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+import { generatePaymentLink, generatePaymentMessage } from "@/lib/payment/payment-service";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
-if (!supabaseUrl || !supabaseSecretKey) {
-  console.error("Variáveis do Supabase não configuradas em noemia payment route");
-  throw new Error("Configuração do Supabase é obrigatória para pagamentos da NoemIA");
+function createPaymentSupabaseClient() {
+  return createAdminSupabaseClient();
 }
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey);
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createPaymentSupabaseClient();
     const { leadId, userId, message, intentionType } = await request.json();
 
-    // Validar dados obrigatórios
     if (!leadId || !userId) {
       return NextResponse.json(
-        { error: 'leadId e userId são obrigatórios' },
+        { error: "leadId e userId sao obrigatorios" },
         { status: 400 }
       );
     }
 
-    // Verificar se o lead existe
     const { data: lead, error: leadError } = await supabase
-      .from('noemia_leads')
-      .select('*')
-      .eq('id', leadId)
-      .single();
+      .from("noemia_leads")
+      .select("*")
+      .eq("id", leadId)
+      .maybeSingle();
 
     if (leadError || !lead) {
-      return NextResponse.json(
-        { error: 'Lead não encontrado' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Lead nao encontrado" }, { status: 404 });
     }
 
-    // Verificar se já existe um pagamento ativo
     const { data: existingPayment } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('lead_id', leadId)
-      .in('status', ['pending', 'approved'])
-      .single();
+      .from("payments")
+      .select("*")
+      .eq("lead_id", leadId)
+      .in("status", ["pending", "approved"])
+      .maybeSingle();
 
-    if (existingPayment && existingPayment.status === 'pending') {
-      // Já existe pagamento pendente, retornar link existente
-      const message = generatePaymentMessage({
+    if (existingPayment && existingPayment.status === "pending") {
+      const responseMessage = generatePaymentMessage({
         success: true,
         paymentUrl: existingPayment.payment_url,
         paymentId: existingPayment.external_id,
@@ -57,69 +46,64 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message,
+        message: responseMessage,
         paymentUrl: existingPayment.payment_url,
         paymentId: existingPayment.external_id,
         alreadyExists: true
       });
     }
 
-    if (existingPayment && existingPayment.status === 'approved') {
-      // Pagamento já aprovado
+    if (existingPayment && existingPayment.status === "approved") {
       return NextResponse.json({
         success: true,
-        message: "Seu pagamento já foi confirmado! Em instantes você receberá as próximas orientações.",
+        message:
+          "Seu pagamento ja foi confirmado. Em instantes voce recebera as proximas orientacoes.",
         alreadyPaid: true
       });
     }
 
-    // Gerar novo pagamento
     const paymentResponse = await generatePaymentLink({
       leadId,
       userId,
       metadata: {
         intention_type: intentionType,
         original_message: message,
-        user_agent: request.headers.get('user-agent')
+        user_agent: request.headers.get("user-agent")
       }
     });
 
     if (!paymentResponse.success) {
       return NextResponse.json(
-        { error: paymentResponse.error || 'Erro ao gerar pagamento' },
+        { error: paymentResponse.error || "Erro ao gerar pagamento" },
         { status: 500 }
       );
     }
 
-    // Adicionar mensagem ao histórico do lead
     const aiMessage = generatePaymentMessage(paymentResponse);
-    
-    await supabase
-      .from('noemia_lead_conversations')
-      .insert({
-        lead_id: leadId,
-        message: aiMessage,
-        sender: 'noemia',
-        message_type: 'payment_request',
-        metadata: {
-          payment_generated: true,
-          payment_id: paymentResponse.paymentId,
-          payment_url: paymentResponse.paymentUrl,
-          amount: paymentResponse.amount,
-          intention_type: intentionType
-        },
-        created_at: new Date().toISOString()
-      });
 
-    // Atualizar status do lead
+    await supabase.from("noemia_lead_conversations").insert({
+      lead_id: leadId,
+      message: aiMessage,
+      sender: "noemia",
+      message_type: "payment_request",
+      metadata: {
+        payment_generated: true,
+        payment_id: paymentResponse.paymentId,
+        payment_url: paymentResponse.paymentUrl,
+        amount: paymentResponse.amount,
+        intention_type: intentionType
+      },
+      created_at: new Date().toISOString()
+    });
+
     await supabase
-      .from('noemia_leads')
+      .from("noemia_leads")
       .update({
-        status: 'payment_pending',
+        status: "payment_pending",
         payment_requested_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', leadId);
+      .eq("id", leadId);
 
     return NextResponse.json({
       success: true,
@@ -128,40 +112,36 @@ export async function POST(request: NextRequest) {
       paymentId: paymentResponse.paymentId,
       amount: paymentResponse.amount
     });
-
   } catch (error) {
-    console.error('Erro ao processar pagamento da IA:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+    console.error("[noemia.payment] Internal error", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
 
-// Método GET para verificar status de pagamento de um lead
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const leadId = searchParams.get('lead_id');
+  const leadId = searchParams.get("lead_id");
 
   if (!leadId) {
-    return NextResponse.json(
-      { error: 'lead_id é obrigatório' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "lead_id e obrigatorio" }, { status: 400 });
   }
 
   try {
+    const supabase = createPaymentSupabaseClient();
     const { data: payment } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
+      .from("payments")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!payment) {
       return NextResponse.json(
-        { error: 'Nenhum pagamento encontrado para este lead' },
+        { error: "Nenhum pagamento encontrado para este lead" },
         { status: 404 }
       );
     }
@@ -178,12 +158,11 @@ export async function GET(request: NextRequest) {
         approved_at: payment.approved_at
       }
     });
-
   } catch (error) {
-    console.error('Erro ao verificar status do pagamento:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+    console.error("[noemia.payment] Failed to fetch payment", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }

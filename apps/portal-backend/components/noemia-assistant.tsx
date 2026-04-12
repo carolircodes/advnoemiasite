@@ -85,38 +85,41 @@ export function NoemiaAssistant({
     setDraft("");
 
     startTransition(async () => {
-      const response = await fetch("/api/noemia/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          audience,
-          currentPath,
-          message: cleanMessage,
-          history: nextHistory.slice(-8)
-        })
-      });
-      const result = await response.json().catch(() => ({}));
+      try {
+        const response = await fetch("/api/noemia/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            audience,
+            currentPath,
+            message: cleanMessage,
+            history: nextHistory.slice(-8)
+          })
+        });
+        const result = await response.json().catch(() => ({}));
 
-      if (!response.ok || !result?.ok || typeof result?.answer !== "string") {
-        setError(
-          typeof result?.error === "string"
-            ? result.error
-            : copy.errorText
-        );
-        setMessages(messages);
-        return;
-      }
-
-      setLastSuccess(true);
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: result.answer
+        if (!response.ok || typeof result?.answer !== "string") {
+          setError(
+            typeof result?.error === "string"
+              ? result.error
+              : copy.errorText
+          );
+          return;
         }
-      ]);
+
+        setLastSuccess(true);
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content: result.answer
+          }
+        ]);
+      } catch {
+        setError(copy.errorText);
+      }
     });
   }
 

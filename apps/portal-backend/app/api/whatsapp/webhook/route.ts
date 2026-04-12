@@ -1,10 +1,14 @@
-import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  computeHmacSha256Hex,
+  shouldEnforceWebhookSignature,
+  timingSafeEqualText
+} from "@/lib/http/webhook-security";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
 
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "noeminha_verify_2026";
-const APP_SECRET = process.env.WHATSAPP_APP_SECRET || "noeminha_whatsapp_secret_2026";
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
+const APP_SECRET = process.env.WHATSAPP_APP_SECRET?.trim();
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -24,15 +28,13 @@ function logEvent(
 }
 
 function verifySignature(body: string, signature: string) {
-  if (!signature) {
+  if (!signature || !APP_SECRET) {
     return false;
   }
 
-  const expectedSignature = `sha256=${createHmac("sha256", APP_SECRET)
-    .update(body, "utf8")
-    .digest("hex")}`;
+  const expectedSignature = `sha256=${computeHmacSha256Hex(APP_SECRET, body)}`;
 
-  return signature === expectedSignature;
+  return timingSafeEqualText(signature, expectedSignature);
 }
 
 function extractMessageInfo(message: Record<string, any>) {
@@ -185,6 +187,14 @@ async function sendWhatsAppResponse(to: string, message: string) {
 }
 
 export async function GET(request: NextRequest) {
+  if (!VERIFY_TOKEN) {
+    logEvent("WHATSAPP_VERIFY_TOKEN_MISSING", undefined, "error");
+    return NextResponse.json(
+      { error: "Webhook verification unavailable" },
+      { status: 503 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
@@ -203,19 +213,70 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-hub-signature-256") || "";
   const body = await request.text();
+  const enforceSignature = shouldEnforceWebhookSignature(
+    "WHATSAPP_WEBHOOK_ENFORCE_SIGNATURE"
+  );
 
-  if (!verifySignature(body, signature)) {
+  if (!APP_SECRET) {
+    if (enforceSignature) {
+      logEvent(
+        "WHATSAPP_SIGNATURE_SECRET_MISSING",
+        {
+          note: "WHATSAPP_APP_SECRET is required when signature enforcement is active."
+        },
+        "error"
+      );
+
+      return NextResponse.json(
+        { error: "Webhook signature secret unavailable" },
+        { status: 503 }
+      );
+    }
+
     logEvent(
-      "WHATSAPP_SIGNATURE_INVALID_BUT_ACCEPTED",
+      "WHATSAPP_SIGNATURE_VALIDATION_DISABLED",
       {
-        note: "Webhook kept in shadow validation mode to avoid operational interruption."
+        note: "WHATSAPP_APP_SECRET is not configured. Signature validation is unavailable."
       },
       "warn"
     );
+  } else if (!verifySignature(body, signature)) {
+      if (enforceSignature) {
+        logEvent(
+          "WHATSAPP_SIGNATURE_INVALID_REJECTED",
+          {
+            note: "Webhook rejected because the signature is invalid."
+          },
+          "warn"
+        );
+
+        return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+      }
+
+      logEvent(
+        "WHATSAPP_SIGNATURE_INVALID_BUT_ACCEPTED",
+        {
+          note: "Webhook kept in shadow validation mode to avoid operational interruption."
+        },
+        "warn"
+      );
   }
 
   try {
-    const data = JSON.parse(body);
+    let data;
+    try {
+      data = JSON.parse(body);
+    } catch (parseError) {
+      logEvent(
+        "WHATSAPP_WEBHOOK_INVALID_JSON",
+        {
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        },
+        "warn"
+      );
+
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
 
     if (data.object !== "whatsapp_business_account") {
       return NextResponse.json({ received: true }, { status: 200 });

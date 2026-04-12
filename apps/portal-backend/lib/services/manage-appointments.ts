@@ -6,6 +6,7 @@ import {
   appointmentStatusLabels,
   appointmentTypeLabels,
   type AppointmentChangeType,
+  cancelCaseAppointmentSchema,
   registerCaseAppointmentSchema,
   updateCaseAppointmentSchema
 } from "../domain/portal";
@@ -844,7 +845,8 @@ export async function updateCaseAppointment(rawInput: unknown, actorProfileId: s
 }
 
 export async function cancelCaseAppointment(rawInput: unknown, actorProfileId: string) {
-  const input = { appointmentId: String(rawInput) };
+  await assertStaffActor(actorProfileId);
+  const input = cancelCaseAppointmentSchema.parse(rawInput);
   const context = await resolveAppointmentContext(input.appointmentId);
 
   return updateCaseAppointment(
@@ -855,7 +857,8 @@ export async function cancelCaseAppointment(rawInput: unknown, actorProfileId: s
       description: context.appointmentRecord.notes || "",
       startsAt: context.appointmentRecord.starts_at,
       status: "cancelled",
-      shouldNotifyClient: false,
+      visibleToClient: context.appointmentRecord.visible_to_client,
+      shouldNotifyClient: input.shouldNotifyClient,
       payload: {}
     },
     actorProfileId

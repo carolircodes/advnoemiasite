@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { createWebhookSupabaseClient } from "../../../../../lib/supabase/webhook";
 
 export async function GET() {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const supabase = createWebhookSupabaseClient();
     

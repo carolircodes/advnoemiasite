@@ -116,9 +116,9 @@ export default async function ClientPage({
       : null,
     {
       tone: "warning" as const,
-      title: "Modo de consolidacao",
+      title: "Como usar este painel",
       description:
-        "O shell autenticado foi separado da arvore variavel. A Fase 2 segue avancando por ondas pequenas, com modulos isolados e fallback local em cada bloco."
+        "Aqui voce acompanha o resumo do caso, documentos, agenda e historico recente. Se algum bloco estiver temporariamente indisponivel, a pagina continua aberta com seguranca."
     }
   ].filter(isNotice);
 

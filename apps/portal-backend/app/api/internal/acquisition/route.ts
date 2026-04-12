@@ -5,10 +5,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { acquisitionContentService } from "../../../../lib/services/acquisition-content";
 import { leadCaptureService } from "../../../../lib/services/lead-capture";
 
 export async function GET(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     console.log("ACQUISITION_API_REQUEST");
 
@@ -151,6 +158,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await request.json();
     console.log("ACQUISITION_API_POST_REQUEST", body);

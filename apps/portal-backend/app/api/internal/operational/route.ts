@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { operationalPanel } from "@/lib/services/operational-panel";
 import { assistedFollowUpService } from "@/lib/services/assisted-follow-up";
 import { followUpResponseHandler } from "@/lib/services/follow-up-response-handler";
 
 export async function POST(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await request.json();
     
@@ -164,6 +171,12 @@ export async function POST(request: NextRequest) {
 
 // GET para consultas simples
 export async function GET(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action') || 'getPanelData';

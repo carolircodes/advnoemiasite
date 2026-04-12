@@ -3,10 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "echo static-root",
-    "build:portal": "cd apps/portal-backend && npm run build",
-    "start": "cd apps/portal-backend && npm start",
-    "dev": "cd apps/portal-backend && npm run dev"
+    "build": "npm run build --workspace portal-backend",
+    "build:portal": "npm run build --workspace portal-backend",
+    "start": "npm run start --workspace portal-backend",
+    "dev": "npm run dev --workspace portal-backend"
   },
   "workspaces": [
     "apps/portal-backend"

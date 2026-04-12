@@ -1,8 +1,17 @@
 import type { NextRequest } from "next/server";
 
+import { guardSensitiveRoute, isSensitiveRoute } from "./lib/http/sensitive-route";
 import { updateSession } from "./lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+  if (isSensitiveRoute(request.nextUrl.pathname)) {
+    const sensitiveRouteResponse = guardSensitiveRoute(request);
+
+    if (sensitiveRouteResponse) {
+      return sensitiveRouteResponse;
+    }
+  }
+
   return updateSession(request);
 }
 
@@ -12,6 +21,10 @@ export const config = {
     "/documentos/:path*",
     "/agenda/:path*",
     "/internal/:path*",
-    "/api/internal/:path*"
+    "/api/internal/:path*",
+    "/api/debug/:path*",
+    "/api/test/:path*",
+    "/api/meta/test",
+    "/api/whatsapp/webhook/test"
   ]
 };
