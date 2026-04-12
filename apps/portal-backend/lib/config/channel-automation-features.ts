@@ -31,3 +31,8 @@ export const channelAutomationFeatures = {
   disableLegacyCommentResponders: readBooleanFlag("CHANNEL_DISABLE_LEGACY_COMMENT_RESPONDERS", true),
   whatsappEmergencyFallback: readBooleanFlag("WHATSAPP_ENABLE_EMERGENCY_FALLBACK", true)
 } as const;
+
+export const channelCommercialConfig = {
+  consultationWhatsappNumber:
+    process.env.CHANNEL_CONSULTATION_WHATSAPP_NUMBER || "5584998566004"
+} as const;

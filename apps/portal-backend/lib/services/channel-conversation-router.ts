@@ -1,7 +1,10 @@
 import type { ConversationSession } from "./conversation-persistence";
 
 import { processNoemiaCore } from "../ai/noemia-core";
-import { channelAutomationFeatures } from "../config/channel-automation-features";
+import {
+  channelAutomationFeatures,
+  channelCommercialConfig
+} from "../config/channel-automation-features";
 import { acquisitionContentService } from "./acquisition-content";
 import { antiSpamGuard } from "./anti-spam-guard";
 import { conversationPersistence } from "./conversation-persistence";
@@ -51,6 +54,9 @@ type RouterDecision = {
   triageStatus: TriageStatus;
   materialUrl?: string;
   handoffReason?: string;
+  followUpState?: FollowUpState;
+  conversionSignal?: ConversionSignal;
+  nextBestAction?: NextBestAction;
   logs: Record<string, unknown>;
 };
 
@@ -59,6 +65,41 @@ type MaterialRecommendation = {
   title: string;
   url: string;
   sendNow: boolean;
+};
+
+type ConversionSignal =
+  | "none"
+  | "curiosity"
+  | "material_interest"
+  | "triage_progress"
+  | "consultation_intent"
+  | "human_handoff";
+
+type FollowUpState =
+  | "awaiting_initial_reply"
+  | "material_sent"
+  | "triage_incomplete"
+  | "warm_lead"
+  | "qualified_waiting_reply"
+  | "human_handoff_pending"
+  | "closed";
+
+type NextBestAction =
+  | "answer_and_ask_one_question"
+  | "send_material_and_continue"
+  | "continue_triage"
+  | "handoff_to_whatsapp"
+  | "await_human"
+  | "close";
+
+type PriorityIntentDecision = {
+  consultationIntentDetected: boolean;
+  addressRequestDetected: boolean;
+  whatsappHandoffRecommended: boolean;
+  handoffReason?: string;
+  replyOverride?: string;
+  nextBestAction: NextBestAction;
+  conversionSignal: ConversionSignal;
 };
 
 function logRouterEvent(
@@ -219,14 +260,119 @@ function buildHandoffReply(reason: string) {
   return `Entendi. Vou encaminhar seu atendimento para a advogada humana com prioridade, sem perder o contexto da conversa. Motivo registrado: ${reason}.`;
 }
 
+function buildWhatsappHandoffReply(reason: string) {
+  const phone = channelCommercialConfig.consultationWhatsappNumber;
+
+  if (reason === "address_request_with_consult_intent") {
+    return `Os detalhes do local e do endereco da consulta sao alinhados diretamente com a advogada no momento do agendamento, para te orientar da forma correta conforme o seu atendimento. Para seguir com isso agora, o ideal e continuar pelo WhatsApp ${phone}. Por la, a continuidade do atendimento e o agendamento sao feitos diretamente.`;
+  }
+
+  return `Perfeito. Para dar continuidade e alinhar seu atendimento diretamente com a advogada, o ideal e seguir pelo WhatsApp ${phone}. Por la, voces conseguem organizar o atendimento da forma correta.`;
+}
+
+function detectConsultationIntent(messageText: string) {
+  const normalizedMessage = messageText.toLowerCase();
+  return (
+    normalizedMessage.includes("quero marcar consulta") ||
+    normalizedMessage.includes("como agendo") ||
+    normalizedMessage.includes("como agendar") ||
+    normalizedMessage.includes("quero falar com a advogada") ||
+    normalizedMessage.includes("me passa o whatsapp") ||
+    normalizedMessage.includes("quero atendimento") ||
+    normalizedMessage.includes("quero dar entrada") ||
+    normalizedMessage.includes("quero seguir com isso") ||
+    normalizedMessage.includes("quero ver minha situacao com ela") ||
+    normalizedMessage.includes("quero ver minha situação com ela") ||
+    normalizedMessage.includes("consulta") ||
+    normalizedMessage.includes("agendamento")
+  );
+}
+
+function detectAddressRequest(messageText: string) {
+  const normalizedMessage = messageText.toLowerCase();
+  return (
+    normalizedMessage.includes("onde fica") ||
+    normalizedMessage.includes("qual e o endereco") ||
+    normalizedMessage.includes("qual é o endereço") ||
+    normalizedMessage.includes("onde e o escritorio") ||
+    normalizedMessage.includes("onde é o escritório") ||
+    normalizedMessage.includes("onde atende") ||
+    normalizedMessage.includes("qual local da consulta") ||
+    normalizedMessage.includes("endereco") ||
+    normalizedMessage.includes("endereço") ||
+    normalizedMessage.includes("local da consulta")
+  );
+}
+
+function buildPriorityIntentDecision(messageText: string): PriorityIntentDecision {
+  const consultationIntentDetected = detectConsultationIntent(messageText);
+  const addressRequestDetected = detectAddressRequest(messageText);
+  const whatsappHandoffRecommended = consultationIntentDetected || addressRequestDetected;
+
+  if (addressRequestDetected && consultationIntentDetected) {
+    return {
+      consultationIntentDetected,
+      addressRequestDetected,
+      whatsappHandoffRecommended,
+      handoffReason: "address_request_with_consult_intent",
+      replyOverride: buildWhatsappHandoffReply("address_request_with_consult_intent"),
+      nextBestAction: "handoff_to_whatsapp",
+      conversionSignal: "human_handoff"
+    };
+  }
+
+  if (consultationIntentDetected) {
+    const normalizedMessage = messageText.toLowerCase();
+    const handoffReason =
+      normalizedMessage.includes("whatsapp") || normalizedMessage.includes("advogada")
+        ? "direct_whatsapp_handoff"
+        : "consultation_requested";
+
+    return {
+      consultationIntentDetected,
+      addressRequestDetected,
+      whatsappHandoffRecommended,
+      handoffReason,
+      replyOverride: buildWhatsappHandoffReply(handoffReason),
+      nextBestAction: "handoff_to_whatsapp",
+      conversionSignal: "human_handoff"
+    };
+  }
+
+  if (addressRequestDetected) {
+    return {
+      consultationIntentDetected,
+      addressRequestDetected,
+      whatsappHandoffRecommended: true,
+      handoffReason: "address_request_with_consult_intent",
+      replyOverride: buildWhatsappHandoffReply("address_request_with_consult_intent"),
+      nextBestAction: "handoff_to_whatsapp",
+      conversionSignal: "human_handoff"
+    };
+  }
+
+  return {
+    consultationIntentDetected,
+    addressRequestDetected,
+    whatsappHandoffRecommended: false,
+    nextBestAction: "answer_and_ask_one_question",
+    conversionSignal: "none"
+  };
+}
+
 function detectNeedForHumanHandoff(
   messageText: string,
   recentMessages: Array<{ role: "user" | "assistant"; content: string; metadata?: Record<string, unknown> }>,
   session: ConversationSession,
-  detectedTheme: string
+  detectedTheme: string,
+  priorityIntentDecision: PriorityIntentDecision
 ) {
   const normalizedMessage = messageText.toLowerCase();
   const reasons: string[] = [];
+
+  if (priorityIntentDecision.handoffReason) {
+    reasons.push(priorityIntentDecision.handoffReason);
+  }
 
   if (
     normalizedMessage.includes("urgente") ||
@@ -385,7 +531,60 @@ function appendMaterialToReply(reply: string, material: MaterialRecommendation |
     return reply;
   }
 
-  return `${reply}\n\nSe isso ajudar agora, aqui esta o material certo para este tema: ${material.url}`;
+  return `${reply}\n\nSeparei um material que pode te ajudar justamente nesse ponto: ${material.url}\n\nSe fizer sentido, me diz o que mais pesa hoje na sua situacao para eu te orientar no proximo passo.`;
+}
+
+function inferFollowUpState(
+  leadStage: LeadStage,
+  handoffTriggered: boolean,
+  materialSent: boolean,
+  consultationIntentDetected: boolean
+): FollowUpState {
+  if (handoffTriggered) {
+    return "human_handoff_pending";
+  }
+
+  if (consultationIntentDetected || leadStage === "qualified") {
+    return "qualified_waiting_reply";
+  }
+
+  if (materialSent) {
+    return "material_sent";
+  }
+
+  if (leadStage === "triage") {
+    return "triage_incomplete";
+  }
+
+  if (leadStage === "engaged") {
+    return "warm_lead";
+  }
+
+  return "awaiting_initial_reply";
+}
+
+function buildSessionSummaryPayload(args: {
+  detectedTheme: string;
+  leadStage: LeadStage;
+  triageStatus: TriageStatus;
+  followUpState: FollowUpState;
+  conversionSignal: ConversionSignal;
+  nextBestAction: NextBestAction;
+  materialSent: boolean;
+  handoffTriggered: boolean;
+  handoffReason?: string;
+}) {
+  return [
+    `theme=${args.detectedTheme}`,
+    `leadStage=${args.leadStage}`,
+    `triageStatus=${args.triageStatus}`,
+    `followUpState=${args.followUpState}`,
+    `conversionSignal=${args.conversionSignal}`,
+    `nextBestAction=${args.nextBestAction}`,
+    `materialSent=${args.materialSent ? "yes" : "no"}`,
+    `handoffTriggered=${args.handoffTriggered ? "yes" : "no"}`,
+    `handoffReason=${args.handoffReason || "none"}`
+  ].join(" | ");
 }
 
 function extractTriageData(
@@ -692,6 +891,7 @@ export async function processChannelConversationEvent(
     recentMessages
   );
 
+  const priorityIntentDecision = buildPriorityIntentDecision(event.messageText);
   const baseTheme = isCommentSource
     ? detectThemeFromText(event.commentContext?.commentText || event.messageText)
     : detectThemeFromText(event.messageText);
@@ -705,6 +905,25 @@ export async function processChannelConversationEvent(
       messageId: event.externalMessageId || null,
       sessionId: session.id,
       commentId: event.commentContext?.commentId || null
+    },
+    conversationPolicy: {
+      order:
+        "reconhecer o que a pessoa disse -> responder minimamente o tema -> mostrar utilidade -> conduzir para a proxima etapa -> fazer apenas uma pergunta essencial -> enviar material so quando fizer sentido -> aproximar de triagem ou handoff",
+      style: [
+        "acolhedora",
+        "clara",
+        "segura",
+        "elegante",
+        "objetiva",
+        "uma_pergunta_por_vez"
+      ],
+      donts: [
+        "nao soar fria",
+        "nao despejar links cedo demais",
+        "nao parecer script barato",
+        "nao fazer triagem interrogatoria",
+        "nao usar juridiques sem necessidade"
+      ]
     },
     channel: event.channel,
     origin: event.source,
@@ -721,6 +940,12 @@ export async function processChannelConversationEvent(
     triageStatus: session.current_intent || "unknown",
     handoffStatus: session.handoff_to_human ? "active" : "available",
     recommendedMaterial: materialRecommendation,
+    commercialRouting: {
+      consultationWhatsappNumber: channelCommercialConfig.consultationWhatsappNumber,
+      consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
+      addressRequestDetected: priorityIntentDecision.addressRequestDetected,
+      whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended
+    },
     acquisition: materialRecommendation
       ? {
           source: event.source,
@@ -764,18 +989,47 @@ export async function processChannelConversationEvent(
         role: message.role as "user" | "assistant",
         content: message.content,
         metadata: message.metadata_json
-      })),
+    })),
     session,
-    detectedTheme
+    detectedTheme,
+    priorityIntentDecision
   );
   const leadStage = inferLeadStage(session, event.messageText, handoffDecision.shouldHandoff);
   const triageStatus = inferTriageStatus(leadStage, handoffDecision.shouldHandoff);
-
-  let replyText = appendMaterialToReply(coreResponse.reply, materialRecommendation);
+  const materialSent = !!materialRecommendation?.sendNow;
+  const followUpState = inferFollowUpState(
+    leadStage,
+    handoffDecision.shouldHandoff,
+    materialSent,
+    priorityIntentDecision.consultationIntentDetected
+  );
+  const conversionSignal =
+    priorityIntentDecision.conversionSignal !== "none"
+      ? priorityIntentDecision.conversionSignal
+      : materialSent
+        ? "material_interest"
+        : leadStage === "triage"
+          ? "triage_progress"
+          : "curiosity";
+  const nextBestAction =
+    priorityIntentDecision.nextBestAction === "answer_and_ask_one_question"
+      ? materialSent
+        ? "send_material_and_continue"
+        : handoffDecision.shouldHandoff
+          ? "handoff_to_whatsapp"
+          : leadStage === "triage"
+            ? "continue_triage"
+            : "answer_and_ask_one_question"
+      : priorityIntentDecision.nextBestAction;
+  let replyText = priorityIntentDecision.replyOverride
+    ? priorityIntentDecision.replyOverride
+    : appendMaterialToReply(coreResponse.reply, materialRecommendation);
   let direction: MessageDirection = coreResponse.usedFallback ? "fallback" : "reply";
 
   if (handoffDecision.shouldHandoff && channelAutomationFeatures.unifiedHumanHandoff) {
-    replyText = `${replyText}\n\n${buildHandoffReply(handoffDecision.reason)}`;
+    replyText = priorityIntentDecision.replyOverride
+      ? priorityIntentDecision.replyOverride
+      : `${replyText}\n\n${buildHandoffReply(handoffDecision.reason)}`;
     direction = "handoff";
   }
 
@@ -789,6 +1043,17 @@ export async function processChannelConversationEvent(
     last_handoff_reason: handoffDecision.reason || session.metadata?.last_handoff_reason || null,
     last_router_at: new Date().toISOString()
   };
+  const sessionSummary = buildSessionSummaryPayload({
+    detectedTheme,
+    leadStage,
+    triageStatus,
+    followUpState,
+    conversionSignal,
+    nextBestAction,
+    materialSent,
+    handoffTriggered: handoffDecision.shouldHandoff,
+    handoffReason: handoffDecision.reason
+  });
 
   let finalReplyText = replyText;
   let sent = await transport.sendText(event.externalUserId, finalReplyText);
@@ -819,6 +1084,14 @@ export async function processChannelConversationEvent(
       materialUrl: materialRecommendation?.url || null,
       triageStatus,
       leadStage,
+      followUpState,
+      conversionSignal,
+      nextBestAction,
+      materialSent,
+      consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
+      addressRequestDetected: priorityIntentDecision.addressRequestDetected,
+      whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
+      handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber,
       responseTime: coreResponse.metadata.responseTime,
       classification: coreResponse.metadata.classification
     });
@@ -826,10 +1099,12 @@ export async function processChannelConversationEvent(
     await safeUpdateSession(session.id, {
       lead_stage: leadStage,
       case_area: detectedTheme || session.case_area,
-      current_intent: coreResponse.intent || session.current_intent || "conversation",
+      current_intent:
+        handoffDecision.reason || coreResponse.intent || session.current_intent || "conversation",
       handoff_to_human: handoffDecision.shouldHandoff,
       last_inbound_at: new Date().toISOString(),
       last_outbound_at: new Date().toISOString(),
+      last_summary: sessionSummary,
       metadata: mergedMetadata
     });
 
@@ -864,11 +1139,18 @@ export async function processChannelConversationEvent(
     currentIntent: coreResponse.intent || "conversation",
     leadStage,
     triageStatus,
+    followUpState,
+    conversionSignal,
+    nextBestAction,
     usedFallback: finalUsedFallback,
     handoffTriggered: handoffDecision.shouldHandoff,
     handoffReason: handoffDecision.reason || null,
     materialUrl: materialRecommendation?.url || null,
-    replySent: sent
+    replySent: sent,
+    consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
+    addressRequestDetected: priorityIntentDecision.addressRequestDetected,
+    whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
+    handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber
   });
 
   return {
@@ -882,12 +1164,19 @@ export async function processChannelConversationEvent(
     currentIntent: coreResponse.intent || "conversation",
     leadStage,
     triageStatus,
+    followUpState,
+    conversionSignal,
+    nextBestAction,
     materialUrl: materialRecommendation?.url,
     handoffReason: handoffDecision.reason,
     logs: {
       source: coreResponse.source,
       openaiUsed: coreResponse.metadata.openaiUsed,
-      responseTime: coreResponse.metadata.responseTime
+      responseTime: coreResponse.metadata.responseTime,
+      consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
+      addressRequestDetected: priorityIntentDecision.addressRequestDetected,
+      whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
+      handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber
     }
   };
 }

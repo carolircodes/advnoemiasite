@@ -55,6 +55,20 @@ class ConversationPersistenceService {
     return message.toLowerCase().includes("metadata") && message.toLowerCase().includes("column");
   }
 
+  private isMissingProcessedWebhookExternalUserIdColumn(error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message || '')
+          : String(error);
+
+    return (
+      message.toLowerCase().includes("external_user_id") &&
+      message.toLowerCase().includes("column")
+    );
+  }
+
   // Método público para acessar supabase
   get supabaseClient() {
     return this.supabase;
@@ -94,17 +108,39 @@ class ConversationPersistenceService {
     payloadHash?: string
   ): Promise<void> {
     try {
+      const payload = {
+        channel,
+        external_event_id: externalEventId,
+        external_message_id: externalMessageId,
+        external_user_id: externalUserId,
+        payload_hash: payloadHash || ''
+      };
+
       const { error } = await this.supabase
         .from('processed_webhook_events')
-        .insert({
-          channel,
-          external_event_id: externalEventId,
-          external_message_id: externalMessageId,
-          external_user_id: externalUserId,
-          payload_hash: payloadHash || ''
-        });
+        .insert(payload);
 
       if (error) {
+        if (this.isMissingProcessedWebhookExternalUserIdColumn(error)) {
+          const { external_user_id: _externalUserId, ...safePayload } = payload;
+
+          console.warn('PROCESSED_EVENT_EXTERNAL_USER_ID_SKIPPED', {
+            channel,
+            externalEventId
+          });
+
+          const { error: retryError } = await this.supabase
+            .from('processed_webhook_events')
+            .insert(safePayload);
+
+          if (!retryError) {
+            return;
+          }
+
+          console.error('ERROR_MARKING_EVENT_PROCESSED_AFTER_RETRY:', retryError);
+          return;
+        }
+
         console.error('ERROR_MARKING_EVENT_PROCESSED:', error);
       }
     } catch (error) {
