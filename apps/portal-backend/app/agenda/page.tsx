@@ -4,10 +4,11 @@ import Link from "next/link";
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
-import { ProductEventBeacon } from "@/components/product-event-beacon";
+import { SafeModuleCard } from "@/components/safe-module-card";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
+import { portalFeatures } from "@/lib/config/portal-features";
 import {
   appointmentChangeLabels,
   appointmentStatuses,
@@ -22,7 +23,7 @@ import {
   buildInternalDocumentsHref
 } from "@/lib/navigation";
 import { getStaffOverview } from "@/lib/services/dashboard";
-import { getClientWorkspace } from "@/lib/services/client-workspace";
+import { getClientAgendaSummary } from "@/lib/services/client-workspace";
 import {
   cancelCaseAppointment,
   registerCaseAppointment,
@@ -951,7 +952,7 @@ export default async function AgendaPage({
     );
   }
 
-  const workspace = await getClientWorkspace(profile);
+  const agendaSummary = await getClientAgendaSummary(profile);
   const params = searchParams ? await searchParams : {};
   const rawError = getStringParam(params.error);
   const decodedError = rawError ? decodeURIComponent(rawError) : "";
@@ -963,7 +964,8 @@ export default async function AgendaPage({
   const sort = getStringParam(params.sort, "nearest");
   const now = new Date();
   const hasFilters = !!(query || dateFrom || dateTo || scope !== "all" || sort !== "nearest");
-  const filteredAppointments = [...workspace.appointments]
+  const agendaEnabled = portalFeatures.clientAgenda;
+  const filteredAppointments = [...agendaSummary.data.appointments]
     .filter(
       (appointment) =>
         matchesSearch(query, [
@@ -992,16 +994,6 @@ export default async function AgendaPage({
     .slice(0, 8);
 
   return (
-    <>
-      <ProductEventBeacon
-        eventKey="client_agenda_viewed"
-        eventGroup="portal"
-        payload={{
-          scope,
-          upcomingAppointments: upcomingAppointments.length,
-          recentHistory: recentHistory.length
-        }}
-      />
       <AppFrame
         eyebrow="Agenda"
         title="Sua agenda do caso, organizada para consulta rapida."
@@ -1023,12 +1015,10 @@ export default async function AgendaPage({
         highlights={[
           { label: "Proximos compromissos", value: String(upcomingAppointments.length) },
           { label: "Historico recente", value: String(recentHistory.length) },
-          { label: "Total visivel", value: String(workspace.appointments.length) },
+          { label: "Total visivel", value: String(agendaSummary.data.appointments.length) },
           {
-            label: "Proximo item",
-            value: upcomingAppointments[0]
-              ? formatPortalDateTime(upcomingAppointments[0].starts_at)
-              : "Sem agenda"
+            label: "Base segura",
+            value: agendaSummary.ok ? "Ativa" : "Fallback"
           }
         ]}
         actions={[
@@ -1038,9 +1028,9 @@ export default async function AgendaPage({
       >
       {error ? <div className="error-notice">{error}</div> : null}
 
-      <SectionCard
+      <SafeModuleCard
         title="Encontrar compromissos"
-        description="Use a busca e os filtros para localizar mais rapido datas futuras, historico recente e mudancas visiveis no seu caso."
+        description="Use a busca e os filtros sem depender do workspace monolitico para a pagina abrir."
       >
         <form className="stack">
           <div className="fields">
@@ -1097,15 +1087,21 @@ export default async function AgendaPage({
             </a>
           </div>
         </form>
-      </SectionCard>
+      </SafeModuleCard>
 
       <div className="grid two">
-        <SectionCard
+        <SafeModuleCard
           id="proximos-compromissos"
           title="Proximos compromissos"
           description="Somente itens visiveis ao cliente aparecem aqui, ordenados da data mais proxima para a mais distante."
         >
-          {upcomingAppointments.length ? (
+          {!agendaEnabled ? (
+            <p className="empty-state">O modulo de agenda esta temporariamente desligado por flag.</p>
+          ) : !agendaSummary.ok && !upcomingAppointments.length ? (
+            <p className="empty-state">
+              Agenda em fallback seguro. Motivo: {agendaSummary.reason || "dados indisponiveis"}.
+            </p>
+          ) : upcomingAppointments.length ? (
             <ul className="update-feed">
               {upcomingAppointments.map((appointment) => (
                 <li key={appointment.id} className="update-card featured">
@@ -1133,14 +1129,16 @@ export default async function AgendaPage({
                 : "Ainda nao ha compromissos visiveis vinculados ao seu caso."}
             </p>
           )}
-        </SectionCard>
+        </SafeModuleCard>
 
-        <SectionCard
+        <SafeModuleCard
           id="historico-recente"
           title="Historico recente"
           description="Compromissos concluidos, passados ou cancelados continuam disponiveis para consulta sem confundir a sua agenda futura."
         >
-          {recentHistory.length ? (
+          {!agendaEnabled ? (
+            <p className="empty-state">O modulo de agenda esta temporariamente desligado por flag.</p>
+          ) : recentHistory.length ? (
             <ul className="update-feed">
               {recentHistory.map((appointment) => (
                 <li key={appointment.id} className="update-card">
@@ -1178,9 +1176,8 @@ export default async function AgendaPage({
                 : "O historico recente da agenda aparecera aqui depois dos primeiros compromissos."}
             </p>
           )}
-        </SectionCard>
+        </SafeModuleCard>
       </div>
       </AppFrame>
-    </>
   );
 }

@@ -2,14 +2,16 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import { ClientModuleBoundary } from "@/components/client-module-boundary";
 import type { ClientUploadState } from "@/components/client-document-upload";
 import { ClientDocumentUploadCard } from "@/components/client-document-upload";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
-import { ProductEventBeacon } from "@/components/product-event-beacon";
+import { SafeModuleCard } from "@/components/safe-module-card";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { isStaffRole, requireProfile } from "@/lib/auth/guards";
+import { portalFeatures } from "@/lib/config/portal-features";
 import {
   documentUploadAccept,
   documentRequestStatusLabels,
@@ -24,7 +26,10 @@ import {
   buildInternalClientHref
 } from "@/lib/navigation";
 import { getStaffOverview } from "@/lib/services/dashboard";
-import { getClientWorkspace } from "@/lib/services/client-workspace";
+import {
+  getClientDocumentsSummary,
+  getClientRequestsSummary
+} from "@/lib/services/client-workspace";
 import {
   registerCaseDocument,
   requestCaseDocument,
@@ -329,7 +334,7 @@ export default async function DocumentsPage({
         {error ? <div className="error-notice">{error}</div> : null}
         {success ? <div className="success-notice">{success}</div> : null}
 
-        <SectionCard
+        <SafeModuleCard
           title="Busca e filtros"
           description="Filtre documentos e solicitacoes para focar no que esta pendente ou localizar um caso rapidamente."
         >
@@ -418,7 +423,7 @@ export default async function DocumentsPage({
               ) : null}
             </div>
           </form>
-        </SectionCard>
+        </SafeModuleCard>
 
         <div className="metric-grid">
           <div className="metric-card">
@@ -767,7 +772,10 @@ export default async function DocumentsPage({
     );
   }
 
-  const workspace = await getClientWorkspace(profile);
+  const [documentsSummary, requestsSummary] = await Promise.all([
+    getClientDocumentsSummary(profile),
+    getClientRequestsSummary(profile)
+  ]);
   const params = searchParams ? await searchParams : {};
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
@@ -783,8 +791,10 @@ export default async function DocumentsPage({
         ? left.created_at.localeCompare(right.created_at)
         : right.created_at.localeCompare(left.created_at)
     );
+  const documentsEnabled = portalFeatures.clientDocuments;
+  const requestsEnabled = portalFeatures.clientRequests;
   const availableDocuments = sortDocuments(
-    workspace.documents.filter(
+    documentsSummary.data.documents.filter(
       (document) =>
         (scope === "all" || scope === "available") &&
         (document.status === "recebido" || document.status === "revisado") &&
@@ -792,7 +802,7 @@ export default async function DocumentsPage({
     )
   );
   const pendingDocuments = sortDocuments(
-    workspace.documents.filter(
+    documentsSummary.data.documents.filter(
       (document) =>
         (scope === "all" || scope === "pending") &&
         (document.status === "pendente" || document.status === "solicitado") &&
@@ -800,29 +810,19 @@ export default async function DocumentsPage({
     )
   );
   const openRequests = sortDocuments(
-    workspace.documentRequests.filter(
+    requestsSummary.data.documentRequests.filter(
       (request) =>
         (scope === "all" || scope === "requests") &&
         request.status === "pending" &&
         matchesSearch(query, [request.title, request.caseTitle, request.instructions])
     )
   );
-  const completedRequests = workspace.documentRequests
+  const completedRequests = requestsSummary.data.documentRequests
     .filter((request) => request.status === "completed")
     .sort((left, right) => right.created_at.localeCompare(left.created_at))
     .slice(0, 8);
 
   return (
-    <>
-      <ProductEventBeacon
-        eventKey="client_documents_viewed"
-        eventGroup="portal"
-        payload={{
-          scope,
-          availableDocuments: availableDocuments.length,
-          openRequests: openRequests.length
-        }}
-      />
       <AppFrame
         eyebrow="Documentos"
         title="Tudo sobre os documentos do seu caso."
@@ -843,9 +843,12 @@ export default async function DocumentsPage({
         ]}
         highlights={[
           { label: "Disponiveis", value: String(availableDocuments.length) },
-          { label: "Aguardando envio", value: String(openRequests.length) },
-          { label: "Enviados", value: String(completedRequests.length) },
-          { label: "Total no portal", value: String(workspace.documents.length) }
+          { label: "Pendencias", value: String(pendingDocuments.length) },
+          { label: "Solicitacoes abertas", value: String(openRequests.length) },
+          {
+            label: "Base segura",
+            value: documentsSummary.ok && requestsSummary.ok ? "Ativa" : "Fallback"
+          }
         ]}
         actions={[
           ...(openRequests.length > 0
@@ -858,9 +861,9 @@ export default async function DocumentsPage({
       {error ? <div className="error-notice">{error}</div> : null}
       {success ? <div className="success-notice">{success}</div> : null}
 
-      <SectionCard
+      <SafeModuleCard
         title="Encontrar documentos"
-        description="Use a busca e os filtros para chegar mais rapido ao que esta disponivel, pendente ou aguardando voce."
+        description="Use a busca e os filtros sem depender do workspace completo para a pagina abrir."
       >
         <form className="stack">
           <div className="fields">
@@ -900,7 +903,7 @@ export default async function DocumentsPage({
             </a>
           </div>
         </form>
-      </SectionCard>
+      </SafeModuleCard>
 
       <div className="grid two">
         <SectionCard
@@ -908,7 +911,13 @@ export default async function DocumentsPage({
           title="Documentos disponíveis"
           description="Arquivos liberados pela equipe para consulta e download na sua area do portal."
         >
-          {availableDocuments.length ? (
+          {!documentsEnabled ? (
+            <p className="empty-state">O modulo de documentos esta temporariamente desligado por flag.</p>
+          ) : !documentsSummary.ok && !availableDocuments.length ? (
+            <p className="empty-state">
+              Documentos em fallback seguro. Motivo: {documentsSummary.reason || "dados indisponiveis"}.
+            </p>
+          ) : availableDocuments.length ? (
             <ul className="update-feed">
               {availableDocuments.map((document) => (
                 <li key={document.id} className="update-card featured">
@@ -1039,7 +1048,17 @@ export default async function DocumentsPage({
         title="Documentos aguardando envio"
         description="A equipe precisa destes arquivos para avançar com o seu caso. O envio e seguro e leva menos de um minuto."
       >
-        {openRequests.length ? (
+        {!requestsEnabled ? (
+          <p className="empty-state">O modulo de solicitacoes esta temporariamente desligado por flag.</p>
+        ) : !requestsSummary.ok && !openRequests.length ? (
+          <p className="empty-state">
+            Solicitacoes em fallback seguro. Motivo: {requestsSummary.reason || "dados indisponiveis"}.
+          </p>
+        ) : openRequests.length ? (
+          <ClientModuleBoundary
+            title="Upload temporariamente indisponivel"
+            description="O cartao de envio falhou localmente, mas a pagina continua carregada com seguranca."
+          >
           <ul className="update-feed">
             {openRequests.map((request) => (
               <li
@@ -1093,6 +1112,7 @@ export default async function DocumentsPage({
               </li>
             ))}
           </ul>
+          </ClientModuleBoundary>
         ) : (
           <p className="empty-state">
             {hasFilters
@@ -1102,7 +1122,7 @@ export default async function DocumentsPage({
         )}
       </SectionCard>
 
-      {completedRequests.length > 0 ? (
+      {requestsEnabled && completedRequests.length > 0 ? (
         <SectionCard
           title="Histórico de envios"
           description="Documentos que voce ja enviou ao escritorio. A equipe confirma o recebimento e te avisa."
@@ -1166,6 +1186,5 @@ export default async function DocumentsPage({
       ) : null}
 
       </AppFrame>
-    </>
   );
 }

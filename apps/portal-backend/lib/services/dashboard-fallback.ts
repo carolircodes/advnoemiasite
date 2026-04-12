@@ -1,5 +1,8 @@
 import type { PortalProfile } from "../auth/guards";
-import { getClientDisplayName, normalizeDateLabel, normalizeText } from "../portal/client-normalizers";
+import {
+  normalizeClientProfileSummary,
+  normalizeClientRecordSummary
+} from "../portal/client-normalizers";
 
 type ClientLoaderResult<T> = {
   ok: boolean;
@@ -21,15 +24,7 @@ function createLoaderResult<T>(
 
 export async function getClientProfileSummary(profile: PortalProfile) {
   return createLoaderResult(
-    {
-      displayName: getClientDisplayName(profile.full_name, profile.email),
-      email: normalizeText(profile.email, "Nao informado"),
-      phoneLabel: normalizeText(profile.phone, "Nao informado"),
-      firstLoginCompletedAt: profile.first_login_completed_at,
-      firstLoginCompletedLabel: normalizeDateLabel(profile.first_login_completed_at),
-      role: profile.role,
-      isActive: !!profile.is_active
-    },
+    normalizeClientProfileSummary(profile),
     false,
     "fallback_mode"
   );
@@ -38,12 +33,7 @@ export async function getClientProfileSummary(profile: PortalProfile) {
 export async function getClientCaseSummary(_profile: PortalProfile) {
   return createLoaderResult(
     {
-      clientRecord: {
-        id: "",
-        status: "indisponivel",
-        notes: "",
-        created_at: new Date().toISOString()
-      },
+      clientRecord: normalizeClientRecordSummary(),
       cases: [] as Array<{
         id: string;
         title: string;

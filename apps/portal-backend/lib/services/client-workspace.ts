@@ -2,16 +2,14 @@ import "server-only";
 
 import type { PortalProfile } from "../auth/guards";
 import {
-  getClientDisplayName,
-  normalizeAppointmentStatusLabel,
-  normalizeAppointmentTypeLabel,
   normalizeArray,
-  normalizeCaseStatusLabel,
-  normalizeDateLabel,
-  normalizeDocumentRequestStatusLabel,
-  normalizeDocumentStatusLabel,
-  normalizeEventLabel,
-  normalizeNullableText,
+  normalizeClientAppointmentSummaryItem,
+  normalizeClientCaseSummaryItem,
+  normalizeClientDocumentSummaryItem,
+  normalizeClientEventSummaryItem,
+  normalizeClientProfileSummary,
+  normalizeClientRecordSummary,
+  normalizeClientRequestSummaryItem,
   normalizeText
 } from "../portal/client-normalizers";
 import { createServerSupabaseClient } from "../supabase/server";
@@ -160,12 +158,7 @@ function createLoaderResult<T>(
 
 function buildEmptyClientCaseSummary(): ClientCaseSummaryData {
   return {
-    clientRecord: {
-      id: "",
-      status: "indisponivel",
-      notes: "",
-      created_at: new Date().toISOString()
-    },
+    clientRecord: normalizeClientRecordSummary(),
     cases: [],
     mainCase: null,
     totalCases: 0
@@ -209,12 +202,7 @@ function buildEmptyClientEventsSummary(): ClientEventsSummaryData {
 
 function buildEmptyClientWorkspace() {
   return {
-    clientRecord: {
-      id: "",
-      status: "indisponivel",
-      notes: "",
-      created_at: new Date().toISOString()
-    } as ClientRecordSummary,
+    clientRecord: normalizeClientRecordSummary() as ClientRecordSummary,
     cases: [] as ClientCaseItem[],
     documents: [] as ClientDocumentItem[],
     documentRequests: [] as ClientRequestItem[],
@@ -299,10 +287,8 @@ async function loadClientBaseContext(
     }
 
     const normalizedClientRecord: ClientRecordSummary = {
-      id: normalizeText(clientRecord.id),
-      status: normalizeText(clientRecord.status, "ativo"),
-      notes: normalizeText(clientRecord.notes),
-      created_at: normalizeText(clientRecord.created_at, new Date().toISOString())
+      ...normalizeClientRecordSummary(clientRecord),
+      status: normalizeText(clientRecord.status, "ativo")
     };
 
     const { data: cases, error: casesError } = await supabase
@@ -329,14 +315,9 @@ async function loadClientBaseContext(
       );
     }
 
-    const normalizedCases = normalizeArray(cases).map((caseItem) => ({
-      id: normalizeText(caseItem.id),
-      title: normalizeText(caseItem.title, "Caso em acompanhamento"),
-      area: normalizeNullableText(caseItem.area),
-      status: normalizeText(caseItem.status, "analise"),
-      created_at: normalizeText(caseItem.created_at, new Date().toISOString()),
-      statusLabel: normalizeCaseStatusLabel(caseItem.status)
-    }));
+    const normalizedCases = normalizeArray(cases).map((caseItem) =>
+      normalizeClientCaseSummaryItem(caseItem)
+    );
 
     return createLoaderResult({
       clientRecord: normalizedClientRecord,
@@ -364,15 +345,9 @@ async function loadClientBaseContext(
 export async function getClientProfileSummary(
   profile: PortalProfile
 ): Promise<ClientLoaderResult<ClientProfileSummary>> {
-  return createLoaderResult({
-    displayName: getClientDisplayName(profile.full_name, profile.email),
-    email: normalizeText(profile.email, "Nao informado"),
-    phoneLabel: normalizeText(profile.phone, "Nao informado"),
-    firstLoginCompletedAt: normalizeNullableText(profile.first_login_completed_at),
-    firstLoginCompletedLabel: normalizeDateLabel(profile.first_login_completed_at),
-    role: profile.role,
-    isActive: !!profile.is_active
-  });
+  return createLoaderResult(
+    normalizeClientProfileSummary(profile) as ClientProfileSummary
+  );
 }
 
 export async function getClientCaseSummary(
@@ -434,27 +409,12 @@ export async function getClientDocumentsSummary(
       return createLoaderResult(emptyData, false, "documents_query_failed");
     }
 
-    const normalizedDocuments = normalizeArray(documents).map((document) => ({
-      id: normalizeText(document.id),
-      case_id: normalizeText(document.case_id),
-      file_name: normalizeText(document.file_name, "Documento sem titulo"),
-      category: normalizeText(document.category, "Documento"),
-      description: normalizeText(document.description),
-      status: normalizeText(document.status, "pendente"),
-      statusLabel: normalizeDocumentStatusLabel(document.status),
-      visibility: normalizeText(document.visibility, "client"),
-      document_date: normalizeText(
-        document.document_date || document.created_at,
-        new Date().toISOString()
-      ),
-      created_at: normalizeText(document.created_at, new Date().toISOString()),
-      storage_path: normalizeNullableText(document.storage_path),
-      mime_type: normalizeNullableText(document.mime_type),
-      file_size_bytes:
-        typeof document.file_size_bytes === "number" ? document.file_size_bytes : null,
-      caseTitle:
+    const normalizedDocuments = normalizeArray(documents).map((document) =>
+      normalizeClientDocumentSummaryItem(
+        document,
         baseContextResult.data.caseMap.get(normalizeText(document.case_id))?.title || "Caso"
-    }));
+      )
+    );
 
     return createLoaderResult({
       documents: normalizedDocuments,
@@ -510,23 +470,12 @@ export async function getClientAgendaSummary(
     }
 
     const now = new Date();
-    const normalizedAppointments = normalizeArray(appointments).map((appointment) => ({
-      id: normalizeText(appointment.id),
-      case_id: normalizeText(appointment.case_id),
-      title: normalizeText(appointment.title, "Compromisso agendado"),
-      appointment_type: normalizeText(appointment.appointment_type, "reuniao"),
-      starts_at: normalizeText(appointment.starts_at, new Date().toISOString()),
-      ends_at: normalizeNullableText(appointment.ends_at),
-      mode: normalizeNullableText(appointment.mode),
-      status: normalizeText(appointment.status, "scheduled"),
-      notes: normalizeText(appointment.notes),
-      description: normalizeText(appointment.notes),
-      visible_to_client: appointment.visible_to_client !== false,
-      caseTitle:
-        baseContextResult.data.caseMap.get(normalizeText(appointment.case_id))?.title || "Caso",
-      statusLabel: normalizeAppointmentStatusLabel(appointment.status),
-      typeLabel: normalizeAppointmentTypeLabel(appointment.appointment_type)
-    }));
+    const normalizedAppointments = normalizeArray(appointments).map((appointment) =>
+      normalizeClientAppointmentSummaryItem(
+        appointment,
+        baseContextResult.data.caseMap.get(normalizeText(appointment.case_id))?.title || "Caso"
+      )
+    );
     const upcomingAppointments = normalizedAppointments.filter((appointment) => {
       const startsAt = new Date(appointment.starts_at);
 
@@ -592,19 +541,12 @@ export async function getClientRequestsSummary(
       return createLoaderResult(emptyData, false, "requests_query_failed");
     }
 
-    const normalizedRequests = normalizeArray(requests).map((request) => ({
-      id: normalizeText(request.id),
-      case_id: normalizeText(request.case_id),
-      title: normalizeText(request.title, "Solicitacao documental"),
-      instructions: normalizeText(request.instructions),
-      due_at: normalizeNullableText(request.due_at),
-      status: normalizeText(request.status, "pending"),
-      statusLabel: normalizeDocumentRequestStatusLabel(request.status),
-      visible_to_client: request.visible_to_client !== false,
-      created_at: normalizeText(request.created_at, new Date().toISOString()),
-      caseTitle:
+    const normalizedRequests = normalizeArray(requests).map((request) =>
+      normalizeClientRequestSummaryItem(
+        request,
         baseContextResult.data.caseMap.get(normalizeText(request.case_id))?.title || "Caso"
-    }));
+      )
+    );
     const openRequests = normalizedRequests.filter((request) => request.status === "pending");
 
     return createLoaderResult({
@@ -655,17 +597,12 @@ export async function getClientEventsSummary(
       return createLoaderResult(emptyData, false, "events_query_failed");
     }
 
-    const normalizedEvents = normalizeArray(events).map((event) => ({
-      id: normalizeText(event.id),
-      case_id: normalizeText(event.case_id),
-      event_type: normalizeText(event.event_type, "case_update"),
-      title: normalizeText(event.title, "Atualizacao do caso"),
-      public_summary: normalizeText(event.public_summary),
-      occurred_at: normalizeText(event.occurred_at, new Date().toISOString()),
-      caseTitle:
-        baseContextResult.data.caseMap.get(normalizeText(event.case_id))?.title || "Caso",
-      eventLabel: normalizeEventLabel(event.event_type)
-    }));
+    const normalizedEvents = normalizeArray(events).map((event) =>
+      normalizeClientEventSummaryItem(
+        event,
+        baseContextResult.data.caseMap.get(normalizeText(event.case_id))?.title || "Caso"
+      )
+    );
 
     return createLoaderResult({
       events: normalizedEvents,
