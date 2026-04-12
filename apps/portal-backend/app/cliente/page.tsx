@@ -3,9 +3,24 @@ import { redirect } from "next/navigation";
 
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
-import { getClientProfileSummary } from "@/lib/services/client-workspace";
+import { portalFeatures } from "@/lib/config/portal-features";
+import {
+  getClientAgendaSummary,
+  getClientCaseSummary,
+  getClientDocumentsSummary,
+  getClientEventsSummary,
+  getClientProfileSummary,
+  getClientRequestsSummary
+} from "@/lib/services/client-workspace";
 
 import { ClientShell } from "./_components/client-shell";
+import {
+  ClientAgendaPreparationCard,
+  ClientCaseSummaryModule,
+  ClientDocumentsPreparationCard,
+  ClientEventsModule,
+  ClientRequestsModule
+} from "./_components/client-case-summary-module";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -67,7 +82,21 @@ export default async function ClientPage({
   const rawErrorCode = pickFirst(params.error);
   const decodedError = decodeErrorMessage(rawErrorCode);
   const errorMessage = getAccessMessage(decodedError) || decodedError;
-  const profileSummary = await getClientProfileSummary(profile);
+  const [
+    profileSummary,
+    caseSummary,
+    documentsSummary,
+    agendaSummary,
+    requestsSummary,
+    eventsSummary
+  ] = await Promise.all([
+    getClientProfileSummary(profile),
+    getClientCaseSummary(profile),
+    getClientDocumentsSummary(profile),
+    getClientAgendaSummary(profile),
+    getClientRequestsSummary(profile),
+    getClientEventsSummary(profile)
+  ]);
 
   const notices = [
     successCode === "primeiro-acesso-concluido"
@@ -89,9 +118,38 @@ export default async function ClientPage({
       tone: "warning" as const,
       title: "Modo de consolidacao",
       description:
-        "O shell autenticado foi separado da arvore variavel. Modulos futuros serao reintroduzidos apenas com loaders pequenos, independentes e seguros."
+        "O shell autenticado foi separado da arvore variavel. A Fase 2 segue avancando por ondas pequenas, com modulos isolados e fallback local em cada bloco."
     }
   ].filter(isNotice);
 
-  return <ClientShell profile={profileSummary.data} notices={notices} />;
+  return (
+    <ClientShell profile={profileSummary.data} notices={notices}>
+      <ClientCaseSummaryModule
+        enabled={portalFeatures.clientCaseSummary}
+        result={caseSummary}
+      />
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <ClientDocumentsPreparationCard
+          enabled={portalFeatures.clientDocuments}
+          result={documentsSummary}
+        />
+        <ClientAgendaPreparationCard
+          enabled={portalFeatures.clientAgenda}
+          result={agendaSummary}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <ClientRequestsModule
+          enabled={portalFeatures.clientRequests}
+          result={requestsSummary}
+        />
+        <ClientEventsModule
+          enabled={portalFeatures.clientActivity}
+          result={eventsSummary}
+        />
+      </div>
+    </ClientShell>
+  );
 }

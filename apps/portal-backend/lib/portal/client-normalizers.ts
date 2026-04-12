@@ -29,6 +29,16 @@ export function normalizeNullableText(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+export function normalizeShortText(value: unknown, fallback = "", maxLength = 120) {
+  const normalizedValue = normalizeText(value, fallback).replace(/\s+/g, " ").trim();
+
+  if (normalizedValue.length <= maxLength) {
+    return normalizedValue;
+  }
+
+  return `${normalizedValue.slice(0, Math.max(maxLength - 3, 1))}...`;
+}
+
 export function safeArray<T>(value: T[] | null | undefined) {
   return Array.isArray(value) ? value : [];
 }
@@ -189,7 +199,7 @@ export function normalizeClientRequestSummaryItem(request?: unknown, caseTitle =
     id: normalizeText(safeValue.id),
     case_id: normalizeText(safeValue.case_id),
     title: normalizeText(safeValue.title, "Solicitacao documental"),
-    instructions: normalizeText(safeValue.instructions),
+    instructions: normalizeShortText(safeValue.instructions, "", 220),
     due_at: safeDate(safeValue.due_at),
     status: normalizeText(safeValue.status, "pending"),
     statusLabel: normalizeDocumentRequestStatusLabel(safeValue.status),
@@ -231,7 +241,7 @@ export function normalizeClientEventSummaryItem(event?: unknown, caseTitle = "Ca
     case_id: normalizeText(safeValue.case_id),
     event_type: normalizeText(safeValue.event_type, "case_update"),
     title: normalizeText(safeValue.title, "Atualizacao do caso"),
-    public_summary: normalizeText(safeValue.public_summary),
+    public_summary: normalizeShortText(safeValue.public_summary, "", 220),
     occurred_at: safeDate(safeValue.occurred_at, new Date().toISOString()) || new Date().toISOString(),
     caseTitle: normalizeText(caseTitle, "Caso"),
     eventLabel: normalizeEventLabel(safeValue.event_type)

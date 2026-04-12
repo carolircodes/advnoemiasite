@@ -23,6 +23,7 @@ export const portalFeatures = {
   clientDocuments: readBooleanFlag("NEXT_PUBLIC_PORTAL_CLIENT_DOCUMENTS", true),
   clientAgenda: readBooleanFlag("NEXT_PUBLIC_PORTAL_CLIENT_AGENDA", true),
   clientRequests: readBooleanFlag("NEXT_PUBLIC_PORTAL_CLIENT_REQUESTS", true),
+  clientActivity: readBooleanFlag("NEXT_PUBLIC_PORTAL_CLIENT_ACTIVITY", true),
   clientWidgets: readBooleanFlag("NEXT_PUBLIC_PORTAL_CLIENT_WIDGETS", false),
   clientAI: readBooleanFlag("NEXT_PUBLIC_PORTAL_CLIENT_AI", false)
 } as const;
