@@ -177,19 +177,53 @@ export default async function InternalCasesPage({
     .filter((event) => !selectedClientId || event.clientId === selectedClientId)
     .slice(0, 8);
   const focusCase = filteredCases[0] || null;
+  const nextCaseSignal = operationalCaseQueue[0] || null;
+  const latestCaseEvent = recentCaseEvents[0] || null;
+  const executiveCaseGuidance = [
+    {
+      label: "Caso que puxa a fila",
+      title: focusCase?.title || "Nenhum caso puxando a carteira agora",
+      detail: focusCase
+        ? `${focusCase.clientName} - ${focusCase.statusLabel} - ${focusCase.priorityLabel}.`
+        : "A central continua pronta para destacar o proximo caso assim que a prioridade mudar.",
+      meta: focusCase
+        ? focusCase.staleDays >= 1
+          ? `${focusCase.staleDays} dia(s) sem nova leitura`
+          : "Atividade recente"
+        : "Sem alerta imediato"
+    },
+    {
+      label: "Ultimo movimento relevante",
+      title: latestCaseEvent?.title || "Ainda nao ha novo andamento recente",
+      detail: latestCaseEvent
+        ? `${latestCaseEvent.caseTitle} - ${latestCaseEvent.eventLabel}.`
+        : "Os proximos registros de caso vao aparecer aqui para orientar reentrada e prioridade.",
+      meta: latestCaseEvent
+        ? formatPortalDateTime(latestCaseEvent.occurred_at)
+        : "Linha da carteira aguardando novo movimento"
+    },
+    {
+      label: "Proximo passo operacional",
+      title: nextCaseSignal?.title || "Nenhum item pedindo acao imediata",
+      detail:
+        nextCaseSignal?.description ||
+        "Quando houver espera, prazo, retorno ou envelhecimento relevante, a central vai apontar a reentrada certa.",
+      meta: nextCaseSignal?.timingLabel || "Operacao estavel agora"
+    }
+  ];
 
   return (
     <AppFrame
-      eyebrow="Gestão de Casos"
-      title="Painel Operacional de Casos"
-      description="Gerencie todos os casos jurídicos em um ambiente organizado. Abra novos processos, atualize andamentos, altere status e mantenha o controle completo da jornada de cada cliente."
+      eyebrow="Central de casos"
+      title="Operacao por caso, com leitura executiva e continuidade real."
+      description="Esta central organiza abertura, andamento, prioridade e reentrada de cada caso sem separar o que mudou, o que importa agora e qual deve ser o proximo passo."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
           fullName={profile.full_name}
           email={profile.email}
-          workspaceLabel="Ambiente Operacional"
-          workspaceHint="Sessão interna ativa para gestão completa de casos jurídicos"
+          workspaceLabel="Operacao interna por caso"
+          workspaceHint="Sessao protegida para conduzir casos, timeline, cliente, agenda e documentos com a mesma referencia."
         />
       }
       navigation={[
@@ -203,18 +237,18 @@ export default async function InternalCasesPage({
         { label: "Casos ativos", value: String(filteredCases.length) },
         { label: "Alta prioridade", value: String(highPriorityCount) },
         { label: "Aguardando retorno", value: String(waitingClientCount) },
-        { label: "Inativos há 10+ dias", value: String(staleCount) }
+        { label: "Sem leitura ha 10+ dias", value: String(staleCount) }
       ]}
       actions={[
-        { href: buildInternalNewCaseHref(selectedClientId || null), label: "Novo Caso" },
+        { href: buildInternalNewCaseHref(selectedClientId || null), label: "Abrir novo caso" },
         {
           href: focusCase ? buildInternalCaseHref(focusCase.id) : buildInternalCasesHref(selectedClientId || null),
-          label: focusCase ? "Ver Caso em Foco" : "Listar Casos",
+          label: focusCase ? "Continuar caso em foco" : "Listar casos",
           tone: "secondary"
         },
         {
           href: selectedClient ? buildInternalClientHref(selectedClient.id) : "/internal/advogada",
-          label: selectedClient ? "Ver Cliente" : "Painel Principal",
+          label: selectedClient ? "Abrir cliente" : "Voltar ao painel",
           tone: "secondary"
         }
       ]}
@@ -222,8 +256,8 @@ export default async function InternalCasesPage({
       {error ? <div className="error-notice">{error}</div> : null}
 
       <SectionCard
-        title="Filtrar Casos"
-        description="Encontre rapidamente qualquer caso usando busca inteligente e filtros específicos. Otimize seu tempo focando nos casos mais relevantes."
+        title="Busca e recorte da central"
+        description="Refine a carteira para entrar no caso certo com menos leitura manual e mais contexto operacional."
       >
         <form className="stack">
           <div className="fields">
@@ -234,11 +268,11 @@ export default async function InternalCasesPage({
                 name="q"
                 type="search"
                 defaultValue={query}
-                placeholder="Título, cliente, área ou descrição do caso"
+                placeholder="Titulo, cliente, area ou resumo executivo do caso"
               />
             </div>
             <div className="field">
-              <label htmlFor="cases-client">Filtrar por Cliente</label>
+              <label htmlFor="cases-client">Cliente</label>
               <select id="cases-client" name="clientId" defaultValue={selectedClientId}>
                 <option value="">Todos os clientes</option>
                 {overview.clientOptions.map((client) => (
@@ -249,7 +283,7 @@ export default async function InternalCasesPage({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cases-status">Status do Processo</label>
+              <label htmlFor="cases-status">Status do caso</label>
               <select id="cases-status" name="status" defaultValue={selectedStatus}>
                 <option value="">Todos os status</option>
                 {caseStatuses.map((status) => (
@@ -260,7 +294,7 @@ export default async function InternalCasesPage({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cases-priority">Nível de Prioridade</label>
+              <label htmlFor="cases-priority">Prioridade</label>
               <select id="cases-priority" name="priority" defaultValue={selectedPriority}>
                 <option value="">Todas as prioridades</option>
                 {casePriorities.map((priority) => (
@@ -271,11 +305,11 @@ export default async function InternalCasesPage({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cases-sort">Ordenar por</label>
+              <label htmlFor="cases-sort">Ordenacao</label>
               <select id="cases-sort" name="sort" defaultValue={sort}>
                 <option value="priority">Prioridade (maior primeiro)</option>
                 <option value="recent">Atividade mais recente</option>
-                <option value="stale">Mais tempo sem atualização</option>
+                <option value="stale">Mais tempo sem atualizacao</option>
               </select>
             </div>
           </div>
@@ -296,6 +330,22 @@ export default async function InternalCasesPage({
             </Link>
           </div>
         </form>
+      </SectionCard>
+
+      <SectionCard
+        title="Leitura executiva da carteira"
+        description="Este resumo cruza foco atual, ultimo movimento e proxima acao para a central de casos funcionar como eixo real da operacao."
+      >
+        <div className="summary-grid compact">
+          {executiveCaseGuidance.map((item) => (
+            <div key={item.label} className="summary-card">
+              <span>{item.label}</span>
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+              <span className="item-meta">{item.meta}</span>
+            </div>
+          ))}
+        </div>
       </SectionCard>
 
       <SectionCard
@@ -441,7 +491,7 @@ export default async function InternalCasesPage({
 
       <SectionCard
         title="Andamentos recentes"
-        description="Linha do tempo curta para entender o que mudou nos casos sem abrir cada detalhe imediatamente."
+        description="Linha viva da carteira para entender o que mudou e qual caso merece reentrada antes de abrir cada ficha."
       >
         {recentCaseEvents.length ? (
           <ul className="update-feed">
@@ -462,6 +512,11 @@ export default async function InternalCasesPage({
                   </span>
                   <span className="pill muted">{formatPortalDateTime(event.occurred_at)}</span>
                 </div>
+                <p className="update-body">
+                  {event.visible_to_client
+                    ? "Este movimento ja conversa com a visao do cliente e ajuda a manter o caso alinhado dos dois lados."
+                    : "Atualizacao interna pronta para orientar o proximo passo da equipe neste caso."}
+                </p>
                 <div className="form-actions">
                   <Link className="button secondary" href={buildInternalCaseHref(event.case_id)}>
                     Abrir caso

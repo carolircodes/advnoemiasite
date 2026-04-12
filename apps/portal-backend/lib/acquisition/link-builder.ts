@@ -24,6 +24,10 @@ const DEFAULT_CONFIG = {
   path: '/noemia'
 };
 
+function shouldLogTrackingLinks() {
+  return process.env.TRACKING_DEBUG_LOGS === '1';
+}
+
 /**
  * Gera URL de tracking completa para a NoemIA
  */
@@ -80,12 +84,13 @@ export function generateTrackingLink(params: TrackingLinkParams, options: LinkGe
 
   const finalUrl = url.toString();
 
-  // Log para debug
-  console.log('LINK_GENERATED: Link gerado com tracking:', {
-    url: finalUrl,
-    params,
-    config
-  });
+  if (shouldLogTrackingLinks()) {
+    console.log('LINK_GENERATED: Link gerado com tracking:', {
+      url: finalUrl,
+      params,
+      config
+    });
+  }
 
   return finalUrl;
 }

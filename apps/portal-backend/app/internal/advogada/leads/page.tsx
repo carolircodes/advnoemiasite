@@ -308,9 +308,9 @@ export default function LeadsDashboard() {
 
   return (
     <AppFrame
-      eyebrow="Dashboard"
-      title="Leads da NoemIA"
-      description="Gerencie os leads capturados pelo assistente virtual"
+      eyebrow="Leads e triagem"
+      title="Acompanhamento legado com ponte para a operacao oficial."
+      description="Esta area continua disponivel para leitura e apoio, mas o fluxo premium de triagem, follow-up e evolucao para cliente agora se concentra no painel operacional e no painel principal."
     >
       <PortalSessionBanner
         role="advogada"
@@ -319,6 +319,24 @@ export default function LeadsDashboard() {
       />
       
       <div className="space-y-8">
+        <SectionCard
+          title="Hub oficial da operacao"
+          description="Use esta rota como apoio historico. A conducao principal dos leads e da triagem agora acontece nas superficies integradas do escritorio."
+        >
+          <div className="grid two">
+            <Link className="route-card" href="/internal/advogada/operacional">
+              <span className="shortcut-kicker">Fluxo principal</span>
+              <strong>Abrir painel operacional</strong>
+              <span>Continue follow-up, consulta, contato assistido e sinais de prioridade na superficie premium consolidada.</span>
+            </Link>
+            <Link className="route-card" href="/internal/advogada#triagens-recebidas">
+              <span className="shortcut-kicker">Entrada do atendimento</span>
+              <strong>Voltar para triagens recebidas</strong>
+              <span>Revise a origem do atendimento e converta para operacao humana sem separar contexto e proximo passo.</span>
+            </Link>
+          </div>
+        </SectionCard>
+
         {/* Prioridades do Dia */}
         <PrioridadesDoDia leads={leads} />
 
