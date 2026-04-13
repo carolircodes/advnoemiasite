@@ -62,6 +62,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS trigger_update_noemia_triage_summaries_updated_at ON noemia_triage_summaries;
 CREATE TRIGGER trigger_update_noemia_triage_summaries_updated_at
     BEFORE UPDATE ON noemia_triage_summaries
     FOR EACH ROW

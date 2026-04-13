@@ -1,6 +1,12 @@
 alter table public.clients
   add column if not exists source_intake_request_id uuid references public.intake_requests(id) on delete set null;
 
+alter table public.document_requests
+  add column if not exists visible_to_client boolean not null default true;
+
+alter table public.appointments
+  add column if not exists visible_to_client boolean not null default true;
+
 create index if not exists clients_source_intake_request_idx
   on public.clients(source_intake_request_id);
 
