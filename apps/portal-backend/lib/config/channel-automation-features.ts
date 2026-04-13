@@ -22,6 +22,8 @@ export const channelAutomationFeatures = {
   unifiedConversationRouter: readBooleanFlag("CHANNEL_ENABLE_UNIFIED_CONVERSATION_ROUTER", true),
   unifiedHumanHandoff: readBooleanFlag("CHANNEL_ENABLE_HUMAN_HANDOFF", true),
   unifiedMaterialRouting: readBooleanFlag("CHANNEL_ENABLE_MATERIAL_ROUTING", true),
+  instagramCommentPublicReply: readBooleanFlag("INSTAGRAM_ENABLE_PUBLIC_COMMENT_REPLY", true),
+  instagramCommentAutoDm: readBooleanFlag("INSTAGRAM_ENABLE_COMMENT_AUTO_DM", false),
   instagramLeadCapture: readBooleanFlag("INSTAGRAM_ENABLE_LEAD_CAPTURE_AUTOMATION", false),
   instagramKeywordAutomation: readBooleanFlag("INSTAGRAM_ENABLE_KEYWORD_AUTOMATION", false),
   instagramCommentCampaignAutomation: readBooleanFlag(

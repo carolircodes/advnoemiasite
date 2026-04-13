@@ -1,4 +1,13 @@
 import type { SchedulingPreferences } from "./conversation-state";
+import type { SocialAcquisitionSnapshot } from "./social-acquisition";
+
+type PublicCommentPolicySnapshot = {
+  decision: string;
+  safetyDecision: string;
+  brevityRule: string;
+  operatorAction: string;
+  directTransitionStatus: string;
+};
 
 type BuildTriageReportInput = {
   channel: string;
@@ -43,6 +52,8 @@ type BuildTriageReportInput = {
     followUpReady?: boolean;
   } | null;
   schedulingPreferences?: SchedulingPreferences | null;
+  acquisitionContext?: SocialAcquisitionSnapshot | null;
+  publicCommentPolicy?: PublicCommentPolicySnapshot | null;
 };
 
 function asStringArray(value: unknown) {
@@ -157,6 +168,32 @@ export function buildTriageReport(input: BuildTriageReportInput) {
       input.conversationState?.leadTemperature || input.leadStage || "initial",
     preferencias_agendamento: availabilityParts.join(" | "),
     canal_origem: input.channel,
+    entry_source: input.acquisitionContext?.source || input.source || input.channel,
+    entry_type: input.acquisitionContext?.entryType || input.source || input.channel,
+    entry_point: input.acquisitionContext?.entryPoint || input.channel,
+    discovery_mechanism: input.acquisitionContext?.discoveryMechanism || "unknown",
+    source_label: input.acquisitionContext?.sourceLabel || input.source || input.channel,
+    campaign: input.acquisitionContext?.campaign || "",
+    campaign_label: input.acquisitionContext?.campaignLabel || "",
+    topic_label: input.acquisitionContext?.topicLabel || input.detectedTheme,
+    content_id: input.acquisitionContext?.contentId || "",
+    content_label: input.acquisitionContext?.contentLabel || "",
+    content_type: input.acquisitionContext?.contentType || "",
+    content_origin_label: input.acquisitionContext?.contentOriginLabel || "",
+    commercial_context: input.acquisitionContext?.commercialContext || "",
+    intent_signal: input.acquisitionContext?.intentSignal || "",
+    recommended_operator_action:
+      input.publicCommentPolicy?.operatorAction ||
+      input.acquisitionContext?.recommendedOperatorAction ||
+      input.nextBestAction ||
+      "",
+    direct_transition_status:
+      input.publicCommentPolicy?.directTransitionStatus ||
+      input.acquisitionContext?.directTransitionStatus ||
+      "",
+    public_comment_decision: input.publicCommentPolicy?.decision || "",
+    public_comment_safety: input.publicCommentPolicy?.safetyDecision || "",
+    public_brevity_rule: input.publicCommentPolicy?.brevityRule || "",
     sessao_relacionada: input.sessionId,
     pipeline_id: input.pipelineId || null,
     next_best_action: input.nextBestAction || "",
@@ -226,6 +263,7 @@ export function buildUserFacingTriageSummary(input: BuildTriageReportInput) {
 
   return [
     `Tema ${report.area_juridica}`,
+    report.source_label ? `origem ${report.source_label}` : "",
     `estado ${input.conversationPolicy?.state || input.leadStage}`,
     `explicacao ${input.conversationPolicy?.explanationStage || "not_started"}`,
     `consulta ${report.status_consulta}`,

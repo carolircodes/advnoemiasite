@@ -100,6 +100,22 @@ interface OperationalContact {
       availability?: string;
     } | null;
     reportSummary?: string | null;
+    entrySource?: string | null;
+    entryType?: string | null;
+    entryPoint?: string | null;
+    discoveryMechanism?: string | null;
+    sourceLabel?: string | null;
+    campaignLabel?: string | null;
+    topicLabel?: string | null;
+    contentLabel?: string | null;
+    contentType?: string | null;
+    commercialContext?: string | null;
+    intentSignal?: string | null;
+    recommendedOperatorAction?: string | null;
+    directTransitionStatus?: string | null;
+    publicCommentDecision?: string | null;
+    publicCommentSafety?: string | null;
+    publicBrevityRule?: string | null;
   } | null;
   daysSinceLastContact: number;
   isOverdue: boolean;
@@ -1095,6 +1111,70 @@ export default function OperationalPanel() {
                       <p className="mt-3 text-sm text-[#5d6d66]">
                         <span className="font-medium text-[#10261d]">Relatorio da triagem:</span>{' '}
                         {contact.conversationState.reportSummary}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.sourceLabel || contact.conversationState.contentLabel ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Entrada social:</span>{' '}
+                        {[
+                          contact.conversationState.sourceLabel,
+                          contact.conversationState.entryType,
+                          contact.conversationState.contentLabel,
+                          contact.conversationState.topicLabel
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.campaignLabel ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Campanha:</span>{' '}
+                        {contact.conversationState.campaignLabel}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.intentSignal || contact.conversationState.commercialContext ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Leitura comercial:</span>{' '}
+                        {[
+                          contact.conversationState.intentSignal
+                            ? `intencao ${contact.conversationState.intentSignal}`
+                            : '',
+                          contact.conversationState.commercialContext
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.recommendedOperatorAction ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Acao recomendada pela origem:</span>{' '}
+                        {contact.conversationState.recommendedOperatorAction}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.publicCommentDecision ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Policy publica:</span>{' '}
+                        {[
+                          contact.conversationState.publicCommentDecision,
+                          contact.conversationState.publicCommentSafety,
+                          contact.conversationState.publicBrevityRule
+                            ? `brevidade ${contact.conversationState.publicBrevityRule}`
+                            : ''
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.directTransitionStatus ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Estado comment para direct:</span>{' '}
+                        {contact.conversationState.directTransitionStatus}
                       </p>
                     ) : null}
 

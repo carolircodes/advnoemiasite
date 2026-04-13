@@ -111,6 +111,62 @@ async function sendInstagramMessage(recipientId: string, messageText: string) {
   }
 }
 
+async function sendInstagramCommentReply(commentId: string, messageText: string) {
+  try {
+    if (!INSTAGRAM_ACCESS_TOKEN) {
+      logEvent(
+        "INSTAGRAM_COMMENT_REPLY_SKIPPED_MISSING_CONFIG",
+        {
+          commentId,
+          hasAccessToken: !!INSTAGRAM_ACCESS_TOKEN
+        },
+        "error"
+      );
+      return false;
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${commentId}/comments`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${INSTAGRAM_ACCESS_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: messageText
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logEvent(
+        "INSTAGRAM_COMMENT_REPLY_ERROR",
+        {
+          commentId,
+          status: response.status,
+          errorText: errorText.slice(0, 500)
+        },
+        "error"
+      );
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logEvent(
+      "INSTAGRAM_COMMENT_REPLY_EXCEPTION",
+      {
+        commentId,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "error"
+    );
+    return false;
+  }
+}
+
 function extractInstagramDmMessageText(message: Record<string, unknown>) {
   const textValue = typeof message.text === "string" ? message.text : "";
   if (textValue.trim().length > 0) {
@@ -290,7 +346,9 @@ export async function POST(request: NextRequest) {
               }
             },
             {
-              sendText: sendInstagramMessage
+              sendText: sendInstagramMessage,
+              sendPublicCommentReply: sendInstagramCommentReply,
+              sendDirectFromComment: sendInstagramMessage
             }
           );
         }

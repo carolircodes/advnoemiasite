@@ -8,11 +8,20 @@ import {
 import { acquisitionContentService } from "./acquisition-content";
 import { antiSpamGuard } from "./anti-spam-guard";
 import { conversationPersistence } from "./conversation-persistence";
+import { evaluateInstagramCommentPolicy } from "./instagram-comment-policy";
 import { instagramCommentContext } from "./instagram-comment-context";
 import {
   evaluateConversationPolicy,
   extractConversationStateFromSession
 } from "./channel-conversation-policy";
+import {
+  buildSocialAcquisitionPayload,
+  buildSocialAcquisitionSnapshot,
+  getSocialAcquisitionFromMetadata,
+  promoteCommentSnapshotToDm,
+  trackSocialAcquisitionEvent,
+  type SocialAcquisitionSnapshot
+} from "./social-acquisition";
 import { triagePersistence, type TriageData } from "./triage-persistence";
 import {
   buildInternalTriageSummary,
@@ -63,6 +72,34 @@ type RouterTransport = {
   ) => Promise<boolean>;
   markAsRead?: (messageId: string) => Promise<boolean>;
   sendTypingIndicator?: (recipientId: string) => Promise<boolean>;
+  sendPublicCommentReply?: (
+    commentId: string,
+    messageText: string,
+    context?: {
+      channel: SupportedChannel;
+      eventId: string;
+      externalUserId: string;
+      sessionId?: string | null;
+      pipelineId?: string | null;
+      responseType?: string | null;
+      responseLength?: number | null;
+      reason?: string | null;
+    }
+  ) => Promise<boolean>;
+  sendDirectFromComment?: (
+    recipientId: string,
+    messageText: string,
+    context?: {
+      channel: SupportedChannel;
+      eventId: string;
+      externalUserId: string;
+      sessionId?: string | null;
+      pipelineId?: string | null;
+      responseType?: string | null;
+      responseLength?: number | null;
+      reason?: string | null;
+    }
+  ) => Promise<boolean>;
 };
 
 type RouterDecision = {
@@ -628,8 +665,10 @@ function buildSessionSummaryPayload(args: {
   handoffReason?: string;
   conversationState?: string;
   consultationStage?: string;
+  acquisitionSummary?: string;
 }) {
   return [
+    `acquisition=${args.acquisitionSummary || "not_resolved"}`,
     `theme=${args.detectedTheme}`,
     `leadStage=${args.leadStage}`,
     `triageStatus=${args.triageStatus}`,
@@ -730,7 +769,15 @@ async function saveTriageAndHandoff(
     followUpReady: boolean;
   },
   pipelineId?: string | null,
-  nextBestAction?: string
+  nextBestAction?: string,
+  acquisitionSnapshot?: SocialAcquisitionSnapshot | null,
+  publicCommentPolicy?: {
+    decision: string;
+    safetyDecision: string;
+    brevityRule: string;
+    operatorAction: string;
+    directTransitionStatus: string;
+  } | null
 ) {
   try {
     const report = buildTriageReport({
@@ -746,7 +793,9 @@ async function saveTriageAndHandoff(
       handoffReasonCode: conversationPolicy?.handoffReasonCode || null,
       conversationState: conversationState || null,
       conversationPolicy: conversationPolicy || null,
-      schedulingPreferences: conversationState?.contactPreferences || null
+      schedulingPreferences: conversationState?.contactPreferences || null,
+      acquisitionContext: acquisitionSnapshot || null,
+      publicCommentPolicy: publicCommentPolicy || null
     });
 
     const triageData = {
@@ -799,7 +848,9 @@ async function saveTriageAndHandoff(
         handoffReasonCode: conversationPolicy?.handoffReasonCode || null,
         conversationState: conversationState || null,
         conversationPolicy: conversationPolicy || null,
-        schedulingPreferences: conversationState?.contactPreferences || null
+        schedulingPreferences: conversationState?.contactPreferences || null,
+        acquisitionContext: acquisitionSnapshot || null,
+        publicCommentPolicy: publicCommentPolicy || null
       }),
       userFriendlySummary: buildUserFacingTriageSummary({
         channel: event.channel,
@@ -814,7 +865,9 @@ async function saveTriageAndHandoff(
         handoffReasonCode: conversationPolicy?.handoffReasonCode || null,
         conversationState: conversationState || null,
         conversationPolicy: conversationPolicy || null,
-        schedulingPreferences: conversationState?.contactPreferences || null
+        schedulingPreferences: conversationState?.contactPreferences || null,
+        acquisitionContext: acquisitionSnapshot || null,
+        publicCommentPolicy: publicCommentPolicy || null
       }),
       conversationStatus: conversationPolicy?.state,
       explanationStage: conversationPolicy?.explanationStage,
@@ -904,6 +957,320 @@ async function safeUpdateSession(
     );
     return false;
   }
+}
+
+function buildAcquisitionSummary(snapshot: SocialAcquisitionSnapshot | null) {
+  if (!snapshot) {
+    return "";
+  }
+
+  return [
+    snapshot.sourceLabel,
+    snapshot.topicLabel,
+    snapshot.contentLabel,
+    snapshot.entryType
+  ]
+    .filter(Boolean)
+    .join("/");
+}
+
+async function trackAcquisitionBootstrapEvents(args: {
+  snapshot: SocialAcquisitionSnapshot;
+  sessionId: string;
+  isFirstTouch: boolean;
+}) {
+  if (args.isFirstTouch) {
+    await trackSocialAcquisitionEvent({
+      eventName: "social_entry_created",
+      eventGroup: "acquisition",
+      snapshot: args.snapshot,
+      sessionId: args.sessionId,
+      payload: {
+        entryType: args.snapshot.entryType,
+        entryPoint: args.snapshot.entryPoint
+      }
+    });
+  }
+
+  await trackSocialAcquisitionEvent({
+    eventName: "acquisition_source_resolved",
+    eventGroup: "acquisition",
+    snapshot: args.snapshot,
+    sessionId: args.sessionId
+  });
+
+  await trackSocialAcquisitionEvent({
+    eventName: "topic_detected",
+    eventGroup: "acquisition",
+    snapshot: args.snapshot,
+    sessionId: args.sessionId,
+    payload: {
+      detectedTopic: args.snapshot.topic
+    }
+  });
+
+  if (args.snapshot.contentId) {
+    await trackSocialAcquisitionEvent({
+      eventName: "content_assisted_lead",
+      eventGroup: "acquisition",
+      snapshot: args.snapshot,
+      sessionId: args.sessionId
+    });
+  }
+}
+
+async function handleInstagramCommentEntry(args: {
+  event: ChannelConversationEvent;
+  eventId: string;
+  messageType: string;
+  session: ConversationSession;
+  pipelineId: string | null;
+  transport: RouterTransport;
+  acquisitionSnapshot: SocialAcquisitionSnapshot;
+  isFirstTouch: boolean;
+}): Promise<RouterDecision> {
+  const commentContext = args.event.commentContext!;
+  const now = new Date().toISOString();
+  const autoDmSupported =
+    channelAutomationFeatures.instagramCommentAutoDm &&
+    typeof args.transport.sendDirectFromComment === "function";
+  const commentPolicy = evaluateInstagramCommentPolicy({
+    commentText: args.event.messageText,
+    topic: args.acquisitionSnapshot.topic,
+    autoDmSupported
+  });
+
+  await trackAcquisitionBootstrapEvents({
+    snapshot: args.acquisitionSnapshot,
+    sessionId: args.session.id,
+    isFirstTouch: args.isFirstTouch
+  });
+
+  await trackSocialAcquisitionEvent({
+    eventName: "comment_received",
+    eventGroup: "social_engagement",
+    snapshot: args.acquisitionSnapshot,
+    sessionId: args.session.id,
+    payload: {
+      commentId: commentContext.commentId
+    }
+  });
+
+  await safeSaveMessage(args.session.id, args.event.externalMessageId, "user", args.event.messageText, "inbound", {
+    channel: args.event.channel,
+    source: args.event.source,
+    eventId: args.eventId,
+    externalUserId: args.event.externalUserId,
+    externalMessageId: args.event.externalMessageId,
+    messageType: args.messageType,
+    responseSurface: "public_comment",
+    socialAcquisition: buildSocialAcquisitionPayload(args.acquisitionSnapshot)
+  });
+
+  let publicReplySent = false;
+  if (
+    channelAutomationFeatures.instagramCommentPublicReply &&
+    commentPolicy.publicReply &&
+    args.transport.sendPublicCommentReply
+  ) {
+    publicReplySent = await args.transport.sendPublicCommentReply(
+      commentContext.commentId,
+      commentPolicy.publicReply,
+      {
+        channel: args.event.channel,
+        eventId: args.eventId,
+        externalUserId: args.event.externalUserId,
+        sessionId: args.session.id,
+        pipelineId: args.pipelineId,
+        responseType: "public_comment",
+        responseLength: commentPolicy.publicReply.length,
+        reason: commentPolicy.decision
+      }
+    );
+  }
+
+  if (publicReplySent) {
+    await safeSaveMessage(args.session.id, undefined, "assistant", commentPolicy.publicReply!, "outbound", {
+      channel: args.event.channel,
+      source: "instagram_public_comment_reply",
+      eventId: args.eventId,
+      responseSurface: "public_comment",
+      commentPolicy
+    });
+
+    await trackSocialAcquisitionEvent({
+      eventName: "comment_replied",
+      eventGroup: "social_engagement",
+      snapshot: args.acquisitionSnapshot,
+      sessionId: args.session.id,
+      payload: {
+        policyDecision: commentPolicy.decision
+      }
+    });
+  }
+
+  let dmStarted = false;
+  if (commentPolicy.inviteToDm) {
+    await trackSocialAcquisitionEvent({
+      eventName: "comment_redirect_to_dm",
+      eventGroup: "social_conversion",
+      snapshot: args.acquisitionSnapshot,
+      sessionId: args.session.id,
+      payload: {
+        autoDmSupported: commentPolicy.autoDmSupported,
+        humanReviewRequired: commentPolicy.humanReviewRequired
+      }
+    });
+  }
+
+  if (
+    commentPolicy.shouldAttemptAutoDm &&
+    commentPolicy.publicReply &&
+    args.transport.sendDirectFromComment
+  ) {
+    dmStarted = await args.transport.sendDirectFromComment(
+      args.event.externalUserId,
+      commentPolicy.publicReply,
+      {
+        channel: args.event.channel,
+        eventId: args.eventId,
+        externalUserId: args.event.externalUserId,
+        sessionId: args.session.id,
+        pipelineId: args.pipelineId,
+        responseType: "direct_message",
+        responseLength: commentPolicy.publicReply.length,
+        reason: "comment_to_dm"
+      }
+    );
+
+    if (dmStarted) {
+      await trackSocialAcquisitionEvent({
+        eventName: "dm_started_from_comment",
+        eventGroup: "social_conversion",
+        snapshot: {
+          ...promoteCommentSnapshotToDm(args.acquisitionSnapshot),
+          lastResolvedAt: now
+        },
+        sessionId: args.session.id
+      });
+    }
+  }
+
+  const finalSnapshot = {
+    ...args.acquisitionSnapshot,
+    directTransitionStatus: dmStarted
+      ? "dm_started"
+      : commentPolicy.directTransitionStatus,
+    lastResolvedAt: now
+  } satisfies SocialAcquisitionSnapshot;
+
+  const mergedMetadata = {
+    ...(args.session.metadata || {}),
+    social_acquisition: finalSnapshot,
+    public_comment_policy: {
+      policyName: commentPolicy.policyName,
+      decision: commentPolicy.decision,
+      safetyDecision: commentPolicy.safetyDecision,
+      brevityRule: commentPolicy.brevityRule,
+      operatorAction: commentPolicy.operatorAction,
+      rationale: commentPolicy.rationale,
+      publicReplySent,
+      dmStarted,
+      updatedAt: now
+    },
+    router_last_event_id: args.eventId,
+    router_last_source: args.event.source,
+    router_last_theme: args.acquisitionSnapshot.topic,
+    router_last_decision: commentPolicy.decision,
+    last_router_at: now
+  };
+
+  await safeUpdateSession(args.session.id, {
+    lead_stage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+    case_area: args.acquisitionSnapshot.topic,
+    current_intent: `comment_${commentPolicy.decision}`,
+    handoff_to_human: commentPolicy.humanReviewRequired,
+    last_inbound_at: now,
+    last_outbound_at: publicReplySent ? now : undefined,
+    last_summary: buildSessionSummaryPayload({
+      acquisitionSummary: buildAcquisitionSummary(finalSnapshot),
+      detectedTheme: finalSnapshot.topic,
+      leadStage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+      triageStatus: "not_started",
+      conversationState: commentPolicy.humanReviewRequired
+        ? "human_followup_pending"
+        : "ai_active",
+      consultationStage: "not_offered",
+      followUpState: commentPolicy.humanReviewRequired
+        ? "human_handoff_pending"
+        : "awaiting_initial_reply",
+      conversionSignal: commentPolicy.inviteToDm ? "curiosity" : "none",
+      nextBestAction: commentPolicy.inviteToDm ? "answer_and_ask_one_question" : "close",
+      materialSent: false,
+      handoffTriggered: commentPolicy.humanReviewRequired,
+      handoffReason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined
+    }),
+    metadata: mergedMetadata
+  });
+
+  await saveTriageAndHandoff(
+    {
+      ...args.session,
+      metadata: mergedMetadata
+    },
+    args.event,
+    finalSnapshot.topic,
+    commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+    commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined,
+    undefined,
+    undefined,
+    args.pipelineId,
+    commentPolicy.inviteToDm ? "continue_triage" : "close",
+    finalSnapshot,
+    {
+      decision: commentPolicy.decision,
+      safetyDecision: commentPolicy.safetyDecision,
+      brevityRule: commentPolicy.brevityRule,
+      operatorAction: commentPolicy.operatorAction,
+      directTransitionStatus: finalSnapshot.directTransitionStatus
+    }
+  );
+
+  await antiSpamGuard.markEventProcessed({
+    channel: args.event.channel,
+    externalEventId: args.eventId,
+    externalMessageId: args.event.externalMessageId,
+    externalUserId: args.event.externalUserId,
+    messageText: args.event.messageText,
+    messageType: args.messageType
+  });
+
+  return {
+    direction: commentPolicy.humanReviewRequired ? "handoff" : publicReplySent ? "reply" : "ignored",
+    sessionId: args.session.id,
+    eventId: args.eventId,
+    usedFallback: false,
+    handoffTriggered: commentPolicy.humanReviewRequired,
+    replySent: publicReplySent,
+    detectedTheme: finalSnapshot.topic,
+    currentIntent: `comment_${commentPolicy.decision}`,
+    leadStage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+    triageStatus: "not_started",
+    followUpState: commentPolicy.humanReviewRequired
+      ? "human_handoff_pending"
+      : "awaiting_initial_reply",
+    conversionSignal: commentPolicy.inviteToDm ? "curiosity" : "none",
+    nextBestAction: commentPolicy.inviteToDm ? "answer_and_ask_one_question" : "close",
+    handoffReason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined,
+    logs: {
+      publicReplySent,
+      dmStarted,
+      commentPolicyDecision: commentPolicy.decision,
+      commentSafetyDecision: commentPolicy.safetyDecision,
+      autoDmSupported: commentPolicy.autoDmSupported,
+      publicReplyConfigured: Boolean(commentPolicy.publicReply)
+    }
+  };
 }
 
 export async function processChannelConversationEvent(
@@ -1070,6 +1437,20 @@ export async function processChannelConversationEvent(
 
     let session = await conversationPersistence.getOrCreateSession(event.channel, event.externalUserId);
     const isCommentSource = event.source === "instagram_comment" && !!event.commentContext;
+    const existingAcquisitionSnapshot = getSocialAcquisitionFromMetadata(session.metadata);
+    const acquisitionSnapshot = buildSocialAcquisitionSnapshot({
+      channel: event.channel,
+      source: event.source,
+      messageText: event.messageText,
+      commentContext: event.commentContext
+        ? {
+            commentId: event.commentContext.commentId,
+            mediaId: event.commentContext.mediaId
+          }
+        : undefined,
+      existing: existingAcquisitionSnapshot
+    });
+    const isFirstTouch = !existingAcquisitionSnapshot;
     let sessionConversationState = extractConversationStateFromSession(session);
     let initialConversationPolicy = evaluateConversationPolicy({
       channel: event.channel,
@@ -1176,6 +1557,17 @@ export async function processChannelConversationEvent(
       confidence: 0.7
     });
     pipelineId = extractPipelineId(session);
+
+    return handleInstagramCommentEntry({
+      event,
+      eventId,
+      messageType,
+      session,
+      pipelineId,
+      transport,
+      acquisitionSnapshot,
+      isFirstTouch
+    });
   } else {
     await safeSaveMessage(session.id, event.externalMessageId, "user", event.messageText, "inbound", {
       channel: event.channel,
@@ -1183,9 +1575,37 @@ export async function processChannelConversationEvent(
       eventId,
       externalUserId: event.externalUserId,
       externalMessageId: event.externalMessageId,
-      messageType
+      messageType,
+      socialAcquisition: buildSocialAcquisitionPayload(acquisitionSnapshot)
     });
   }
+
+    if (isFirstTouch) {
+      await trackAcquisitionBootstrapEvents({
+        snapshot: acquisitionSnapshot,
+        sessionId: session.id,
+        isFirstTouch
+      });
+    } else if (
+      existingAcquisitionSnapshot?.entryType === "instagram_comment" &&
+      acquisitionSnapshot.entryType === "instagram_comment_to_dm"
+    ) {
+      await trackSocialAcquisitionEvent({
+        eventName: "dm_started_from_comment",
+        eventGroup: "social_conversion",
+        snapshot: acquisitionSnapshot,
+        sessionId: session.id
+      });
+      await trackSocialAcquisitionEvent({
+        eventName: "direct_conversion_signal",
+        eventGroup: "social_conversion",
+        snapshot: acquisitionSnapshot,
+        sessionId: session.id,
+        payload: {
+          signal: "comment_to_dm"
+        }
+      });
+    }
 
     logRouterEvent(
       "CHANNEL_ROUTER_PRE_CONTEXT",
@@ -1271,7 +1691,7 @@ export async function processChannelConversationEvent(
       addressRequestDetected: priorityIntentDecision.addressRequestDetected,
       whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended
     },
-    acquisition: materialRecommendation
+    materialContext: materialRecommendation
       ? {
           source: event.source,
           topic: materialRecommendation.theme,
@@ -1285,7 +1705,8 @@ export async function processChannelConversationEvent(
         : {
           source: event.source,
           topic: baseTheme
-        }
+        },
+    acquisition: buildSocialAcquisitionPayload(acquisitionSnapshot)
   };
 
   const preparedContext = isCommentSource
@@ -1582,6 +2003,7 @@ export async function processChannelConversationEvent(
 
   const mergedMetadata = {
     ...(session.metadata || {}),
+    social_acquisition: acquisitionSnapshot,
     router_last_event_id: eventId,
     router_last_source: event.source,
     router_last_theme: detectedTheme,
@@ -1608,6 +2030,7 @@ export async function processChannelConversationEvent(
     last_router_at: new Date().toISOString()
   };
   const sessionSummary = buildSessionSummaryPayload({
+    acquisitionSummary: buildAcquisitionSummary(acquisitionSnapshot),
     detectedTheme,
     leadStage,
     triageStatus,
@@ -1828,7 +2251,9 @@ export async function processChannelConversationEvent(
       conversationState,
       conversationPolicy,
       pipelineId,
-      nextBestAction
+      nextBestAction,
+      acquisitionSnapshot,
+      null
     );
 
     await antiSpamGuard.markEventProcessed({
@@ -1856,7 +2281,7 @@ export async function processChannelConversationEvent(
     );
   }
 
-  logRouterEvent("CHANNEL_ROUTER_COMPLETED", {
+    logRouterEvent("CHANNEL_ROUTER_COMPLETED", {
     channel: event.channel,
     source: event.source,
     sessionId: session.id,
@@ -1886,8 +2311,26 @@ export async function processChannelConversationEvent(
     consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
     addressRequestDetected: priorityIntentDecision.addressRequestDetected,
     whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
-    handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber
-  });
+      handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber
+    });
+
+    if (
+      acquisitionSnapshot.entryType === "instagram_comment_to_dm" &&
+      (conversionSignal === "triage_progress" ||
+        conversionSignal === "consultation_intent" ||
+        conversionSignal === "human_handoff")
+    ) {
+      await trackSocialAcquisitionEvent({
+        eventName: "lead_progressed_from_content",
+        eventGroup: "social_conversion",
+        snapshot: acquisitionSnapshot,
+        sessionId: session.id,
+        payload: {
+          conversionSignal,
+          nextBestAction
+        }
+      });
+    }
 
   return {
     direction: finalDirection,

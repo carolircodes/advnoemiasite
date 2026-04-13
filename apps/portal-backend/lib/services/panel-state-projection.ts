@@ -20,6 +20,22 @@ export type PanelConversationStateProjection = {
   followUpReady: boolean;
   schedulingPreferences?: SchedulingPreferences | null;
   reportSummary?: string | null;
+  entrySource?: string | null;
+  entryType?: string | null;
+  entryPoint?: string | null;
+  discoveryMechanism?: string | null;
+  sourceLabel?: string | null;
+  campaignLabel?: string | null;
+  topicLabel?: string | null;
+  contentLabel?: string | null;
+  contentType?: string | null;
+  commercialContext?: string | null;
+  intentSignal?: string | null;
+  recommendedOperatorAction?: string | null;
+  directTransitionStatus?: string | null;
+  publicCommentDecision?: string | null;
+  publicCommentSafety?: string | null;
+  publicBrevityRule?: string | null;
 };
 
 export function projectPanelConversationState(summary: any): PanelConversationStateProjection | null {
@@ -70,6 +86,22 @@ export function projectPanelConversationState(summary: any): PanelConversationSt
       summary.follow_up_ready === true || triageData.ai_activity?.follow_up_ready === true,
     schedulingPreferences: triageData.scheduling_preferences || null,
     reportSummary:
-      reportData.resumo_caso || summary.user_friendly_summary || triageData.report?.resumo_caso || null
+      reportData.resumo_caso || summary.user_friendly_summary || triageData.report?.resumo_caso || null,
+    entrySource: reportData.entry_source || null,
+    entryType: reportData.entry_type || null,
+    entryPoint: reportData.entry_point || null,
+    discoveryMechanism: reportData.discovery_mechanism || null,
+    sourceLabel: reportData.source_label || null,
+    campaignLabel: reportData.campaign_label || null,
+    topicLabel: reportData.topic_label || null,
+    contentLabel: reportData.content_label || null,
+    contentType: reportData.content_type || null,
+    commercialContext: reportData.commercial_context || null,
+    intentSignal: reportData.intent_signal || null,
+    recommendedOperatorAction: reportData.recommended_operator_action || null,
+    directTransitionStatus: reportData.direct_transition_status || null,
+    publicCommentDecision: reportData.public_comment_decision || null,
+    publicCommentSafety: reportData.public_comment_safety || null,
+    publicBrevityRule: reportData.public_brevity_rule || null
   };
 }
