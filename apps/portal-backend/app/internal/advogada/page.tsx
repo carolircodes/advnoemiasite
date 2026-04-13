@@ -148,6 +148,13 @@ function getIntakeNextStep(status: string, urgencyLabel: string) {
   return "Revisar o andamento atual e decidir se ainda existe proximo movimento operacional pendente.";
 }
 
+function formatMoneyBRL(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format(value);
+}
+
 async function createClientAction(formData: FormData) {
   "use server";
 
@@ -382,6 +389,140 @@ export default async function InternalLawyerPage({
     }
   ];
   const suggestedMoves = intelligence.suggestions.slice(0, 4);
+  const pendingRevenuePayments = revenue.latestPayments.filter((item) => item.status === "pending");
+  const failedRevenuePayments = revenue.latestPayments.filter(
+    (item) => item.status === "rejected" || item.status === "failed"
+  );
+  const sourceRows = intelligence.acquisition.bySource.slice(0, 4);
+  const hottestSource = sourceRows[0] || null;
+  const siteSource =
+    intelligence.acquisition.bySource.find((item) => item.key === "site") || null;
+  const socialSources = intelligence.acquisition.bySource.filter(
+    (item) => item.key === "instagram" || item.key === "whatsapp"
+  );
+  const commandQuickActions = [
+    {
+      kicker: "Consulta do dia",
+      title: upcomingAppointments[0]
+        ? `Abrir ${upcomingAppointments[0].title}`
+        : "Organizar agenda e compromissos",
+      body: upcomingAppointments[0]
+        ? `${upcomingAppointments[0].clientName} - ${formatPortalDateTime(upcomingAppointments[0].starts_at)}`
+        : "A agenda segue como eixo central para preparar atendimento, retorno e comparecimento.",
+      href: upcomingAppointments[0]
+        ? buildInternalAgendaHref(
+            upcomingAppointments[0].client_id,
+            upcomingAppointments[0].case_id
+          )
+        : "/agenda",
+      actionLabel: upcomingAppointments[0] ? "Abrir agenda do compromisso" : "Abrir agenda"
+    },
+    {
+      kicker: "Pagamento pendente",
+      title: pendingRevenuePayments[0]
+        ? pendingRevenuePayments[0].offerLabel
+        : "Abrir camada de monetizacao",
+      body: pendingRevenuePayments[0]
+        ? `${pendingRevenuePayments[0].amountLabel} em ${pendingRevenuePayments[0].pathLabel}.`
+        : "Veja pagamentos pendentes, gargalos entre aceite e checkout e oportunidades de retomada.",
+      href: "#camadas-command-center",
+      actionLabel: pendingRevenuePayments[0] ? "Ver pagamentos em aberto" : "Abrir monetizacao"
+    },
+    {
+      kicker: "Entrada mais forte",
+      title: hottestSource
+        ? `${hottestSource.label} puxando aquisicao`
+        : "Revisar entradas e social",
+      body: hottestSource
+        ? `${hottestSource.triageSubmitted} triagem(ns) enviadas e ${hottestSource.clientsCreated} cliente(s) originados no periodo.`
+        : "A camada de entradas cruza site, social e triagem para mostrar onde existe oportunidade hoje.",
+      href: "#camadas-command-center",
+      actionLabel: hottestSource ? "Abrir entradas e canais" : "Ver entradas"
+    },
+    {
+      kicker: "Gargalo dominante",
+      title:
+        operationalSummary.waitingClientCount > operationalSummary.waitingTeamCount
+          ? "Destravar dependencias do cliente"
+          : "Destravar fila interna",
+      body:
+        operationalSummary.waitingClientCount > operationalSummary.waitingTeamCount
+          ? `${operationalSummary.waitingClientCount} item(ns) seguem parados por documento, retorno ou acesso.`
+          : `${operationalSummary.waitingTeamCount} item(ns) dependem de decisao, registro ou conducao humana.`,
+      href: "#central-prioridades",
+      actionLabel: "Abrir gargalos"
+    }
+  ];
+  const commandCenterLayers = [
+    {
+      title: "Agenda e compromissos no centro",
+      kicker: "Camada agenda",
+      summary: upcomingAppointments.length
+        ? `${upcomingAppointments.length} compromisso(s) futuro(s) visivel(is) com preparo operacional imediato.`
+        : "Sem compromisso futuro puxando preparo agora, mas a agenda segue como eixo principal do cockpit.",
+      bullets: [
+        upcomingAppointments[0]
+          ? `${upcomingAppointments[0].title} em ${formatPortalDateTime(upcomingAppointments[0].starts_at)}.`
+          : "Nenhum compromisso puxando urgencia nas proximas horas.",
+        `${overview.latestAppointments.filter((item) => item.status === "scheduled").length} consulta(s) ainda em status agendado.`,
+        `${overview.latestAppointments.filter((item) => item.status === "confirmed").length} compromisso(s) ja confirmados.`
+      ],
+      href: "/agenda",
+      actionLabel: "Abrir agenda central"
+    },
+    {
+      title: "Entradas, social e maquina do site",
+      kicker: "Camada entrada",
+      summary: sourceRows.length
+        ? `${sourceRows
+            .map((item) => `${item.label}: ${item.triageSubmitted}`)
+            .join(" | ")} triagem(ns) enviadas por origem.`
+        : "As origens ganham leitura aqui assim que o funil registrar mais movimento no periodo.",
+      bullets: [
+        siteSource
+          ? `Site gerou ${siteSource.triageSubmitted} triagem(ns) e ${siteSource.clientsCreated} cliente(s).`
+          : "Sem volume do site suficiente para destaque no periodo.",
+        socialSources.length
+          ? socialSources
+              .map((item) => `${item.label} com ${item.triageStarted} inicio(s) de triagem`)
+              .join(" | ")
+          : "Instagram e WhatsApp entram aqui quando a origem social gera conversa rastreavel.",
+        filteredIntakeRequests[0]
+          ? `Triagem mais recente: ${filteredIntakeRequests[0].full_name} em ${filteredIntakeRequests[0].areaLabel}.`
+          : "Nenhuma triagem nova aguardando leitura neste momento."
+      ],
+      href: "#triagens-recebidas",
+      actionLabel: "Abrir entradas e triagens"
+    },
+    {
+      title: "Comercial, consulta e receita",
+      kicker: "Camada comercial",
+      summary: `${formatMoneyBRL(revenue.summary.revenueInFormation)} em formacao e ${formatMoneyBRL(revenue.summary.revenueConfirmed)} confirmados no periodo.`,
+      bullets: [
+        `${revenue.summary.pendingCount} pagamento(s) pendente(s) entre aceite e confirmacao.`,
+        `${revenue.summary.paymentFollowUpNeeded} jornada(s) pedindo follow-up monetizavel.`,
+        pendingRevenuePayments[0]
+          ? `Pagamento mais sensivel: ${pendingRevenuePayments[0].offerLabel} (${pendingRevenuePayments[0].amountLabel}).`
+          : "Sem pagamento pendente puxando a fila agora."
+      ],
+      href: "#camadas-command-center",
+      actionLabel: "Abrir monetizacao"
+    },
+    {
+      title: "Gargalos, dependencias e risco",
+      kicker: "Camada risco operacional",
+      summary: `${operationalSummary.waitingClientCount} dependencias do cliente, ${operationalSummary.waitingTeamCount} internas e ${operationalSummary.agedPendingDocumentsCount} pendencia(s) documental(is) envelhecida(s).`,
+      bullets: [
+        `${operationalSummary.inviteStalledCount} convite(s) travado(s) no portal.`,
+        failedRevenuePayments.length
+          ? `${failedRevenuePayments.length} tentativa(s) de pagamento falharam e podem ser recuperadas.`
+          : "Nenhuma falha de pagamento recente dominando o risco comercial.",
+        `${operationalSummary.staleCasesCount} caso(s) sem atualizacao recente pedindo reentrada.`
+      ],
+      href: "#central-prioridades",
+      actionLabel: "Abrir gargalos"
+    }
+  ];
   const operationalHeadline =
     operationalSummary.criticalCount > 0
       ? `${operationalSummary.criticalCount} item(ns) ja cruzaram o limite de atencao e merecem acao antes do restante da fila.`
@@ -459,8 +600,8 @@ export default async function InternalLawyerPage({
   return (
     <AppFrame
       eyebrow="Painel da advogada"
-      title={`Central operacional premium para ${profile.full_name}.`}
-      description="O painel agora comeca pela prioridade real: organiza o trabalho em filas uteis, destaca o que envelheceu e usa inteligencia do produto para apoiar decisao, retorno e acompanhamento."
+      title={`Command center premium para ${profile.full_name}.`}
+      description="O cockpit-mae agora unifica agenda, entradas, comercial, receita, operacao e proximo passo em uma leitura central de comando, sem depender de paines paralelos."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -494,8 +635,8 @@ export default async function InternalLawyerPage({
       {success ? <div className="success-notice">{success}</div> : null}
 
       <SectionCard
-        title="Cockpit estrategico"
-        description="Leitura executiva do dia para decidir com rapidez o que exige acao imediata, o que trava por dependencia e onde a operacao ainda forma receita."
+        title="Command center do imperio"
+        description="Radar executivo do dia com hierarquia clara: o que pede acao agora, o que trava a operacao, onde existe resultado hoje e qual camada deve ser aberta em seguida."
       >
         <div className="notice">{cockpitProjection.focusHeadline}</div>
 
@@ -520,7 +661,7 @@ export default async function InternalLawyerPage({
           ))}
         </div>
 
-        <div className="grid three">
+        <div className="summary-grid compact">
           {cockpitProjection.strategicCards.map((card) => (
             <article key={card.label} className="summary-card">
               <span>{card.label}</span>
@@ -530,7 +671,7 @@ export default async function InternalLawyerPage({
           ))}
         </div>
 
-        <div className="grid three">
+        <div className="grid two">
           <div className="subtle-panel stack">
             <span className="shortcut-kicker">Prioridade imediata</span>
             {cockpitProjection.priorityDeck.length ? (
@@ -568,6 +709,22 @@ export default async function InternalLawyerPage({
             )}
           </div>
 
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Proximos passos com maior impacto</span>
+            <div className="grid two">
+              {commandQuickActions.map((item) => (
+                <Link key={item.title} href={item.href} className="route-card">
+                  <span className="shortcut-kicker">{item.kicker}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                  <span>{item.actionLabel}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid two">
           <div className="subtle-panel stack">
             <span className="shortcut-kicker">Dependencias e bloqueios</span>
             {cockpitProjection.dependencyDeck.length ? (
@@ -637,114 +794,135 @@ export default async function InternalLawyerPage({
       </SectionCard>
 
       <SectionCard
-        id="receita-formacao"
-        title="Receita em formacao"
-        description="Leitura direta de pagamentos pendentes, ofertas aceitas, receita confirmada e jornadas que pedem follow-up sem inflar o cockpit."
+        id="camadas-command-center"
+        title="Camadas centrais do command center"
+        description="Agenda, entradas, receita e gargalos agora aparecem como camadas do mesmo cerebro executivo, em vez de modulos separados competindo por atencao."
       >
         <div className="summary-grid compact">
           <div className="summary-card">
+            <span>Agenda real no centro</span>
+            <strong>{upcomingAppointments.length}</strong>
+            <p>Compromisso(s) futuro(s) conectando consulta, preparo e proximo passo operacional.</p>
+            <span className="item-meta">A agenda deixa de ser detalhe e vira eixo do cockpit.</span>
+          </div>
+          <div className="summary-card">
+            <span>Entradas e canais</span>
+            <strong>{intelligence.summary.triageSubmitted}</strong>
+            <p>Triagem(ns) enviada(s) no periodo entre site, social e canais de conversa.</p>
+            <span className="item-meta">Entrada viva, nao analytics ornamental.</span>
+          </div>
+          <div className="summary-card">
             <span>Receita em formacao</span>
-            <strong>R$ {revenue.summary.revenueInFormation.toFixed(2)}</strong>
-            <p>{revenue.summary.pendingCount} pagamento(s) ainda em andamento.</p>
-            <span className="item-meta">Dinheiro que ja entrou em checkout e ainda nao fechou.</span>
+            <strong>{formatMoneyBRL(revenue.summary.revenueInFormation)}</strong>
+            <p>{revenue.summary.pendingCount} pagamento(s) ainda em aberto antes da confirmacao.</p>
+            <span className="item-meta">Consulta, aceite e pagamento agora entram na mesma leitura.</span>
           </div>
-          <div className="summary-card">
-            <span>Receita confirmada</span>
-            <strong>R$ {revenue.summary.revenueConfirmed.toFixed(2)}</strong>
-            <p>{revenue.summary.approvedCount} pagamento(s) aprovados no periodo.</p>
-            <span className="item-meta">Valor que ja virou fechamento real.</span>
-          </div>
-          <div className="summary-card">
-            <span>Follow-up de pagamento</span>
-            <strong>{revenue.summary.paymentFollowUpNeeded}</strong>
-            <p>Jornadas que pedem retomada humana ou nova passagem de valor.</p>
-            <span className="item-meta">Evita perder dinheiro entre aceite e confirmacao.</span>
-          </div>
+        </div>
+
+        <div className="grid two">
+          {commandCenterLayers.map((layer) => (
+            <div key={layer.title} className="subtle-panel stack">
+              <span className="shortcut-kicker">{layer.kicker}</span>
+              <strong>{layer.title}</strong>
+              <p className="update-body">{layer.summary}</p>
+              <ul className="list">
+                {layer.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+              <div className="form-actions">
+                <Link className="button secondary" href={layer.href}>
+                  {layer.actionLabel}
+                </Link>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="grid three">
           <div className="subtle-panel stack">
-            <span className="shortcut-kicker">Pagamentos pendentes</span>
-            {revenue.latestPayments.filter((item) => item.status === "pending").length ? (
+            <span className="shortcut-kicker">Agenda do dia e prontidao</span>
+            {upcomingAppointments.length ? (
               <ul className="update-feed compact">
-                {revenue.latestPayments
-                  .filter((item) => item.status === "pending")
-                  .slice(0, 4)
-                  .map((item) => (
-                    <li key={item.id} className="update-card">
-                      <div className="update-head">
-                        <div>
-                          <strong>{item.offerLabel}</strong>
-                          <span className="item-meta">{item.amountLabel}</span>
-                        </div>
-                        <span className={`pill ${item.followUpNeeded ? "warning" : "muted"}`}>
-                          {item.followUpNeeded ? "Pede follow-up" : "Pendente"}
+                {upcomingAppointments.slice(0, 4).map((appointment) => (
+                  <li key={appointment.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{appointment.title}</strong>
+                        <span className="item-meta">
+                          {appointment.clientName} - {appointment.caseTitle}
                         </span>
                       </div>
-                      <p className="update-body">
-                        Caminho: {item.pathLabel}. Criado em {new Date(item.createdAt).toLocaleString("pt-BR")}.
-                      </p>
-                    </li>
-                  ))}
-              </ul>
-            ) : (
-              <p className="empty-state">Nenhum pagamento pendente puxando a fila agora.</p>
-            )}
-          </div>
-
-          <div className="subtle-panel stack">
-            <span className="shortcut-kicker">Falhas e recuperacao</span>
-            {revenue.latestPayments.filter((item) => item.status === "rejected" || item.status === "failed").length ? (
-              <ul className="update-feed compact">
-                {revenue.latestPayments
-                  .filter((item) => item.status === "rejected" || item.status === "failed")
-                  .slice(0, 4)
-                  .map((item) => (
-                    <li key={item.id} className="update-card">
-                      <div className="update-head">
-                        <div>
-                          <strong>{item.offerLabel}</strong>
-                          <span className="item-meta">{item.amountLabel}</span>
-                        </div>
-                        <span className="pill critical">Recuperar</span>
-                      </div>
-                      <p className="update-body">
-                        {item.statusDetail || "Falha no pagamento sem detalhamento adicional."}
-                      </p>
-                    </li>
-                  ))}
-              </ul>
-            ) : (
-              <p className="empty-state">Nenhuma falha recente destacada neste momento.</p>
-            )}
-          </div>
-
-          <div className="subtle-panel stack">
-            <span className="shortcut-kicker">Ofertas que mais fecham</span>
-            {revenue.offerBreakdown.length ? (
-              <ul className="list">
-                {revenue.offerBreakdown.slice(0, 4).map((item) => (
-                  <li key={item.code}>
-                    <div className="item-head">
-                      <strong>{item.label}</strong>
-                      <span className="tag soft">{item.approved} aprovado(s)</span>
+                      <span className="pill success">{appointment.statusLabel}</span>
                     </div>
-                    <span className="item-meta">
-                      R$ {item.revenueConfirmed.toFixed(2)} confirmados e R$ {item.revenueInFormation.toFixed(2)} em formacao.
-                    </span>
+                    <p className="update-body">
+                      {appointment.typeLabel} em {formatPortalDateTime(appointment.starts_at)}.
+                    </p>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="empty-state">As ofertas entram aqui assim que a camada de receita ganhar volume real.</p>
+              <p className="empty-state">Sem compromisso futuro puxando preparo imediato no momento.</p>
+            )}
+          </div>
+
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Social, site e origem viva</span>
+            {sourceRows.length ? (
+              <ul className="update-feed compact">
+                {sourceRows.map((item) => (
+                  <li key={item.key} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{item.label}</strong>
+                        <span className="item-meta">
+                          {item.visits} visita(s) | {item.ctas} CTA(s)
+                        </span>
+                      </div>
+                      <span className="pill warning">{item.triageSubmitted} triagem(ns)</span>
+                    </div>
+                    <p className="update-body">
+                      {item.clientsCreated} cliente(s) criados com taxa triagem-&gt;cliente de {item.triageToClientRate}%.
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">As origens entram aqui assim que o periodo registrar aquisicao suficiente.</p>
+            )}
+          </div>
+
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Pagamento e recuperacao</span>
+            {pendingRevenuePayments.length || failedRevenuePayments.length ? (
+              <ul className="update-feed compact">
+                {[...pendingRevenuePayments.slice(0, 2), ...failedRevenuePayments.slice(0, 2)].map((item) => (
+                  <li key={item.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{item.offerLabel}</strong>
+                        <span className="item-meta">{item.amountLabel}</span>
+                      </div>
+                      <span className={`pill ${item.status === "pending" ? "warning" : "critical"}`}>
+                        {item.status === "pending" ? "Pagamento pendente" : "Recuperar"}
+                      </span>
+                    </div>
+                    <p className="update-body">
+                      {item.status === "pending"
+                        ? `Caminho ${item.pathLabel} criado em ${new Date(item.createdAt).toLocaleString("pt-BR")}.`
+                        : item.statusDetail || "Falha recente na camada de pagamento."}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">Nenhum pagamento aberto ou falhado puxando a fila agora.</p>
             )}
           </div>
         </div>
 
-        <div className="form-actions">
-          <Link className="button secondary" href="/internal/advogada/inteligencia">
-            Abrir inteligencia de receita
-          </Link>
+        <div className="notice">
+          O command center agora responde no mesmo lugar onde esta o dinheiro, onde esta a agenda, onde entram as oportunidades e onde a operacao esta travando.
         </div>
       </SectionCard>
 
@@ -814,8 +992,8 @@ export default async function InternalLawyerPage({
 
       <SectionCard
         id="central-prioridades"
-        title="Central de prioridades"
-        description="A rotina agora comeca pela fila certa: o que exige acao hoje, o que pede preparo nesta semana e o que ficou esperando cliente ou equipe."
+        title="Gargalos, filas e prioridades"
+        description="A rotina agora comeca pela fila certa: o que exige acao hoje, o que pede preparo nesta semana e o que ficou travado por cliente ou equipe."
       >
         <div className="operational-band">
           {operationalHighlights.map((item) => (
@@ -858,8 +1036,8 @@ export default async function InternalLawyerPage({
       </SectionCard>
 
       <SectionCard
-        title="Direcao executiva da operacao"
-        description="Este bloco costura cliente, caso, triagem e inteligencia em uma leitura unica para a equipe comecar pelo ponto certo."
+        title="Proximos focos do command center"
+        description="Este bloco costura cliente, caso, triagem e inteligencia em uma leitura unica para a equipe comecar pelo ponto certo sem abrir paines paralelos."
       >
         {executiveFocus.length ? (
           <div className="grid two">
@@ -1026,49 +1204,61 @@ export default async function InternalLawyerPage({
         </SectionCard>
 
         <SectionCard
-          title="Acoes rapidas"
-          description="Use estes atalhos quando souber exatamente o que precisa fazer. Cada card leva voce direto para a acao principal."
+          title="Acoes rapidas e comando operacional"
+          description="Use estes atalhos quando souber exatamente o que precisa fazer. Cada card reduz cliques e leva voce direto para a acao principal."
         >
-          <div className="shortcut-grid">
-            <Link href="#cadastro-cliente" className="shortcut-card">
-              <span className="shortcut-kicker">Atendimento</span>
-              <strong>Cadastrar cliente</strong>
-              <p>Abrir cadastro, gerar convite e iniciar o caso sem etapas manuais.</p>
-            </Link>
-            <Link href="#atualizacoes-caso" className="shortcut-card">
-              <span className="shortcut-kicker">Andamento</span>
-              <strong>Registrar atualizacao</strong>
-              <p>Adicionar novo andamento visivel ou interno com resumo para o portal.</p>
-            </Link>
-            <Link href="#gestao-casos" className="shortcut-card">
-              <span className="shortcut-kicker">Casos</span>
-              <strong>Abrir ou editar caso</strong>
-              <p>Organizar titulo, area, prioridade e resumo do caso sem sair do painel.</p>
-            </Link>
-            <Link href="/documentos#solicitar-documento" className="shortcut-card">
-              <span className="shortcut-kicker">Documentos</span>
-              <strong>Solicitar documento</strong>
-              <p>Abrir uma pendencia documental com orientacoes e prazo para o cliente.</p>
-            </Link>
+            <div className="shortcut-grid">
+              <Link href="#cadastro-cliente" className="shortcut-card">
+                <span className="shortcut-kicker">Atendimento</span>
+                <strong>Cadastrar cliente</strong>
+                <p>Abrir cadastro, gerar convite e iniciar o caso sem etapas manuais.</p>
+              </Link>
+              <Link
+                href={
+                  preferredCase
+                    ? buildInternalCaseHref(preferredCase.id)
+                    : buildInternalCasesHref(preferredClient?.id || null)
+                }
+                className="shortcut-card"
+              >
+                <span className="shortcut-kicker">Andamento</span>
+                <strong>Registrar atualizacao</strong>
+                <p>Adicionar novo andamento visivel ou interno com resumo consistente para o portal.</p>
+              </Link>
+              <Link href="#gestao-casos" className="shortcut-card">
+                <span className="shortcut-kicker">Casos</span>
+                <strong>Abrir ou editar caso</strong>
+                <p>Organizar titulo, area, prioridade e resumo do caso sem sair do painel.</p>
+              </Link>
+              <Link href="#triagens-recebidas" className="shortcut-card">
+                <span className="shortcut-kicker">Entradas</span>
+                <strong>Revisar triagens e origem</strong>
+                <p>Entrar direto na camada de entrada para decidir resposta, conversao e prioridade.</p>
+              </Link>
+              <Link href="/documentos#solicitar-documento" className="shortcut-card">
+                <span className="shortcut-kicker">Documentos</span>
+                <strong>Solicitar documento</strong>
+                <p>Abrir uma pendencia documental com orientacoes e prazo para o cliente.</p>
+              </Link>
             <Link href="/documentos#registrar-documento" className="shortcut-card">
               <span className="shortcut-kicker">Arquivos</span>
               <strong>Registrar documento</strong>
               <p>Enviar o arquivo real para o caso e definir se ele aparece no portal.</p>
             </Link>
-            <Link href="/agenda#registrar-compromisso" className="shortcut-card">
-              <span className="shortcut-kicker">Agenda</span>
-              <strong>Criar compromisso</strong>
-              <p>Marcar prazo, reuniao, retorno ou audiencia com data e visibilidade.</p>
-            </Link>
-            <Link href="#status-caso" className="shortcut-card">
-              <span className="shortcut-kicker">Fluxo</span>
-              <strong>Alterar status do caso</strong>
-              <p>Atualizar a fase do caso e refletir isso com clareza para a equipe e o cliente.</p>
-            </Link>
-            <Link href="/noemia" className="shortcut-card">
-              <span className="shortcut-kicker">IA aplicada</span>
-              <strong>Consultar Noemia</strong>
-              <p>Usar a assistente em tela cheia para resumir o contexto e rascunhar retornos.</p>
+              <Link href="/agenda#registrar-compromisso" className="shortcut-card">
+                <span className="shortcut-kicker">Agenda</span>
+                <strong>Criar compromisso</strong>
+                <p>Marcar prazo, reuniao, retorno ou audiencia com data e visibilidade.</p>
+              </Link>
+              <Link href="#camadas-command-center" className="shortcut-card">
+                <span className="shortcut-kicker">Receita</span>
+                <strong>Abrir monetizacao e pagamentos</strong>
+                <p>Ir direto para consulta, pagamento pendente, recuperacao e receita em formacao.</p>
+              </Link>
+              <Link href="/noemia" className="shortcut-card">
+                <span className="shortcut-kicker">IA aplicada</span>
+                <strong>Consultar Noemia</strong>
+                <p>Usar a assistente em tela cheia para resumir o contexto e rascunhar retornos.</p>
             </Link>
           </div>
         </SectionCard>

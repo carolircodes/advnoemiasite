@@ -420,7 +420,7 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
 
   const radarCards: PremiumStatusCard[] = [
     {
-      label: "Radar imediato",
+      label: "Urgente agora",
       value: String(operationalSummary.criticalCount),
       detail:
         todayQueue[0]?.title ||
@@ -428,20 +428,20 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
       tone: operationalSummary.criticalCount > 0 ? "critical" : "success"
     },
     {
-      label: "Travado por cliente",
+      label: "Depende do cliente",
       value: String(operationalSummary.waitingClientCount),
       detail:
         "Pedidos de documento, primeiro acesso pendente ou retorno ainda nao recebido.",
       tone: operationalSummary.waitingClientCount > 0 ? "warning" : "success"
     },
     {
-      label: "Travado por equipe",
+      label: "Depende do humano",
       value: String(operationalSummary.waitingTeamCount),
       detail: "Casos, triagens e ajustes internos que pedem decisao ou registro.",
       tone: operationalSummary.waitingTeamCount > 0 ? "warning" : "success"
     },
     {
-      label: "Agenda pronta",
+      label: "Agenda central",
       value: String(upcomingAppointments.length),
       detail:
         upcomingAppointments[0]
@@ -460,13 +460,13 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
       tone: revenueFormation > 0 ? "success" : "muted"
     },
     {
-      label: "Oportunidades em follow-up",
+      label: "Follow-up monetizavel",
       value: String(Math.max(followUpPending, 0)),
       detail: "Triagens enviadas que ainda dependem de conversa, consulta ou conversao.",
       tone: followUpPending > 0 ? "warning" : "success"
     },
     {
-      label: "Pendencias documentais",
+      label: "Documentos travando",
       value: String(operationalSummary.agedPendingDocumentsCount),
       detail: "Pedidos vencidos ou envelhecidos que seguram a operacao e a experiencia do cliente.",
       tone: operationalSummary.agedPendingDocumentsCount > 0 ? "critical" : "success"
@@ -529,10 +529,10 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
 
   const focusHeadline =
     operationalSummary.criticalCount > 0
-      ? `${operationalSummary.criticalCount} ponto(s) ja exigem conducao imediata antes do restante da fila.`
+      ? `${operationalSummary.criticalCount} ponto(s) ja exigem conducao imediata antes do restante da fila do imperio.`
       : operationalSummary.todayCount > 0
-        ? `${operationalSummary.todayCount} movimento(s) estruturam o dia com clareza entre consulta, documentos e operacao.`
-        : "A operacao esta limpa agora. O cockpit segue pronto para destacar o proximo gargalo assim que ele surgir.";
+        ? `${operationalSummary.todayCount} movimento(s) estruturam o dia com clareza entre agenda, consulta, documentos e operacao.`
+        : "A operacao esta limpa agora. O command center segue pronto para destacar o proximo gargalo assim que ele surgir.";
 
   return {
     focusHeadline,
@@ -542,6 +542,6 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
     dependencyDeck,
     revenueDeck,
     consistencyNote:
-      "Cockpit, portal, agenda e documentos agora podem ser lidos pela mesma logica: urgencia, dependencia, proximo passo e impacto operacional."
+      "Command center, portal, agenda, monetizacao e documentos agora usam a mesma logica: urgencia, dependencia, proximo passo e impacto operacional."
   };
 }
