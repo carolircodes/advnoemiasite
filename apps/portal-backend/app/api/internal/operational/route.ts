@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
       // Buscar dados do contato para determinar o canal
       const contactsResult = await operationalPanel.getOperationalContacts(
-        { search: clientId }, 
+        { clientId }, 
         1, 
         0
       );

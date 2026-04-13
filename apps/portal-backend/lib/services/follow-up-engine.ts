@@ -23,7 +23,7 @@ export interface FollowUpMessage {
   clientId: string;
   pipelineId: string;
   channel: 'whatsapp' | 'instagram' | 'site' | 'portal';
-  messageType: 'reengagement' | 'post_contact_followup' | 'consultation_invite' | 'proposal_reminder' | 'contract_nudge' | 'inactive_reengagement' | 'custom';
+  messageType: 'reengagement' | 'post_contact_followup' | 'consultation_invite' | 'proposal_reminder' | 'contract_nudge' | 'inactive_reengagement' | 'document_request_nudge' | 'intake_completion_reminder' | 'strong_source_reengagement' | 'custom';
   content: string;
   scheduledFor?: Date;
   status?: 'draft' | 'scheduled' | 'sent' | 'delivered' | 'read' | 'replied' | 'failed' | 'cancelled' | 'no_response';
@@ -43,6 +43,8 @@ export interface FollowUpScheduleInput {
   channel: 'whatsapp' | 'instagram' | 'site' | 'portal';
   messageType: string;
   scheduledFor: Date;
+  customContext?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface FollowUpResultInput {
@@ -342,6 +344,21 @@ Se você quiser, posso te ajudar a seguir com os próximos passos.`;
 Estava pensando em você e queria saber como está indo. Às vezes a vida fica corrida e acabamos deixando algumas coisas importantes para depois.
 Se ainda fizer sentido, podemos retomar nossa conversa.`;
 
+      case 'document_request_nudge':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Estou retomando seu atendimento porque ainda existe documento pendente por aqui ${this.getEmoji('focus')}
+Sem esse envio, a equipe fica com menos contexto para seguir com segurança.
+Se você quiser, posso te ajudar a destravar esse próximo passo.`;
+
+      case 'intake_completion_reminder':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Sua triagem ficou no meio do caminho ${this.getEmoji('friendly')}
+Quando ela é concluída, fica muito mais fácil orientar com clareza o melhor próximo passo.
+Se ainda fizer sentido, podemos retomar de forma simples.`;
+
+      case 'strong_source_reengagement':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Quis retomar nossa conversa enquanto seu tema ainda está fresco ${this.getEmoji('lightbulb')}
+Esse tipo de situação costuma avançar melhor quando a retomada acontece com contexto e no tempo certo.
+Se você quiser, seguimos daqui com mais clareza.`;
+
       default:
         return `${saudacao}${nome ? ', ' + nome : ''}! Como você está? ${this.getEmoji('hello')}
 Estava pensando na nossa conversa e queria saber como está indo. Se precisar de algo, estou aqui para ajudar.`;
@@ -384,7 +401,8 @@ Estava pensando na nossa conversa e queria saber como está indo. Se precisar de
           status: 'scheduled',
           metadata: {
             generated_at: new Date().toISOString(),
-            generation_context: 'scheduled_follow_up'
+            generation_context: 'scheduled_follow_up',
+            ...(input.metadata || {})
           }
         });
 

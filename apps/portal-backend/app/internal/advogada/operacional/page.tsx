@@ -20,6 +20,7 @@ import {
 
 interface OperationalContact {
   clientId: string;
+  pipelineId: string;
   fullName: string;
   phone?: string;
   isClient: boolean;
@@ -40,6 +41,40 @@ interface OperationalContact {
   followUpCount: number;
   priorityScore: number;
   priorityLabel: 'high' | 'medium' | 'low';
+  priorityReasons: string[];
+  attentionBucket: 'needs_attention' | 'follow_up' | 'blocked' | 'monitor';
+  nextBestAction: {
+    title: string;
+    detail: string;
+  };
+  growthContext: {
+    acquisitionContext: {
+      sourceLabel: string;
+      campaignLabel: string;
+      topicLabel: string;
+      contentLabel: string;
+    } | null;
+    intakeContext: {
+      statusLabel: string;
+      currentStageLabel: string;
+      urgencyLabel: string;
+    } | null;
+    funnelLossSignals: Array<{
+      key: string;
+      label: string;
+      detail: string;
+    }>;
+    pendingDocumentsCount: number;
+    pendingDocumentsLabel: string;
+    portalActivationPending: boolean;
+    summaryLines: string[];
+  } | null;
+  automationPlan: {
+    label: string;
+    detail: string;
+    state: 'eligible' | 'queued' | 'cooldown' | 'idle';
+    scheduledFor?: string;
+  } | null;
   daysSinceLastContact: number;
   isOverdue: boolean;
   suggestedMessage?: {
@@ -235,6 +270,35 @@ export default function OperationalPanel() {
     () => Object.values(filters).filter((value) => value !== '').length,
     [filters]
   );
+  const queueSummary = useMemo(() => {
+    return contacts.reduce(
+      (accumulator, contact) => {
+        accumulator[contact.attentionBucket].push(contact);
+        return accumulator;
+      },
+      {
+        needs_attention: [] as OperationalContact[],
+        follow_up: [] as OperationalContact[],
+        blocked: [] as OperationalContact[],
+        monitor: [] as OperationalContact[],
+      }
+    );
+  }, [contacts]);
+  const automationSummary = useMemo(() => {
+    return contacts.reduce(
+      (accumulator, contact) => {
+        const state = contact.automationPlan?.state || 'idle';
+        accumulator[state] += 1;
+        return accumulator;
+      },
+      {
+        eligible: 0,
+        queued: 0,
+        cooldown: 0,
+        idle: 0,
+      }
+    );
+  }, [contacts]);
 
   async function loadPanelData() {
     setLoading(true);
@@ -277,40 +341,23 @@ export default function OperationalPanel() {
     setActionLoading(`${contact.clientId}:${actionType}`);
 
     try {
-      const contactResponse = await fetch('/api/internal/operational', {
+      const response = await fetch('/api/internal/operational', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'getContacts',
-          filters: { search: contact.clientId },
-          limit: 1,
+          action: 'applyAction',
+          clientId: contact.clientId,
+          pipelineId: contact.pipelineId,
+          actionType,
+          value,
+          notes,
         }),
       });
 
-      const contactResult = await contactResponse.json();
+      const result = await response.json();
 
-      if (contactResult?.success && contactResult.data?.contacts?.length > 0) {
-        const fullContact = contactResult.data.contacts[0];
-        const pipelineId = fullContact.pipelineId || contact.clientId;
-
-        const response = await fetch('/api/internal/operational', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'applyAction',
-            clientId: contact.clientId,
-            pipelineId,
-            actionType,
-            value,
-            notes,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (result?.success) {
-          await loadPanelData();
-        }
+      if (result?.success) {
+        await loadPanelData();
       }
     } catch (error) {
       console.error('Error applying action:', error);
@@ -329,7 +376,7 @@ export default function OperationalPanel() {
         body: JSON.stringify({
           action: 'generateSuggestedMessage',
           clientId: contact.clientId,
-          pipelineId: contact.clientId,
+          pipelineId: contact.pipelineId,
         }),
       });
 
@@ -404,7 +451,7 @@ export default function OperationalPanel() {
         body: JSON.stringify({
           action: 'sendAssistedFollowUp',
           clientId: selectedContact.clientId,
-          pipelineId: selectedContact.clientId,
+          pipelineId: selectedContact.pipelineId,
           channel: selectedChannel,
           content: messageContent.trim(),
           approvedBy: 'staff_user', // TODO: pegar do contexto de autenticação
@@ -516,6 +563,58 @@ export default function OperationalPanel() {
     return stage.replaceAll('_', ' ');
   }
 
+  function getAttentionTone(bucket: OperationalContact['attentionBucket']): 'red' | 'orange' | 'blue' | 'gray' {
+    switch (bucket) {
+      case 'needs_attention':
+        return 'red';
+      case 'follow_up':
+        return 'orange';
+      case 'blocked':
+        return 'blue';
+      default:
+        return 'gray';
+    }
+  }
+
+  function getAttentionLabel(bucket: OperationalContact['attentionBucket']) {
+    switch (bucket) {
+      case 'needs_attention':
+        return 'Exige atencao agora';
+      case 'follow_up':
+        return 'Pede follow-up';
+      case 'blocked':
+        return 'Travado';
+      default:
+        return 'Pode acompanhar';
+    }
+  }
+
+  function getAutomationTone(state: NonNullable<OperationalContact['automationPlan']>['state']): 'green' | 'orange' | 'blue' | 'gray' {
+    switch (state) {
+      case 'queued':
+        return 'green';
+      case 'eligible':
+        return 'orange';
+      case 'cooldown':
+        return 'blue';
+      default:
+        return 'gray';
+    }
+  }
+
+  function getAutomationLabel(state: NonNullable<OperationalContact['automationPlan']>['state']) {
+    switch (state) {
+      case 'queued':
+        return 'Automacao enfileirada';
+      case 'eligible':
+        return 'Automacao pronta';
+      case 'cooldown':
+        return 'Em cooldown';
+      default:
+        return 'Sem automacao';
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -562,6 +661,70 @@ export default function OperationalPanel() {
           />
         </div>
       ) : null}
+
+      <PanelSection
+        title="Prioridades do dia"
+        description="A fila separa o que pede acao imediata, follow-up comercial, revisao de travamento e simples acompanhamento."
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              key: 'needs_attention' as const,
+              label: 'Exige atencao agora',
+              count: queueSummary.needs_attention.length,
+              note: queueSummary.needs_attention[0]?.fullName || 'Nenhum item critico neste momento.',
+            },
+            {
+              key: 'follow_up' as const,
+              label: 'Pede follow-up',
+              count: queueSummary.follow_up.length,
+              note: queueSummary.follow_up[0]?.nextBestAction.title || 'Sem follow-up puxando a fila agora.',
+            },
+            {
+              key: 'blocked' as const,
+              label: 'Travado',
+              count: queueSummary.blocked.length,
+              note: queueSummary.blocked[0]?.fullName || 'Nenhum travamento dominante agora.',
+            },
+            {
+              key: 'monitor' as const,
+              label: 'Pode acompanhar',
+              count: queueSummary.monitor.length,
+              note: queueSummary.monitor[0]?.fullName || 'Acompanhamento leve neste momento.',
+            },
+          ].map((item) => (
+            <div key={item.key} className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm text-[#6a7a73]">{item.label}</p>
+                  <p className="mt-1 text-2xl font-bold text-[#10261d]">{item.count}</p>
+                </div>
+                <StatusChip tone={getAttentionTone(item.key)}>{item.label}</StatusChip>
+              </div>
+              <p className="mt-3 text-sm text-[#56675f]">{item.note}</p>
+            </div>
+          ))}
+        </div>
+      </PanelSection>
+
+      <PanelSection
+        title="Automacoes comerciais seguras"
+        description="A fila abaixo mostra onde a maquina pode ajudar com seguranca, sem disparo cego e com estado auditavel por item."
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { key: 'eligible', label: 'Prontas para fila', value: automationSummary.eligible },
+            { key: 'queued', label: 'Ja enfileiradas', value: automationSummary.queued },
+            { key: 'cooldown', label: 'Em cooldown', value: automationSummary.cooldown },
+            { key: 'idle', label: 'Sem automacao', value: automationSummary.idle },
+          ].map((item) => (
+            <div key={item.key} className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
+              <p className="text-sm text-[#6a7a73]">{item.label}</p>
+              <p className="mt-1 text-2xl font-bold text-[#10261d]">{item.value}</p>
+            </div>
+          ))}
+        </div>
+      </PanelSection>
 
       <PanelSection
         title="Filtros"
@@ -706,6 +869,10 @@ export default function OperationalPanel() {
 
                       {contact.isOverdue ? <StatusChip tone="red">Vencido</StatusChip> : null}
 
+                      <StatusChip tone={getAttentionTone(contact.attentionBucket)}>
+                        {getAttentionLabel(contact.attentionBucket)}
+                      </StatusChip>
+
                       <StatusChip tone={getStageTone(contact.pipelineStage)}>
                         {formatStageLabel(contact.pipelineStage)}
                       </StatusChip>
@@ -743,6 +910,103 @@ export default function OperationalPanel() {
                 {contact.latestSessionSummary ? (
                   <div className="mt-3 text-sm text-[#62726b]">
                     <span className="font-medium text-[#10261d]">Resumo:</span> {contact.latestSessionSummary}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1.3fr_1fr]">
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Proxima melhor acao
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.nextBestAction.title}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-[#56675f]">
+                      {contact.nextBestAction.detail}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Motivos da prioridade
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {contact.priorityReasons.length ? (
+                        contact.priorityReasons.map((reason) => (
+                          <StatusChip key={reason} tone="neutral">
+                            {reason}
+                          </StatusChip>
+                        ))
+                      ) : (
+                        <span className="text-sm text-[#62726b]">
+                          Sem alerta dominante no momento.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {contact.growthContext || contact.automationPlan ? (
+                  <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_1fr]">
+                    <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                        Contexto de growth por item
+                      </p>
+                      {contact.growthContext?.summaryLines?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {contact.growthContext.summaryLines.map((line) => (
+                            <StatusChip key={line} tone="neutral">
+                              {line}
+                            </StatusChip>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm text-[#62726b]">
+                          Sem contexto adicional de growth para este item no momento.
+                        </p>
+                      )}
+
+                      {contact.growthContext?.funnelLossSignals?.length ? (
+                        <div className="mt-3 space-y-2">
+                          {contact.growthContext.funnelLossSignals.slice(0, 2).map((signal) => (
+                            <div key={signal.key} className="rounded-xl border border-[#e8e0d1] bg-white px-3 py-2">
+                              <p className="text-sm font-medium text-[#10261d]">{signal.label}</p>
+                              <p className="mt-1 text-sm text-[#5d6d66]">{signal.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                        Automacao comercial segura
+                      </p>
+                      {contact.automationPlan ? (
+                        <>
+                          <div className="mt-2">
+                            <StatusChip tone={getAutomationTone(contact.automationPlan.state)}>
+                              {getAutomationLabel(contact.automationPlan.state)}
+                            </StatusChip>
+                          </div>
+                          <p className="mt-3 text-sm font-semibold text-[#10261d]">
+                            {contact.automationPlan.label}
+                          </p>
+                          <p className="mt-1 text-sm text-[#5d6d66]">
+                            {contact.automationPlan.detail}
+                          </p>
+                          {contact.automationPlan.scheduledFor ? (
+                            <p className="mt-2 text-xs text-[#6a7a73]">
+                              Referencia: {formatDate(contact.automationPlan.scheduledFor)}
+                            </p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="mt-2 text-sm text-[#62726b]">
+                          Nenhuma automacao segura destacada para este item agora.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ) : null}
 

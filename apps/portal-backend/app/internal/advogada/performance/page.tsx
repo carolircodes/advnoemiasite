@@ -17,6 +17,11 @@ export default async function PerformancePage() {
       .filter((item) => item.visits >= 3)
       .sort((left, right) => left.visitToSubmitRate - right.visitToSubmitRate)[0] || null;
   const strongestTheme = intelligence.acquisition.byTopic[0] || null;
+  const weakestTheme =
+    intelligence.acquisition.byTopic
+      .filter((item) => item.visits >= 3)
+      .sort((left, right) => left.triageToClientRate - right.triageToClientRate)[0] || null;
+  const strongestContent = intelligence.acquisition.byContent[0] || null;
 
   return (
     <AppFrame
@@ -162,6 +167,111 @@ export default async function PerformancePage() {
           </p>
         )}
       </SectionCard>
+
+      <div className="grid two">
+        <SectionCard
+          title="Comparacao executiva entre canais e temas"
+          description="Este bloco responde onde insistir, onde corrigir e onde testar nova abordagem sem depender de leitura tecnica espalhada."
+        >
+          <ul className="update-feed">
+            <li className="update-card">
+              <div className="update-head">
+                <div>
+                  <strong>Canal mais forte</strong>
+                  <span className="item-meta">{strongestSource?.label || "Sem base suficiente"}</span>
+                </div>
+                <span className="tag soft">
+                  {strongestSource ? `${strongestSource.clientsCreated} cliente(s)` : "Aguardando base"}
+                </span>
+              </div>
+              <p className="update-body">
+                {strongestSource
+                  ? `Vale insistir nesta origem enquanto ela sustenta ${strongestSource.triageToClientRate}% de triagem para cliente.`
+                  : "Assim que uma origem se destacar, a recomendacao de insistencia aparece aqui."}
+              </p>
+            </li>
+            <li className="update-card">
+              <div className="update-head">
+                <div>
+                  <strong>Canal com perda relevante</strong>
+                  <span className="item-meta">{weakestSource?.label || "Sem alerta dominante"}</span>
+                </div>
+                <span className="tag soft">
+                  {weakestSource ? `${weakestSource.visitToSubmitRate}% visita para triagem` : "Estavel"}
+                </span>
+              </div>
+              <p className="update-body">
+                {weakestSource
+                  ? "A leitura sugere corrigir CTA, promessa e friccao antes de ampliar distribuicao deste caminho."
+                  : "Nenhum canal com volume esta destoando negativamente agora."}
+              </p>
+            </li>
+            <li className="update-card">
+              <div className="update-head">
+                <div>
+                  <strong>Tema que mais avanca</strong>
+                  <span className="item-meta">{strongestTheme?.label || "Sem tema dominante"}</span>
+                </div>
+                <span className="tag soft">
+                  {strongestTheme ? `${strongestTheme.triageToClientRate}%` : "Aguardando base"}
+                </span>
+              </div>
+              <p className="update-body">
+                {strongestTheme
+                  ? "Quando o escritorio precisar insistir em narrativa e distribuicao, este tema aparece como aposta mais robusta."
+                  : "A comparacao por tema ganha corpo conforme o tracking amadurece."}
+              </p>
+            </li>
+            <li className="update-card">
+              <div className="update-head">
+                <div>
+                  <strong>Tema ou conteudo que pede ajuste</strong>
+                  <span className="item-meta">
+                    {weakestTheme?.label || strongestContent?.label || "Sem alerta claro"}
+                  </span>
+                </div>
+                <span className="tag soft">
+                  {weakestTheme
+                    ? `${weakestTheme.clientsCreated} cliente(s)`
+                    : strongestContent
+                      ? `${strongestContent.triageSubmitted} triagem(ns)`
+                      : "Estavel"}
+                </span>
+              </div>
+              <p className="update-body">
+                {weakestTheme
+                  ? "Tema com procura, mas fechamento mais fraco. Vale revisar argumento, qualificador e passagem para humano."
+                  : strongestContent
+                    ? "O melhor conteudo atual ajuda a calibrar o que deve ser testado ou replicado."
+                    : "Sem desvio comparativo forte neste momento."}
+              </p>
+            </li>
+          </ul>
+        </SectionCard>
+
+        <SectionCard
+          title="Onde a automacao ainda alivia peso manual"
+          description="Growth so escala quando a equipe enxerga onde a maquina ja empurra o fluxo e onde ainda existe atrito humano demais."
+        >
+          <div className="summary-grid compact">
+            <div className="summary-card">
+              <span>Triagens no radar automatico</span>
+              <strong>{intelligence.automation.triageAlerts}</strong>
+              <p>Alertas que reduzem leitura manual dispersa logo na entrada do funil.</p>
+            </div>
+            <div className="summary-card">
+              <span>Documentos e agenda</span>
+              <strong>{intelligence.automation.documentReminders + intelligence.automation.appointmentReminders}</strong>
+              <p>Lembretes que ajudam a segurar continuidade depois que o lead ja virou cliente ou caso.</p>
+            </div>
+            <div className="summary-card">
+              <span>Convites ainda pendentes</span>
+              <strong>{intelligence.automation.clientsAwaitingFirstAccess}</strong>
+              <p>Mostra onde a automacao ajuda, mas a ativacao do portal ainda precisa insistencia humana.</p>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
 
       <SectionCard
         title="Painel analitico de apoio"

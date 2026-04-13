@@ -14,6 +14,11 @@ export default async function AcquisitionPage() {
   const topSource = intelligence.acquisition.bySource[0] || null;
   const topCampaign = intelligence.acquisition.byCampaign[0] || null;
   const topTopic = intelligence.acquisition.byTopic[0] || null;
+  const strongestContent = intelligence.acquisition.byContent[0] || null;
+  const weakestTopic =
+    intelligence.acquisition.byTopic
+      .filter((item) => item.visits >= 3)
+      .sort((left, right) => left.triageToClientRate - right.triageToClientRate)[0] || null;
 
   return (
     <AppFrame
@@ -173,6 +178,74 @@ export default async function AcquisitionPage() {
           </p>
         )}
       </SectionCard>
+
+      <div className="grid two">
+        <SectionCard
+          title="Temas que merecem insistencia ou correcao"
+          description="Aqui a equipe separa tema que avanca bem de tema que gera atencao, mas perde forca antes de virar cliente."
+        >
+          {intelligence.acquisition.byTopic.length ? (
+            <ul className="update-feed">
+              {intelligence.acquisition.byTopic.slice(0, 4).map((item) => (
+                <li key={item.key} className="update-card">
+                  <div className="update-head">
+                    <div>
+                      <strong>{item.label}</strong>
+                      <span className="item-meta">
+                        {item.visits} visita(s) | {item.triageSubmitted} triagem(ns) enviadas
+                      </span>
+                    </div>
+                    <span className="tag soft">{item.clientsCreated} cliente(s)</span>
+                  </div>
+                  <p className="update-body">
+                    {item.key === weakestTopic?.key
+                      ? "Tema com procura inicial, mas fechamento mais fraco. Vale revisar promessa, qualificador e passagem para humano."
+                      : "Tema com sinal saudavel para insistir quando o escritorio precisar puxar captacao mais qualificada."}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">
+              Ainda nao ha base suficiente por tema para orientar insistencia ou correcao.
+            </p>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Conteudos com melhor progressao"
+          description="A comparacao abaixo ajuda a decidir quais conteudos merecem continuar, ganhar distribuicao ou mudar abordagem."
+        >
+          {intelligence.acquisition.byContent.length ? (
+            <div className="summary-grid compact">
+              <div className="summary-card">
+                <span>Conteudo mais promissor</span>
+                <strong>{strongestContent?.label || "Sem conteudo dominante"}</strong>
+                <p>
+                  {strongestContent
+                    ? `${strongestContent.triageSubmitted} triagem(ns) e ${strongestContent.clientsCreated} cliente(s) no periodo.`
+                    : "A leitura por conteudo aparece aqui conforme o tracking amadurece."}
+                </p>
+              </div>
+              {intelligence.acquisition.byContent.slice(1, 4).map((item) => (
+                <div key={item.key} className="summary-card">
+                  <span>{item.label}</span>
+                  <strong>{item.visitToSubmitRate}%</strong>
+                  <p>
+                    {item.clientsCreated > 0
+                      ? `${item.clientsCreated} cliente(s) vieram deste conteudo.`
+                      : "Chama atencao, mas ainda pede melhor progressao no funil."}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">
+              Ainda nao ha comparacao confiavel entre conteudos nesta janela.
+            </p>
+          )}
+        </SectionCard>
+      </div>
 
       <SectionCard
         title="Painel analitico de apoio"

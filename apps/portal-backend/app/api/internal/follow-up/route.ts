@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { getCommercialAutomationPlans, queueEligibleCommercialAutomations } from "@/lib/services/commercial-automation";
 import { followUpEngine } from "@/lib/services/follow-up-engine";
+import { operationalPanel } from "@/lib/services/operational-panel";
 
 export async function POST(request: NextRequest) {
   const access = await requireInternalApiProfile();
@@ -143,9 +145,31 @@ export async function POST(request: NextRequest) {
         count: scheduledFollowUps.length
       });
 
+    } else if (action === 'getCommercialPlans') {
+      const contactsResult = await operationalPanel.getOperationalContacts({}, limit || 20, 0);
+      const plans = await getCommercialAutomationPlans(contactsResult.contacts);
+
+      return NextResponse.json({
+        success: true,
+        data: contactsResult.contacts.map((contact) => ({
+          clientId: contact.clientId,
+          fullName: contact.fullName,
+          plan: plans.get(contact.clientId) || null
+        }))
+      });
+
+    } else if (action === 'queueCommercialAutomations') {
+      const contactsResult = await operationalPanel.getOperationalContacts({}, limit || 20, 0);
+      const summary = await queueEligibleCommercialAutomations(contactsResult.contacts, limit || 10);
+
+      return NextResponse.json({
+        success: true,
+        data: summary
+      });
+
     } else {
       return NextResponse.json(
-        { error: 'Invalid action. Supported actions: getEligible, generateMessage, scheduleFollowUp, markResult, saveMessage, getPriority, getScheduled' },
+        { error: 'Invalid action. Supported actions: getEligible, generateMessage, scheduleFollowUp, markResult, saveMessage, getPriority, getScheduled, getCommercialPlans, queueCommercialAutomations' },
         { status: 400 }
       );
     }
@@ -194,6 +218,18 @@ export async function GET(request: NextRequest) {
         success: true,
         data: scheduledFollowUps,
         count: scheduledFollowUps.length
+      });
+    } else if (action === 'getCommercialPlans') {
+      const contactsResult = await operationalPanel.getOperationalContacts({}, limit, 0);
+      const plans = await getCommercialAutomationPlans(contactsResult.contacts);
+
+      return NextResponse.json({
+        success: true,
+        data: contactsResult.contacts.map((contact) => ({
+          clientId: contact.clientId,
+          fullName: contact.fullName,
+          plan: plans.get(contact.clientId) || null
+        }))
       });
     } else {
       // Default: listar elegíveis
