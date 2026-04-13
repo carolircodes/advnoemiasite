@@ -14,6 +14,9 @@ type RevenuePaymentRow = {
   user_id: string | null;
   external_id: string | null;
   amount: number | null;
+  base_amount_cents?: number | null;
+  final_amount_cents?: number | null;
+  price_source?: string | null;
   status: string | null;
   created_at: string;
   updated_at: string;
@@ -82,7 +85,7 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
     supabase
       .from("payments")
       .select(
-        "id,lead_id,user_id,external_id,amount,status,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
+        "id,lead_id,user_id,external_id,amount,base_amount_cents,final_amount_cents,price_source,status,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
       )
       .gte("created_at", since)
       .order("created_at", { ascending: false })
@@ -325,6 +328,11 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
         followUpNeeded:
           payment.status === "pending" && payment.created_at <= stalePendingLimit,
         statusDetail: payment.status_detail || "",
+        priceSource: payment.price_source || asString(payment.metadata?.price_source) || "default_consultation",
+        finalAmountCents:
+          asNumber(payment.final_amount_cents) ||
+          asNumber(payment.base_amount_cents) ||
+          Math.round(asNumber(payment.amount) * 100),
         pathLabel:
           asString(payment.metadata?.monetization_path) || "noemia_consultation_flow"
       };
