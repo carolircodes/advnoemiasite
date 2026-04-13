@@ -17,38 +17,43 @@ type NoemiaAssistantProps = {
 const audienceCopy = {
   visitor: {
     welcome:
-      "👋 Olá! Posso orientar sobre triagem, funcionamento do portal e os próximos passos antes do atendimento.",
-    modeLabel: "Orientação inicial",
+      "Olá. Sou a NoemIA. Posso te orientar com clareza sobre triagem, consulta, funcionamento do escritório e o próximo passo mais adequado.",
+    modeLabel: "Orientação inicial premium",
     usageHint:
-      "Pergunte sobre triagem, áreas atendidas, funcionamento do portal e próximos passos.",
+      "Pergunte sobre triagem, áreas atendidas, consulta, portal e próximos passos.",
     placeholder:
-      "Ex.: Como funciona a triagem e quando recebo acesso ao portal?",
-    pendingText: "🔍 Estou organizando a resposta com base no fluxo público e institucional...",
-    successText: "✨ Pronto! Aqui está minha orientação.",
-    errorText: "❌ Não consegui responder agora. Tente novamente em instantes."
+      "Ex.: Meu caso parece urgente. Como funciona a análise inicial e qual é o próximo passo?",
+    pendingText:
+      "Estou organizando sua resposta com base no fluxo público e institucional do escritório...",
+    successText: "Resposta pronta com o melhor próximo passo disponível agora.",
+    errorText:
+      "Não consegui responder com segurança neste instante. Tente novamente em alguns segundos."
   },
   client: {
     welcome:
-      "👋 Olá! Posso explicar o que aparece no seu portal, resumir status, agenda, documentos e orientar o próximo passo mais prático.",
-    modeLabel: "Contexto do portal do cliente",
+      "Olá. Sou a NoemIA. Posso traduzir o que aparece no seu portal com linguagem clara, resumir status, agenda, documentos e indicar o próximo passo prático.",
+    modeLabel: "Leitura clara do seu portal",
     usageHint:
-      "Pergunte sobre status, documentos, agenda ou o que significa uma etapa do seu caso.",
-    placeholder: "Ex.: O que significa o status atual do meu caso?",
-    pendingText: "🔍 Estou organizando a resposta com base no contexto disponível do portal...",
-    successText: "✨ Pronto! Aqui está o que encontrei no seu portal.",
-    errorText: "❌ Não consegui acessar seu contexto agora. Tente novamente."
+      "Pergunte sobre status, documentos, agenda, pendências ou o significado de uma etapa do seu caso.",
+    placeholder:
+      "Ex.: O que significa o estágio atual do meu caso e o que eu preciso fazer agora?",
+    pendingText:
+      "Estou cruzando o contexto disponível do seu portal para responder com mais precisão...",
+    successText: "Resposta pronta com base no que está visível no seu portal.",
+    errorText: "Não consegui acessar seu contexto agora. Tente novamente em instantes."
   },
   staff: {
     welcome:
-      "👋 Olá! Posso resumir triagens, apontar prioridades, sugerir próximos passos internos e montar textos-base de retorno para a rotina da advogada.",
-    modeLabel: "Operação interna",
+      "Olá. Sou a NoemIA. Posso resumir triagens, destacar prioridades, sugerir próximos passos internos e acelerar a resposta operacional da equipe.",
+    modeLabel: "Cockpit operacional",
     usageHint:
-      "Peça resumo de triagens, leitura de prioridades, próximo passo interno ou um rascunho de retorno ao cliente.",
+      "Peça leitura de prioridades, resumo de triagens, próximo passo interno ou um rascunho de retorno ao cliente.",
     placeholder:
-      "Ex.: Resuma as prioridades de hoje e diga o que devo tratar primeiro.",
-    pendingText: "🔍 Estou cruzando operação, telemetria e filas internas para responder com mais clareza...",
-    successText: "✨ Pronto! Aqui está minha análise operacional.",
-    errorText: "❌ Não consegui acessar os dados operacionais agora. Tente novamente."
+      "Ex.: Resuma as prioridades de hoje e diga onde há maior chance de avanço comercial ou risco operacional.",
+    pendingText:
+      "Estou cruzando operação, telemetria e filas internas para responder com visão mais acionável...",
+    successText: "Análise operacional pronta com foco em decisão rápida.",
+    errorText: "Não consegui acessar os dados operacionais agora. Tente novamente."
   }
 } as const;
 
@@ -74,7 +79,7 @@ export function NoemiaAssistant({
     const cleanMessage = nextMessage.trim();
 
     if (cleanMessage.length < 5) {
-      setError("Escreva uma pergunta um pouco mais completa para eu conseguir ajudar.");
+      setError("Escreva uma pergunta um pouco mais completa para eu te responder com mais precisão.");
       return;
     }
 
@@ -101,11 +106,7 @@ export function NoemiaAssistant({
         const result = await response.json().catch(() => ({}));
 
         if (!response.ok || typeof result?.answer !== "string") {
-          setError(
-            typeof result?.error === "string"
-              ? result.error
-              : copy.errorText
-          );
+          setError(typeof result?.error === "string" ? result.error : copy.errorText);
           return;
         }
 
@@ -127,17 +128,17 @@ export function NoemiaAssistant({
     <div className="stack">
       <div className="support-panel">
         <div className="support-row">
-          <span className="support-label">Modo ativo</span>
+          <span className="support-label">Modo em uso</span>
           <strong>
             {audience === "client"
               ? `Portal de ${displayName}`
               : audience === "staff"
-                ? `Apoio interno para ${displayName}`
+                ? `Camada interna para ${displayName}`
                 : copy.modeLabel}
           </strong>
         </div>
         <div className="support-row">
-          <span className="support-label">Como usar melhor</span>
+          <span className="support-label">Melhor uso</span>
           <strong>{copy.usageHint}</strong>
         </div>
       </div>
@@ -157,9 +158,9 @@ export function NoemiaAssistant({
       </div>
 
       {error ? <div className="error-notice">{error}</div> : null}
-      {lastSuccess && !error && !isPending && messages.length > 1 && (
+      {lastSuccess && !error && !isPending && messages.length > 1 ? (
         <div className="success-notice subtle">{copy.successText}</div>
-      )}
+      ) : null}
 
       <div className="conversation-feed">
         {messages.map((message, index) => (
@@ -167,13 +168,13 @@ export function NoemiaAssistant({
             key={`${message.role}-${index}`}
             className={message.role === "assistant" ? "chat-bubble assistant" : "chat-bubble user"}
           >
-            <span>{message.role === "assistant" ? "Noemia" : displayName}</span>
+            <span>{message.role === "assistant" ? "NoemIA" : displayName}</span>
             <p>{message.content}</p>
           </article>
         ))}
         {isPending ? (
           <article className="chat-bubble assistant pending">
-            <span>Noemia</span>
+            <span>NoemIA</span>
             <p>{copy.pendingText}</p>
           </article>
         ) : null}
@@ -198,7 +199,7 @@ export function NoemiaAssistant({
         </div>
         <div className="form-actions">
           <button className="button" type="submit" disabled={isPending}>
-            {isPending ? "Consultando Noemia..." : "Enviar pergunta"}
+            {isPending ? "Consultando NoemIA..." : "Enviar pergunta"}
           </button>
         </div>
       </form>

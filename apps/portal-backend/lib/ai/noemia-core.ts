@@ -11,71 +11,39 @@ import { conversationPersistence } from "../services/conversation-persistence";
 import { saveTriageData } from "./triage-persistence";
 import { PortalProfile } from "../auth/guards";
 import { askNoemiaSchema } from "../domain/portal";
+import {
+  ClassifiedIntent,
+  FollowUpAttempt,
+  FollowUpTrigger,
+  FollowUpRule,
+  LeadTemperature,
+  LegalTheme,
+  NoemiaContext,
+  NoemiaChannel,
+  NoemiaUserType,
+  PriorityLevel,
+  RecommendedAction
+} from "./core-types";
+import {
+  classifyMessage as classifyIncomingMessage,
+  detectLegalTheme as detectConversationTheme,
+  detectUserIntent as detectConversationIntent
+} from "./message-classifier";
+import { buildSystemPrompt as buildNoemiaSystemPrompt } from "./system-prompt";
 
-type NoemiaChannel = "site" | "portal" | "whatsapp" | "instagram";
-type NoemiaUserType = "visitor" | "client" | "staff" | "unknown";
-export type LegalTheme =
-  | "previdenciario"
-  | "bancario"
-  | "familia"
-  | "civil"
-  | "geral";
-type ClassifiedIntent =
-  | "curiosity"
-  | "lead_interest"
-  | "support"
-  | "appointment_interest";
-type LeadTemperature = "cold" | "warm" | "hot";
-type PriorityLevel = "low" | "medium" | "high" | "urgent";
-type RecommendedAction = "continue_triage" | "schedule_consultation" | "human_handoff" | "send_info";
-type AcquisitionContext = {
-  source?: string;
-  campaign?: string;
-  topic?: string;
-  content_id?: string;
-  utm_source?: string;
-  utm_medium?: string;
-  utm_campaign?: string;
-  utm_term?: string;
-  utm_content?: string;
-  ai_context?: string;
-  language_adaptation?: string;
-};
-
-type NoemiaContext = {
-  acquisition?: AcquisitionContext;
-  [key: string]: unknown;
-};
-
-// Tipos para Follow-up Inteligente
-export type FollowUpTrigger = 'inactivity' | 'post_handoff' | 'consultation_proposed' | 'follow_up_needed';
-type FollowUpPriority = 'immediate' | 'high' | 'medium' | 'low';
-export type FollowUpCadence = {
-  minutes: number;
-  hours: number;
-  days: number;
-};
-
-export interface FollowUpRule {
-  id: string;
-  trigger: FollowUpTrigger;
-  temperature: LeadTemperature;
-  commercialStatus?: string;
-  cadence: FollowUpCadence;
-  maxAttempts: number;
-  priority: FollowUpPriority;
-}
-
-export interface FollowUpAttempt {
-  id: string;
-  sessionId: string;
-  attemptNumber: number;
-  trigger: FollowUpTrigger;
-  message: string;
-  sentAt: Date;
-  responseReceived?: boolean;
-  nextAttemptAt?: Date;
-}
+export type {
+  ClassifiedIntent,
+  FollowUpAttempt,
+  FollowUpRule,
+  FollowUpTrigger,
+  LeadTemperature,
+  LegalTheme,
+  NoemiaChannel,
+  NoemiaContext,
+  NoemiaUserType,
+  PriorityLevel,
+  RecommendedAction
+} from "./core-types";
 
 interface FollowUpContext {
   lastMessage: string;
@@ -2901,7 +2869,7 @@ export async function processNoemiaCore(
 ): Promise<NoemiaCoreOutput> {
   const startTime = Date.now();
 
-  const classification = classifyMessage(input.message);
+  const classification = classifyIncomingMessage(input.message);
   const currentConversationState =
     input.conversationState || initializeConversationState();
   const newConversationState = updateConversationState(
@@ -2964,8 +2932,8 @@ export async function processNoemiaCore(
       }
     }
 
-    const intent = detectUserIntent(input.message);
-    const detectedTheme = detectLegalTheme(input.message);
+    const intent = detectConversationIntent(input.message);
+    const detectedTheme = detectConversationTheme(input.message);
 
     let effectiveAudience: NoemiaUserType = input.userType;
 
@@ -2982,7 +2950,7 @@ export async function processNoemiaCore(
       effectiveAudience = "client";
     }
 
-    const systemPrompt = buildSystemPrompt(
+    const systemPrompt = buildNoemiaSystemPrompt(
       input.channel,
       effectiveAudience,
       enrichedContext
@@ -3093,7 +3061,7 @@ export async function processNoemiaCore(
       error: errorMessage,
       metadata: {
         responseTime: Date.now() - startTime,
-        detectedTheme: detectLegalTheme(input.message) || undefined,
+        detectedTheme: detectConversationTheme(input.message) || undefined,
         channel: input.channel,
         openaiUsed: false,
         classification,
@@ -3114,7 +3082,7 @@ export async function processComment(
   console.log(`NOEMIA_COMMENT_START: ${platform} | ${commentId} | ${userId}`);
   console.log(`NOEMIA_COMMENT_TEXT: ${commentText.substring(0, 100)}...`);
 
-  const classification = classifyMessage(commentText);
+  const classification = classifyIncomingMessage(commentText);
 
   const shouldReplyPrivately =
     classification.intent === "lead_interest" ||

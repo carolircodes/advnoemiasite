@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+
 import { assertStaffActor } from "../auth/guards";
 import {
   caseAreaLabels,
@@ -23,6 +25,16 @@ type ProductEventInput = {
   payload?: Record<string, unknown>;
   profileId?: string;
 };
+
+const recordProductEventSchema = z.object({
+  eventKey: z.string().trim().min(1).max(120),
+  eventGroup: z.string().trim().min(1).max(80).optional(),
+  pagePath: z.string().trim().max(300).optional(),
+  sessionId: z.string().trim().max(160).optional(),
+  intakeRequestId: z.string().trim().max(160).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+  profileId: z.string().trim().max(160).optional()
+});
 
 type PublicTriageContext = {
   pagePath?: string;
@@ -200,18 +212,19 @@ function normalizePublicTriageInput(
 }
 
 export async function recordProductEvent(rawInput: ProductEventInput) {
+  const input = recordProductEventSchema.parse(rawInput);
   // const input = recordProductEventSchema.parse(rawInput); // Schema não definido, pulando validação
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("product_events")
     .insert({
-      event_key: rawInput.eventKey,
-      event_group: rawInput.eventGroup,
-      page_path: rawInput.pagePath || null,
-      session_id: rawInput.sessionId || null,
-      intake_request_id: rawInput.intakeRequestId || null,
-      profile_id: rawInput.profileId || null,
-      payload: rawInput.payload || {}
+      event_key: input.eventKey,
+      event_group: input.eventGroup,
+      page_path: input.pagePath || null,
+      session_id: input.sessionId || null,
+      intake_request_id: input.intakeRequestId || null,
+      profile_id: input.profileId || null,
+      payload: input.payload || {}
     })
     .select("id,event_key,event_group")
     .single();

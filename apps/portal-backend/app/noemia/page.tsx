@@ -18,7 +18,7 @@ import { injectAcquisitionContext } from "@/lib/middleware/acquisition-middlewar
 export const metadata: Metadata = {
   title: "Noemia",
   description:
-    "Assistente inicial do portal para orientar visitantes e ajudar clientes a entender o proprio acompanhamento.",
+    "Assistente premium do escritorio para orientar visitantes, traduzir o portal do cliente e apoiar a operacao interna com mais clareza.",
   robots: {
     index: true,
     follow: true
@@ -67,10 +67,10 @@ export default async function NoemiaPage({
   const suggestedPrompts = isStaffMode
     ? [
         "Resuma as prioridades de hoje e diga o que devo tratar primeiro.",
-        "Quais casos estao sem atualizacao ha mais tempo e qual proximo passo interno faz sentido?",
-        "Monte um texto-base curto para cobrar o cliente sobre documentos pendentes.",
-        "Qual triagem mais urgente precisa de minha atencao agora?",
-        "Analise a carga de trabalho desta semana e sugira como organizar melhor."
+        "Quais casos estao esfriando e qual acao humana faz mais sentido agora?",
+        "Monte um texto-base curto para cobrar o cliente sobre documentos pendentes sem soar burocratico.",
+        "Qual triagem mais urgente tem maior chance de virar consulta agora?",
+        "Analise a carga desta semana e sugira a melhor sequencia operacional."
       ]
     : isClientMode
     ? [
@@ -81,11 +81,11 @@ export default async function NoemiaPage({
         "Resuma o que aconteceu recentemente no meu acompanhamento."
       ]
     : [
-        "Como funciona a triagem inicial do atendimento?",
-        "Quando eu recebo acesso ao portal do cliente?",
-        "O que eu consigo acompanhar dentro do portal?",
-        "Quais areas juridicas sao atendidas pelo escritorio?",
-        "Como funciona o processo de acompanhamento de caso?"
+        "Meu caso parece urgente. Como funciona a triagem inicial?",
+        "Quando o atendimento humano entra na jornada?",
+        "O que eu consigo acompanhar dentro do portal do cliente?",
+        "Quais areas juridicas o escritorio atende com mais frequencia?",
+        "Como funciona da primeira conversa ate a consulta?"
       ];
   const utilityContent =
     profile && profile.is_active ? (
@@ -113,17 +113,17 @@ export default async function NoemiaPage({
         eyebrow="Noemia"
         title={
           isStaffMode
-            ? "Uma assistente operacional para transformar sinais do painel em acao pratica."
+            ? "Uma camada de decisao para transformar sinais operacionais em acao rapida."
             : isClientMode
-            ? "Uma assistente para traduzir o seu portal em linguagem mais simples."
-            : "Uma assistente inicial para orientar a jornada antes e depois da triagem."
+            ? "Uma assistente para traduzir seu acompanhamento com clareza e calma."
+            : "Uma assistente premium para orientar a jornada antes, durante e depois da triagem."
         }
         description={
           isStaffMode
-            ? "Noemia cruza filas internas, triagens, pendencias, agenda e BI para resumir prioridades, sugerir proximo passo e apoiar a rotina da advogada."
+            ? "NoemIA cruza filas internas, triagens, pendencias, agenda e sinais comerciais para resumir prioridades, sugerir proximo passo e acelerar a rotina da equipe."
             : isClientMode
-            ? "Noemia usa apenas o contexto do seu proprio portal para explicar status, agenda, documentos e proximos passos com mais clareza."
-            : "Noemia ajuda visitantes a entender triagem, atendimento, convite e funcionamento do portal sem substituir o retorno tecnico da equipe."
+            ? "NoemIA usa apenas o contexto do seu proprio portal para explicar status, agenda, documentos e proximos passos sem gerar ruído."
+            : "NoemIA ajuda visitantes a entender triagem, consulta, funcionamento do escritorio e continuidade do atendimento sem substituir a analise tecnica da equipe."
         }
         utilityContent={utilityContent}
         navigation={navigation}
@@ -142,11 +142,11 @@ export default async function NoemiaPage({
               ? "Filas, BI e operacao"
               : isClientMode
                 ? "Contexto do seu portal"
-                : "Fluxo institucional"
+                : "Fluxo do escritorio"
           },
           {
             label: "Melhor uso",
-            value: isStaffMode ? "Prioridade e proximo passo" : "Duvidas simples e orientacao"
+            value: isStaffMode ? "Prioridade, risco e proximo passo" : "Orientacao clara e proximo movimento"
           },
           {
             label: "Limite",
@@ -172,14 +172,14 @@ export default async function NoemiaPage({
                 ? "Conversa com contexto operacional do escritorio"
                 : isClientMode
                   ? "Conversa com contexto do seu caso"
-                  : "Orientacao inicial com contexto do escritorio"
+                  : "Orientacao inicial com contexto real do escritorio"
             }
             description={
               isStaffMode
-                ? "Use a assistente para resumir triagens, enxergar prioridades, montar proximos passos e rascunhar retornos com mais velocidade."
+                ? "Use a assistente para resumir triagens, enxergar prioridades, identificar oportunidade comercial e rascunhar retornos com mais velocidade."
                 : isClientMode
                 ? "Pergunte de forma direta. A assistente responde com base no que esta visivel no seu proprio portal."
-                : "Use a assistente para tirar duvidas antes da triagem ou entender como o portal funciona."
+                : "Use a assistente para tirar duvidas, entender a triagem e descobrir qual deve ser o proximo passo."
             }
           >
             <NoemiaAssistant
@@ -194,7 +194,7 @@ export default async function NoemiaPage({
             {isStaffMode ? (
               <SectionCard
                 title="Onde a Noemia entra no fluxo oficial"
-                description="A assistente deixa de parecer uma area separada quando fica ancorada nas mesmas superficies que organizam triagem, operacao humana e acompanhamento por caso."
+                description="A assistente sobe de nivel quando fica ancorada nas mesmas superficies que organizam triagem, operacao humana e acompanhamento por caso."
               >
                 <div className="grid two">
                   <Link className="route-card" href="/internal/advogada#triagens-recebidas">
@@ -213,13 +213,13 @@ export default async function NoemiaPage({
 
             <SectionCard
               title="O que a Noemia faz bem agora"
-              description="Esta primeira camada ja foi pensada para ser util desde o primeiro dia, sem prometer mais do que deve."
+              description="A camada atual foi desenhada para ser util de verdade, com limites claros e continuidade entre orientacao, operacao e acompanhamento."
             >
               <ul className="timeline">
                 {isStaffMode ? (
                   <>
                     <li>1. Resume triagens, filas e pendencias com linguagem mais acionavel.</li>
-                    <li>2. Sugere prioridade inicial e proximo passo interno com base no contexto atual.</li>
+                    <li>2. Sugere prioridade inicial, risco operacional e proximo passo com base no contexto atual.</li>
                     <li>3. Ajuda a transformar leitura operacional em texto-base de retorno ao cliente.</li>
                     <li>4. Mantem limites claros quando a pergunta exigir criterio juridico final da equipe.</li>
                   </>
@@ -232,10 +232,10 @@ export default async function NoemiaPage({
                   </>
                 ) : (
                   <>
-                    <li>1. Explica como funciona a triagem e o retorno inicial.</li>
+                    <li>1. Explica como funciona a triagem, a consulta e o retorno inicial.</li>
                     <li>2. Mostra quando o portal entra na jornada do cliente.</li>
                     <li>3. Ajuda a reduzir duvidas antes do envio da triagem.</li>
-                    <li>4. Encaminha para a triagem quando a pergunta depender do contexto do caso.</li>
+                    <li>4. Encaminha para a triagem ou consulta quando a pergunta exigir contexto real do caso.</li>
                   </>
                 )}
               </ul>
