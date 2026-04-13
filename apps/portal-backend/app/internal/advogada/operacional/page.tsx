@@ -78,9 +78,15 @@ interface OperationalContact {
   conversationState: {
     conversationStatus?: string;
     triageStage?: string;
+    explanationStage?: string;
     consultationStage?: string;
     handoffReason?: string | null;
     readyForLawyer: boolean;
+    aiActiveOnChannel: boolean;
+    operationalHandoffRecorded: boolean;
+    lawyerNotificationGenerated: boolean;
+    humanFollowUpPending: boolean;
+    followUpReady: boolean;
     schedulingPreferences?: {
       channel?: string;
       period?: string;
@@ -635,16 +641,37 @@ export default function OperationalPanel() {
         return 'IA ativa';
       case 'triage_in_progress':
         return 'Triagem em andamento';
+      case 'explanation_in_progress':
+        return 'Explicacao em andamento';
       case 'consultation_offer':
         return 'Consulta em condução';
       case 'scheduling_in_progress':
         return 'Agendamento em andamento';
+      case 'scheduling_preference_captured':
+        return 'Preferencia de agenda capturada';
       case 'consultation_ready':
         return 'Consulta pronta';
+      case 'lawyer_notified':
+        return 'Advogada notificada';
       case 'handed_off_to_lawyer':
         return 'Encaminhado à advogada';
       default:
         return 'Em acompanhamento';
+    }
+  }
+
+  function formatExplanationStageLabel(value?: string | null) {
+    switch (value) {
+      case 'understanding_case':
+        return 'Entendendo o caso';
+      case 'clarifying_questions':
+        return 'Aprofundando a triagem';
+      case 'guidance_shared':
+        return 'Explicacao compartilhada';
+      case 'consultation_positioned':
+        return 'Consulta posicionada';
+      default:
+        return 'Explicacao inicial';
     }
   }
 
@@ -978,6 +1005,9 @@ export default function OperationalPanel() {
                       <StatusChip tone={contact.conversationState.readyForLawyer ? 'green' : 'neutral'}>
                         {formatConversationStateLabel(contact.conversationState.conversationStatus)}
                       </StatusChip>
+                      <StatusChip tone={contact.conversationState.aiActiveOnChannel ? 'blue' : 'red'}>
+                        {contact.conversationState.aiActiveOnChannel ? 'IA segue ativa' : 'IA inativa'}
+                      </StatusChip>
                       <StatusChip tone="neutral">
                         {formatConsultationStageLabel(contact.conversationState.consultationStage)}
                       </StatusChip>
@@ -985,6 +1015,17 @@ export default function OperationalPanel() {
                         <StatusChip tone="neutral">
                           Triagem: {contact.conversationState.triageStage}
                         </StatusChip>
+                      ) : null}
+                      {contact.conversationState.explanationStage ? (
+                        <StatusChip tone="neutral">
+                          Explicacao: {formatExplanationStageLabel(contact.conversationState.explanationStage)}
+                        </StatusChip>
+                      ) : null}
+                      {contact.conversationState.operationalHandoffRecorded ? (
+                        <StatusChip tone="green">Encaminhamento operacional registrado</StatusChip>
+                      ) : null}
+                      {contact.conversationState.humanFollowUpPending ? (
+                        <StatusChip tone="orange">Follow-up humano pendente</StatusChip>
                       ) : null}
                     </div>
 
@@ -999,6 +1040,20 @@ export default function OperationalPanel() {
                       <p className="mt-3 text-sm text-[#5d6d66]">
                         <span className="font-medium text-[#10261d]">Relatorio da triagem:</span>{' '}
                         {contact.conversationState.reportSummary}
+                      </p>
+                    ) : null}
+
+                    {(contact.conversationState.lawyerNotificationGenerated ||
+                      contact.conversationState.operationalHandoffRecorded) ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Estado paralelo:</span>{' '}
+                        {contact.conversationState.operationalHandoffRecorded
+                          ? 'encaminhamento operacional realizado'
+                          : 'advogada pronta para notificacao'}
+                        {' + '}
+                        {contact.conversationState.aiActiveOnChannel
+                          ? 'IA continua ativa no canal'
+                          : 'IA precisa ser reativada'}
                       </p>
                     ) : null}
 

@@ -36,6 +36,7 @@ export interface TriageData {
   completude?: number;
   conversation_status?: string;
   triage_stage?: string;
+  explanation_stage?: string;
   consultation_stage?: string;
   scheduling_preferences?: {
     channel?: string;
@@ -43,12 +44,21 @@ export interface TriageData {
     urgency?: string;
     availability?: string;
   };
+  ai_activity?: {
+    channel_active?: boolean;
+    operational_handoff_recorded?: boolean;
+    human_followup_pending?: boolean;
+    follow_up_ready?: boolean;
+    lawyer_notification_generated?: boolean;
+  };
   handoff_policy?: {
     status?: string;
     allowed?: boolean;
     blocked?: boolean;
     reason?: string | null;
+    reason_code?: string | null;
     legitimate?: boolean;
+    recorded?: boolean;
   };
   report?: {
     resumo_caso?: string;
@@ -113,9 +123,14 @@ class TriagePersistenceService {
       internalSummary: string;
       userFriendlySummary: string;
       conversationStatus?: string;
+      explanationStage?: string;
       consultationStage?: string;
       reportData?: Record<string, unknown>;
       lawyerNotificationGenerated?: boolean;
+      aiActiveOnChannel?: boolean;
+      operationalHandoffRecorded?: boolean;
+      humanFollowUpPending?: boolean;
+      followUpReady?: boolean;
     }
   ): Promise<TriageSummary> {
     try {
@@ -144,9 +159,16 @@ class TriagePersistenceService {
         internal_summary: metadata.internalSummary,
         user_friendly_summary: metadata.userFriendlySummary,
         conversation_status: metadata.conversationStatus || triageData.conversation_status || null,
+        explanation_stage: metadata.explanationStage || triageData.explanation_stage || null,
         consultation_stage: metadata.consultationStage || triageData.consultation_stage || null,
         report_data: metadata.reportData || triageData.report || {},
         lawyer_notification_generated: metadata.lawyerNotificationGenerated ?? false,
+        ai_active_on_channel: metadata.aiActiveOnChannel ?? triageData.ai_activity?.channel_active ?? true,
+        operational_handoff_recorded:
+          metadata.operationalHandoffRecorded ?? triageData.handoff_policy?.recorded ?? false,
+        human_followup_pending:
+          metadata.humanFollowUpPending ?? triageData.ai_activity?.human_followup_pending ?? false,
+        follow_up_ready: metadata.followUpReady ?? triageData.ai_activity?.follow_up_ready ?? false,
         updated_at: now,
         ...(existingData ? {} : { created_at: now })
       };
@@ -165,9 +187,14 @@ class TriagePersistenceService {
           error &&
           (
             this.isMissingColumn(error, 'conversation_status') ||
+            this.isMissingColumn(error, 'explanation_stage') ||
             this.isMissingColumn(error, 'consultation_stage') ||
             this.isMissingColumn(error, 'report_data') ||
-            this.isMissingColumn(error, 'lawyer_notification_generated')
+            this.isMissingColumn(error, 'lawyer_notification_generated') ||
+            this.isMissingColumn(error, 'ai_active_on_channel') ||
+            this.isMissingColumn(error, 'operational_handoff_recorded') ||
+            this.isMissingColumn(error, 'human_followup_pending') ||
+            this.isMissingColumn(error, 'follow_up_ready')
           )
         ) {
           console.warn('TRIAGE_SCHEMA_DRIFT_RETRY', {
@@ -177,9 +204,14 @@ class TriagePersistenceService {
 
           const {
             conversation_status: _conversationStatus,
+            explanation_stage: _explanationStage,
             consultation_stage: _consultationStage,
             report_data: _reportData,
             lawyer_notification_generated: _lawyerNotificationGenerated,
+            ai_active_on_channel: _aiActiveOnChannel,
+            operational_handoff_recorded: _operationalHandoffRecorded,
+            human_followup_pending: _humanFollowUpPending,
+            follow_up_ready: _followUpReady,
             ...legacySummaryData
           } = summaryData;
 
@@ -211,9 +243,14 @@ class TriagePersistenceService {
           error &&
           (
             this.isMissingColumn(error, 'conversation_status') ||
+            this.isMissingColumn(error, 'explanation_stage') ||
             this.isMissingColumn(error, 'consultation_stage') ||
             this.isMissingColumn(error, 'report_data') ||
-            this.isMissingColumn(error, 'lawyer_notification_generated')
+            this.isMissingColumn(error, 'lawyer_notification_generated') ||
+            this.isMissingColumn(error, 'ai_active_on_channel') ||
+            this.isMissingColumn(error, 'operational_handoff_recorded') ||
+            this.isMissingColumn(error, 'human_followup_pending') ||
+            this.isMissingColumn(error, 'follow_up_ready')
           )
         ) {
           console.warn('TRIAGE_SCHEMA_DRIFT_RETRY', {
@@ -223,9 +260,14 @@ class TriagePersistenceService {
 
           const {
             conversation_status: _conversationStatus,
+            explanation_stage: _explanationStage,
             consultation_stage: _consultationStage,
             report_data: _reportData,
             lawyer_notification_generated: _lawyerNotificationGenerated,
+            ai_active_on_channel: _aiActiveOnChannel,
+            operational_handoff_recorded: _operationalHandoffRecorded,
+            human_followup_pending: _humanFollowUpPending,
+            follow_up_ready: _followUpReady,
             ...legacySummaryData
           } = summaryData;
 

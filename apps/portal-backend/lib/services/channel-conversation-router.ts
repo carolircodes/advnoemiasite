@@ -14,6 +14,11 @@ import {
   extractConversationStateFromSession
 } from "./channel-conversation-policy";
 import { triagePersistence, type TriageData } from "./triage-persistence";
+import {
+  buildInternalTriageSummary,
+  buildTriageReport,
+  buildUserFacingTriageSummary
+} from "./triage-report";
 
 type SupportedChannel = "instagram" | "whatsapp";
 type ConversationSource = "instagram_comment" | "instagram_dm" | "whatsapp_inbound";
@@ -688,91 +693,120 @@ async function saveTriageAndHandoff(
   conversationPolicy?: {
     state: string;
     triageStage: string;
+    explanationStage: string;
     consultationStage: string;
     handoffStatus: string;
     handoffAllowed: boolean;
     handoffBlocked: boolean;
     handoffReason: string | null;
+    handoffReasonCode: string | null;
     legitimateHandoff: boolean;
     schedulingComplete: boolean;
     readyForLawyer: boolean;
+    aiActiveOnChannel: boolean;
+    operationalHandoffRecorded: boolean;
+    lawyerNotificationGenerated: boolean;
+    humanFollowUpPending: boolean;
+    followUpReady: boolean;
   },
   pipelineId?: string | null,
   nextBestAction?: string
 ) {
   try {
+    const report = buildTriageReport({
+      channel: event.channel,
+      source: event.source,
+      sessionId: session.id,
+      pipelineId: pipelineId || null,
+      messageText: event.messageText,
+      detectedTheme,
+      leadStage,
+      nextBestAction: nextBestAction || null,
+      handoffReason: conversationPolicy?.handoffReason || handoffReason || null,
+      handoffReasonCode: conversationPolicy?.handoffReasonCode || null,
+      conversationState: conversationState || null,
+      conversationPolicy: conversationPolicy || null,
+      schedulingPreferences: conversationState?.contactPreferences || null
+    });
+
     const triageData = {
       ...extractTriageData(event.messageText, detectedTheme, leadStage, handoffReason),
       conversation_status: conversationPolicy?.state || conversationState?.conversationStatus,
       triage_stage: conversationPolicy?.triageStage || conversationState?.triageStage,
+      explanation_stage: conversationPolicy?.explanationStage,
       consultation_stage: conversationPolicy?.consultationStage || conversationState?.consultationStage,
       scheduling_preferences: conversationState?.contactPreferences,
+      ai_activity: {
+        channel_active: conversationPolicy?.aiActiveOnChannel ?? true,
+        operational_handoff_recorded: conversationPolicy?.operationalHandoffRecorded ?? false,
+        human_followup_pending: conversationPolicy?.humanFollowUpPending ?? false,
+        follow_up_ready: conversationPolicy?.followUpReady ?? false,
+        lawyer_notification_generated:
+          conversationPolicy?.lawyerNotificationGenerated ??
+          conversationState?.lawyerNotificationGenerated ??
+          false
+      },
       handoff_policy: {
         status: conversationPolicy?.handoffStatus || undefined,
         allowed: conversationPolicy?.handoffAllowed || false,
         blocked: conversationPolicy?.handoffBlocked || false,
         reason: conversationPolicy?.handoffReason || handoffReason || null,
-        legitimate: conversationPolicy?.legitimateHandoff || false
+        reason_code: conversationPolicy?.handoffReasonCode || null,
+        legitimate: conversationPolicy?.legitimateHandoff || false,
+        recorded: conversationPolicy?.operationalHandoffRecorded || false
       },
-      report: {
-        resumo_caso:
-          typeof conversationState?.collectedData?.descricao_detalhada === "string"
-            ? conversationState.collectedData.descricao_detalhada
-            : event.messageText,
-        area_juridica: detectedTheme,
-        fatos_principais: [
-          typeof conversationState?.collectedData?.problema_principal === "string"
-            ? conversationState.collectedData.problema_principal
-            : event.messageText
-        ],
-        problema_central:
-          typeof conversationState?.collectedData?.problema_principal === "string"
-            ? conversationState.collectedData.problema_principal
-            : event.messageText,
-        cronologia:
-          typeof conversationState?.collectedData?.timeframe === "string"
-            ? conversationState.collectedData.timeframe
-            : "",
-        sinais_urgencia:
-          typeof conversationState?.collectedData?.nivel_urgencia === "string" &&
-          conversationState.collectedData.nivel_urgencia !== "baixa"
-            ? [`Urgencia ${conversationState.collectedData.nivel_urgencia}`]
-            : [],
-        documentos_mencionados: Array.isArray(conversationState?.collectedData?.tipos_documentos)
-          ? conversationState.collectedData.tipos_documentos
-          : [],
-        documentos_pendentes:
-          conversationState?.collectedData?.tem_documentos === false
-            ? ["Documentos ainda pendentes"]
-            : [],
-        respostas_relevantes: Array.isArray(conversationState?.collectedData?.palavras_chave)
-          ? conversationState.collectedData.palavras_chave
-          : [],
-        nivel_interesse:
-          typeof conversationState?.collectedData?.nivel_urgencia === "string"
-            ? conversationState.collectedData.nivel_urgencia
-            : leadStage,
-        status_consulta: conversationPolicy?.consultationStage || conversationState?.consultationStage || "",
-        preferencias_dia_horario: conversationState?.contactPreferences?.availability || "",
-        observacoes_livres: conversationPolicy?.handoffReason || handoffReason || "",
-        canal_origem: event.channel,
-        pipeline_id: pipelineId || null,
-        next_best_action: nextBestAction || ""
-      }
+      report
     } satisfies TriageData;
 
     await triagePersistence.saveTriageData(session.id, triageData, {
       channel: event.channel,
       userId: event.externalUserId,
       isHotLead: leadStage === "qualified" || Boolean(conversationPolicy?.readyForLawyer),
-      needsHumanAttention: Boolean(conversationPolicy?.handoffAllowed),
+      needsHumanAttention: Boolean(
+        conversationPolicy?.handoffAllowed || conversationPolicy?.humanFollowUpPending
+      ),
       handoffReason,
-      internalSummary: `Canal: ${event.channel} | Origem: ${event.source} | Tema: ${detectedTheme} | LeadStage: ${leadStage} | Estado: ${conversationPolicy?.state || "ai_active"} | Consulta: ${conversationPolicy?.consultationStage || "not_offered"} | Handoff: ${handoffReason || "nao"}`,
-      userFriendlySummary: `Tema ${detectedTheme}; etapa ${conversationPolicy?.state || leadStage}; consulta ${conversationPolicy?.consultationStage || "nao ofertada"}; handoff ${handoffReason || "nao acionado"}`,
+      internalSummary: buildInternalTriageSummary({
+        channel: event.channel,
+        source: event.source,
+        sessionId: session.id,
+        pipelineId: pipelineId || null,
+        messageText: event.messageText,
+        detectedTheme,
+        leadStage,
+        nextBestAction: nextBestAction || null,
+        handoffReason: conversationPolicy?.handoffReason || handoffReason || null,
+        handoffReasonCode: conversationPolicy?.handoffReasonCode || null,
+        conversationState: conversationState || null,
+        conversationPolicy: conversationPolicy || null,
+        schedulingPreferences: conversationState?.contactPreferences || null
+      }),
+      userFriendlySummary: buildUserFacingTriageSummary({
+        channel: event.channel,
+        source: event.source,
+        sessionId: session.id,
+        pipelineId: pipelineId || null,
+        messageText: event.messageText,
+        detectedTheme,
+        leadStage,
+        nextBestAction: nextBestAction || null,
+        handoffReason: conversationPolicy?.handoffReason || handoffReason || null,
+        handoffReasonCode: conversationPolicy?.handoffReasonCode || null,
+        conversationState: conversationState || null,
+        conversationPolicy: conversationPolicy || null,
+        schedulingPreferences: conversationState?.contactPreferences || null
+      }),
       conversationStatus: conversationPolicy?.state,
+      explanationStage: conversationPolicy?.explanationStage,
       consultationStage: conversationPolicy?.consultationStage,
       reportData: triageData.report,
-      lawyerNotificationGenerated: conversationState?.lawyerNotificationGenerated
+      lawyerNotificationGenerated:
+        conversationPolicy?.lawyerNotificationGenerated ??
+        conversationState?.lawyerNotificationGenerated,
+      aiActiveOnChannel: conversationPolicy?.aiActiveOnChannel,
+      operationalHandoffRecorded: conversationPolicy?.operationalHandoffRecorded,
+      humanFollowUpPending: conversationPolicy?.humanFollowUpPending,
+      followUpReady: conversationPolicy?.followUpReady
     });
 
     logRouterEvent("TRIAGE_REPORT_SAVED", {
@@ -1029,6 +1063,7 @@ export async function processChannelConversationEvent(
         ...(session.metadata || {}),
         ...(initialConversationPolicy.metadata || {}),
         handoff_already_active: false,
+        ai_active_on_channel: true,
         last_handoff_reason: null,
         session_state_normalized_at: new Date().toISOString(),
         session_state_normalized_reason: initialConversationPolicy.normalizationReason
@@ -1075,7 +1110,7 @@ export async function processChannelConversationEvent(
 
     if (handoffAlreadyActive && initialConversationPolicy.legitimateHandoff) {
       logRouterEvent(
-        "CHANNEL_ROUTER_EARLY_RETURN",
+        "POST_HANDOFF_MESSAGE_RECEIVED",
         buildRouterLogContext({
           event,
           eventId,
@@ -1083,38 +1118,19 @@ export async function processChannelConversationEvent(
           messageType,
           pipelineId,
           reason: "handoff_active"
-        }),
-        "warn"
+        })
       );
       logRouterEvent(
-        "CHANNEL_ROUTER_RESPONSE_SKIPPED",
+        "AI_CONTINUES_AFTER_HANDOFF",
         buildRouterLogContext({
           event,
           eventId,
           session,
           messageType,
           pipelineId,
-          reason: "handoff_active"
-        }),
-        "warn"
+          reason: "channel_remains_ai_active"
+        })
       );
-
-      return {
-        direction: "ignored",
-        sessionId: session.id,
-        eventId,
-        usedFallback: false,
-        handoffTriggered: true,
-        replySent: false,
-        detectedTheme: session.case_area || "geral",
-        currentIntent: session.current_intent || "handoff_active",
-        leadStage: "handoff",
-        triageStatus: "handoff",
-        handoffReason: "handoff_ja_ativo",
-        logs: {
-          reason: "handoff_active"
-        }
-      };
     }
 
   if (isCommentSource) {
@@ -1329,6 +1345,7 @@ export async function processChannelConversationEvent(
         oldState: session.metadata?.conversation_policy_state || session.lead_stage || "unknown",
         newState: conversationPolicy.state,
         triageStage: conversationPolicy.triageStage,
+        explanationStage: conversationPolicy.explanationStage,
         consultationStage: conversationPolicy.consultationStage
       }
     })
@@ -1349,7 +1366,8 @@ export async function processChannelConversationEvent(
         handoffAllowed: conversationPolicy.handoffAllowed,
         handoffBlocked: conversationPolicy.handoffBlocked,
         schedulingComplete: conversationPolicy.schedulingComplete,
-        lawyerNotificationGenerated: conversationPolicy.lawyerNotificationGenerated
+        lawyerNotificationGenerated: conversationPolicy.lawyerNotificationGenerated,
+        aiActiveOnChannel: conversationPolicy.aiActiveOnChannel
       }
     })
   );
@@ -1380,30 +1398,34 @@ export async function processChannelConversationEvent(
   };
 
   const leadStage: LeadStage =
+    conversationPolicy.state === "consultation_ready" ||
+    conversationPolicy.state === "lawyer_notified" ||
     conversationPolicy.state === "handed_off_to_lawyer"
-      ? "handoff"
-      : conversationPolicy.state === "consultation_ready"
-        ? "qualified"
-        : conversationPolicy.state === "consultation_offer" ||
-            conversationPolicy.state === "scheduling_in_progress" ||
-            conversationPolicy.state === "triage_in_progress"
-          ? "triage"
-          : (session.lead_stage as LeadStage | undefined) || "engaged";
+      ? "qualified"
+      : conversationPolicy.state === "consultation_offer" ||
+          conversationPolicy.state === "explanation_in_progress" ||
+          conversationPolicy.state === "scheduling_in_progress" ||
+          conversationPolicy.state === "scheduling_preference_captured" ||
+          conversationPolicy.state === "triage_in_progress"
+        ? "triage"
+        : (session.lead_stage as LeadStage | undefined) || "engaged";
   const triageStatus: TriageStatus =
+    conversationPolicy.triageStage === "completed" ||
+    conversationPolicy.state === "consultation_ready" ||
+    conversationPolicy.state === "lawyer_notified" ||
     conversationPolicy.state === "handed_off_to_lawyer"
-      ? "handoff"
-      : conversationPolicy.triageStage === "completed" || conversationPolicy.state === "consultation_ready"
-        ? "qualified"
-        : conversationPolicy.triageStage === "not_started"
-          ? "not_started"
-          : "in_progress";
+      ? "qualified"
+      : conversationPolicy.triageStage === "not_started"
+        ? "not_started"
+        : "in_progress";
   const materialSent = !!materialRecommendation?.sendNow;
   const followUpState: FollowUpState =
-    conversationPolicy.state === "handed_off_to_lawyer"
+    conversationPolicy.humanFollowUpPending
       ? "human_handoff_pending"
       : conversationPolicy.state === "consultation_ready" ||
           conversationPolicy.state === "consultation_offer" ||
-          conversationPolicy.state === "scheduling_in_progress"
+          conversationPolicy.state === "scheduling_in_progress" ||
+          conversationPolicy.state === "scheduling_preference_captured"
         ? "qualified_waiting_reply"
         : leadStage === "triage"
           ? "triage_incomplete"
@@ -1411,7 +1433,7 @@ export async function processChannelConversationEvent(
             ? "material_sent"
             : "awaiting_initial_reply";
   const conversionSignal: ConversionSignal =
-    conversationPolicy.state === "handed_off_to_lawyer"
+    conversationPolicy.operationalHandoffRecorded
       ? "human_handoff"
       : conversationPolicy.consultationStage !== "not_offered"
         ? "consultation_intent"
@@ -1422,9 +1444,11 @@ export async function processChannelConversationEvent(
             : "curiosity";
   const nextBestAction: NextBestAction =
     conversationPolicy.nextBestAction === "handoff_to_lawyer"
-      ? "handoff_to_whatsapp"
+      ? "await_human"
       : conversationPolicy.nextBestAction === "await_human_follow_up"
         ? "await_human"
+        : conversationPolicy.nextBestAction === "continue_explanation"
+          ? "answer_and_ask_one_question"
         : conversationPolicy.nextBestAction === "collect_scheduling_preferences" ||
             conversationPolicy.nextBestAction === "offer_consultation" ||
             conversationPolicy.nextBestAction === "continue_triage" ||
@@ -1433,11 +1457,6 @@ export async function processChannelConversationEvent(
           : "answer_and_ask_one_question";
   let replyText = appendMaterialToReply(coreResponse.reply, materialRecommendation);
   let direction: MessageDirection = coreResponse.usedFallback ? "fallback" : "reply";
-
-  if (conversationPolicy.handoffAllowed && channelAutomationFeatures.unifiedHumanHandoff) {
-    replyText = `${replyText}\n\n${buildHandoffReply(handoffDecision.reason)}`;
-    direction = "handoff";
-  }
 
   logRouterEvent(
     "TRIAGE_STAGE_UPDATED",
@@ -1468,6 +1487,22 @@ export async function processChannelConversationEvent(
         oldState: session.metadata?.consultation_stage || null,
         newState: conversationPolicy.consultationStage,
         schedulingComplete: conversationPolicy.schedulingComplete
+      }
+    })
+  );
+
+  logRouterEvent(
+    "EXPLANATION_STAGE_UPDATED",
+    buildRouterLogContext({
+      event,
+      eventId,
+      session,
+      messageType,
+      pipelineId,
+      reason: conversationPolicy.explanationStage,
+      extra: {
+        oldState: session.metadata?.explanation_stage || null,
+        newState: conversationPolicy.explanationStage
       }
     })
   );
@@ -1534,14 +1569,22 @@ export async function processChannelConversationEvent(
     handoff_already_active: session.handoff_to_human === true,
     last_material_url: materialRecommendation?.url || session.metadata?.last_material_url || null,
     last_handoff_reason: handoffDecision.reason || session.metadata?.last_handoff_reason || null,
+    handoff_reason_code: conversationPolicy.handoffReasonCode,
     conversation_state: conversationState,
     conversation_policy_state: conversationPolicy.state,
     triage_stage: conversationPolicy.triageStage,
+    explanation_stage: conversationPolicy.explanationStage,
     consultation_stage: conversationPolicy.consultationStage,
     handoff_status: conversationPolicy.handoffStatus,
     scheduling_complete: conversationPolicy.schedulingComplete,
     ready_for_lawyer: conversationPolicy.readyForLawyer,
-    lawyer_notification_generated: conversationPolicy.lawyerNotificationGenerated,
+    lawyer_notification_generated:
+      conversationPolicy.handoffAllowed || conversationPolicy.lawyerNotificationGenerated,
+    ai_active_on_channel: conversationPolicy.aiActiveOnChannel,
+    operational_handoff_recorded:
+      conversationPolicy.handoffAllowed || conversationPolicy.operationalHandoffRecorded,
+    human_followup_pending: conversationPolicy.humanFollowUpPending,
+    follow_up_ready: conversationPolicy.followUpReady,
     last_router_at: new Date().toISOString()
   };
   const sessionSummary = buildSessionSummaryPayload({
@@ -1570,7 +1613,7 @@ export async function processChannelConversationEvent(
       pipelineId,
       responseType: "text",
       responseLength: finalReplyText.length,
-      reason: direction === "handoff" ? handoffDecision.reason || "handoff" : direction
+      reason: direction
     })
   );
 
@@ -1583,7 +1626,7 @@ export async function processChannelConversationEvent(
     messageType,
     responseType: "text",
     responseLength: finalReplyText.length,
-    reason: direction === "handoff" ? handoffDecision.reason || "handoff" : direction
+    reason: direction
   });
   let finalUsedFallback = coreResponse.usedFallback;
   let finalDirection = direction;
@@ -1639,6 +1682,7 @@ export async function processChannelConversationEvent(
       conversationPolicyState: conversationPolicy.state,
       consultationStage: conversationPolicy.consultationStage,
       triageStage: conversationPolicy.triageStage,
+      explanationStage: conversationPolicy.explanationStage,
       schedulingComplete: conversationPolicy.schedulingComplete,
       materialUrl: materialRecommendation?.url || null,
       triageStatus,
@@ -1660,7 +1704,8 @@ export async function processChannelConversationEvent(
       case_area: detectedTheme || session.case_area,
       current_intent:
         conversationPolicy.state || coreResponse.intent || session.current_intent || "conversation",
-      handoff_to_human: finalDirection === "handoff" && conversationPolicy.handoffAllowed,
+      handoff_to_human:
+        conversationPolicy.handoffAllowed || conversationPolicy.operationalHandoffRecorded,
       last_inbound_at: new Date().toISOString(),
       last_outbound_at: new Date().toISOString(),
       last_summary: sessionSummary,
@@ -1680,12 +1725,13 @@ export async function processChannelConversationEvent(
           oldState: session.metadata?.conversation_policy_state || null,
           newState: conversationPolicy.state,
           consultationStage: conversationPolicy.consultationStage,
-          handoffAllowed: conversationPolicy.handoffAllowed
+          handoffAllowed: conversationPolicy.handoffAllowed,
+          aiActiveOnChannel: conversationPolicy.aiActiveOnChannel
         }
       })
     );
 
-    if (finalDirection === "handoff" && conversationPolicy.handoffAllowed) {
+    if (conversationPolicy.handoffAllowed || conversationPolicy.operationalHandoffRecorded) {
       logRouterEvent(
         "LAWYER_HANDOFF_TRIGGERED",
         buildRouterLogContext({
@@ -1697,10 +1743,55 @@ export async function processChannelConversationEvent(
           reason: conversationPolicy.handoffReason || "consultation_ready",
           extra: {
             oldState: session.metadata?.conversation_policy_state || null,
-            newState: "handed_off_to_lawyer",
+            newState: conversationPolicy.operationalHandoffRecorded
+              ? "handed_off_to_lawyer"
+              : "lawyer_notified",
             schedulingComplete: conversationPolicy.schedulingComplete,
             lawyerNotificationGenerated: conversationPolicy.lawyerNotificationGenerated
           }
+        })
+      );
+      logRouterEvent(
+        "HANDOFF_RECORDED_WITHOUT_AI_SHUTDOWN",
+        buildRouterLogContext({
+          event,
+          eventId,
+          session,
+          messageType,
+          pipelineId,
+          reason: conversationPolicy.handoffReason || "operational_handoff_recorded",
+          extra: {
+            aiActiveOnChannel: conversationPolicy.aiActiveOnChannel
+          }
+        })
+      );
+      logRouterEvent(
+        "LAWYER_NOTIFIED_AI_STILL_ACTIVE",
+        buildRouterLogContext({
+          event,
+          eventId,
+          session,
+          messageType,
+          pipelineId,
+          reason: conversationPolicy.handoffReason || "lawyer_notified",
+          extra: {
+            lawyerNotificationGenerated: true,
+            aiActiveOnChannel: conversationPolicy.aiActiveOnChannel
+          }
+        })
+      );
+    }
+
+    if (handoffAlreadyActive || conversationPolicy.operationalHandoffRecorded) {
+      logRouterEvent(
+        "POST_HANDOFF_RESPONSE_SENT",
+        buildRouterLogContext({
+          event,
+          eventId,
+          session,
+          messageType,
+          pipelineId,
+          reason: finalDirection
         })
       );
     }
@@ -1765,8 +1856,11 @@ export async function processChannelConversationEvent(
     conversationPolicyState: conversationPolicy.state,
     consultationStage: conversationPolicy.consultationStage,
     triageStage: conversationPolicy.triageStage,
+    explanationStage: conversationPolicy.explanationStage,
     schedulingComplete: conversationPolicy.schedulingComplete,
     lawyerNotificationGenerated: conversationPolicy.lawyerNotificationGenerated,
+    aiActiveOnChannel: conversationPolicy.aiActiveOnChannel,
+    operationalHandoffRecorded: conversationPolicy.operationalHandoffRecorded,
     materialUrl: materialRecommendation?.url || null,
     replySent: sent,
     consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,

@@ -1,57 +1,41 @@
 import type { ConversationState } from "../ai/noemia-core";
 import type { ConversationSession } from "./conversation-persistence";
-
-export type ConversationPolicyState =
-  | "ai_active"
-  | "triage_in_progress"
-  | "consultation_offer"
-  | "scheduling_in_progress"
-  | "consultation_ready"
-  | "handed_off_to_lawyer"
-  | "human_followup_pending"
-  | "closed"
-  | "archived";
-
-export type ConversationPolicyTriageStage =
-  | "not_started"
-  | "collecting_context"
-  | "area_identified"
-  | "details_in_progress"
-  | "urgency_assessed"
-  | "completed";
-
-export type ConversationPolicyConsultationStage =
-  | "not_offered"
-  | "offered"
-  | "interest_detected"
-  | "collecting_availability"
-  | "availability_collected"
-  | "ready_for_lawyer"
-  | "scheduled_pending_confirmation"
-  | "forwarded_to_lawyer";
-
-export type ConversationPolicyHandoffStatus =
-  | "ai_only"
-  | "blocked_as_premature"
-  | "allowed"
-  | "completed";
+import {
+  extractStoredConversationSignals,
+  hasCompleteSchedulingPreferences,
+  hasSchedulingSignal,
+  inferExplanationStage,
+  type ConversationPolicyConsultationStage,
+  type ConversationPolicyExplanationStage,
+  type ConversationPolicyHandoffStatus,
+  type ConversationPolicyState,
+  type ConversationPolicyTriageStage
+} from "./conversation-state";
 
 export type ConversationPolicySummary = {
   state: ConversationPolicyState;
   triageStage: ConversationPolicyTriageStage;
+  explanationStage: ConversationPolicyExplanationStage;
   consultationStage: ConversationPolicyConsultationStage;
   handoffStatus: ConversationPolicyHandoffStatus;
   handoffAllowed: boolean;
   handoffBlocked: boolean;
   handoffReason: string | null;
+  handoffReasonCode: string | null;
   legitimateHandoff: boolean;
   sessionNeedsNormalization: boolean;
   normalizationReason: string | null;
   schedulingComplete: boolean;
   lawyerNotificationGenerated: boolean;
   readyForLawyer: boolean;
+  aiShouldRespond: boolean;
+  aiActiveOnChannel: boolean;
+  operationalHandoffRecorded: boolean;
+  humanFollowUpPending: boolean;
+  followUpReady: boolean;
   nextBestAction:
     | "continue_triage"
+    | "continue_explanation"
     | "offer_consultation"
     | "collect_scheduling_preferences"
     | "finalize_consultation"
@@ -80,13 +64,23 @@ function hasManualHandoffFlag(session: ConversationSession) {
   );
 }
 
+function detectExplicitLawyerRequest(messageText: string) {
+  const normalizedMessage = normalizeText(messageText);
+  return (
+    normalizedMessage.includes("falar com a advogada") ||
+    normalizedMessage.includes("quero falar com a advogada") ||
+    normalizedMessage.includes("passa para a advogada") ||
+    normalizedMessage.includes("quero atendimento humano") ||
+    normalizedMessage.includes("quero falar com humano") ||
+    normalizedMessage.includes("quero falar com alguem")
+  );
+}
+
 function hasSevereException(messageText: string, state: ConversationState | null) {
   const normalizedMessage = normalizeText(messageText);
   const mentionsSevereRisk =
     normalizedMessage.includes("prisao") ||
-    normalizedMessage.includes("prisão") ||
     normalizedMessage.includes("violencia") ||
-    normalizedMessage.includes("violência") ||
     normalizedMessage.includes("ameaça") ||
     normalizedMessage.includes("ameaça") ||
     normalizedMessage.includes("medida protetiva");
@@ -129,22 +123,45 @@ function inferTriageStage(state: ConversationState | null): ConversationPolicyTr
   return "collecting_context";
 }
 
-function inferConsultationStage(state: ConversationState | null): ConversationPolicyConsultationStage {
+function inferConsultationStage(
+  state: ConversationState | null,
+  messageText: string
+): ConversationPolicyConsultationStage {
   if (!state) {
     return "not_offered";
   }
 
-  const status = state.commercialStatus;
-  const hasAvailability =
-    Boolean(state.contactPreferences?.availability) ||
-    Boolean(state.contactPreferences?.period) ||
-    Boolean(state.contactPreferences?.urgency);
+  const explicitStage = normalizeText(state.consultationStage);
+  if (
+    explicitStage === "offered" ||
+    explicitStage === "interest_detected" ||
+    explicitStage === "collecting_availability" ||
+    explicitStage === "availability_collected" ||
+    explicitStage === "ready_for_lawyer" ||
+    explicitStage === "scheduled_pending_confirmation" ||
+    explicitStage === "forwarded_to_lawyer"
+  ) {
+    return explicitStage;
+  }
 
-  if (status === "consultation_scheduled") {
+  const normalizedMessage = normalizeText(messageText);
+  const asksToSchedule =
+    normalizedMessage.includes("consulta") ||
+    normalizedMessage.includes("agendar") ||
+    normalizedMessage.includes("horario") ||
+    normalizedMessage.includes("horário") ||
+    normalizedMessage.includes("manha") ||
+    normalizedMessage.includes("manhã") ||
+    normalizedMessage.includes("tarde") ||
+    normalizedMessage.includes("noite");
+
+  const hasAvailability = hasSchedulingSignal(state.contactPreferences);
+
+  if (state.commercialStatus === "consultation_scheduled") {
     return "scheduled_pending_confirmation";
   }
 
-  if (state.readyForHandoff && hasAvailability) {
+  if (hasCompleteSchedulingPreferences(state.contactPreferences) && state.triageCompleteness >= 70) {
     return "ready_for_lawyer";
   }
 
@@ -152,15 +169,12 @@ function inferConsultationStage(state: ConversationState | null): ConversationPo
     return "availability_collected";
   }
 
-  if (
-    status === "consultation_proposed" ||
-    state.recommendedAction === "schedule_consultation"
-  ) {
-    return state.commercialMomentDetected ? "collecting_availability" : "offered";
+  if (asksToSchedule) {
+    return state.triageCompleteness >= 55 ? "collecting_availability" : "interest_detected";
   }
 
-  if (state.commercialMomentDetected) {
-    return "interest_detected";
+  if (state.commercialMomentDetected || state.recommendedAction === "schedule_consultation") {
+    return "offered";
   }
 
   return "not_offered";
@@ -180,9 +194,13 @@ export function extractConversationStateFromSession(
 
 export function evaluateConversationPolicy(input: PolicyInput): ConversationPolicySummary {
   const triageStage = inferTriageStage(input.conversationState);
-  const consultationStage = inferConsultationStage(input.conversationState);
+  const explanationStage = inferExplanationStage(input.conversationState, input.messageText);
+  const consultationStage = inferConsultationStage(input.conversationState, input.messageText);
+  const storedSignals = extractStoredConversationSignals(input.session, input.conversationState);
   const manualHandoff = hasManualHandoffFlag(input.session);
   const severeException = hasSevereException(input.messageText, input.conversationState);
+  const explicitLawyerRequest = detectExplicitLawyerRequest(input.messageText);
+
   const schedulingComplete =
     consultationStage === "availability_collected" ||
     consultationStage === "ready_for_lawyer" ||
@@ -195,93 +213,168 @@ export function evaluateConversationPolicy(input: PolicyInput): ConversationPoli
 
   const legitimateHandoff =
     manualHandoff ||
+    severeException ||
     consultationStage === "forwarded_to_lawyer" ||
     consultationStage === "scheduled_pending_confirmation" ||
-    (readyForLawyer && input.session.handoff_to_human === true) ||
-    severeException;
+    storedSignals.lawyerNotificationGenerated ||
+    (readyForLawyer && input.session.handoff_to_human === true);
 
   const contaminatedHandoff =
     input.session.handoff_to_human === true &&
     !legitimateHandoff &&
     !manualHandoff;
+  const aiStateContaminated =
+    storedSignals.aiActiveOnChannel === false &&
+    !["closed", "archived"].includes(normalizeText(storedSignals.conversationStatus));
+  const sessionNeedsNormalization = contaminatedHandoff || aiStateContaminated;
 
   let state: ConversationPolicyState = "ai_active";
   let handoffStatus: ConversationPolicyHandoffStatus = "ai_only";
   let handoffAllowed = false;
   let handoffBlocked = false;
   let handoffReason: string | null = null;
+  let handoffReasonCode: string | null = null;
   let nextBestAction: ConversationPolicySummary["nextBestAction"] = "continue_triage";
+  let operationalHandoffRecorded = storedSignals.operationalHandoffRecorded;
+  let lawyerNotificationGenerated = storedSignals.lawyerNotificationGenerated;
+  let humanFollowUpPending = storedSignals.humanFollowUpPending;
+  let followUpReady = storedSignals.followUpReady || schedulingComplete;
 
-  if (legitimateHandoff && input.session.handoff_to_human === true) {
-    state = "handed_off_to_lawyer";
+  if (legitimateHandoff && (input.session.handoff_to_human || storedSignals.lawyerNotificationGenerated)) {
+    state =
+      consultationStage === "scheduled_pending_confirmation" ||
+      consultationStage === "forwarded_to_lawyer"
+        ? "handed_off_to_lawyer"
+        : "lawyer_notified";
     handoffStatus = "completed";
     handoffAllowed = true;
-    handoffReason = manualHandoff
-      ? "manual_handoff"
-      : severeException
-        ? "operational_exception"
-        : "consultation_ready";
+    operationalHandoffRecorded = true;
+    lawyerNotificationGenerated = true;
+    humanFollowUpPending = true;
+    handoffReason =
+      storedSignals.handoffReason ||
+      (manualHandoff
+        ? "Acionamento manual da equipe"
+        : severeException
+          ? "Excecao operacional legitima"
+          : "Consulta pronta e registrada para a advogada");
+    handoffReasonCode =
+      storedSignals.handoffReasonCode ||
+      (manualHandoff ? "manual_handoff" : severeException ? "operational_exception" : "consultation_ready");
     nextBestAction = "await_human_follow_up";
   } else if (readyForLawyer) {
     state = "consultation_ready";
     handoffStatus = "allowed";
     handoffAllowed = true;
-    handoffReason = severeException ? "operational_exception" : "consultation_ready";
+    humanFollowUpPending = true;
+    handoffReason = severeException
+      ? "Excecao operacional legitima"
+      : "Consulta pronta para notificacao operacional";
+    handoffReasonCode = severeException ? "operational_exception" : "consultation_ready";
     nextBestAction = "handoff_to_lawyer";
-  } else if (consultationStage === "availability_collected" || consultationStage === "collecting_availability") {
+  } else if (consultationStage === "availability_collected") {
+    state = "scheduling_preference_captured";
+    handoffStatus = explicitLawyerRequest ? "blocked_as_premature" : "ai_only";
+    handoffBlocked = explicitLawyerRequest || contaminatedHandoff;
+    handoffReason = handoffBlocked
+      ? "Ainda falta consolidar a consulta antes do encaminhamento operacional"
+      : null;
+    handoffReasonCode = handoffBlocked ? "consultation_needs_confirmation" : null;
+    nextBestAction = "finalize_consultation";
+  } else if (consultationStage === "collecting_availability") {
     state = "scheduling_in_progress";
-    handoffStatus = "blocked_as_premature";
-    handoffBlocked = Boolean(input.session.handoff_to_human) || manualHandoff;
-    handoffReason = handoffBlocked ? "scheduling_not_finished" : null;
-    nextBestAction = schedulingComplete ? "finalize_consultation" : "collect_scheduling_preferences";
-  } else if (
-    consultationStage === "interest_detected" ||
-    consultationStage === "offered"
-  ) {
+    handoffStatus = explicitLawyerRequest || contaminatedHandoff ? "blocked_as_premature" : "ai_only";
+    handoffBlocked = explicitLawyerRequest || contaminatedHandoff;
+    handoffReason = handoffBlocked
+      ? "A NoemIA ainda precisa coletar dia e horario antes de acionar a advogada"
+      : null;
+    handoffReasonCode = handoffBlocked ? "scheduling_not_finished" : null;
+    nextBestAction = "collect_scheduling_preferences";
+  } else if (consultationStage === "interest_detected" || consultationStage === "offered") {
     state = "consultation_offer";
-    handoffStatus = "blocked_as_premature";
-    handoffBlocked = Boolean(input.session.handoff_to_human) || manualHandoff;
-    handoffReason = handoffBlocked ? "consultation_not_ready" : null;
+    handoffStatus = explicitLawyerRequest || contaminatedHandoff ? "blocked_as_premature" : "ai_only";
+    handoffBlocked = explicitLawyerRequest || contaminatedHandoff;
+    handoffReason = handoffBlocked
+      ? "A NoemIA ainda precisa organizar a triagem e a consulta antes do encaminhamento humano"
+      : null;
+    handoffReasonCode = handoffBlocked ? "triage_and_scheduling_required_first" : null;
     nextBestAction = "offer_consultation";
-  } else if (triageStage === "completed" || triageStage === "urgency_assessed" || triageStage === "details_in_progress") {
+  } else if (
+    explanationStage === "guidance_shared" ||
+    explanationStage === "consultation_positioned"
+  ) {
+    state = "explanation_in_progress";
+    handoffStatus = contaminatedHandoff ? "blocked_as_premature" : "ai_only";
+    handoffBlocked = contaminatedHandoff;
+    handoffReason = contaminatedHandoff ? "Sessao contaminada por handoff residual" : null;
+    handoffReasonCode = contaminatedHandoff ? "residual_handoff_state" : null;
+    nextBestAction = "continue_explanation";
+  } else if (triageStage !== "not_started") {
     state = "triage_in_progress";
-    if (contaminatedHandoff) {
-      handoffStatus = "blocked_as_premature";
-      handoffBlocked = true;
-      handoffReason = "residual_handoff_state";
-    }
+    handoffStatus = contaminatedHandoff ? "blocked_as_premature" : "ai_only";
+    handoffBlocked = contaminatedHandoff;
+    handoffReason = contaminatedHandoff ? "Sessao contaminada por handoff residual" : null;
+    handoffReasonCode = contaminatedHandoff ? "residual_handoff_state" : null;
     nextBestAction = "continue_triage";
   }
+
+  if (!handoffReason && explicitLawyerRequest && !handoffAllowed) {
+    handoffBlocked = true;
+    handoffStatus = "blocked_as_premature";
+    handoffReason =
+      "Mesmo com pedido para falar com a advogada, a NoemIA ainda precisa organizar triagem e consulta";
+    handoffReasonCode = "lawyer_request_requires_structuring";
+  }
+
+  const aiShouldRespond = !["closed", "archived"].includes(state);
+  const aiActiveOnChannel = aiShouldRespond;
 
   const metadata = {
     conversation_policy_state: state,
     triage_stage: triageStage,
+    explanation_stage: explanationStage,
     consultation_stage: consultationStage,
     handoff_status: handoffStatus,
     handoff_allowed: handoffAllowed,
     handoff_blocked: handoffBlocked,
     handoff_reason: handoffReason,
+    handoff_reason_code: handoffReasonCode,
     legitimate_handoff: legitimateHandoff,
     scheduling_complete: schedulingComplete,
-    lawyer_notification_generated: false,
+    lawyer_notification_generated: lawyerNotificationGenerated,
     ready_for_lawyer: readyForLawyer,
+    ai_active_on_channel: aiActiveOnChannel,
+    operational_handoff_recorded: operationalHandoffRecorded,
+    human_followup_pending: humanFollowUpPending,
+    follow_up_ready: followUpReady,
     policy_updated_at: new Date().toISOString()
   };
 
   return {
     state,
     triageStage,
+    explanationStage,
     consultationStage,
     handoffStatus,
     handoffAllowed,
     handoffBlocked,
     handoffReason,
+    handoffReasonCode,
     legitimateHandoff,
-    sessionNeedsNormalization: contaminatedHandoff,
-    normalizationReason: contaminatedHandoff ? "residual_handoff_state" : null,
+    sessionNeedsNormalization,
+    normalizationReason: contaminatedHandoff
+      ? "residual_handoff_state"
+      : aiStateContaminated
+        ? "ai_channel_must_remain_active"
+        : null,
     schedulingComplete,
-    lawyerNotificationGenerated: false,
+    lawyerNotificationGenerated,
     readyForLawyer,
+    aiShouldRespond,
+    aiActiveOnChannel,
+    operationalHandoffRecorded,
+    humanFollowUpPending,
+    followUpReady,
     nextBestAction,
     metadata
   };

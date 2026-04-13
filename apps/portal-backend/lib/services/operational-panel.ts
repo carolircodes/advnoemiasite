@@ -10,6 +10,7 @@ import {
   type OperationalAttentionBucket,
   type OperationalNextBestAction
 } from "./operational-priority";
+import { projectPanelConversationState } from "./panel-state-projection";
 
 export interface OperationalContact {
   clientId: string;
@@ -40,18 +41,24 @@ export interface OperationalContact {
   growthContext: GrowthContextByItem | null;
   automationPlan: CommercialAutomationPlan | null;
   conversationState: {
-    conversationStatus?: string;
-    triageStage?: string;
-    consultationStage?: string;
+    conversationStatus?: string | null;
+    triageStage?: string | null;
+    explanationStage?: string | null;
+    consultationStage?: string | null;
     handoffReason?: string | null;
     readyForLawyer: boolean;
+    aiActiveOnChannel: boolean;
+    operationalHandoffRecorded: boolean;
+    lawyerNotificationGenerated: boolean;
+    humanFollowUpPending: boolean;
+    followUpReady: boolean;
     schedulingPreferences?: {
       channel?: string;
       period?: string;
       urgency?: string;
       availability?: string;
     } | null;
-    reportSummary?: string;
+    reportSummary?: string | null;
   } | null;
   daysSinceLastContact: number;
   isOverdue: boolean;
@@ -370,28 +377,7 @@ class OperationalPanel {
       growthContext,
       automationPlan: null,
       conversationState: latestTriageSummary
-        ? {
-            conversationStatus:
-              latestTriageSummary.conversation_status ||
-              latestTriageSummary.triage_data?.conversation_status,
-            triageStage:
-              latestTriageSummary.triage_data?.triage_stage || null,
-            consultationStage:
-              latestTriageSummary.consultation_stage ||
-              latestTriageSummary.triage_data?.consultation_stage,
-            handoffReason: latestTriageSummary.handoff_reason || null,
-            readyForLawyer:
-              latestTriageSummary.conversation_status === "consultation_ready" ||
-              latestTriageSummary.consultation_stage === "ready_for_lawyer" ||
-              latestTriageSummary.triage_data?.consultation_stage === "ready_for_lawyer",
-            schedulingPreferences:
-              latestTriageSummary.triage_data?.scheduling_preferences || null,
-            reportSummary:
-              latestTriageSummary.report_data?.resumo_caso ||
-              latestTriageSummary.triage_data?.report?.resumo_caso ||
-              latestTriageSummary.user_friendly_summary ||
-              null
-          }
+        ? projectPanelConversationState(latestTriageSummary)
         : null,
       daysSinceLastContact,
       isOverdue,
@@ -411,6 +397,7 @@ class OperationalPanel {
       .from("noemia_triage_summaries")
       .select(
         "session_id, conversation_status, consultation_stage, handoff_reason, user_friendly_summary, triage_data, report_data"
+        + ", explanation_stage, lawyer_notification_generated, ai_active_on_channel, operational_handoff_recorded, human_followup_pending, follow_up_ready"
       )
       .in("session_id", sessionIds);
 

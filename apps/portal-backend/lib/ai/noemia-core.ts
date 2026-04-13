@@ -1673,9 +1673,12 @@ export interface ConversationState {
   conversationStatus?:
     | "ai_active"
     | "triage_in_progress"
+    | "explanation_in_progress"
     | "consultation_offer"
     | "scheduling_in_progress"
+    | "scheduling_preference_captured"
     | "consultation_ready"
+    | "lawyer_notified"
     | "handed_off_to_lawyer"
     | "human_followup_pending"
     | "closed"
@@ -1687,6 +1690,12 @@ export interface ConversationState {
     | "details_in_progress"
     | "urgency_assessed"
     | "completed";
+  explanationStage?:
+    | "not_started"
+    | "understanding_case"
+    | "clarifying_questions"
+    | "guidance_shared"
+    | "consultation_positioned";
   consultationStage?:
     | "not_offered"
     | "offered"
@@ -1697,6 +1706,7 @@ export interface ConversationState {
     | "scheduled_pending_confirmation"
     | "forwarded_to_lawyer";
   lawyerNotificationGenerated?: boolean;
+  lawyerNotificationState?: "not_notified" | "ready_to_notify" | "notified";
   // Handoff e Agendamento
   contactPreferences?: {
     channel: 'whatsapp' | 'ligacao' | 'consulta_online' | 'email';
@@ -1705,6 +1715,11 @@ export interface ConversationState {
     availability: string;
   };
   commercialStatus?: 'new_lead' | 'triage_in_progress' | 'qualified' | 'awaiting_human_contact' | 'human_contact_started' | 'consultation_proposed' | 'consultation_scheduled' | 'follow_up_needed' | 'converted' | 'lost';
+  aiActiveOnChannel?: boolean;
+  operationalHandoffRecorded?: boolean;
+  humanFollowUpPending?: boolean;
+  followUpReady?: boolean;
+  handoffReasonCode?: string;
   handoffPackage?: any;
 }
 
@@ -1725,10 +1740,17 @@ function initializeConversationState(): ConversationState {
     handoffReason: undefined,
     conversationStatus: "ai_active",
     triageStage: "not_started",
+    explanationStage: "not_started",
     consultationStage: "not_offered",
     lawyerNotificationGenerated: false,
+    lawyerNotificationState: "not_notified",
     contactPreferences: undefined,
     commercialStatus: undefined,
+    aiActiveOnChannel: true,
+    operationalHandoffRecorded: false,
+    humanFollowUpPending: false,
+    followUpReady: false,
+    handoffReasonCode: undefined,
     handoffPackage: undefined,
   };
 }
@@ -1865,6 +1887,7 @@ function updateConversationState(
 
   newState.triageStage = derivePolicyConversationTriageStage(newState);
   newState.consultationStage = derivePolicyConsultationStage(newState, consultationIntentDetected);
+  newState.explanationStage = deriveExplanationStage(newState);
   newState.commercialStatus = determineCommercialStatus(newState) as ConversationState["commercialStatus"];
   newState.conversationStatus = determineConversationStatus(newState);
 
@@ -1872,6 +1895,26 @@ function updateConversationState(
   newState.needsHumanAttention = policyHandoffDecision.needsAttention;
   newState.readyForHandoff = policyHandoffDecision.readyForHandoff;
   newState.handoffReason = policyHandoffDecision.reason || undefined;
+  newState.handoffReasonCode = policyHandoffDecision.readyForHandoff
+    ? policyHandoffDecision.reason === 'Excecao_operacional_com_urgencia_real'
+      ? 'operational_exception'
+      : 'consultation_ready'
+    : undefined;
+  newState.aiActiveOnChannel = true;
+  newState.operationalHandoffRecorded = newState.operationalHandoffRecorded || false;
+  newState.followUpReady =
+    Boolean(newState.contactPreferences?.availability) ||
+    newState.consultationStage === 'ready_for_lawyer' ||
+    newState.consultationStage === 'scheduled_pending_confirmation';
+  newState.humanFollowUpPending =
+    newState.operationalHandoffRecorded ||
+    newState.consultationStage === 'ready_for_lawyer' ||
+    newState.consultationStage === 'scheduled_pending_confirmation';
+  newState.lawyerNotificationState = newState.operationalHandoffRecorded
+    ? 'notified'
+    : newState.readyForHandoff
+      ? 'ready_to_notify'
+      : 'not_notified';
 
   return newState;
 }
@@ -2020,6 +2063,28 @@ function derivePolicyConversationTriageStage(
   }
 
   return "collecting_context";
+}
+
+function deriveExplanationStage(
+  state: ConversationState
+): NonNullable<ConversationState["explanationStage"]> {
+  if (state.consultationStage && state.consultationStage !== "not_offered") {
+    return "consultation_positioned";
+  }
+
+  if (state.triageCompleteness >= 60) {
+    return "guidance_shared";
+  }
+
+  if (state.collectedData.problema_principal) {
+    return "clarifying_questions";
+  }
+
+  if (state.collectedData.area) {
+    return "understanding_case";
+  }
+
+  return "not_started";
 }
 
 function derivePolicyConsultationStage(
@@ -2194,16 +2259,23 @@ function determineCommercialStatus(state: ConversationState): string {
 function determineConversationStatus(
   state: ConversationState
 ): NonNullable<ConversationState["conversationStatus"]> {
-  if (state.consultationStage === 'scheduled_pending_confirmation') {
+  if (state.operationalHandoffRecorded && state.consultationStage === 'scheduled_pending_confirmation') {
     return 'handed_off_to_lawyer';
+  }
+
+  if (state.operationalHandoffRecorded || state.lawyerNotificationGenerated) {
+    return 'lawyer_notified';
   }
 
   if (state.consultationStage === 'ready_for_lawyer') {
     return 'consultation_ready';
   }
 
+  if (state.consultationStage === 'availability_collected') {
+    return 'scheduling_preference_captured';
+  }
+
   if (
-    state.consultationStage === 'availability_collected' ||
     state.consultationStage === 'collecting_availability'
   ) {
     return 'scheduling_in_progress';
@@ -2214,6 +2286,13 @@ function determineConversationStatus(
     state.consultationStage === 'offered'
   ) {
     return 'consultation_offer';
+  }
+
+  if (
+    state.explanationStage === 'guidance_shared' ||
+    state.explanationStage === 'consultation_positioned'
+  ) {
+    return 'explanation_in_progress';
   }
 
   if (state.triageStage === 'not_started') {
@@ -2251,12 +2330,12 @@ function generateConversionMessage(state: ConversationState): string {
   
   // 🚀 MENSAGENS PREMIUM DE CONVERSÃO
   if (temperature === 'hot' && score >= 70) {
-    // LEAD QUENTE - Encaminhamento direto
+    // LEAD QUENTE - acelerar consulta sem desligar a conversa
     if (action === 'schedule_consultation') {
       return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente pede uma análise especializada e cuidadosa.\n\nO próximo passo ideal é organizarmos sua consulta com a Dra. Noêmia, porque aí conseguimos olhar o caso com profundidade e te orientar com segurança.\n\nPara eu deixar isso pronto sem perder o ritmo da conversa, qual dia ou turno costuma funcionar melhor para você?`;
     }
     if (action === 'human_handoff') {
-      return `Compreendo completamente a urgência e complexidade do seu caso. Situações como a sua exigem análise humana especializada imediata.\n\nVou encaminhar seu caso diretamente para a equipe da Dra. Noêmia com prioridade máxima. Você receberá contato em até 2 horas úteis.\n\nEnquanto isso, se houver algum agravamento da situação, me avise imediatamente.`;
+      return `Compreendo completamente a urgência e a sensibilidade do seu caso. Vou priorizar isso operacionalmente para a equipe da Dra. Noêmia, sem perder o contexto da nossa conversa.\n\nEnquanto organizo esse encaminhamento interno, sigo com você por aqui para confirmar os pontos mais importantes. Qual dia, turno ou faixa de horário tende a funcionar melhor para o seu atendimento?`;
     }
   }
   
@@ -2699,6 +2778,7 @@ function buildSystemPrompt(
     "- nesses casos, avance para a consulta de forma objetiva, mas só faça handoff humano quando a consulta estiver pronta para ação",
     "- antes do handoff, tente coletar melhor dia, melhor turno, melhor horário, urgência e preferência de contato",
     "- nunca use handoff humano como atalho padrão de resposta",
+    "- mesmo após um handoff legítimo, a NoemIA continua ativa no canal: responda dúvidas adicionais, ajuste agenda e siga aprofundando quando fizer sentido",
     "",
     "EXEMPLO DE TOM BOM:",
     "Usuário: 'sou autista e quero saber se posso me aposentar'",
