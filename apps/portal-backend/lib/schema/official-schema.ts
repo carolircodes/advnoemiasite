@@ -1,63 +1,6 @@
-export const OFFICIAL_SCHEMA_GOVERNANCE = {
-  sourceOfTruth: "supabase/migrations",
-  schemaVersion: "phase-6.5-2026-04-13",
-  requiredTables: {
-    conversation_sessions: [
-      "id",
-      "channel",
-      "external_user_id",
-      "lead_stage",
-      "current_intent",
-      "last_summary",
-      "handoff_to_human",
-      "metadata"
-    ],
-    processed_webhook_events: [
-      "id",
-      "channel",
-      "external_event_id",
-      "external_message_id",
-      "external_user_id",
-      "payload_hash",
-      "response_sent_at",
-      "processed_at"
-    ],
-    noemia_triage_summaries: [
-      "session_id",
-      "channel",
-      "user_id",
-      "triage_data",
-      "handoff_reason",
-      "conversation_status",
-      "explanation_stage",
-      "consultation_stage",
-      "report_data",
-      "lawyer_notification_generated",
-      "ai_active_on_channel",
-      "operational_handoff_recorded",
-      "human_followup_pending",
-      "follow_up_ready",
-      "updated_at"
-    ],
-    follow_up_messages: [
-      "id",
-      "client_id",
-      "channel",
-      "message_type",
-      "status",
-      "content",
-      "created_at"
-    ],
-    product_events: [
-      "id",
-      "event_key",
-      "event_group",
-      "page_path",
-      "session_id",
-      "payload"
-    ]
-  }
-} as const;
+import officialSchemaJson from "./official-schema.json";
+
+export const OFFICIAL_SCHEMA_GOVERNANCE = officialSchemaJson;
 
 export type OfficialOperationalTable =
   keyof typeof OFFICIAL_SCHEMA_GOVERNANCE.requiredTables;
