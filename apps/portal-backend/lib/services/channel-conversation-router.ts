@@ -1250,6 +1250,7 @@ export async function processChannelConversationEvent(
     router_last_source: event.source,
     router_last_theme: detectedTheme,
     router_last_decision: direction,
+    handoff_already_active: handoffAlreadyActive,
     last_material_url: materialRecommendation?.url || session.metadata?.last_material_url || null,
     last_handoff_reason: handoffDecision.reason || session.metadata?.last_handoff_reason || null,
     last_router_at: new Date().toISOString()
@@ -1343,6 +1344,7 @@ export async function processChannelConversationEvent(
       usedFallback: finalUsedFallback,
       handoffTriggered: handoffDecision.shouldHandoff,
       handoffReason: handoffDecision.reason || null,
+      handoffAlreadyActive,
       materialUrl: materialRecommendation?.url || null,
       triageStatus,
       leadStage,
@@ -1422,6 +1424,7 @@ export async function processChannelConversationEvent(
     usedFallback: finalUsedFallback,
     handoffTriggered: handoffDecision.shouldHandoff,
     handoffReason: handoffDecision.reason || null,
+    handoffAlreadyActive,
     materialUrl: materialRecommendation?.url || null,
     replySent: sent,
     consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
@@ -1453,7 +1456,8 @@ export async function processChannelConversationEvent(
       consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
       addressRequestDetected: priorityIntentDecision.addressRequestDetected,
       whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
-      handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber
+      handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber,
+      handoffAlreadyActive
     }
   };
   } catch (error) {

@@ -38,7 +38,8 @@ export interface ProcessedWebhookEvent {
   external_event_id: string;
   external_message_id?: string;
   external_user_id?: string;
-  payload_hash: string;
+  payload_hash?: string | null;
+  response_sent_at?: string | null;
   processed_at: string;
 }
 
@@ -67,6 +68,40 @@ class ConversationPersistenceService {
       message.toLowerCase().includes("external_user_id") &&
       message.toLowerCase().includes("column")
     );
+  }
+
+  private isMissingProcessedWebhookPayloadHashColumn(error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message || '')
+          : String(error);
+
+    return message.toLowerCase().includes("payload_hash") && message.toLowerCase().includes("column");
+  }
+
+  private isMissingProcessedWebhookResponseSentAtColumn(error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message || '')
+          : String(error);
+
+    return (
+      message.toLowerCase().includes("response_sent_at") &&
+      message.toLowerCase().includes("column")
+    );
+  }
+
+  private isUniqueViolation(error: unknown) {
+    if (typeof error !== 'object' || !error) {
+      return false;
+    }
+
+    const code = 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    return code === '23505';
   }
 
   // Método público para acessar supabase
@@ -105,7 +140,8 @@ class ConversationPersistenceService {
     externalEventId: string,
     externalMessageId?: string,
     externalUserId?: string,
-    payloadHash?: string
+    payloadHash?: string,
+    responseSentAt?: string
   ): Promise<void> {
     try {
       const payload = {
@@ -113,38 +149,125 @@ class ConversationPersistenceService {
         external_event_id: externalEventId,
         external_message_id: externalMessageId,
         external_user_id: externalUserId,
-        payload_hash: payloadHash || ''
+        payload_hash: payloadHash || '',
+        response_sent_at: responseSentAt || new Date().toISOString()
       };
 
-      const { error } = await this.supabase
-        .from('processed_webhook_events')
-        .insert(payload);
+      const candidates: Array<{
+        label: string;
+        data: Record<string, unknown>;
+      }> = [
+        {
+          label: 'full_payload',
+          data: payload
+        },
+        {
+          label: 'without_external_user_id',
+          data: (() => {
+            const { external_user_id: _externalUserId, ...safePayload } = payload;
+            return safePayload;
+          })()
+        },
+        {
+          label: 'without_payload_hash',
+          data: (() => {
+            const { payload_hash: _payloadHash, ...safePayload } = payload;
+            return safePayload;
+          })()
+        },
+        {
+          label: 'without_response_sent_at',
+          data: (() => {
+            const { response_sent_at: _responseSentAt, ...safePayload } = payload;
+            return safePayload;
+          })()
+        },
+        {
+          label: 'minimal_legacy_payload',
+          data: (() => {
+            const {
+              external_user_id: _externalUserId,
+              payload_hash: _payloadHash,
+              response_sent_at: _responseSentAt,
+              ...safePayload
+            } = payload;
+            return safePayload;
+          })()
+        }
+      ];
 
-      if (error) {
-        if (this.isMissingProcessedWebhookExternalUserIdColumn(error)) {
-          const { external_user_id: _externalUserId, ...safePayload } = payload;
+      for (const candidate of candidates) {
+        const { error } = await this.supabase
+          .from('processed_webhook_events')
+          .insert(candidate.data);
 
-          console.warn('PROCESSED_EVENT_EXTERNAL_USER_ID_SKIPPED', {
-            channel,
-            externalEventId
-          });
-
-          const { error: retryError } = await this.supabase
-            .from('processed_webhook_events')
-            .insert(safePayload);
-
-          if (!retryError) {
-            return;
+        if (!error) {
+          if (candidate.label !== 'full_payload') {
+            console.warn('PROCESSED_EVENT_MARKED_WITH_FALLBACK_PAYLOAD', {
+              channel,
+              externalEventId,
+              strategy: candidate.label
+            });
           }
 
-          console.error('ERROR_MARKING_EVENT_PROCESSED_AFTER_RETRY:', retryError);
           return;
         }
 
-        console.error('ERROR_MARKING_EVENT_PROCESSED:', error);
+        if (this.isUniqueViolation(error)) {
+          console.log('PROCESSED_EVENT_ALREADY_MARKED', {
+            channel,
+            externalEventId,
+            strategy: candidate.label
+          });
+          return;
+        }
+
+        const missingExternalUserId = this.isMissingProcessedWebhookExternalUserIdColumn(error);
+        const missingPayloadHash = this.isMissingProcessedWebhookPayloadHashColumn(error);
+        const missingResponseSentAt = this.isMissingProcessedWebhookResponseSentAtColumn(error);
+
+        const isExpectedLegacyDrift =
+          (candidate.label === 'full_payload' &&
+            (missingExternalUserId || missingPayloadHash || missingResponseSentAt)) ||
+          (candidate.label === 'without_external_user_id' &&
+            (missingPayloadHash || missingResponseSentAt)) ||
+          (candidate.label === 'without_payload_hash' &&
+            (missingExternalUserId || missingResponseSentAt)) ||
+          (candidate.label === 'without_response_sent_at' &&
+            (missingExternalUserId || missingPayloadHash));
+
+        if (isExpectedLegacyDrift) {
+          console.warn('PROCESSED_EVENT_SCHEMA_DRIFT_RETRY', {
+            channel,
+            externalEventId,
+            strategy: candidate.label,
+            missingExternalUserId,
+            missingPayloadHash,
+            missingResponseSentAt
+          });
+          continue;
+        }
+
+        console.error('ERROR_MARKING_EVENT_PROCESSED_PRIMARY', {
+          channel,
+          externalEventId,
+          strategy: candidate.label,
+          error
+        });
+        return;
       }
+
+      console.error('ERROR_MARKING_EVENT_PROCESSED_AFTER_FALLBACKS', {
+        channel,
+        externalEventId,
+        attemptedStrategies: candidates.map((candidate) => candidate.label)
+      });
     } catch (error) {
-      console.error('ERROR_MARKING_EVENT_PROCESSED:', error);
+      console.error('ERROR_MARKING_EVENT_PROCESSED_FATAL:', {
+        channel,
+        externalEventId,
+        error
+      });
     }
   }
 
@@ -304,7 +427,7 @@ class ConversationPersistenceService {
         if ('metadata' in payload && this.isMissingMetadataColumnError(error)) {
           const { metadata: _metadata, ...safePayload } = payload;
 
-          console.warn('SESSION_UPDATE_METADATA_SKIPPED', {
+          console.warn('SESSION_UPDATE_METADATA_SCHEMA_DRIFT', {
             sessionId,
             reason: 'metadata_column_missing'
           });
@@ -318,15 +441,25 @@ class ConversationPersistenceService {
             return;
           }
 
-          console.error('ERROR_UPDATING_SESSION_AFTER_METADATA_RETRY:', retryError);
+          console.error('ERROR_UPDATING_SESSION_SECONDARY_AFTER_METADATA_RETRY:', {
+            sessionId,
+            reason: 'metadata_column_missing',
+            error: retryError
+          });
           throw retryError;
         }
 
-        console.error('ERROR_UPDATING_SESSION:', error);
+        console.error('ERROR_UPDATING_SESSION_PRIMARY:', {
+          sessionId,
+          error
+        });
         throw error;
       }
     } catch (error) {
-      console.error('ERROR_UPDATING_SESSION:', error);
+      console.error('ERROR_UPDATING_SESSION_FATAL:', {
+        sessionId,
+        error
+      });
       throw error;
     }
   }
