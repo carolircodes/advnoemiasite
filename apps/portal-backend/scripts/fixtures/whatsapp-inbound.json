@@ -1,0 +1,25 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messages": [
+              {
+                "from": "5588999999999",
+                "id": "wamid.sample-phase65-001",
+                "timestamp": "1712956800",
+                "type": "text",
+                "text": {
+                  "body": "Quero entender meu caso de aposentadoria."
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

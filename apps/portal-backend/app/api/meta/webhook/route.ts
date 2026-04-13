@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   computeHmacSha256Hex,
+  shouldAllowShadowWebhookAcceptance,
   shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
+import { traceOperationalEvent } from "@/lib/observability/operational-trace";
+import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
 
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN?.trim();
@@ -18,13 +21,21 @@ function logEvent(
   data?: Record<string, unknown>,
   level: "info" | "warn" | "error" = "info"
 ) {
-  console.log(
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      event,
-      data: data ?? null
-    })
+  traceOperationalEvent(
+    level,
+    event,
+    {
+      service: "meta_webhook",
+      action: event.toLowerCase(),
+      eventId: typeof data?.eventId === "string" ? data.eventId : null,
+      sessionId: typeof data?.sessionId === "string" ? data.sessionId : null,
+      channel: "instagram",
+      pipelineId: typeof data?.pipelineId === "string" ? data.pipelineId : null,
+      decisionState: typeof data?.decisionState === "string" ? data.decisionState : null,
+      sendResult: typeof data?.sendResult === "string" ? data.sendResult : null,
+      handoffState: typeof data?.handoffState === "string" ? data.handoffState : null
+    },
+    data ?? {}
   );
 }
 
@@ -140,13 +151,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await assertOperationalSchemaCompatibility("meta_webhook");
+
     const rawBuffer = Buffer.from(await request.arrayBuffer());
     const signature = request.headers.get("x-hub-signature-256") || "";
     const signatureValid = APP_SECRET ? verifySignature(rawBuffer, signature) : false;
     const enforceSignature = shouldEnforceWebhookSignature("META_WEBHOOK_ENFORCE_SIGNATURE");
+    const allowShadowAcceptance = shouldAllowShadowWebhookAcceptance(
+      "META_WEBHOOK_ALLOW_SHADOW_SIGNATURE"
+    );
 
     if (!APP_SECRET) {
-      if (enforceSignature) {
+      if (!allowShadowAcceptance) {
         logEvent(
           "META_SIGNATURE_SECRET_MISSING",
           {
@@ -162,18 +178,20 @@ export async function POST(request: NextRequest) {
       }
 
       logEvent(
-        "META_SIGNATURE_VALIDATION_DISABLED",
+        "META_SIGNATURE_SHADOW_MODE",
         {
-          note: "INSTAGRAM_APP_SECRET/META_APP_SECRET is not configured. Signature validation is unavailable."
+          note: "Signature validation unavailable, but shadow mode was explicitly enabled.",
+          shadowMode: true
         },
         "warn"
       );
     } else if (!signatureValid) {
-      if (enforceSignature) {
+      if (enforceSignature || !allowShadowAcceptance) {
         logEvent(
           "META_SIGNATURE_INVALID_REJECTED",
           {
-            note: "Webhook rejected because the signature is invalid."
+            note: "Webhook rejected because the signature is invalid.",
+            shadowMode: allowShadowAcceptance
           },
           "warn"
         );
@@ -182,9 +200,10 @@ export async function POST(request: NextRequest) {
       }
 
       logEvent(
-        "META_SIGNATURE_INVALID_BUT_ACCEPTED",
+        "META_SIGNATURE_SHADOW_MODE",
         {
-          note: "Webhook kept in shadow validation mode to avoid operational interruption."
+          note: "Webhook kept in explicit shadow validation mode.",
+          shadowMode: true
         },
         "warn"
       );

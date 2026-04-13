@@ -19,6 +19,7 @@ import {
   buildTriageReport,
   buildUserFacingTriageSummary
 } from "./triage-report";
+import { traceOperationalEvent } from "../observability/operational-trace";
 
 type SupportedChannel = "instagram" | "whatsapp";
 type ConversationSource = "instagram_comment" | "instagram_dm" | "whatsapp_inbound";
@@ -130,13 +131,32 @@ function logRouterEvent(
   data: Record<string, unknown>,
   level: "info" | "warn" | "error" = "info"
 ) {
-  console.log(
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      event,
-      data
-    })
+  traceOperationalEvent(
+    level,
+    event,
+    {
+      service: "channel_router",
+      action: event.toLowerCase(),
+      eventId: typeof data.eventId === "string" ? data.eventId : null,
+      sessionId: typeof data.sessionId === "string" ? data.sessionId : null,
+      clientId: typeof data.clientId === "string" ? data.clientId : null,
+      channel: typeof data.channel === "string" ? data.channel : null,
+      pipelineId: typeof data.pipelineId === "string" ? data.pipelineId : null,
+      decisionState: typeof data.reason === "string" ? data.reason : null,
+      sendResult:
+        typeof data.replySent === "boolean"
+          ? data.replySent
+            ? "sent"
+            : "not_sent"
+          : null,
+      handoffState:
+        typeof data.handoffReason === "string"
+          ? data.handoffReason
+          : typeof data.handoffStatus === "string"
+            ? data.handoffStatus
+            : null
+    },
+    data
   );
 }
 

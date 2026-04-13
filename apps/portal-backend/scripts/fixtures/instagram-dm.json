@@ -1,0 +1,19 @@
+{
+  "object": "instagram",
+  "entry": [
+    {
+      "messaging": [
+        {
+          "sender": {
+            "id": "17841400000000000"
+          },
+          "timestamp": 1712956800000,
+          "message": {
+            "mid": "mid.sample-phase65-001",
+            "text": "Preciso falar sobre um desconto indevido."
+          }
+        }
+      ]
+    }
+  ]
+}

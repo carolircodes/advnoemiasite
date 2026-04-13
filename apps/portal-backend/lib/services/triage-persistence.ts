@@ -6,6 +6,7 @@
  */
 
 import { conversationPersistence, ConversationSession } from './conversation-persistence';
+import { isLegacySchemaFallbackAllowed } from "../schema/compatibility";
 
 export interface TriageData {
   // Bloco A - Tema Principal
@@ -197,6 +198,14 @@ class TriagePersistenceService {
             this.isMissingColumn(error, 'follow_up_ready')
           )
         ) {
+          if (!isLegacySchemaFallbackAllowed()) {
+            console.error('TRIAGE_SCHEMA_DRIFT_BLOCKED', {
+              sessionId,
+              reason: 'extended_triage_columns_missing'
+            });
+            throw error;
+          }
+
           console.warn('TRIAGE_SCHEMA_DRIFT_RETRY', {
             sessionId,
             reason: 'extended_triage_columns_missing'
@@ -253,6 +262,14 @@ class TriagePersistenceService {
             this.isMissingColumn(error, 'follow_up_ready')
           )
         ) {
+          if (!isLegacySchemaFallbackAllowed()) {
+            console.error('TRIAGE_SCHEMA_DRIFT_BLOCKED', {
+              sessionId,
+              reason: 'extended_triage_columns_missing'
+            });
+            throw error;
+          }
+
           console.warn('TRIAGE_SCHEMA_DRIFT_RETRY', {
             sessionId,
             reason: 'extended_triage_columns_missing'

@@ -9,6 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "validate:schema": "node scripts/check-schema-governance.mjs",
+    "validate:channels": "node scripts/channel-assisted-validation.mjs",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
     "notifications:process": "node scripts/process-notifications.mjs",
     "supabase:start": "npx supabase start",

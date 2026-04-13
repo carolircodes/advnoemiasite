@@ -1,6 +1,7 @@
 import { createWebhookSupabaseClient } from "../supabase/webhook";
 import { clientService } from "./client-service";
 import { clientIdentityService } from "./client-identity";
+import { isLegacySchemaFallbackAllowed } from "../schema/compatibility";
 
 export interface ConversationSession {
   id: string;
@@ -237,6 +238,18 @@ class ConversationPersistenceService {
             (missingExternalUserId || missingPayloadHash));
 
         if (isExpectedLegacyDrift) {
+          if (!isLegacySchemaFallbackAllowed()) {
+            console.error('PROCESSED_EVENT_SCHEMA_DRIFT_BLOCKED', {
+              channel,
+              externalEventId,
+              strategy: candidate.label,
+              missingExternalUserId,
+              missingPayloadHash,
+              missingResponseSentAt
+            });
+            throw error;
+          }
+
           console.warn('PROCESSED_EVENT_SCHEMA_DRIFT_RETRY', {
             channel,
             externalEventId,
@@ -425,6 +438,14 @@ class ConversationPersistenceService {
 
       if (error) {
         if ('metadata' in payload && this.isMissingMetadataColumnError(error)) {
+          if (!isLegacySchemaFallbackAllowed()) {
+            console.error('SESSION_UPDATE_METADATA_SCHEMA_DRIFT_BLOCKED', {
+              sessionId,
+              reason: 'metadata_column_missing'
+            });
+            throw error;
+          }
+
           const { metadata: _metadata, ...safePayload } = payload;
 
           console.warn('SESSION_UPDATE_METADATA_SCHEMA_DRIFT', {

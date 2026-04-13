@@ -21,10 +21,6 @@ export const config = {
     "/documentos/:path*",
     "/agenda/:path*",
     "/internal/:path*",
-    "/api/internal/:path*",
-    "/api/debug/:path*",
-    "/api/test/:path*",
-    "/api/meta/test",
-    "/api/whatsapp/webhook/test"
+    "/api/internal/:path*"
   ]
 };

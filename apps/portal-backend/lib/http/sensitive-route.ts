@@ -20,9 +20,7 @@ function getConfiguredSecret() {
 export function isSensitiveRoute(pathname: string) {
   return (
     pathname.startsWith("/api/debug/") ||
-    pathname.startsWith("/api/test/") ||
-    pathname === "/api/meta/test" ||
-    pathname === "/api/whatsapp/webhook/test"
+    pathname.startsWith("/api/test/")
   );
 }
 

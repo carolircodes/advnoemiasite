@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   computeHmacSha256Hex,
+  shouldAllowShadowWebhookAcceptance,
   shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
+import { traceOperationalEvent } from "@/lib/observability/operational-trace";
+import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
@@ -48,13 +51,21 @@ function logEvent(
   data?: Record<string, unknown>,
   level: "info" | "warn" | "error" = "info"
 ) {
-  console.log(
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      event,
-      data: data ?? null
-    })
+  traceOperationalEvent(
+    level,
+    event,
+    {
+      service: "whatsapp_webhook",
+      action: event.toLowerCase(),
+      eventId: typeof data?.eventId === "string" ? data.eventId : null,
+      sessionId: typeof data?.sessionId === "string" ? data.sessionId : null,
+      channel: "whatsapp",
+      pipelineId: typeof data?.pipelineId === "string" ? data.pipelineId : null,
+      decisionState: typeof data?.decisionState === "string" ? data.decisionState : null,
+      sendResult: typeof data?.sendResult === "string" ? data.sendResult : null,
+      handoffState: typeof data?.handoffState === "string" ? data.handoffState : null
+    },
+    data ?? {}
   );
 }
 
@@ -304,14 +315,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  await assertOperationalSchemaCompatibility("whatsapp_webhook");
+
   const signature = request.headers.get("x-hub-signature-256") || "";
   const body = await request.text();
   const enforceSignature = shouldEnforceWebhookSignature(
     "WHATSAPP_WEBHOOK_ENFORCE_SIGNATURE"
   );
+  const allowShadowAcceptance = shouldAllowShadowWebhookAcceptance(
+    "WHATSAPP_WEBHOOK_ALLOW_SHADOW_SIGNATURE"
+  );
 
   if (!APP_SECRET) {
-    if (enforceSignature) {
+    if (!allowShadowAcceptance) {
       logEvent(
         "WHATSAPP_SIGNATURE_SECRET_MISSING",
         {
@@ -329,21 +345,23 @@ export async function POST(request: NextRequest) {
     }
 
     logEvent(
-      "WHATSAPP_SIGNATURE_VALIDATION_DISABLED",
+      "WHATSAPP_SIGNATURE_SHADOW_MODE",
       {
-        note: "WHATSAPP_APP_SECRET/META_APP_SECRET is not configured. Signature validation is unavailable.",
+        note: "Signature validation unavailable, but shadow mode was explicitly enabled.",
         enforceSignature,
+        shadowMode: true,
         appSecretSource: APP_SECRET_SOURCE
       },
       "warn"
     );
   } else if (!verifySignature(body, signature)) {
-      if (enforceSignature) {
+      if (enforceSignature || !allowShadowAcceptance) {
         logEvent(
           "WHATSAPP_SIGNATURE_INVALID_REJECTED",
           {
             note: "Webhook rejected because the signature is invalid.",
             enforceSignature,
+            shadowMode: allowShadowAcceptance,
             appSecretSource: APP_SECRET_SOURCE
           },
           "warn"
@@ -353,10 +371,11 @@ export async function POST(request: NextRequest) {
       }
 
       logEvent(
-        "WHATSAPP_SIGNATURE_INVALID_BUT_ACCEPTED",
+        "WHATSAPP_SIGNATURE_SHADOW_MODE",
         {
-          note: "Webhook kept in shadow validation mode to avoid operational interruption.",
+          note: "Webhook kept in explicit shadow validation mode.",
           enforceSignature,
+          shadowMode: true,
           appSecretSource: APP_SECRET_SOURCE
         },
         "warn"
