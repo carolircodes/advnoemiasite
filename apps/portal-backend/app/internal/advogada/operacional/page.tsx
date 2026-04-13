@@ -75,6 +75,20 @@ interface OperationalContact {
     state: 'eligible' | 'queued' | 'cooldown' | 'idle';
     scheduledFor?: string;
   } | null;
+  conversationState: {
+    conversationStatus?: string;
+    triageStage?: string;
+    consultationStage?: string;
+    handoffReason?: string | null;
+    readyForLawyer: boolean;
+    schedulingPreferences?: {
+      channel?: string;
+      period?: string;
+      urgency?: string;
+      availability?: string;
+    } | null;
+    reportSummary?: string | null;
+  } | null;
   daysSinceLastContact: number;
   isOverdue: boolean;
   suggestedMessage?: {
@@ -615,6 +629,48 @@ export default function OperationalPanel() {
     }
   }
 
+  function formatConversationStateLabel(value?: string | null) {
+    switch (value) {
+      case 'ai_active':
+        return 'IA ativa';
+      case 'triage_in_progress':
+        return 'Triagem em andamento';
+      case 'consultation_offer':
+        return 'Consulta em condução';
+      case 'scheduling_in_progress':
+        return 'Agendamento em andamento';
+      case 'consultation_ready':
+        return 'Consulta pronta';
+      case 'handed_off_to_lawyer':
+        return 'Encaminhado à advogada';
+      default:
+        return 'Em acompanhamento';
+    }
+  }
+
+  function formatConsultationStageLabel(value?: string | null) {
+    switch (value) {
+      case 'not_offered':
+        return 'Consulta ainda não ofertada';
+      case 'offered':
+        return 'Consulta apresentada';
+      case 'interest_detected':
+        return 'Interesse detectado';
+      case 'collecting_availability':
+        return 'Coletando disponibilidade';
+      case 'availability_collected':
+        return 'Disponibilidade coletada';
+      case 'ready_for_lawyer':
+        return 'Pronta para ação da advogada';
+      case 'scheduled_pending_confirmation':
+        return 'Agendada / aguardando confirmação';
+      case 'forwarded_to_lawyer':
+        return 'Encaminhada à advogada';
+      default:
+        return 'Sem etapa registrada';
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -910,6 +966,48 @@ export default function OperationalPanel() {
                 {contact.latestSessionSummary ? (
                   <div className="mt-3 text-sm text-[#62726b]">
                     <span className="font-medium text-[#10261d]">Resumo:</span> {contact.latestSessionSummary}
+                  </div>
+                ) : null}
+
+                {contact.conversationState ? (
+                  <div className="mt-3 rounded-2xl border border-[#ece5d8] bg-[#f8f5ee] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Estado real da conversa
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <StatusChip tone={contact.conversationState.readyForLawyer ? 'green' : 'neutral'}>
+                        {formatConversationStateLabel(contact.conversationState.conversationStatus)}
+                      </StatusChip>
+                      <StatusChip tone="neutral">
+                        {formatConsultationStageLabel(contact.conversationState.consultationStage)}
+                      </StatusChip>
+                      {contact.conversationState.triageStage ? (
+                        <StatusChip tone="neutral">
+                          Triagem: {contact.conversationState.triageStage}
+                        </StatusChip>
+                      ) : null}
+                    </div>
+
+                    {contact.conversationState.schedulingPreferences?.availability ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Preferencia registrada:</span>{' '}
+                        {contact.conversationState.schedulingPreferences.availability}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.reportSummary ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Relatorio da triagem:</span>{' '}
+                        {contact.conversationState.reportSummary}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.handoffReason ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Motivo de handoff legitimo:</span>{' '}
+                        {contact.conversationState.handoffReason}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 

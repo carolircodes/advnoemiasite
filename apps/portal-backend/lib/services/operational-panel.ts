@@ -39,6 +39,20 @@ export interface OperationalContact {
   nextBestAction: OperationalNextBestAction;
   growthContext: GrowthContextByItem | null;
   automationPlan: CommercialAutomationPlan | null;
+  conversationState: {
+    conversationStatus?: string;
+    triageStage?: string;
+    consultationStage?: string;
+    handoffReason?: string | null;
+    readyForLawyer: boolean;
+    schedulingPreferences?: {
+      channel?: string;
+      period?: string;
+      urgency?: string;
+      availability?: string;
+    } | null;
+    reportSummary?: string;
+  } | null;
   daysSinceLastContact: number;
   isOverdue: boolean;
   suggestedMessage?: {
@@ -205,13 +219,20 @@ class OperationalPanel {
           sourceIntakeRequestId: client.source_intake_request_id
         }))
       );
+      const triageSummaryBySessionId = await this.getTriageSummaryBySessionId(
+        data
+          .flatMap((client) => client.conversation_sessions || [])
+          .map((session: { id?: string }) => session?.id)
+          .filter((value: string | undefined): value is string => Boolean(value))
+      );
 
       const contacts: OperationalContact[] = [];
 
       for (const client of data) {
         const operationalContact = await this.processOperationalContact(
           client,
-          growthContextByClient.get(client.id) || null
+          growthContextByClient.get(client.id) || null,
+          triageSummaryBySessionId
         );
         contacts.push(operationalContact);
       }
@@ -271,7 +292,8 @@ class OperationalPanel {
 
   private async processOperationalContact(
     client: any,
-    growthContext: GrowthContextByItem | null
+    growthContext: GrowthContextByItem | null,
+    triageSummaryBySessionId: Map<string, any>
   ): Promise<OperationalContact> {
     const pipeline = client.client_pipeline;
     const channels = client.client_channels || [];
@@ -303,6 +325,9 @@ class OperationalPanel {
     });
 
     const latestSession = sessions[0];
+    const latestTriageSummary = latestSession?.id
+      ? triageSummaryBySessionId.get(latestSession.id) || null
+      : null;
     const latestMessagePreview = latestSession
       ? this.getMessagePreview(latestSession.last_summary)
       : "";
@@ -344,10 +369,70 @@ class OperationalPanel {
       nextBestAction: priority.nextBestAction,
       growthContext,
       automationPlan: null,
+      conversationState: latestTriageSummary
+        ? {
+            conversationStatus:
+              latestTriageSummary.conversation_status ||
+              latestTriageSummary.triage_data?.conversation_status,
+            triageStage:
+              latestTriageSummary.triage_data?.triage_stage || null,
+            consultationStage:
+              latestTriageSummary.consultation_stage ||
+              latestTriageSummary.triage_data?.consultation_stage,
+            handoffReason: latestTriageSummary.handoff_reason || null,
+            readyForLawyer:
+              latestTriageSummary.conversation_status === "consultation_ready" ||
+              latestTriageSummary.consultation_stage === "ready_for_lawyer" ||
+              latestTriageSummary.triage_data?.consultation_stage === "ready_for_lawyer",
+            schedulingPreferences:
+              latestTriageSummary.triage_data?.scheduling_preferences || null,
+            reportSummary:
+              latestTriageSummary.report_data?.resumo_caso ||
+              latestTriageSummary.triage_data?.report?.resumo_caso ||
+              latestTriageSummary.user_friendly_summary ||
+              null
+          }
+        : null,
       daysSinceLastContact,
       isOverdue,
       suggestedMessage
     };
+  }
+
+  private async getTriageSummaryBySessionId(sessionIds: string[]) {
+    if (sessionIds.length === 0) {
+      return new Map<string, any>();
+    }
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    const primaryResult = await this.supabase
+      .from("noemia_triage_summaries")
+      .select(
+        "session_id, conversation_status, consultation_stage, handoff_reason, user_friendly_summary, triage_data, report_data"
+      )
+      .in("session_id", sessionIds);
+
+    data = primaryResult.data;
+    error = primaryResult.error;
+
+    if (error && String((error as { message?: unknown }).message || "").includes("column")) {
+      const legacyResult = await this.supabase
+        .from("noemia_triage_summaries")
+        .select("session_id, handoff_reason, user_friendly_summary, triage_data")
+        .in("session_id", sessionIds);
+
+      data = legacyResult.data;
+      error = legacyResult.error;
+    }
+
+    if (error) {
+      console.error("FOLLOW_UP_PANEL_TRIAGE_SUMMARY_ERROR", error);
+      return new Map<string, any>();
+    }
+
+    return new Map((data || []).map((item) => [item.session_id, item]));
   }
 
   private calculateOperationalPriority(input: {

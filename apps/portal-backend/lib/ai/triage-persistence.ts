@@ -42,7 +42,19 @@ export async function saveTriageData(
     
     // Metadados
     palavras_chave: conversationState.collectedData.palavras_chave,
-    completude: conversationState.triageCompleteness
+    completude: conversationState.triageCompleteness,
+    conversation_status: conversationState.conversationStatus,
+    triage_stage: conversationState.triageStage,
+    consultation_stage: conversationState.consultationStage,
+    scheduling_preferences: conversationState.contactPreferences,
+    handoff_policy: {
+      status: conversationState.readyForHandoff ? 'allowed' : 'blocked_as_premature',
+      allowed: conversationState.readyForHandoff,
+      blocked: !conversationState.readyForHandoff && conversationState.needsHumanAttention,
+      reason: conversationState.handoffReason || null,
+      legitimate: conversationState.readyForHandoff
+    },
+    report: buildStructuredReport(input, conversationState, classification)
   };
 
   // Extrair userId do metadata ou context
@@ -61,9 +73,61 @@ export async function saveTriageData(
       needsHumanAttention: conversationState.needsHumanAttention,
       handoffReason: conversationState.handoffReason,
       internalSummary: generateInternalSummary(conversationState),
-      userFriendlySummary: generateUserFriendlySummary(conversationState)
+      userFriendlySummary: generateUserFriendlySummary(conversationState),
+      conversationStatus: conversationState.conversationStatus,
+      consultationStage: conversationState.consultationStage,
+      reportData: triageData.report,
+      lawyerNotificationGenerated: conversationState.lawyerNotificationGenerated
     }
   );
+}
+
+function buildStructuredReport(
+  input: NoemiaCoreInput,
+  state: ConversationState,
+  classification: {
+    theme: string;
+    intent: string;
+    leadTemperature: string;
+  }
+) {
+  const data = state.collectedData;
+  const facts = [
+    data.problema_principal,
+    data.timeframe ? `Contexto temporal: ${data.timeframe}` : null,
+    data.tem_documentos !== undefined
+      ? data.tem_documentos
+        ? 'Informou que possui documentos/provas.'
+        : 'Ainda não confirmou documentos disponíveis.'
+      : null,
+    data.objetivo_cliente ? `Objetivo declarado: ${data.objetivo_cliente}` : null
+  ].filter(Boolean) as string[];
+
+  return {
+    resumo_caso:
+      data.problema_principal ||
+      'Caso ainda em organização inicial pela NoemIA.',
+    area_juridica: data.area || classification.theme || 'geral',
+    fatos_principais: facts,
+    problema_central: data.problema_principal || 'A definir na triagem',
+    cronologia: data.timeframe || 'Cronologia ainda em coleta',
+    sinais_urgencia:
+      data.nivel_urgencia && data.nivel_urgencia !== 'baixa'
+        ? [`Urgência ${data.nivel_urgencia}`]
+        : [],
+    documentos_mencionados: data.tipos_documentos || [],
+    documentos_pendentes:
+      data.tem_documentos === false ? ['Documentos ainda não enviados'] : [],
+    respostas_relevantes: data.palavras_chave || [],
+    nivel_interesse: state.leadTemperature,
+    status_consulta: state.consultationStage || 'not_offered',
+    preferencias_dia_horario: state.contactPreferences?.availability || '',
+    observacoes_livres: state.handoffReason || '',
+    canal_origem: input.channel,
+    pipeline_id:
+      typeof input.metadata?.pipelineId === 'string' ? input.metadata.pipelineId : null,
+    next_best_action: state.recommendedAction
+  };
 }
 
 function generateUserFriendlySummary(state: ConversationState): string {

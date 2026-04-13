@@ -1,0 +1,465 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.conversationPersistence = void 0;
+const webhook_1 = require("../supabase/webhook");
+const client_identity_1 = require("./client-identity");
+class ConversationPersistenceService {
+    constructor() {
+        this.supabase = (0, webhook_1.createWebhookSupabaseClient)();
+    }
+    isMissingMetadataColumnError(error) {
+        const message = error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error && 'message' in error
+                ? String(error.message || '')
+                : String(error);
+        return message.toLowerCase().includes("metadata") && message.toLowerCase().includes("column");
+    }
+    isMissingProcessedWebhookExternalUserIdColumn(error) {
+        const message = error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error && 'message' in error
+                ? String(error.message || '')
+                : String(error);
+        return (message.toLowerCase().includes("external_user_id") &&
+            message.toLowerCase().includes("column"));
+    }
+    isMissingProcessedWebhookPayloadHashColumn(error) {
+        const message = error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error && 'message' in error
+                ? String(error.message || '')
+                : String(error);
+        return message.toLowerCase().includes("payload_hash") && message.toLowerCase().includes("column");
+    }
+    isMissingProcessedWebhookResponseSentAtColumn(error) {
+        const message = error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error && 'message' in error
+                ? String(error.message || '')
+                : String(error);
+        return (message.toLowerCase().includes("response_sent_at") &&
+            message.toLowerCase().includes("column"));
+    }
+    isUniqueViolation(error) {
+        if (typeof error !== 'object' || !error) {
+            return false;
+        }
+        const code = 'code' in error ? String(error.code || '') : '';
+        return code === '23505';
+    }
+    // Método público para acessar supabase
+    get supabaseClient() {
+        return this.supabase;
+    }
+    // Verificar se evento já foi processado (idempotência)
+    async isEventProcessed(channel, externalEventId) {
+        try {
+            const { data, error } = await this.supabase
+                .from('processed_webhook_events')
+                .select('id')
+                .eq('channel', channel)
+                .eq('external_event_id', externalEventId)
+                .single();
+            if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+                console.error('ERROR_CHECKING_EVENT_PROCESSED:', error);
+                return false;
+            }
+            return !!data;
+        }
+        catch (error) {
+            console.error('ERROR_CHECKING_EVENT_PROCESSED:', error);
+            return false;
+        }
+    }
+    // Marcar evento como processado
+    async markEventProcessed(channel, externalEventId, externalMessageId, externalUserId, payloadHash, responseSentAt) {
+        try {
+            const payload = {
+                channel,
+                external_event_id: externalEventId,
+                external_message_id: externalMessageId,
+                external_user_id: externalUserId,
+                payload_hash: payloadHash || '',
+                response_sent_at: responseSentAt || new Date().toISOString()
+            };
+            const candidates = [
+                {
+                    label: 'full_payload',
+                    data: payload
+                },
+                {
+                    label: 'without_external_user_id',
+                    data: (() => {
+                        const { external_user_id: _externalUserId, ...safePayload } = payload;
+                        return safePayload;
+                    })()
+                },
+                {
+                    label: 'without_payload_hash',
+                    data: (() => {
+                        const { payload_hash: _payloadHash, ...safePayload } = payload;
+                        return safePayload;
+                    })()
+                },
+                {
+                    label: 'without_response_sent_at',
+                    data: (() => {
+                        const { response_sent_at: _responseSentAt, ...safePayload } = payload;
+                        return safePayload;
+                    })()
+                },
+                {
+                    label: 'minimal_legacy_payload',
+                    data: (() => {
+                        const { external_user_id: _externalUserId, payload_hash: _payloadHash, response_sent_at: _responseSentAt, ...safePayload } = payload;
+                        return safePayload;
+                    })()
+                }
+            ];
+            for (const candidate of candidates) {
+                const { error } = await this.supabase
+                    .from('processed_webhook_events')
+                    .insert(candidate.data);
+                if (!error) {
+                    if (candidate.label !== 'full_payload') {
+                        console.warn('PROCESSED_EVENT_MARKED_WITH_FALLBACK_PAYLOAD', {
+                            channel,
+                            externalEventId,
+                            strategy: candidate.label
+                        });
+                    }
+                    return;
+                }
+                if (this.isUniqueViolation(error)) {
+                    console.log('PROCESSED_EVENT_ALREADY_MARKED', {
+                        channel,
+                        externalEventId,
+                        strategy: candidate.label
+                    });
+                    return;
+                }
+                const missingExternalUserId = this.isMissingProcessedWebhookExternalUserIdColumn(error);
+                const missingPayloadHash = this.isMissingProcessedWebhookPayloadHashColumn(error);
+                const missingResponseSentAt = this.isMissingProcessedWebhookResponseSentAtColumn(error);
+                const isExpectedLegacyDrift = (candidate.label === 'full_payload' &&
+                    (missingExternalUserId || missingPayloadHash || missingResponseSentAt)) ||
+                    (candidate.label === 'without_external_user_id' &&
+                        (missingPayloadHash || missingResponseSentAt)) ||
+                    (candidate.label === 'without_payload_hash' &&
+                        (missingExternalUserId || missingResponseSentAt)) ||
+                    (candidate.label === 'without_response_sent_at' &&
+                        (missingExternalUserId || missingPayloadHash));
+                if (isExpectedLegacyDrift) {
+                    console.warn('PROCESSED_EVENT_SCHEMA_DRIFT_RETRY', {
+                        channel,
+                        externalEventId,
+                        strategy: candidate.label,
+                        missingExternalUserId,
+                        missingPayloadHash,
+                        missingResponseSentAt
+                    });
+                    continue;
+                }
+                console.error('ERROR_MARKING_EVENT_PROCESSED_PRIMARY', {
+                    channel,
+                    externalEventId,
+                    strategy: candidate.label,
+                    error
+                });
+                return;
+            }
+            console.error('ERROR_MARKING_EVENT_PROCESSED_AFTER_FALLBACKS', {
+                channel,
+                externalEventId,
+                attemptedStrategies: candidates.map((candidate) => candidate.label)
+            });
+        }
+        catch (error) {
+            console.error('ERROR_MARKING_EVENT_PROCESSED_FATAL:', {
+                channel,
+                externalEventId,
+                error
+            });
+        }
+    }
+    // Obter ou criar sessão de conversação (Fase 2.3 - Integrado com clientIdentityService)
+    async getOrCreateSession(channel, externalUserId, externalThreadId) {
+        try {
+            // Fase 2.2 - Para WhatsApp/Instagram, tratar como visitor/lead sem criar client
+            // Isso evita o erro de profile_id NOT NULL na tabela clients
+            let clientIdentity = null;
+            // Apenas tentar criar client para canais que não sejam WhatsApp/Instagram
+            // pois esses canais devem tratar usuários como visitors até conversão
+            if (channel !== 'whatsapp' && channel !== 'instagram') {
+                try {
+                    clientIdentity = await client_identity_1.clientIdentityService.getOrCreateClientAndChannel({
+                        channel,
+                        externalUserId,
+                        externalThreadId
+                    });
+                    console.log('CLIENT_IDENTITY_PROCESSED', {
+                        clientId: clientIdentity.client.id,
+                        channelId: clientIdentity.clientChannel.id,
+                        isNewClient: clientIdentity.isNewClient,
+                        isNewChannel: clientIdentity.isNewChannel,
+                        pipelineUpdated: clientIdentity.pipelineUpdated
+                    });
+                }
+                catch (identityError) {
+                    console.error('CLIENT_IDENTITY_ERROR', identityError);
+                    // Continuar sem client_id para não quebrar o fluxo
+                }
+            }
+            else {
+                console.log('VISITOR_FLOW_SKIP_CLIENT_CREATION', {
+                    channel,
+                    externalUserId,
+                    reason: 'WhatsApp/Instagram users treated as visitors until conversion'
+                });
+            }
+            // Tentar encontrar sessão existente
+            const { data: existingSession, error: findError } = await this.supabase
+                .from('conversation_sessions')
+                .select('*')
+                .eq('channel', channel)
+                .eq('external_user_id', externalUserId)
+                .single();
+            if (findError && findError.code !== 'PGRST116') { // PGRST116 = not found
+                console.error('ERROR_FINDING_SESSION:', findError);
+            }
+            if (existingSession) {
+                // Fase 2.3 - Se sessão existe mas não tem client_id, vincular agora (apenas para não WhatsApp/Instagram)
+                // WhatsApp/Instagram devem permanecer como visitors até conversão manual
+                if (!existingSession.client_id && clientIdentity && channel !== 'whatsapp' && channel !== 'instagram') {
+                    try {
+                        await client_identity_1.clientIdentityService.linkClientToSession(existingSession.id, clientIdentity.client.id);
+                        // Atualizar objeto local com client_id
+                        existingSession.client_id = clientIdentity.client.id;
+                        console.log('CLIENT_LINKED_TO_EXISTING_SESSION', {
+                            sessionId: existingSession.id,
+                            clientId: clientIdentity.client.id,
+                            channel,
+                            externalUserId
+                        });
+                    }
+                    catch (linkError) {
+                        console.error('ERROR_LINKING_CLIENT_TO_EXISTING_SESSION', linkError);
+                        // Continuar sem client_id para não quebrar o fluxo
+                    }
+                }
+                else if (channel === 'whatsapp' || channel === 'instagram') {
+                    console.log('VISITOR_SESSION_MAINTAINED', {
+                        sessionId: existingSession.id,
+                        channel,
+                        externalUserId,
+                        reason: 'WhatsApp/Instagram session maintained without client_id'
+                    });
+                }
+                return existingSession;
+            }
+            // Criar nova sessão
+            let newSessionData = {
+                channel,
+                external_user_id: externalUserId,
+                external_thread_id: externalThreadId,
+                lead_stage: 'initial'
+            };
+            // Fase 2.3 - Apenas vincular client_id para canais que não são WhatsApp/Instagram
+            // WhatsApp/Instagram permanecem como visitors até conversão
+            if (clientIdentity && channel !== 'whatsapp' && channel !== 'instagram') {
+                newSessionData.client_id = clientIdentity.client.id;
+                console.log('CLIENT_LINKED_TO_NEW_SESSION', {
+                    clientId: clientIdentity.client.id,
+                    channelId: clientIdentity.clientChannel.id,
+                    channel,
+                    externalUserId
+                });
+            }
+            else if (channel === 'whatsapp' || channel === 'instagram') {
+                console.log('VISITOR_SESSION_CREATED', {
+                    channel,
+                    externalUserId,
+                    reason: 'WhatsApp/Instagram session created without client_id'
+                });
+            }
+            const { data: newSession, error: createError } = await this.supabase
+                .from('conversation_sessions')
+                .insert(newSessionData)
+                .select()
+                .single();
+            if (createError) {
+                console.error('ERROR_CREATING_SESSION:', createError);
+                throw createError;
+            }
+            console.log('CONVERSATION_SESSION_CREATED', {
+                channel,
+                externalUserId,
+                sessionId: newSession.id,
+                clientId: newSession.client_id
+            });
+            return newSession;
+        }
+        catch (error) {
+            console.error('ERROR_GET_OR_CREATE_SESSION:', error);
+            throw error;
+        }
+    }
+    // Atualizar sessão com informações da conversação
+    async updateSession(sessionId, updates) {
+        try {
+            const payload = {
+                ...updates,
+                updated_at: new Date().toISOString()
+            };
+            const { error } = await this.supabase
+                .from('conversation_sessions')
+                .update(payload)
+                .eq('id', sessionId);
+            if (error) {
+                if ('metadata' in payload && this.isMissingMetadataColumnError(error)) {
+                    const { metadata: _metadata, ...safePayload } = payload;
+                    console.warn('SESSION_UPDATE_METADATA_SCHEMA_DRIFT', {
+                        sessionId,
+                        reason: 'metadata_column_missing'
+                    });
+                    const { error: retryError } = await this.supabase
+                        .from('conversation_sessions')
+                        .update(safePayload)
+                        .eq('id', sessionId);
+                    if (!retryError) {
+                        return;
+                    }
+                    console.error('ERROR_UPDATING_SESSION_SECONDARY_AFTER_METADATA_RETRY:', {
+                        sessionId,
+                        reason: 'metadata_column_missing',
+                        error: retryError
+                    });
+                    throw retryError;
+                }
+                console.error('ERROR_UPDATING_SESSION_PRIMARY:', {
+                    sessionId,
+                    error
+                });
+                throw error;
+            }
+        }
+        catch (error) {
+            console.error('ERROR_UPDATING_SESSION_FATAL:', {
+                sessionId,
+                error
+            });
+            throw error;
+        }
+    }
+    // Salvar mensagem da conversação
+    async saveMessage(sessionId, externalMessageId, role, content, direction, metadata) {
+        try {
+            const { error } = await this.supabase
+                .from('conversation_messages')
+                .insert({
+                session_id: sessionId,
+                external_message_id: externalMessageId,
+                role,
+                content,
+                direction,
+                metadata_json: metadata || {}
+            });
+            if (error) {
+                console.error('ERROR_SAVING_MESSAGE:', error);
+                throw error;
+            }
+        }
+        catch (error) {
+            console.error('ERROR_SAVING_MESSAGE:', error);
+            throw error;
+        }
+    }
+    // Obter histórico de mensagens recentes
+    async getRecentMessages(sessionId, limit = 20) {
+        try {
+            const { data, error } = await this.supabase
+                .from('conversation_messages')
+                .select('*')
+                .eq('session_id', sessionId)
+                .order('created_at', { ascending: false })
+                .limit(limit);
+            if (error) {
+                console.error('ERROR_GETTING_RECENT_MESSAGES:', error);
+                return [];
+            }
+            return data || [];
+        }
+        catch (error) {
+            console.error('ERROR_GETTING_RECENT_MESSAGES:', error);
+            return [];
+        }
+    }
+    // Verificar se houve resposta recente (anti-spam)
+    async hasRecentResponse(sessionId, secondsThreshold = 15) {
+        try {
+            const cutoffTime = new Date(Date.now() - secondsThreshold * 1000).toISOString();
+            const { data, error } = await this.supabase
+                .from('conversation_messages')
+                .select('id')
+                .eq('session_id', sessionId)
+                .eq('direction', 'outbound')
+                .gte('created_at', cutoffTime)
+                .limit(1);
+            if (error) {
+                console.error('ERROR_CHECKING_RECENT_RESPONSE:', error);
+                return false;
+            }
+            return (data?.length || 0) > 0;
+        }
+        catch (error) {
+            console.error('ERROR_CHECKING_RECENT_RESPONSE:', error);
+            return false;
+        }
+    }
+    // Gerar resumo automático da conversação
+    async generateConversationSummary(sessionId, messages) {
+        try {
+            // Se tiver poucas mensagens, não precisa resumir
+            if (messages.length <= 6) {
+                return '';
+            }
+            // Extrair as mensagens mais recentes para contexto
+            const recentMessages = messages
+                .slice(0, 8)
+                .reverse()
+                .map(msg => `${msg.role}: ${msg.content}`)
+                .join('\n');
+            // Gerar resumo simples baseado em palavras-chave
+            const userMessages = messages.filter(msg => msg.role === 'user');
+            const lastUserMessage = userMessages[0]?.content || '';
+            // Detectar área jurídica baseada nas mensagens
+            const text = userMessages.map(msg => msg.content).join(' ').toLowerCase();
+            let detectedArea = 'geral';
+            if (text.includes('aposentadoria') || text.includes('inss') || text.includes('benefício')) {
+                detectedArea = 'previdenciário';
+            }
+            else if (text.includes('banco') || text.includes('empréstimo') || text.includes('cobrança')) {
+                detectedArea = 'bancário';
+            }
+            else if (text.includes('divórcio') || text.includes('pensão') || text.includes('guarda')) {
+                detectedArea = 'família';
+            }
+            else if (text.includes('contrato') || text.includes('dano') || text.includes('indenização')) {
+                detectedArea = 'civil';
+            }
+            const summary = `Cliente com caso aparentemente na área ${detectedArea}. Última mensagem: "${lastUserMessage.substring(0, 100)}${lastUserMessage.length > 100 ? '...' : ''}"`;
+            // Atualizar resumo na sessão
+            await this.updateSession(sessionId, {
+                last_summary: summary,
+                case_area: detectedArea
+            });
+            return summary;
+        }
+        catch (error) {
+            console.error('ERROR_GENERATING_SUMMARY:', error);
+            return '';
+        }
+    }
+}
+exports.conversationPersistence = new ConversationPersistenceService();

@@ -1670,6 +1670,33 @@ export interface ConversationState {
   commercialMomentDetected: boolean;
   sessionId: string;
   handoffReason?: string;
+  conversationStatus?:
+    | "ai_active"
+    | "triage_in_progress"
+    | "consultation_offer"
+    | "scheduling_in_progress"
+    | "consultation_ready"
+    | "handed_off_to_lawyer"
+    | "human_followup_pending"
+    | "closed"
+    | "archived";
+  triageStage?:
+    | "not_started"
+    | "collecting_context"
+    | "area_identified"
+    | "details_in_progress"
+    | "urgency_assessed"
+    | "completed";
+  consultationStage?:
+    | "not_offered"
+    | "offered"
+    | "interest_detected"
+    | "collecting_availability"
+    | "availability_collected"
+    | "ready_for_lawyer"
+    | "scheduled_pending_confirmation"
+    | "forwarded_to_lawyer";
+  lawyerNotificationGenerated?: boolean;
   // Handoff e Agendamento
   contactPreferences?: {
     channel: 'whatsapp' | 'ligacao' | 'consulta_online' | 'email';
@@ -1696,6 +1723,10 @@ function initializeConversationState(): ConversationState {
     commercialMomentDetected: false,
     sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     handoffReason: undefined,
+    conversationStatus: "ai_active",
+    triageStage: "not_started",
+    consultationStage: "not_offered",
+    lawyerNotificationGenerated: false,
     contactPreferences: undefined,
     commercialStatus: undefined,
     handoffPackage: undefined,
@@ -1711,6 +1742,7 @@ function updateConversationState(
     leadTemperature: LeadTemperature;
   }
 ): ConversationState {
+  const lowerMessage = message.toLowerCase();
   const newState: ConversationState = {
     ...state,
     collectedData: {
@@ -1787,6 +1819,59 @@ function updateConversationState(
       break;
 
   }
+
+  newState.triageCompleteness = calculateTriageCompleteness(newState.collectedData);
+
+  const policyLeadScoreResult = calculateLeadScore(newState, message);
+  newState.leadTemperature = policyLeadScoreResult.temperature;
+  newState.conversionScore = policyLeadScoreResult.score;
+  newState.priorityLevel = policyLeadScoreResult.priorityLevel;
+  newState.recommendedAction = policyLeadScoreResult.recommendedAction;
+  newState.commercialMomentDetected = policyLeadScoreResult.commercialMomentDetected;
+  newState.isHotLead =
+    policyLeadScoreResult.temperature === 'hot' ||
+    newState.collectedData.nivel_urgencia === 'alta' ||
+    (newState.collectedData.prejuizo_ativo === true);
+
+  const extractedPreferences = extractContactPreferences(message);
+  const hasNewPreferences =
+    extractedPreferences.channel ||
+    extractedPreferences.period ||
+    extractedPreferences.urgency ||
+    extractedPreferences.availability;
+
+  if (hasNewPreferences) {
+    newState.contactPreferences = {
+      channel: extractedPreferences.channel ?? newState.contactPreferences?.channel ?? 'whatsapp',
+      period: extractedPreferences.period ?? newState.contactPreferences?.period ?? 'qualquer_horario',
+      urgency: extractedPreferences.urgency ?? newState.contactPreferences?.urgency ?? 'sem_urgencia',
+      availability:
+        extractedPreferences.availability ||
+        newState.contactPreferences?.availability ||
+        message.trim()
+    };
+  }
+
+  const consultationIntentDetected =
+    classification.intent === "appointment_interest" ||
+    lowerMessage.includes("consulta") ||
+    lowerMessage.includes("agendar") ||
+    lowerMessage.includes("horario") ||
+    lowerMessage.includes("horário") ||
+    lowerMessage.includes("manha") ||
+    lowerMessage.includes("manhã") ||
+    lowerMessage.includes("tarde") ||
+    lowerMessage.includes("noite");
+
+  newState.triageStage = derivePolicyConversationTriageStage(newState);
+  newState.consultationStage = derivePolicyConsultationStage(newState, consultationIntentDetected);
+  newState.commercialStatus = determineCommercialStatus(newState) as ConversationState["commercialStatus"];
+  newState.conversationStatus = determineConversationStatus(newState);
+
+  const policyHandoffDecision = evaluatePolicyHandoff(newState, lowerMessage);
+  newState.needsHumanAttention = policyHandoffDecision.needsAttention;
+  newState.readyForHandoff = policyHandoffDecision.readyForHandoff;
+  newState.handoffReason = policyHandoffDecision.reason || undefined;
 
   return newState;
 }
@@ -1911,6 +1996,106 @@ function calculateTriageCompleteness(data: ConversationState['collectedData']): 
   return Math.round((completedFields / fields.length) * 100);
 }
 
+function derivePolicyConversationTriageStage(
+  state: ConversationState
+): NonNullable<ConversationState["triageStage"]> {
+  if (state.triageCompleteness >= 80) {
+    return "completed";
+  }
+
+  if (state.collectedData.nivel_urgencia) {
+    return "urgency_assessed";
+  }
+
+  if (
+    state.collectedData.problema_principal ||
+    state.collectedData.timeframe ||
+    state.collectedData.tem_documentos !== undefined
+  ) {
+    return "details_in_progress";
+  }
+
+  if (state.collectedData.area) {
+    return "area_identified";
+  }
+
+  return "collecting_context";
+}
+
+function derivePolicyConsultationStage(
+  state: ConversationState,
+  consultationIntentDetected: boolean
+): NonNullable<ConversationState["consultationStage"]> {
+  const hasAvailability =
+    Boolean(state.contactPreferences?.availability) ||
+    Boolean(state.contactPreferences?.period) ||
+    Boolean(state.contactPreferences?.urgency);
+
+  if (state.commercialStatus === 'consultation_scheduled') {
+    return 'scheduled_pending_confirmation';
+  }
+
+  if (state.triageCompleteness >= 70 && hasAvailability) {
+    return 'ready_for_lawyer';
+  }
+
+  if (hasAvailability) {
+    return 'availability_collected';
+  }
+
+  if (consultationIntentDetected) {
+    return state.triageCompleteness >= 55 ? 'collecting_availability' : 'interest_detected';
+  }
+
+  if (state.commercialMomentDetected || state.recommendedAction === 'schedule_consultation') {
+    return 'offered';
+  }
+
+  return 'not_offered';
+}
+
+function evaluatePolicyHandoff(
+  state: ConversationState,
+  normalizedMessage: string
+): { needsAttention: boolean; readyForHandoff: boolean; reason: string } {
+  const severeOperationalException =
+    (state.collectedData.nivel_urgencia === 'alta' &&
+      state.collectedData.prejuizo_ativo === true &&
+      (normalizedMessage.includes('agora') ||
+        normalizedMessage.includes('urgente') ||
+        normalizedMessage.includes('imediato'))) ||
+    normalizedMessage.includes('prisao') ||
+    normalizedMessage.includes('prisão') ||
+    normalizedMessage.includes('violencia') ||
+    normalizedMessage.includes('violência') ||
+    normalizedMessage.includes('medida protetiva');
+
+  if (severeOperationalException) {
+    return {
+      needsAttention: true,
+      readyForHandoff: true,
+      reason: 'Excecao_operacional_com_urgencia_real'
+    };
+  }
+
+  if (
+    state.consultationStage === 'ready_for_lawyer' ||
+    state.consultationStage === 'scheduled_pending_confirmation'
+  ) {
+    return {
+      needsAttention: true,
+      readyForHandoff: true,
+      reason: 'Consulta_pronta_para_advogada'
+    };
+  }
+
+  return {
+    needsAttention: false,
+    readyForHandoff: false,
+    reason: ''
+  };
+}
+
 function evaluateHandoff(state: ConversationState): { needsAttention: boolean; reason: string } {
   // Critérios para handoff humano
   if (state.isHotLead) {
@@ -1988,15 +2173,53 @@ function generateHandoffPackage(state: ConversationState, lastMessage: string): 
 }
 
 function determineCommercialStatus(state: ConversationState): string {
-  if (state.readyForHandoff && state.leadTemperature === 'hot') {
-    return 'awaiting_human_contact';
+  if (state.consultationStage === 'scheduled_pending_confirmation') {
+    return 'consultation_scheduled';
   }
-  if (state.readyForHandoff && state.leadTemperature === 'warm') {
+  if (state.consultationStage === 'ready_for_lawyer' || state.readyForHandoff) {
     return 'qualified';
   }
-  if (state.commercialMomentDetected) {
+  if (
+    state.consultationStage === 'availability_collected' ||
+    state.consultationStage === 'collecting_availability' ||
+    state.consultationStage === 'interest_detected' ||
+    state.consultationStage === 'offered' ||
+    state.commercialMomentDetected
+  ) {
     return 'consultation_proposed';
   }
+  return 'triage_in_progress';
+}
+
+function determineConversationStatus(
+  state: ConversationState
+): NonNullable<ConversationState["conversationStatus"]> {
+  if (state.consultationStage === 'scheduled_pending_confirmation') {
+    return 'handed_off_to_lawyer';
+  }
+
+  if (state.consultationStage === 'ready_for_lawyer') {
+    return 'consultation_ready';
+  }
+
+  if (
+    state.consultationStage === 'availability_collected' ||
+    state.consultationStage === 'collecting_availability'
+  ) {
+    return 'scheduling_in_progress';
+  }
+
+  if (
+    state.consultationStage === 'interest_detected' ||
+    state.consultationStage === 'offered'
+  ) {
+    return 'consultation_offer';
+  }
+
+  if (state.triageStage === 'not_started') {
+    return 'ai_active';
+  }
+
   return 'triage_in_progress';
 }
 
@@ -2030,7 +2253,7 @@ function generateConversionMessage(state: ConversationState): string {
   if (temperature === 'hot' && score >= 70) {
     // LEAD QUENTE - Encaminhamento direto
     if (action === 'schedule_consultation') {
-      return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente precisa de atenção especializada e rápida.\n\nO que poucos entendem é que cada dia de espera pode impactar diretamente seu resultado. Vou organizar tudo para a Dra. Noêmia analisar seu caso com prioridade máxima.\n\nGeralmente casos como o seu têm solução mais rápida do que imaginamos. Você prefere agendar uma consulta online ainda hoje ou falar primeiro com a equipe por WhatsApp?`;
+      return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente pede uma análise especializada e cuidadosa.\n\nO próximo passo ideal é organizarmos sua consulta com a Dra. Noêmia, porque aí conseguimos olhar o caso com profundidade e te orientar com segurança.\n\nPara eu deixar isso pronto sem perder o ritmo da conversa, qual dia ou turno costuma funcionar melhor para você?`;
     }
     if (action === 'human_handoff') {
       return `Compreendo completamente a urgência e complexidade do seu caso. Situações como a sua exigem análise humana especializada imediata.\n\nVou encaminhar seu caso diretamente para a equipe da Dra. Noêmia com prioridade máxima. Você receberá contato em até 2 horas úteis.\n\nEnquanto isso, se houver algum agravamento da situação, me avise imediatamente.`;
@@ -2039,7 +2262,7 @@ function generateConversionMessage(state: ConversationState): string {
   
   if (temperature === 'warm' && score >= 45) {
     // LEAD MORNO - Condução qualificada
-    return `Excelente! Já estou entendendo bem seu cenário. Vejo que seu caso tem potencial e merece uma análise cuidadosa.\n\nPara te dar a orientação mais precisa possível, sugiro avançarmos para uma consulta individual. Cada caso tem particularidades que só uma análise detalhada pode revelar.\n\nPosso já organizar uma conversa com a Dra. Noêmia para avaliar suas opções reais?`;
+    return `Excelente! Já estou entendendo bem seu cenário. Vejo que seu caso merece uma análise cuidadosa.\n\nPara te orientar com precisão, o melhor caminho é avançarmos para a consulta individual. Cada caso tem detalhes que só uma análise mais profunda revela.\n\nSe fizer sentido para você, posso já organizar isso agora. Qual dia ou horário costuma ser melhor?`;
   }
   
   if (temperature === 'cold' && score >= 25) {
@@ -2371,7 +2594,8 @@ function buildSystemPrompt(
       "- pode usar emoji com moderação, quando ajudar a acolher",
       "- reconheça primeiro o que a pessoa disse antes de fazer a próxima pergunta",
       "- faça uma pergunta por vez quando a conversa estiver no início",
-      "- se houver intenção clara de consulta, agendamento, endereço ou falar com a advogada, não prolongue a triagem",
+      "- se houver intenção clara de consulta, agendamento, endereço ou falar com a advogada, continue conduzindo a triagem e organize o agendamento antes do handoff humano",
+      "- colete preferência de dia, turno, horário e canal de contato antes de encerrar o atendimento inicial",
     ],
     instagram: [
       "CANAL: Instagram",
@@ -2383,7 +2607,7 @@ function buildSystemPrompt(
       "- deixar claro que é assistente virtual que ajuda a organizar o atendimento",
       "- reconheça o contexto do comentário ou da DM de forma natural, sem repetir mecanicamente",
       "- faça uma pergunta curta por vez",
-      "- se a pessoa pedir consulta, endereço, WhatsApp ou quiser seguir no atendimento real, priorize encaminhamento",
+      "- se a pessoa pedir consulta, endereço, WhatsApp ou quiser seguir no atendimento real, organize as informações mínimas e avance até o momento correto do encaminhamento",
     ],
     site: [
       "CANAL: Site",
@@ -2471,8 +2695,10 @@ function buildSystemPrompt(
     "- não despeje link cedo demais",
     "- quando enviar material, explique em uma frase por que ele ajuda e continue com uma pergunta curta",
     "- se a pessoa perguntar endereço/local de consulta, explique com naturalidade que esse alinhamento é feito no agendamento com a advogada",
-    "- se a pessoa quiser marcar consulta, falar com a advogada, pedir WhatsApp ou seguir com atendimento real, priorize encaminhamento para WhatsApp 5584998566004",
-    "- nesses casos, não prolongue a triagem com perguntas desnecessárias",
+    "- se a pessoa quiser marcar consulta, falar com a advogada, pedir WhatsApp ou seguir com atendimento real, não encerre a conversa cedo: organize o caso, confirme interesse e colete disponibilidade",
+    "- nesses casos, avance para a consulta de forma objetiva, mas só faça handoff humano quando a consulta estiver pronta para ação",
+    "- antes do handoff, tente coletar melhor dia, melhor turno, melhor horário, urgência e preferência de contato",
+    "- nunca use handoff humano como atalho padrão de resposta",
     "",
     "EXEMPLO DE TOM BOM:",
     "Usuário: 'sou autista e quero saber se posso me aposentar'",

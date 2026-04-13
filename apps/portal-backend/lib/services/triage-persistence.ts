@@ -34,6 +34,40 @@ export interface TriageData {
   // Metadados
   palavras_chave?: string[];
   completude?: number;
+  conversation_status?: string;
+  triage_stage?: string;
+  consultation_stage?: string;
+  scheduling_preferences?: {
+    channel?: string;
+    period?: string;
+    urgency?: string;
+    availability?: string;
+  };
+  handoff_policy?: {
+    status?: string;
+    allowed?: boolean;
+    blocked?: boolean;
+    reason?: string | null;
+    legitimate?: boolean;
+  };
+  report?: {
+    resumo_caso?: string;
+    area_juridica?: string;
+    fatos_principais?: string[];
+    problema_central?: string;
+    cronologia?: string;
+    sinais_urgencia?: string[];
+    documentos_mencionados?: string[];
+    documentos_pendentes?: string[];
+    respostas_relevantes?: string[];
+    nivel_interesse?: string;
+    status_consulta?: string;
+    preferencias_dia_horario?: string;
+    observacoes_livres?: string;
+    canal_origem?: string;
+    pipeline_id?: string | null;
+    next_best_action?: string;
+  };
 }
 
 export interface TriageSummary {
@@ -53,6 +87,17 @@ export interface TriageSummary {
 class TriagePersistenceService {
   private supabase = conversationPersistence.supabaseClient;
 
+  private isMissingColumn(error: unknown, column: string) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message || '')
+          : String(error);
+
+    return message.toLowerCase().includes(column.toLowerCase()) && message.toLowerCase().includes('column');
+  }
+
   /**
    * Salvar ou atualizar dados da triagem
    */
@@ -67,6 +112,10 @@ class TriagePersistenceService {
       handoffReason?: string;
       internalSummary: string;
       userFriendlySummary: string;
+      conversationStatus?: string;
+      consultationStage?: string;
+      reportData?: Record<string, unknown>;
+      lawyerNotificationGenerated?: boolean;
     }
   ): Promise<TriageSummary> {
     try {
@@ -94,6 +143,10 @@ class TriagePersistenceService {
         handoff_reason: metadata.handoffReason || null,
         internal_summary: metadata.internalSummary,
         user_friendly_summary: metadata.userFriendlySummary,
+        conversation_status: metadata.conversationStatus || triageData.conversation_status || null,
+        consultation_stage: metadata.consultationStage || triageData.consultation_stage || null,
+        report_data: metadata.reportData || triageData.report || {},
+        lawyer_notification_generated: metadata.lawyerNotificationGenerated ?? false,
         updated_at: now,
         ...(existingData ? {} : { created_at: now })
       };
@@ -101,12 +154,45 @@ class TriagePersistenceService {
       let result;
       if (existingData) {
         // Atualizar registro existente
-        const { data, error } = await this.supabase
+        let { data, error } = await this.supabase
           .from('noemia_triage_summaries')
           .update(summaryData)
           .eq('session_id', sessionId)
           .select()
           .single();
+
+        if (
+          error &&
+          (
+            this.isMissingColumn(error, 'conversation_status') ||
+            this.isMissingColumn(error, 'consultation_stage') ||
+            this.isMissingColumn(error, 'report_data') ||
+            this.isMissingColumn(error, 'lawyer_notification_generated')
+          )
+        ) {
+          console.warn('TRIAGE_SCHEMA_DRIFT_RETRY', {
+            sessionId,
+            reason: 'extended_triage_columns_missing'
+          });
+
+          const {
+            conversation_status: _conversationStatus,
+            consultation_stage: _consultationStage,
+            report_data: _reportData,
+            lawyer_notification_generated: _lawyerNotificationGenerated,
+            ...legacySummaryData
+          } = summaryData;
+
+          const retryResult = await this.supabase
+            .from('noemia_triage_summaries')
+            .update(legacySummaryData)
+            .eq('session_id', sessionId)
+            .select()
+            .single();
+
+          data = retryResult.data;
+          error = retryResult.error;
+        }
 
         if (error) {
           console.error('ERROR_UPDATING_TRIAGE:', error);
@@ -115,11 +201,43 @@ class TriagePersistenceService {
         result = data;
       } else {
         // Criar novo registro
-        const { data, error } = await this.supabase
+        let { data, error } = await this.supabase
           .from('noemia_triage_summaries')
           .insert(summaryData)
           .select()
           .single();
+
+        if (
+          error &&
+          (
+            this.isMissingColumn(error, 'conversation_status') ||
+            this.isMissingColumn(error, 'consultation_stage') ||
+            this.isMissingColumn(error, 'report_data') ||
+            this.isMissingColumn(error, 'lawyer_notification_generated')
+          )
+        ) {
+          console.warn('TRIAGE_SCHEMA_DRIFT_RETRY', {
+            sessionId,
+            reason: 'extended_triage_columns_missing'
+          });
+
+          const {
+            conversation_status: _conversationStatus,
+            consultation_stage: _consultationStage,
+            report_data: _reportData,
+            lawyer_notification_generated: _lawyerNotificationGenerated,
+            ...legacySummaryData
+          } = summaryData;
+
+          const retryResult = await this.supabase
+            .from('noemia_triage_summaries')
+            .insert(legacySummaryData)
+            .select()
+            .single();
+
+          data = retryResult.data;
+          error = retryResult.error;
+        }
 
         if (error) {
           console.error('ERROR_CREATING_TRIAGE:', error);
