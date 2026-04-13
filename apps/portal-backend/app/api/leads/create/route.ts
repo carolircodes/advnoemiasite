@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { 
   extractAcquisitionParams, 
   createAcquisitionContext, 
@@ -10,7 +10,7 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminSupabaseClient();
     
     const body = await request.json();
     const { name, email, phone, message, ...otherData } = body;
