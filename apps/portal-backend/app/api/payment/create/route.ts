@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
+import {
+  amountCentsToDecimal,
+  buildCheckoutPaymentMethods,
+  normalizePhoneNumber,
+  resolvePaymentPricing
+} from "@/lib/payment/pricing";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 type PaymentCreateContext = {
@@ -69,6 +75,43 @@ function extractLeadIdFromExternalReference(externalReference: string | null) {
   return match?.[2] || null;
 }
 
+type PersistedPaymentRecord = {
+  amount?: number | null;
+  payment_url?: string | null;
+  external_id?: string | null;
+  price_source?: string | null;
+  final_amount_cents?: number | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+function shouldReusePendingPayment(
+  pendingPayment: PersistedPaymentRecord | null,
+  resolvedPricing: ReturnType<typeof resolvePaymentPricing>,
+  offerCode: string
+) {
+  if (!pendingPayment) {
+    return false;
+  }
+
+  const paymentMetadata = pendingPayment.metadata || {};
+  const metadataFinalAmount =
+    typeof paymentMetadata.final_amount_cents === "number"
+      ? paymentMetadata.final_amount_cents
+      : null;
+  const metadataOfferCode =
+    typeof paymentMetadata.offer_code === "string" ? paymentMetadata.offer_code : null;
+  const metadataPriceSource =
+    typeof paymentMetadata.price_source === "string" ? paymentMetadata.price_source : null;
+  const pendingFinalAmountCents = pendingPayment.final_amount_cents ?? metadataFinalAmount;
+  const pendingPriceSource = pendingPayment.price_source ?? metadataPriceSource;
+
+  return (
+    pendingFinalAmountCents === resolvedPricing.finalAmountCents &&
+    metadataOfferCode === offerCode &&
+    pendingPriceSource === resolvedPricing.priceSource
+  );
+}
+
 export async function POST(request: NextRequest) {
   const context = getPaymentCreateContext();
 
@@ -86,6 +129,7 @@ export async function POST(request: NextRequest) {
       intentionType,
       monetizationPath,
       monetizationSource,
+      requestedAmountCents,
       metadata = {}
     } = await request.json();
 
@@ -100,7 +144,24 @@ export async function POST(request: NextRequest) {
       offerCode && typeof offerCode === "string"
         ? getRevenueOfferByCode(offerCode)
         : getRevenueOfferByIntent(typeof intentionType === "string" ? intentionType : "");
-    const amount = selectedOffer.defaultAmount;
+    const requesterPhone = normalizePhoneNumber(
+      typeof metadata?.external_user_id === "string"
+        ? metadata.external_user_id
+        : typeof metadata?.requester_phone === "string"
+          ? metadata.requester_phone
+          : typeof userId === "string"
+            ? userId
+            : ""
+    );
+    const resolvedPricing = resolvePaymentPricing({
+      offerCode: selectedOffer.code,
+      offerDefaultAmount: selectedOffer.defaultAmount,
+      requesterPhone,
+      originalMessage:
+        typeof metadata?.original_message === "string" ? metadata.original_message : null,
+      requestedAmountCents
+    });
+    const amount = amountCentsToDecimal(resolvedPricing.finalAmountCents);
 
     if (!amount) {
       return NextResponse.json(
@@ -114,9 +175,18 @@ export async function POST(request: NextRequest) {
       .select("*")
       .eq("lead_id", leadId)
       .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (existingPayment) {
+    if (
+      existingPayment &&
+      shouldReusePendingPayment(
+        existingPayment as PersistedPaymentRecord,
+        resolvedPricing,
+        selectedOffer.code
+      )
+    ) {
       const pendingPayment = existingPayment as {
         payment_url?: string | null;
         external_id?: string | null;
@@ -126,6 +196,9 @@ export async function POST(request: NextRequest) {
         paymentUrl: pendingPayment.payment_url,
         paymentId: pendingPayment.external_id,
         amount,
+        priceSource: resolvedPricing.priceSource,
+        baseAmountCents: resolvedPricing.baseAmountCents,
+        finalAmountCents: resolvedPricing.finalAmountCents,
         offer: {
           code: selectedOffer.code,
           name: selectedOffer.name,
@@ -145,6 +218,16 @@ export async function POST(request: NextRequest) {
       (typeof metadata?.monetization_source === "string" && metadata.monetization_source) ||
       "noemia";
     const checkoutStartedAt = new Date().toISOString();
+    const externalReference = `${selectedOffer.code}_${leadId}_${Date.now()}`;
+    const safePriceMetadata = {
+      base_amount_cents: resolvedPricing.baseAmountCents,
+      final_amount_cents: resolvedPricing.finalAmountCents,
+      price_source: resolvedPricing.priceSource,
+      requested_test_amount_cents: resolvedPricing.requestedTestAmountCents,
+      owner_override_phone: resolvedPricing.ownerOverridePhone,
+      price_reason: resolvedPricing.auditReason,
+      pricing_context: resolvedPricing.safeMetadata
+    };
 
     const preferenceData = {
       items: [
@@ -165,11 +248,7 @@ export async function POST(request: NextRequest) {
           number: metadata.documentNumber || undefined
         }
       },
-      payment_methods: {
-        excluded_payment_types: [{ id: "debit_card" }, { id: "credit_card" }],
-        excluded_payment_methods: [{ id: "bolbradesco" }, { id: "pec" }],
-        default_payment_method_id: "pix"
-      },
+      payment_methods: buildCheckoutPaymentMethods(),
       back_urls: {
         success: `${baseUrl}/pagamento/sucesso`,
         failure: `${baseUrl}/pagamento/falha`,
@@ -177,7 +256,7 @@ export async function POST(request: NextRequest) {
       },
       notification_url: `${baseUrl}/api/payment/webhook`,
       auto_return: "approved",
-      external_reference: `${selectedOffer.code}_${leadId}_${Date.now()}`,
+      external_reference: externalReference,
       metadata: {
         lead_id: leadId,
         user_id: userId,
@@ -188,6 +267,9 @@ export async function POST(request: NextRequest) {
         monetization_path: revenuePath,
         monetization_source: revenueSource,
         checkout_started_at: checkoutStartedAt,
+        external_reference: externalReference,
+        requester_phone: requesterPhone || null,
+        ...safePriceMetadata,
         ...metadata
       }
     };
@@ -202,6 +284,11 @@ export async function POST(request: NextRequest) {
         external_id: response.id,
         payment_url: response.init_point,
         amount,
+        base_amount_cents: resolvedPricing.baseAmountCents,
+        final_amount_cents: resolvedPricing.finalAmountCents,
+        price_source: resolvedPricing.priceSource,
+        requested_test_amount_cents: resolvedPricing.requestedTestAmountCents,
+        owner_override_phone: resolvedPricing.ownerOverridePhone,
         status: "pending",
         metadata: {
           ...preferenceData.metadata,
@@ -235,6 +322,9 @@ export async function POST(request: NextRequest) {
           payment_id: payment.id,
           external_id: response.id,
           amount,
+          price_source: resolvedPricing.priceSource,
+          base_amount_cents: resolvedPricing.baseAmountCents,
+          final_amount_cents: resolvedPricing.finalAmountCents,
           offer_code: selectedOffer.code,
           offer_kind: selectedOffer.kind,
           monetization_source: revenueSource,
@@ -251,6 +341,9 @@ export async function POST(request: NextRequest) {
           payment_id: payment.id,
           external_id: response.id,
           amount,
+          price_source: resolvedPricing.priceSource,
+          base_amount_cents: resolvedPricing.baseAmountCents,
+          final_amount_cents: resolvedPricing.finalAmountCents,
           offer_code: selectedOffer.code,
           offer_kind: selectedOffer.kind,
           monetization_source: revenueSource,
@@ -265,6 +358,9 @@ export async function POST(request: NextRequest) {
           lead_id: leadId,
           payment_id: payment.id,
           amount,
+          price_source: resolvedPricing.priceSource,
+          base_amount_cents: resolvedPricing.baseAmountCents,
+          final_amount_cents: resolvedPricing.finalAmountCents,
           offer_code: selectedOffer.code,
           offer_kind: selectedOffer.kind,
           monetization_source: revenueSource,
@@ -283,6 +379,9 @@ export async function POST(request: NextRequest) {
       paymentUrl: response.init_point,
       paymentId: response.id,
       amount,
+      priceSource: resolvedPricing.priceSource,
+      baseAmountCents: resolvedPricing.baseAmountCents,
+      finalAmountCents: resolvedPricing.finalAmountCents,
       offer: {
         code: selectedOffer.code,
         name: selectedOffer.name,
@@ -363,6 +462,11 @@ export async function GET(request: NextRequest) {
         id: payment.id,
         status: payment.status,
         amount: payment.amount,
+        base_amount_cents: payment.base_amount_cents,
+        final_amount_cents: payment.final_amount_cents,
+        price_source: payment.price_source,
+        requested_test_amount_cents: payment.requested_test_amount_cents,
+        owner_override_phone: payment.owner_override_phone,
         payment_url: payment.payment_url,
         external_id: payment.external_id,
         metadata: payment.metadata || null,

@@ -40,6 +40,10 @@ import {
   generatePaymentMessage
 } from "../payment/payment-service";
 import {
+  detectExplicitPaymentLinkRequest,
+  extractAmountCentsFromMessage
+} from "../payment/pricing";
+import {
   getRevenueOfferByCode,
   getRevenueOfferByIntent
 } from "./revenue-architecture";
@@ -183,6 +187,7 @@ type PaymentIntentDecision = {
   explicitRequestDetected: boolean;
   offerCode: string;
   intentionType: string;
+  requestedAmountCents: number | null;
   reason: string | null;
 };
 
@@ -713,7 +718,8 @@ function detectExplicitPaymentIntent(messageText: string) {
 
 function resolvePaymentIntentDecision(messageText: string): PaymentIntentDecision {
   const normalizedMessage = messageText.toLowerCase();
-  const explicitRequestDetected = detectExplicitPaymentIntent(messageText);
+  const explicitRequestDetected = detectExplicitPaymentLinkRequest(messageText);
+  const requestedAmountCents = extractAmountCentsFromMessage(messageText);
 
   let offerCode = "consultation_initial";
   let intentionType = "consultation";
@@ -737,6 +743,7 @@ function resolvePaymentIntentDecision(messageText: string): PaymentIntentDecisio
     explicitRequestDetected,
     offerCode: selectedOffer.code || selectedIntentOffer.code,
     intentionType,
+    requestedAmountCents,
     reason: explicitRequestDetected ? "explicit_payment_request" : null
   };
 }
@@ -959,6 +966,7 @@ async function maybeGenerateChannelPayment(args: {
     intentionType: paymentIntent.intentionType,
     monetizationPath: `whatsapp_${selectedOffer.kind}_flow`,
     monetizationSource: "whatsapp",
+    requestedAmountCents: paymentIntent.requestedAmountCents ?? undefined,
     metadata: {
       channel: args.event.channel,
       source: args.event.source,
@@ -968,7 +976,8 @@ async function maybeGenerateChannelPayment(args: {
       offer_code: selectedOffer.code,
       offer_kind: selectedOffer.kind,
       detected_theme: args.detectedTheme,
-      original_message: args.event.messageText
+      original_message: args.event.messageText,
+      requested_test_amount_cents: paymentIntent.requestedAmountCents
     }
   });
 

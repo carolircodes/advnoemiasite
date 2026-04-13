@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  CONSULTATION_ONLINE_AMOUNT_CENTS,
+  amountCentsToDecimal
+} from "../payment/pricing";
+
 export type RevenueMoment = "now" | "next" | "future";
 export type RevenueLayer =
   | "core_legal_service"
@@ -134,7 +139,10 @@ export const revenueOffers: RevenueOffer[] = [
     layer: "consultation",
     moment: "now",
     scope: "main_brand",
-    defaultAmount: envNumber("CONSULTATION_VALUE", 297),
+    defaultAmount: envNumber(
+      "CONSULTATION_VALUE",
+      amountCentsToDecimal(CONSULTATION_ONLINE_AMOUNT_CENTS)
+    ),
     checkoutTitle: "Consulta estrategica inicial",
     checkoutDescription:
       "Pagamento da consulta individual para analise do caso e orientacao inicial com clareza.",

@@ -7,6 +7,7 @@ export interface PaymentRequest {
   intentionType?: string;
   monetizationPath?: string;
   monetizationSource?: string;
+  requestedAmountCents?: number;
   metadata?: Record<string, any>;
 }
 
@@ -20,6 +21,9 @@ export interface PaymentResponse {
     name: string;
     kind: string;
   };
+  priceSource?: string;
+  baseAmountCents?: number;
+  finalAmountCents?: number;
   message?: string;
   error?: string;
 }
@@ -55,13 +59,16 @@ export async function generatePaymentLink(request: PaymentRequest): Promise<Paym
     }
 
     return {
-      success: true,
-      paymentUrl: data.paymentUrl,
-      paymentId: data.paymentId,
-      amount: data.amount,
-      offer: data.offer,
-      message: data.message
-    };
+        success: true,
+        paymentUrl: data.paymentUrl,
+        paymentId: data.paymentId,
+        amount: data.amount,
+        offer: data.offer,
+        priceSource: data.priceSource,
+        baseAmountCents: data.baseAmountCents,
+        finalAmountCents: data.finalAmountCents,
+        message: data.message
+      };
   } catch (error) {
     console.error("[payment.service] Failed to generate payment link", {
       error: error instanceof Error ? error.message : String(error)
@@ -111,13 +118,20 @@ export function generatePaymentMessage(paymentResponse: PaymentResponse): string
     return "Desculpe, ocorreu um erro ao gerar o link de pagamento. Por favor, tente novamente em alguns instantes.";
   }
 
-  return `Perfeito. Vou te encaminhar o link para agendamento da consulta.
+  const offerLabel =
+    paymentResponse.offer?.kind === "consultation"
+      ? paymentResponse.priceSource === "owner_test_override"
+        ? "o link solicitado"
+        : "a consulta online"
+      : paymentResponse.offer?.name || "o pagamento";
+
+  return `Perfeito. Vou te encaminhar o link para ${offerLabel}.
 
 Assim que o pagamento for confirmado, seguimos com seu atendimento prioritario.
 
 Link para pagamento: ${paymentResponse.paymentUrl}
 
-O valor desta etapa e de R$ ${paymentResponse.amount?.toFixed(2)} e pode ser pago via Pix ou cartao de credito.
+O valor desta etapa e de R$ ${paymentResponse.amount?.toFixed(2)} e pode ser pago via Pix, cartao de debito ou cartao de credito com parcelamento.
 
 Apos a confirmacao, voce recebera as proximas orientacoes automaticamente.`;
 }

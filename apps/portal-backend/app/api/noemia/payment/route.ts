@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { extractAmountCentsFromMessage } from "@/lib/payment/pricing";
 import { generatePaymentLink, generatePaymentMessage } from "@/lib/payment/payment-service";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
       .select("*")
       .eq("lead_id", leadId)
       .in("status", ["pending", "approved"])
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     const selectedOffer =
       typeof offerCode === "string" && offerCode.trim()
@@ -119,13 +122,17 @@ export async function POST(request: NextRequest) {
       metadata: {
         intention_type: intentionType,
         original_message: message,
+        requester_phone: userId,
+        external_user_id: userId,
+        requested_test_amount_cents: extractAmountCentsFromMessage(message),
         user_agent: request.headers.get("user-agent"),
         offer_code: selectedOffer.code,
         offer_kind: selectedOffer.kind,
         offer_name: selectedOffer.name,
         monetization_path: `noemia_${selectedOffer.kind}_flow`,
         monetization_source: "noemia"
-      }
+      },
+      requestedAmountCents: extractAmountCentsFromMessage(message)
     } as any);
 
     if (!paymentResponse.success) {
@@ -217,6 +224,9 @@ export async function GET(request: NextRequest) {
         external_id: payment.external_id,
         status: payment.status,
         amount: payment.amount,
+        base_amount_cents: payment.base_amount_cents,
+        final_amount_cents: payment.final_amount_cents,
+        price_source: payment.price_source,
         metadata: payment.metadata || null,
         created_at: payment.created_at,
         updated_at: payment.updated_at,

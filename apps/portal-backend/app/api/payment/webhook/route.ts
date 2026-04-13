@@ -206,6 +206,37 @@ function mergeMercadoPagoMetadata(
   };
 }
 
+async function findPaymentRecordForWebhook(
+  supabase: any,
+  leadId: string,
+  externalReference: string | null | undefined
+) {
+  const paymentsLookup = await supabase
+    .from("payments")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (paymentsLookup.error) {
+    throw paymentsLookup.error;
+  }
+
+  const payments = Array.isArray(paymentsLookup.data) ? paymentsLookup.data : [];
+
+  if (externalReference) {
+    const matchedPayment = payments.find(
+      (payment: any) => payment?.metadata?.external_reference === externalReference
+    );
+
+    if (matchedPayment) {
+      return matchedPayment;
+    }
+  }
+
+  return payments[0] || null;
+}
+
 export async function POST(request: NextRequest) {
   const context = getWebhookContext();
 
@@ -314,11 +345,19 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       return;
     }
 
-    const { data: previousPayment } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("lead_id", leadId)
-      .maybeSingle();
+    const previousPayment = await findPaymentRecordForWebhook(
+      supabase,
+      leadId,
+      paymentInfo.external_reference
+    );
+
+    if (!previousPayment?.id) {
+      console.error("[payment.webhook] Payment record not found for approval", {
+        leadId,
+        externalReference: paymentInfo.external_reference
+      });
+      return;
+    }
 
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
@@ -332,7 +371,7 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
         approved_at: new Date().toISOString(),
         metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
-      .eq("lead_id", leadId)
+      .eq("id", previousPayment?.id)
       .select()
       .single();
 
@@ -465,13 +504,19 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
 
     const { offerCode, leadId } = reference;
 
-    const { data: previousPayment } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("lead_id", leadId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const previousPayment = await findPaymentRecordForWebhook(
+      supabase,
+      leadId,
+      paymentInfo.external_reference
+    );
+
+    if (!previousPayment?.id) {
+      console.error("[payment.webhook] Payment record not found for rejection", {
+        leadId,
+        externalReference: paymentInfo.external_reference
+      });
+      return;
+    }
 
     const { data: payment } = await supabase
       .from("payments")
@@ -482,7 +527,7 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
         rejected_at: new Date().toISOString(),
         metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
-      .eq("lead_id", leadId)
+      .eq("id", previousPayment?.id)
       .select()
       .maybeSingle();
 
@@ -552,13 +597,19 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
 
     const { offerCode, leadId } = reference;
 
-    const { data: previousPayment } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("lead_id", leadId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const previousPayment = await findPaymentRecordForWebhook(
+      supabase,
+      leadId,
+      paymentInfo.external_reference
+    );
+
+    if (!previousPayment?.id) {
+      console.error("[payment.webhook] Payment record not found for pending update", {
+        leadId,
+        externalReference: paymentInfo.external_reference
+      });
+      return;
+    }
 
     const { data: payment } = await supabase
       .from("payments")
@@ -568,7 +619,7 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
         status_detail: paymentInfo.status_detail,
         metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
-      .eq("lead_id", leadId)
+      .eq("id", previousPayment?.id)
       .select()
       .maybeSingle();
 
