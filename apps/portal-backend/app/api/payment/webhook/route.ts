@@ -7,6 +7,8 @@ import {
   shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
+import { getRevenueOfferByCode } from "@/lib/services/revenue-architecture";
+import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type PaymentWebhookContext = {
@@ -14,6 +16,57 @@ type PaymentWebhookContext = {
   supabase: ReturnType<typeof createAdminSupabaseClient>;
   webhookSecret?: string;
 };
+
+type ParsedExternalReference = {
+  offerCode: string;
+  leadId: string;
+};
+
+type WebhookRuntimeDiagnostics = {
+  mercadoPagoAccessTokenConfigured: boolean;
+  mercadoPagoPublicKeyConfigured: boolean;
+  webhookSecretConfigured: boolean;
+  supabaseUrlConfigured: boolean;
+  supabaseSecretConfigured: boolean;
+  siteUrlConfigured: boolean;
+  siteUrlSource:
+    | "NEXT_PUBLIC_SITE_URL"
+    | "NEXT_PUBLIC_PUBLIC_SITE_URL"
+    | "NEXT_PUBLIC_BASE_URL"
+    | "NEXT_PUBLIC_APP_URL"
+    | null;
+};
+
+function getWebhookRuntimeDiagnostics(): WebhookRuntimeDiagnostics {
+  const siteUrlSource = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+    ? "NEXT_PUBLIC_SITE_URL"
+    : process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim()
+      ? "NEXT_PUBLIC_PUBLIC_SITE_URL"
+      : process.env.NEXT_PUBLIC_BASE_URL?.trim()
+        ? "NEXT_PUBLIC_BASE_URL"
+        : process.env.NEXT_PUBLIC_APP_URL?.trim()
+          ? "NEXT_PUBLIC_APP_URL"
+          : null;
+
+  return {
+    mercadoPagoAccessTokenConfigured: Boolean(
+      process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim()
+    ),
+    mercadoPagoPublicKeyConfigured: Boolean(
+      process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY?.trim()
+    ),
+    webhookSecretConfigured: Boolean(
+      process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim()
+    ),
+    supabaseUrlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()),
+    supabaseSecretConfigured: Boolean(
+      process.env.SUPABASE_SECRET_KEY?.trim() ||
+        process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    ),
+    siteUrlConfigured: Boolean(siteUrlSource),
+    siteUrlSource
+  };
+}
 
 function getWebhookContext():
   | { ok: true; value: PaymentWebhookContext }
@@ -124,6 +177,35 @@ function validateMercadoPagoWebhookSignature(args: {
   } as const;
 }
 
+function parseExternalReference(externalReference: unknown): ParsedExternalReference | null {
+  if (typeof externalReference !== "string") {
+    return null;
+  }
+
+  const match = externalReference.match(/^(.+?)_(.+)_\d+$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    offerCode: match[1],
+    leadId: match[2]
+  };
+}
+
+function mergeMercadoPagoMetadata(
+  currentMetadata: Record<string, unknown> | null | undefined,
+  paymentInfo: any
+) {
+  return {
+    ...(currentMetadata || {}),
+    mercado_pago_payment_id: paymentInfo.id,
+    mercado_pago_status: paymentInfo.status,
+    mercado_pago_status_detail: paymentInfo.status_detail
+  };
+}
+
 export async function POST(request: NextRequest) {
   const context = getWebhookContext();
 
@@ -207,22 +289,21 @@ export async function POST(request: NextRequest) {
 
 async function handleApprovedPayment(supabase: any, paymentInfo: any) {
   try {
-    const externalReference = paymentInfo.external_reference;
-    const match = externalReference?.match(/^consultation_(.+)_\d+$/);
+    const reference = parseExternalReference(paymentInfo.external_reference);
 
-    if (!match) {
+    if (!reference) {
       console.error("[payment.webhook] Invalid external reference", {
-        externalReference
+        externalReference: paymentInfo.external_reference
       });
       return;
     }
 
-    const leadId = match[1];
+    const { offerCode, leadId } = reference;
 
     const { data: existingPayment } = await supabase
       .from("payments")
       .select("*")
-      .eq("external_id", paymentInfo.id)
+      .eq("lead_id", leadId)
       .eq("status", "approved")
       .single();
 
@@ -233,23 +314,25 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       return;
     }
 
+    const { data: previousPayment } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("lead_id", leadId)
+      .maybeSingle();
+
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .update({
+        external_id: String(paymentInfo.id),
         status: "approved",
         payment_method_id: paymentInfo.payment_method_id,
         payment_type_id: paymentInfo.payment_type_id,
         status_detail: paymentInfo.status_detail,
         transaction_amount: paymentInfo.transaction_amount,
         approved_at: new Date().toISOString(),
-        metadata: {
-          ...paymentInfo.metadata,
-          mercado_pago_payment_id: paymentInfo.id,
-          mercado_pago_status: paymentInfo.status,
-          mercado_pago_status_detail: paymentInfo.status_detail
-        }
+        metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
-      .eq("external_id", paymentInfo.id)
+      .eq("lead_id", leadId)
       .select()
       .single();
 
@@ -275,6 +358,10 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       return;
     }
 
+    const offer = getRevenueOfferByCode(
+      payment?.metadata?.offer_code || paymentInfo.metadata?.offer_code || offerCode
+    );
+
     await sendPaymentConfirmationMessage(supabase, lead);
 
     await supabase.from("follow_up_events").insert({
@@ -290,6 +377,76 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       },
       sent_at: new Date().toISOString()
     });
+
+    try {
+      await recordRevenueTelemetry({
+        eventKey: "payment_approved",
+        pagePath: "/pagamento/sucesso",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment.id,
+          external_id: paymentInfo.id,
+          amount: paymentInfo.transaction_amount,
+          offer_code: offer.code,
+          offer_kind: offer.kind,
+          monetization_path:
+            payment?.metadata?.monetization_path ||
+            paymentInfo.metadata?.monetization_path ||
+            "noemia_consultation_flow",
+          monetization_source:
+            payment?.metadata?.monetization_source ||
+            paymentInfo.metadata?.monetization_source ||
+            "noemia",
+          payment_method: paymentInfo.payment_method_id
+        }
+      });
+
+      await recordRevenueTelemetry({
+        eventKey: offer.kind === "analysis" ? "paid_analysis" : "paid_consultation",
+        pagePath: "/pagamento/sucesso",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment.id,
+          amount: paymentInfo.transaction_amount,
+          offer_code: offer.code,
+          offer_kind: offer.kind
+        }
+      });
+
+      await recordRevenueTelemetry({
+        eventKey: "revenue_confirmed",
+        pagePath: "/pagamento/sucesso",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment.id,
+          amount: paymentInfo.transaction_amount,
+          offer_code: offer.code,
+          offer_kind: offer.kind,
+          monetization_path:
+            payment?.metadata?.monetization_path ||
+            paymentInfo.metadata?.monetization_path ||
+            "noemia_consultation_flow"
+        }
+      });
+
+      if (previousPayment?.status === "rejected") {
+        await recordRevenueTelemetry({
+          eventKey: "payment_recovered",
+          pagePath: "/pagamento/sucesso",
+          payload: {
+            lead_id: leadId,
+            payment_id: payment.id,
+            amount: paymentInfo.transaction_amount,
+            offer_code: offer.code,
+            offer_kind: offer.kind
+          }
+        });
+      }
+    } catch (trackingError) {
+      console.error("[payment.webhook] Failed to record approval telemetry", {
+        trackingError
+      });
+    }
   } catch (error) {
     console.error("[payment.webhook] Error processing approved payment", { error });
   }
@@ -297,31 +454,37 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
 
 async function handleRejectedPayment(supabase: any, paymentInfo: any) {
   try {
-    const externalReference = paymentInfo.external_reference;
-    const match = externalReference?.match(/^consultation_(.+)_\d+$/);
+    const reference = parseExternalReference(paymentInfo.external_reference);
 
-    if (!match) {
+    if (!reference) {
       console.error("[payment.webhook] Invalid external reference", {
-        externalReference
+        externalReference: paymentInfo.external_reference
       });
       return;
     }
 
-    const leadId = match[1];
+    const { offerCode, leadId } = reference;
 
-    await supabase
+    const { data: previousPayment } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: payment } = await supabase
       .from("payments")
       .update({
+        external_id: String(paymentInfo.id),
         status: "rejected",
         status_detail: paymentInfo.status_detail,
         rejected_at: new Date().toISOString(),
-        metadata: {
-          mercado_pago_payment_id: paymentInfo.id,
-          mercado_pago_status: paymentInfo.status,
-          mercado_pago_status_detail: paymentInfo.status_detail
-        }
+        metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
-      .eq("external_id", paymentInfo.id);
+      .eq("lead_id", leadId)
+      .select()
+      .maybeSingle();
 
     await supabase
       .from("noemia_leads")
@@ -331,6 +494,46 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
         updated_at: new Date().toISOString()
       })
       .eq("id", leadId);
+
+    try {
+      const offer = getRevenueOfferByCode(
+        payment?.metadata?.offer_code || paymentInfo.metadata?.offer_code || offerCode
+      );
+
+      await recordRevenueTelemetry({
+        eventKey: "payment_failed",
+        pagePath: "/pagamento/falha",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment?.id || null,
+          external_id: paymentInfo.id,
+          offer_code: offer.code,
+          offer_kind: offer.kind,
+          amount: paymentInfo.transaction_amount,
+          status_detail: paymentInfo.status_detail,
+          monetization_path:
+            payment?.metadata?.monetization_path ||
+            paymentInfo.metadata?.monetization_path ||
+            "noemia_consultation_flow"
+        }
+      });
+
+      await recordRevenueTelemetry({
+        eventKey: "payment_followup_needed",
+        pagePath: "/pagamento/falha",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment?.id || null,
+          offer_code: offer.code,
+          offer_kind: offer.kind,
+          reason: "payment_failed"
+        }
+      });
+    } catch (trackingError) {
+      console.error("[payment.webhook] Failed to record rejection telemetry", {
+        trackingError
+      });
+    }
   } catch (error) {
     console.error("[payment.webhook] Error processing rejected payment", { error });
   }
@@ -338,18 +541,63 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
 
 async function handlePendingPayment(supabase: any, paymentInfo: any) {
   try {
-    await supabase
+    const reference = parseExternalReference(paymentInfo.external_reference);
+
+    if (!reference) {
+      console.error("[payment.webhook] Invalid external reference", {
+        externalReference: paymentInfo.external_reference
+      });
+      return;
+    }
+
+    const { offerCode, leadId } = reference;
+
+    const { data: previousPayment } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: payment } = await supabase
       .from("payments")
       .update({
+        external_id: String(paymentInfo.id),
         status: "pending",
         status_detail: paymentInfo.status_detail,
-        metadata: {
-          mercado_pago_payment_id: paymentInfo.id,
-          mercado_pago_status: paymentInfo.status,
-          mercado_pago_status_detail: paymentInfo.status_detail
-        }
+        metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
-      .eq("external_id", paymentInfo.id);
+      .eq("lead_id", leadId)
+      .select()
+      .maybeSingle();
+
+    try {
+      const offer = getRevenueOfferByCode(
+        payment?.metadata?.offer_code || previousPayment?.metadata?.offer_code || offerCode
+      );
+
+      await recordRevenueTelemetry({
+        eventKey: "payment_pending",
+        pagePath: "/pagamento/pendente",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment?.id || null,
+          external_id: paymentInfo.id,
+          amount: paymentInfo.transaction_amount,
+          offer_code: offer.code,
+          offer_kind: offer.kind,
+          monetization_path:
+            payment?.metadata?.monetization_path ||
+            paymentInfo.metadata?.monetization_path ||
+            "noemia_consultation_flow"
+        }
+      });
+    } catch (trackingError) {
+      console.error("[payment.webhook] Failed to record pending telemetry", {
+        trackingError
+      });
+    }
   } catch (error) {
     console.error("[payment.webhook] Error processing pending payment", { error });
   }
@@ -382,20 +630,22 @@ Em instantes voce recebera as proximas orientacoes.`;
   }
 }
 
-export async function GET() {
-  const context = getWebhookContext();
-
-  if (!context.ok) {
-    return paymentWebhookUnavailableResponse(context.missing);
-  }
+export async function GET(request: NextRequest) {
+  const diagnostics = getWebhookRuntimeDiagnostics();
 
   return NextResponse.json({
     status: "webhook_active",
     timestamp: new Date().toISOString(),
-    message: "Webhook do Mercado Pago esta ativo",
+    message: "Webhook do Mercado Pago esta acessivel para validacao e monitoramento.",
+    validation: {
+      topic: request.nextUrl.searchParams.get("topic"),
+      id: request.nextUrl.searchParams.get("id"),
+      dataId: request.nextUrl.searchParams.get("data.id")
+    },
+    runtime: diagnostics,
     signature: {
       enforced: shouldEnforceWebhookSignature("MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"),
-      secretConfigured: Boolean(context.value.webhookSecret)
+      secretConfigured: diagnostics.webhookSecretConfigured
     }
   });
 }

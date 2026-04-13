@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
-const CONSULTATION_VALUE = Number(process.env.CONSULTATION_VALUE) || 297.0;
-
+import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
+import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 type PaymentCreateContext = {
   mercadopago: MercadoPagoConfig;
   supabase: any;
@@ -60,6 +60,15 @@ function paymentCreateUnavailableResponse(missing: string[]) {
   );
 }
 
+function extractLeadIdFromExternalReference(externalReference: string | null) {
+  if (!externalReference) {
+    return null;
+  }
+
+  const match = externalReference.match(/^(.+?)_(.+)_\d+$/);
+  return match?.[2] || null;
+}
+
 export async function POST(request: NextRequest) {
   const context = getPaymentCreateContext();
 
@@ -70,11 +79,32 @@ export async function POST(request: NextRequest) {
   const { mercadopago, supabase, baseUrl } = context.value;
 
   try {
-    const { leadId, userId, metadata = {} } = await request.json();
+    const {
+      leadId,
+      userId,
+      offerCode,
+      intentionType,
+      monetizationPath,
+      monetizationSource,
+      metadata = {}
+    } = await request.json();
 
     if (!leadId || !userId) {
       return NextResponse.json(
         { error: "leadId e userId sao obrigatorios" },
+        { status: 400 }
+      );
+    }
+
+    const selectedOffer =
+      offerCode && typeof offerCode === "string"
+        ? getRevenueOfferByCode(offerCode)
+        : getRevenueOfferByIntent(typeof intentionType === "string" ? intentionType : "");
+    const amount = selectedOffer.defaultAmount;
+
+    if (!amount) {
+      return NextResponse.json(
+        { error: "Oferta sem configuracao de pagamento pronta para checkout" },
         { status: 400 }
       );
     }
@@ -95,20 +125,35 @@ export async function POST(request: NextRequest) {
         success: true,
         paymentUrl: pendingPayment.payment_url,
         paymentId: pendingPayment.external_id,
+        amount,
+        offer: {
+          code: selectedOffer.code,
+          name: selectedOffer.name,
+          kind: selectedOffer.kind
+        },
         message: "Pagamento ja gerado anteriormente"
       });
     }
 
     const preference = new Preference(mercadopago);
+    const revenuePath =
+      (typeof monetizationPath === "string" && monetizationPath.trim()) ||
+      (typeof metadata?.monetization_path === "string" && metadata.monetization_path) ||
+      `noemia_${selectedOffer.kind}_flow`;
+    const revenueSource =
+      (typeof monetizationSource === "string" && monetizationSource.trim()) ||
+      (typeof metadata?.monetization_source === "string" && metadata.monetization_source) ||
+      "noemia";
+    const checkoutStartedAt = new Date().toISOString();
 
     const preferenceData = {
       items: [
         {
-          id: `consultation_${leadId}`,
-          title: "Consulta Juridica - Noemia Paixao Advocacia",
-          description: "Analise completa do seu caso juridico com orientacao especializada",
+          id: `${selectedOffer.code}_${leadId}`,
+          title: `${selectedOffer.checkoutTitle} - Noemia Paixao Advocacia`,
+          description: selectedOffer.checkoutDescription,
           quantity: 1,
-          unit_price: CONSULTATION_VALUE,
+          unit_price: amount,
           currency_id: "BRL"
         }
       ],
@@ -132,11 +177,17 @@ export async function POST(request: NextRequest) {
       },
       notification_url: `${baseUrl}/api/payment/webhook`,
       auto_return: "approved",
-      external_reference: `consultation_${leadId}_${Date.now()}`,
+      external_reference: `${selectedOffer.code}_${leadId}_${Date.now()}`,
       metadata: {
         lead_id: leadId,
         user_id: userId,
-        consultation_type: "initial",
+        offer_code: selectedOffer.code,
+        offer_name: selectedOffer.name,
+        offer_kind: selectedOffer.kind,
+        revenue_layer: selectedOffer.layer,
+        monetization_path: revenuePath,
+        monetization_source: revenueSource,
+        checkout_started_at: checkoutStartedAt,
         ...metadata
       }
     };
@@ -150,7 +201,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         external_id: response.id,
         payment_url: response.init_point,
-        amount: CONSULTATION_VALUE,
+        amount,
         status: "pending",
         metadata: {
           ...preferenceData.metadata,
@@ -174,11 +225,69 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", leadId);
 
+    try {
+      await recordRevenueTelemetry({
+        eventKey: "checkout_started",
+        pagePath: "/pagamento/checkout",
+        payload: {
+          lead_id: leadId,
+          user_id: userId,
+          payment_id: payment.id,
+          external_id: response.id,
+          amount,
+          offer_code: selectedOffer.code,
+          offer_kind: selectedOffer.kind,
+          monetization_source: revenueSource,
+          monetization_path: revenuePath
+        }
+      });
+
+      await recordRevenueTelemetry({
+        eventKey: "payment_pending",
+        pagePath: "/pagamento/checkout",
+        payload: {
+          lead_id: leadId,
+          user_id: userId,
+          payment_id: payment.id,
+          external_id: response.id,
+          amount,
+          offer_code: selectedOffer.code,
+          offer_kind: selectedOffer.kind,
+          monetization_source: revenueSource,
+          monetization_path: revenuePath
+        }
+      });
+
+      await recordRevenueTelemetry({
+        eventKey: "revenue_signal",
+        pagePath: "/pagamento/checkout",
+        payload: {
+          lead_id: leadId,
+          payment_id: payment.id,
+          amount,
+          offer_code: selectedOffer.code,
+          offer_kind: selectedOffer.kind,
+          monetization_source: revenueSource,
+          monetization_path: revenuePath,
+          signal: "checkout_created"
+        }
+      });
+    } catch (trackingError) {
+      console.error("[payment.create] Failed to record revenue telemetry", {
+        trackingError
+      });
+    }
+
     return NextResponse.json({
       success: true,
       paymentUrl: response.init_point,
       paymentId: response.id,
-      amount: CONSULTATION_VALUE,
+      amount,
+      offer: {
+        code: selectedOffer.code,
+        name: selectedOffer.name,
+        kind: selectedOffer.kind
+      },
       message: "Link de pagamento gerado com sucesso"
     });
   } catch (error) {
@@ -196,18 +305,53 @@ export async function GET(request: NextRequest) {
 
   const { supabase } = context.value;
   const { searchParams } = new URL(request.url);
-  const paymentId = searchParams.get("payment_id");
+  const paymentId =
+    searchParams.get("payment_id") || searchParams.get("collection_id");
+  const externalReference = searchParams.get("external_reference");
+  const leadId =
+    searchParams.get("lead_id") || extractLeadIdFromExternalReference(externalReference);
 
-  if (!paymentId) {
-    return NextResponse.json({ error: "payment_id e obrigatorio" }, { status: 400 });
+  if (!paymentId && !leadId) {
+    return NextResponse.json(
+      { error: "payment_id, collection_id, external_reference ou lead_id sao obrigatorios" },
+      { status: 400 }
+    );
   }
 
   try {
-    const { data: payment } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("external_id", paymentId)
-      .single();
+    let payment = null;
+
+    if (paymentId) {
+      const paymentByExternalId = await supabase
+        .from("payments")
+        .select("*")
+        .eq("external_id", paymentId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (paymentByExternalId.error) {
+        throw paymentByExternalId.error;
+      }
+
+      payment = paymentByExternalId.data;
+    }
+
+    if (!payment && leadId) {
+      const paymentByLead = await supabase
+        .from("payments")
+        .select("*")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (paymentByLead.error) {
+        throw paymentByLead.error;
+      }
+
+      payment = paymentByLead.data;
+    }
 
     if (!payment) {
       return NextResponse.json({ error: "pagamento_nao_encontrado" }, { status: 404 });
@@ -219,6 +363,9 @@ export async function GET(request: NextRequest) {
         id: payment.id,
         status: payment.status,
         amount: payment.amount,
+        payment_url: payment.payment_url,
+        external_id: payment.external_id,
+        metadata: payment.metadata || null,
         created_at: payment.created_at,
         updated_at: payment.updated_at
       }

@@ -5,6 +5,7 @@ import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
+import { getRevenueIntelligenceOverview } from "@/lib/services/revenue-intelligence";
 
 function getStringParam(
   value: string | string[] | undefined,
@@ -30,6 +31,7 @@ export default async function IntelligencePage({
   const params = searchParams ? await searchParams : {};
   const selectedDays = Number.parseInt(getStringParam(params.days, "30"), 10);
   const intelligence = await getBusinessIntelligenceOverview(selectedDays);
+  const revenue = await getRevenueIntelligenceOverview(selectedDays);
 
   return (
     <AppFrame
@@ -54,14 +56,172 @@ export default async function IntelligencePage({
       highlights={[
         { label: "Periodo", value: `${intelligence.days} dias` },
         { label: "Triagem -> cliente", value: formatRate(intelligence.summary.triageToClientRate) },
-        { label: "Cliente -> portal", value: formatRate(intelligence.summary.portalActivationRate) },
-        { label: "Fila automatica", value: String(intelligence.automation.pendingQueue) }
+        { label: "Receita confirmada", value: `R$ ${revenue.summary.revenueConfirmed.toFixed(2)}` },
+        { label: "Em formacao", value: `R$ ${revenue.summary.revenueInFormation.toFixed(2)}` }
       ]}
       actions={[
         { href: "/internal/advogada", label: "Voltar ao painel", tone: "secondary" },
         { href: "/noemia", label: "Abrir Noemia", tone: "secondary" }
       ]}
     >
+      <SectionCard
+        title="Arquitetura de receita do imperio"
+        description="A monetizacao agora fica organizada por camadas: o que e nuclear, o que entra agora, o que expande depois e o que merece identidade propria no futuro."
+      >
+        <div className="grid two">
+          {revenue.architecture.map((item) => (
+            <article key={item.layer} className="summary-card">
+              <span>{item.title}</span>
+              <strong>
+                {item.moment === "now"
+                  ? "Entra agora"
+                  : item.moment === "next"
+                    ? "Proxima camada"
+                    : "Expansao futura"}
+              </strong>
+              <p>{item.summary}</p>
+              <span className="item-meta">
+                {item.scope === "main_brand" ? "Dentro da operacao principal" : "Pode virar marca separada no futuro"}
+              </span>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Ofertas e jornadas de compra"
+        description="O escritorio passa a separar claramente a oferta principal de consulta, a analise premium e as camadas de continuidade que destravam receita com mais governanca."
+      >
+        <div className="grid three">
+          {revenue.nowOffers.concat(revenue.nextOffers).map((offer) => (
+            <article key={offer.code} className="route-card">
+              <span className="shortcut-kicker">{offer.shortLabel}</span>
+              <strong>{offer.name}</strong>
+              <span>{offer.description}</span>
+              <p>{offer.premiumPositioning}</p>
+              <span>
+                {offer.defaultAmount ? `Base de cobranca: R$ ${offer.defaultAmount.toFixed(2)}` : "Camada sem preco ativo agora"}
+              </span>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Receita, checkout e gargalos"
+        description="Leitura executiva da camada de monetizacao para saber onde a pessoa aceita oferta, onde inicia checkout e onde a receita realmente fecha."
+      >
+        <div className="summary-grid">
+          <div className="summary-card">
+            <span>Ofertas apresentadas</span>
+            <strong>{revenue.summary.offersPresented}</strong>
+            <p>Momentos em que o sistema posicionou uma oferta monetizavel com contexto.</p>
+          </div>
+          <div className="summary-card">
+            <span>Checkout iniciado</span>
+            <strong>{revenue.summary.checkoutStarted}</strong>
+            <p>Jornadas que realmente entraram no fluxo de pagamento.</p>
+          </div>
+          <div className="summary-card">
+            <span>Pagamento pendente</span>
+            <strong>{revenue.summary.pendingCount}</strong>
+            <p>Dinheiro em andamento que ainda pode travar sem follow-up.</p>
+          </div>
+          <div className="summary-card">
+            <span>Pagamento aprovado</span>
+            <strong>{revenue.summary.approvedCount}</strong>
+            <p>Receita confirmada com continuidade operacional pronta.</p>
+          </div>
+          <div className="summary-card">
+            <span>Falhas e abandono</span>
+            <strong>{revenue.summary.failedCount + revenue.summary.checkoutAbandoned}</strong>
+            <p>Etapas que pedem recuperacao de checkout ou novo framing de valor.</p>
+          </div>
+          <div className="summary-card">
+            <span>Follow-up de pagamento</span>
+            <strong>{revenue.summary.paymentFollowUpNeeded}</strong>
+            <p>Jornadas que ja merecem retomada humana ou automatizada.</p>
+          </div>
+        </div>
+        <div className="summary-grid compact">
+          <div className="summary-card">
+            <span>Receita em formacao</span>
+            <strong>R$ {revenue.summary.revenueInFormation.toFixed(2)}</strong>
+            <p>Valor que ja entrou em checkout e ainda nao confirmou fechamento.</p>
+          </div>
+          <div className="summary-card">
+            <span>Receita confirmada</span>
+            <strong>R$ {revenue.summary.revenueConfirmed.toFixed(2)}</strong>
+            <p>Valor efetivamente aprovado no periodo analisado.</p>
+          </div>
+          <div className="summary-card">
+            <span>Tempo medio checkout para aprovacao</span>
+            <strong>
+              {revenue.summary.averageCheckoutToApprovedHours === null
+                ? "Sem base"
+                : `${revenue.summary.averageCheckoutToApprovedHours}h`}
+            </strong>
+            <p>Leitura inicial do ritmo entre intencao de compra e receita confirmada.</p>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="grid two">
+        <SectionCard
+          title="Ofertas que mais fecham"
+          description="Comparacao objetiva entre oferta apresentada, checkout iniciado, pendencia e receita confirmada."
+        >
+          {revenue.offerBreakdown.length ? (
+            <ul className="update-feed">
+              {revenue.offerBreakdown.map((item) => (
+                <li key={item.code} className="update-card">
+                  <div className="update-head">
+                    <div>
+                      <strong>{item.label}</strong>
+                      <span className="item-meta">{item.layerLabel}</span>
+                    </div>
+                    <span className="tag soft">{item.kind}</span>
+                  </div>
+                  <div className="pill-row">
+                    <span className="pill muted">{item.presented} oferta(s)</span>
+                    <span className="pill warning">{item.checkoutStarted} checkout(s)</span>
+                    <span className="pill success">{item.approved} aprovado(s)</span>
+                  </div>
+                  <p className="update-body">
+                    Receita confirmada: R$ {item.revenueConfirmed.toFixed(2)}. Em formacao: R$ {item.revenueInFormation.toFixed(2)}.
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">A camada de receita passa a aparecer aqui conforme as ofertas entram em uso real.</p>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Caminhos de monetizacao"
+          description="A leitura abaixo mostra qual jornada gera mais checkout e fechamento, para evitar monetizacao cega."
+        >
+          {revenue.monetizationPaths.length ? (
+            <ul className="list">
+              {revenue.monetizationPaths.map((item) => (
+                <li key={item.path}>
+                  <div className="item-head">
+                    <strong>{item.label}</strong>
+                    <span className="tag soft">{item.approved} aprovado(s)</span>
+                  </div>
+                  <span className="item-meta">
+                    {item.presented} oferta(s) apresentadas e {item.checkoutStarted} checkout(s) iniciados.
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">Os caminhos de monetizacao aparecerao aqui conforme os eventos de receita crescerem.</p>
+          )}
+        </SectionCard>
+      </div>
+
       <SectionCard
         title="Janela de analise"
         description="Troque o periodo para comparar conversao, uso do portal e disparos automaticos sem perder o contexto operacional."
@@ -121,6 +281,39 @@ export default async function IntelligencePage({
       </SectionCard>
 
       <div className="grid two">
+        <SectionCard
+          title="Receita recente e continuidade"
+          description="Cada pagamento recente aparece com oferta, status e sinal de follow-up para nao deixar dinheiro em limbo."
+        >
+          {revenue.latestPayments.length ? (
+            <ul className="update-feed">
+              {revenue.latestPayments.map((payment) => (
+                <li key={payment.id} className="update-card">
+                  <div className="update-head">
+                    <div>
+                      <strong>{payment.offerLabel}</strong>
+                      <span className="item-meta">{payment.pathLabel}</span>
+                    </div>
+                    <span className="tag soft">{payment.status}</span>
+                  </div>
+                  <div className="pill-row">
+                    <span className="pill muted">{payment.amountLabel}</span>
+                    <span className={`pill ${payment.followUpNeeded ? "warning" : payment.status === "approved" ? "success" : "muted"}`}>
+                      {payment.followUpNeeded ? "Pede follow-up" : payment.status === "approved" ? "Receita confirmada" : "Em andamento"}
+                    </span>
+                  </div>
+                  <p className="update-body">
+                    Criado em {new Date(payment.createdAt).toLocaleString("pt-BR")}.
+                    {payment.statusDetail ? ` Detalhe: ${payment.statusDetail}.` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">Os pagamentos recentes entrarao aqui assim que a camada de monetizacao ganhar volume.</p>
+          )}
+        </SectionCard>
+
         <SectionCard
           title="Uso do portal"
           description="Sinais objetivos de como os clientes estao usando a area segura no dia a dia."
@@ -225,9 +418,9 @@ export default async function IntelligencePage({
           title="Acoes sugeridas"
           description="Sugestoes simples, geradas a partir do estado real do produto e da operacao."
         >
-          {intelligence.suggestions.length ? (
+          {intelligence.suggestions.length || revenue.suggestions.length ? (
             <div className="notice-grid">
-              {intelligence.suggestions.map((item) => (
+              {intelligence.suggestions.concat(revenue.suggestions).map((item) => (
                 <Link key={item.title} href={item.href} className="notice-card">
                   <strong>{item.title}</strong>
                   <p>{item.body}</p>

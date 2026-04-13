@@ -1,152 +1,237 @@
-'use client';
+"use client";
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-function PagamentoSucessoContent() {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [paymentInfo, setPaymentInfo] = useState<any>(null);
+import { ProductEventBeacon } from "@/components/product-event-beacon";
+
+type PaymentState =
+  | { status: "loading" }
+  | {
+      status: "success";
+      payment: {
+        id: string;
+        status: string;
+        amount: number;
+        metadata?: Record<string, unknown> | null;
+      };
+    }
+  | { status: "error" };
+
+function formatCurrency(value: number | undefined) {
+  if (!value) {
+    return "Valor nao informado";
+  }
+
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format(value);
+}
+
+function PaymentSuccessContent() {
+  const [state, setState] = useState<PaymentState>({ status: "loading" });
   const searchParams = useSearchParams();
   const router = useRouter();
-
-  const paymentId = searchParams.get('payment_id');
-  const externalReference = searchParams.get('external_reference');
-  const collectionId = searchParams.get('collection_id');
+  const paymentId = searchParams.get("payment_id") || searchParams.get("collection_id");
+  const externalReference = searchParams.get("external_reference");
 
   useEffect(() => {
-    const verifyPayment = async () => {
-      if (!paymentId) {
-        setStatus('error');
+    async function verify() {
+      if (!paymentId && !externalReference) {
+        setState({ status: "error" });
         return;
       }
 
       try {
-        // Verificar status do pagamento
-        const response = await fetch(`/api/payment/create?payment_id=${paymentId}`);
+        const requestUrl = new URL("/api/payment/create", window.location.origin);
+
+        if (paymentId) {
+          requestUrl.searchParams.set("payment_id", paymentId);
+        }
+
+        if (externalReference) {
+          requestUrl.searchParams.set("external_reference", externalReference);
+        }
+
+        const response = await fetch(requestUrl.toString());
         const data = await response.json();
 
         if (data.success) {
-          setPaymentInfo(data.payment);
-          setStatus('success');
-          
-          // Se for sucesso, redirecionar para o Noêmia após 3 segundos
-          setTimeout(() => {
-            router.push('/noemia?payment=confirmed');
-          }, 3000);
-        } else {
-          setStatus('error');
+          setState({
+            status: "success",
+            payment: data.payment
+          });
+          return;
         }
-      } catch (error) {
-        console.error('Erro ao verificar pagamento:', error);
-        setStatus('error');
+
+        setState({ status: "error" });
+      } catch {
+        setState({ status: "error" });
       }
-    };
+    }
 
-    verifyPayment();
-  }, [paymentId, router]);
+    void verify();
+  }, [externalReference, paymentId]);
 
-  if (status === 'loading') {
+  const offerName = useMemo(() => {
+    if (state.status !== "success") {
+      return "Pagamento premium";
+    }
+
+    return (state.payment.metadata?.offer_name as string) || "Pagamento premium";
+  }, [state]);
+
+  if (state.status === "loading") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Verificando pagamento...</h1>
-            <p className="text-gray-600">Aguarde um instante enquanto confirmamos sua transação.</p>
+      <main className="min-h-screen bg-[#f7f4ee] px-6 py-10 text-[#10261d]">
+        <div className="mx-auto max-w-3xl rounded-[32px] border border-[#e7e0d5] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+          <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
+            Verificando pagamento
           </div>
+          <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em]">
+            Estamos confirmando sua etapa de pagamento.
+          </h1>
+          <p className="mt-4 text-base leading-8 text-[#5f6f68]">
+            Em instantes o sistema organiza a confirmacao, a continuidade e o
+            proximo passo da sua jornada premium.
+          </p>
         </div>
-      </div>
+      </main>
     );
   }
 
-  if (status === 'error') {
+  if (state.status === "error") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Erro no pagamento</h1>
-            <p className="text-gray-600 mb-6">Ocorreu um erro ao processar seu pagamento. Por favor, tente novamente ou entre em contato conosco.</p>
-            <div className="space-y-3">
-              <button
-                onClick={() => router.push('/noemia')}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Voltar para o atendimento
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full bg-gray-200 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Tentar novamente
-              </button>
-            </div>
+      <main className="min-h-screen bg-[#f7f4ee] px-6 py-10 text-[#10261d]">
+        <div className="mx-auto max-w-3xl rounded-[32px] border border-[#efd7d7] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+          <div className="inline-flex rounded-full border border-[#efd7d7] bg-[#fff6f6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8a3f3f]">
+            Confirmacao indisponivel
+          </div>
+          <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em]">
+            Nao conseguimos validar esse retorno agora.
+          </h1>
+          <p className="mt-4 text-base leading-8 text-[#5f6f68]">
+            O fluxo de pagamento nao foi perdido. Voce pode voltar ao
+            atendimento ou tentar novamente em instantes.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => router.push("/noemia")}
+              className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white"
+            >
+              Voltar ao atendimento
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d]"
+            >
+              Tentar novamente
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+    <main className="min-h-screen bg-[#f7f4ee] px-6 py-10 text-[#10261d]">
+      <ProductEventBeacon
+        eventKey="revenue_signal"
+        eventGroup="revenue"
+        payload={{
+          payment_id: state.payment.id,
+          offer_code: state.payment.metadata?.offer_code || "consultation_initial",
+          offer_name: offerName,
+          status: "success_return_viewed"
+        }}
+      />
+
+      <div className="mx-auto max-w-4xl space-y-6">
+        <section className="rounded-[32px] border border-[#d7e7dc] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+          <div className="inline-flex rounded-full border border-[#d7e7dc] bg-[#f5fbf6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#245236]">
+            Pagamento confirmado
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Pagamento confirmado!</h1>
-          <p className="text-gray-600 mb-6">
-            Seu pagamento foi processado com sucesso. 
-            {paymentInfo?.amount && ` Valor: R$ ${paymentInfo.amount.toFixed(2)}`}
+          <h1 className="mt-6 text-4xl font-semibold tracking-[-0.03em]">
+            {offerName} confirmada com sucesso.
+          </h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
+            O sistema ja reconheceu o pagamento e a jornada segue com contexto:
+            atendimento, continuidade e proximo passo permanecem conectados.
           </p>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-blue-800 text-sm">
-              <strong>Próximos passos:</strong><br />
-              • Você será redirecionado automaticamente para o atendimento<br />
-              • Receberá as orientações para sua consulta<br />
-              • Nossa equipe entrará em contato para agendar
+
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                Oferta
+              </p>
+              <p className="mt-3 text-lg font-semibold">{offerName}</p>
+            </article>
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                Valor confirmado
+              </p>
+              <p className="mt-3 text-lg font-semibold">
+                {formatCurrency(state.payment.amount)}
+              </p>
+            </article>
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                Proximo passo
+              </p>
+              <p className="mt-3 text-lg font-semibold">
+                Organizar atendimento
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-2">
+          <article className="rounded-[28px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+            <h2 className="text-xl font-semibold tracking-[-0.03em]">
+              O que acontece agora
+            </h2>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-[#5f6f68]">
+              <li>A operacao recebe a confirmacao e pode seguir sem depender de cobranca manual.</li>
+              <li>A jornada continua com status claro, sem limbo entre pagamento e atendimento.</li>
+              <li>Agenda, consulta ou analise seguem para o proximo passo conforme a oferta contratada.</li>
+            </ul>
+          </article>
+
+          <article className="rounded-[28px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+            <h2 className="text-xl font-semibold tracking-[-0.03em]">
+              Continuar com clareza
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#5f6f68]">
+              Voce pode voltar ao atendimento para acompanhar a continuidade ou
+              seguir para a pagina inicial. O contexto do pagamento permanece
+              preservado internamente.
             </p>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={() => router.push('/noemia?payment=confirmed')}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Continuar para o atendimento
-            </button>
-            <button
-              onClick={() => router.push('/')}
-              className="w-full bg-gray-200 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Ir para a página inicial
-            </button>
-          </div>
-
-          <p className="text-xs text-gray-500 mt-4">
-            Redirecionando automaticamente em 3 segundos...
-          </p>
-        </div>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                onClick={() => router.push("/noemia?payment=confirmed")}
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white"
+              >
+                Continuar atendimento
+              </button>
+              <button
+                onClick={() => router.push("/")}
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d]"
+              >
+                Ir para a pagina inicial
+              </button>
+            </div>
+          </article>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
 
-export default function PagamentoSucesso() {
+export default function PaymentSuccessPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    }>
-      <PagamentoSucessoContent />
+    <Suspense fallback={null}>
+      <PaymentSuccessContent />
     </Suspense>
   );
 }

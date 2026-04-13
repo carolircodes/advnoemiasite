@@ -33,6 +33,7 @@ import { getStaffOverview } from "@/lib/services/dashboard";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
 import { buildExecutiveCockpitProjection } from "@/lib/services/premium-operational-model";
 import { updateIntakeRequestStatus } from "@/lib/services/public-intake";
+import { getRevenueIntelligenceOverview } from "@/lib/services/revenue-intelligence";
 
 function getStringParam(
   value: string | string[] | undefined,
@@ -205,6 +206,7 @@ export default async function InternalLawyerPage({
   const profile = await requireProfile(["advogada", "admin"]);
   const overview = await getStaffOverview();
   const intelligence = await getBusinessIntelligenceOverview(30);
+  const revenue = await getRevenueIntelligenceOverview(30);
   const params = await searchParams;
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
@@ -631,6 +633,118 @@ export default async function InternalLawyerPage({
 
         <div className="notice">
           {cockpitProjection.consistencyNote}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        id="receita-formacao"
+        title="Receita em formacao"
+        description="Leitura direta de pagamentos pendentes, ofertas aceitas, receita confirmada e jornadas que pedem follow-up sem inflar o cockpit."
+      >
+        <div className="summary-grid compact">
+          <div className="summary-card">
+            <span>Receita em formacao</span>
+            <strong>R$ {revenue.summary.revenueInFormation.toFixed(2)}</strong>
+            <p>{revenue.summary.pendingCount} pagamento(s) ainda em andamento.</p>
+            <span className="item-meta">Dinheiro que ja entrou em checkout e ainda nao fechou.</span>
+          </div>
+          <div className="summary-card">
+            <span>Receita confirmada</span>
+            <strong>R$ {revenue.summary.revenueConfirmed.toFixed(2)}</strong>
+            <p>{revenue.summary.approvedCount} pagamento(s) aprovados no periodo.</p>
+            <span className="item-meta">Valor que ja virou fechamento real.</span>
+          </div>
+          <div className="summary-card">
+            <span>Follow-up de pagamento</span>
+            <strong>{revenue.summary.paymentFollowUpNeeded}</strong>
+            <p>Jornadas que pedem retomada humana ou nova passagem de valor.</p>
+            <span className="item-meta">Evita perder dinheiro entre aceite e confirmacao.</span>
+          </div>
+        </div>
+
+        <div className="grid three">
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Pagamentos pendentes</span>
+            {revenue.latestPayments.filter((item) => item.status === "pending").length ? (
+              <ul className="update-feed compact">
+                {revenue.latestPayments
+                  .filter((item) => item.status === "pending")
+                  .slice(0, 4)
+                  .map((item) => (
+                    <li key={item.id} className="update-card">
+                      <div className="update-head">
+                        <div>
+                          <strong>{item.offerLabel}</strong>
+                          <span className="item-meta">{item.amountLabel}</span>
+                        </div>
+                        <span className={`pill ${item.followUpNeeded ? "warning" : "muted"}`}>
+                          {item.followUpNeeded ? "Pede follow-up" : "Pendente"}
+                        </span>
+                      </div>
+                      <p className="update-body">
+                        Caminho: {item.pathLabel}. Criado em {new Date(item.createdAt).toLocaleString("pt-BR")}.
+                      </p>
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="empty-state">Nenhum pagamento pendente puxando a fila agora.</p>
+            )}
+          </div>
+
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Falhas e recuperacao</span>
+            {revenue.latestPayments.filter((item) => item.status === "rejected" || item.status === "failed").length ? (
+              <ul className="update-feed compact">
+                {revenue.latestPayments
+                  .filter((item) => item.status === "rejected" || item.status === "failed")
+                  .slice(0, 4)
+                  .map((item) => (
+                    <li key={item.id} className="update-card">
+                      <div className="update-head">
+                        <div>
+                          <strong>{item.offerLabel}</strong>
+                          <span className="item-meta">{item.amountLabel}</span>
+                        </div>
+                        <span className="pill critical">Recuperar</span>
+                      </div>
+                      <p className="update-body">
+                        {item.statusDetail || "Falha no pagamento sem detalhamento adicional."}
+                      </p>
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="empty-state">Nenhuma falha recente destacada neste momento.</p>
+            )}
+          </div>
+
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Ofertas que mais fecham</span>
+            {revenue.offerBreakdown.length ? (
+              <ul className="list">
+                {revenue.offerBreakdown.slice(0, 4).map((item) => (
+                  <li key={item.code}>
+                    <div className="item-head">
+                      <strong>{item.label}</strong>
+                      <span className="tag soft">{item.approved} aprovado(s)</span>
+                    </div>
+                    <span className="item-meta">
+                      R$ {item.revenueConfirmed.toFixed(2)} confirmados e R$ {item.revenueInFormation.toFixed(2)} em formacao.
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">As ofertas entram aqui assim que a camada de receita ganhar volume real.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <Link className="button secondary" href="/internal/advogada/inteligencia">
+            Abrir inteligencia de receita
+          </Link>
         </div>
       </SectionCard>
 

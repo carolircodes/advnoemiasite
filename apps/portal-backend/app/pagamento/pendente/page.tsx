@@ -1,202 +1,171 @@
-'use client';
+"use client";
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-function PagamentoPendenteContent() {
-  const [countdown, setCountdown] = useState(60);
-  const [paymentMethod, setPaymentMethod] = useState<string>('');
+import { ProductEventBeacon } from "@/components/product-event-beacon";
+
+function PaymentPendingContent() {
+  const [countdown, setCountdown] = useState(45);
+  const [payment, setPayment] = useState<any>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const paymentId = searchParams.get("payment_id") || searchParams.get("collection_id");
+  const externalReference = searchParams.get("external_reference");
 
-  const paymentId = searchParams.get('payment_id');
-  const paymentType = searchParams.get('payment_type');
-
-  useEffect(() => {
-    // Determinar método de pagamento
-    if (paymentType === 'pix') {
-      setPaymentMethod('Pix');
-    } else if (paymentType === 'credit_card') {
-      setPaymentMethod('Cartão de Crédito');
-    } else {
-      setPaymentMethod('outro método');
+  async function checkStatus() {
+    if (!paymentId && !externalReference) {
+      return;
     }
 
-    // Countdown para verificar status
+    const requestUrl = new URL("/api/payment/create", window.location.origin);
+
+    if (paymentId) {
+      requestUrl.searchParams.set("payment_id", paymentId);
+    }
+
+    if (externalReference) {
+      requestUrl.searchParams.set("external_reference", externalReference);
+    }
+
+    const response = await fetch(requestUrl.toString());
+    const data = await response.json();
+
+    if (!data.success) {
+      return;
+    }
+
+    setPayment(data.payment);
+
+    const redirectParams = new URLSearchParams();
+
+    if (paymentId) {
+      redirectParams.set("payment_id", paymentId);
+    }
+
+    if (externalReference) {
+      redirectParams.set("external_reference", externalReference);
+    }
+
+    if (data.payment.status === "approved") {
+      router.push(`/pagamento/sucesso?${redirectParams.toString()}`);
+    } else if (data.payment.status === "rejected") {
+      redirectParams.set("collection_status", "rejected");
+      router.push(`/pagamento/falha?${redirectParams.toString()}`);
+    }
+  }
+
+  useEffect(() => {
+    void checkStatus();
+
     const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          checkPaymentStatus();
-          return 0;
+      setCountdown((current) => {
+        if (current <= 1) {
+          void checkStatus();
+          return 45;
         }
-        return prev - 1;
+
+        return current - 1;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [paymentType]);
+  }, [externalReference, paymentId, router]);
 
-  const checkPaymentStatus = async () => {
-    if (!paymentId) return;
-
-    try {
-      const response = await fetch(`/api/payment/create?payment_id=${paymentId}`);
-      const data = await response.json();
-
-      if (data.success && data.payment.status === 'approved') {
-        router.push('/pagamento/sucesso?payment_id=' + paymentId);
-      } else if (data.payment.status === 'rejected') {
-        router.push('/pagamento/falha?payment_id=' + paymentId + '&collection_status=rejected');
-      } else {
-        // Continua pendente, reinicia o countdown
-        setCountdown(60);
-      }
-    } catch (error) {
-      console.error('Erro ao verificar status:', error);
-      setCountdown(60); // Tentar novamente em 60 segundos
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getInstructions = () => {
-    switch (paymentType) {
-      case 'pix':
-        return {
-          title: 'Aguardando pagamento via Pix',
-          steps: [
-            'Escaneie o QR Code com o app do seu banco',
-            'Ou copie e cole o código Pix no app do seu banco',
-            'Pagamentos via Pix são confirmados instantaneamente',
-            'Após o pagamento, você será redirecionado automaticamente'
-          ],
-          color: 'green'
-        };
-      
-      case 'credit_card':
-        return {
-          title: 'Processando pagamento com Cartão de Crédito',
-          steps: [
-            'Seu pagamento está sendo processado pela operadora',
-            'A confirmação pode levar até 5 minutos',
-            'Não feche esta página enquanto aguardamos',
-            'Você será redirecionado automaticamente após a confirmação'
-          ],
-          color: 'blue'
-        };
-      
-      default:
-        return {
-          title: 'Processando pagamento',
-          steps: [
-            'Seu pagamento está sendo processado',
-            'Aguarde a confirmação da transação',
-            'Não feche esta página',
-            'Você será redirecionado automaticamente'
-          ],
-          color: 'yellow'
-        };
-    }
-  };
-
-  const instructions = getInstructions();
+  const offerName = useMemo(
+    () => (payment?.metadata?.offer_name as string) || "Etapa premium",
+    [payment]
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-        <div className="text-center">
-          {/* Ícone de carregamento */}
-          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+    <main className="min-h-screen bg-[#f7f4ee] px-6 py-10 text-[#10261d]">
+      <ProductEventBeacon
+        eventKey="payment_pending"
+        eventGroup="revenue"
+        payload={{
+          payment_id: paymentId || "",
+          offer_code: payment?.metadata?.offer_code || "consultation_initial",
+          offer_name: offerName,
+          status: "pending_return_viewed"
+        }}
+      />
+
+      <div className="mx-auto max-w-4xl space-y-6">
+        <section className="rounded-[32px] border border-[#eadfcf] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+          <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#7b5c31]">
+            Pagamento em andamento
           </div>
-          
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {instructions.title}
+          <h1 className="mt-6 text-4xl font-semibold tracking-[-0.03em]">
+            Estamos acompanhando a confirmacao de {offerName.toLowerCase()}.
           </h1>
-          
-          <p className="text-gray-600 mb-6">
-            ID da transação: <span className="font-mono text-sm">{paymentId}</span>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
+            Seu checkout foi iniciado e o sistema continua verificando a
+            confirmacao para liberar a continuidade sem ruído.
           </p>
 
-          {/* Timer */}
-          <div className={`bg-${instructions.color}-50 border border-${instructions.color}-200 rounded-lg p-4 mb-6`}>
-            <p className={`text-${instructions.color}-800 text-sm mb-2`}>
-              <strong>Verificando status em:</strong>
-            </p>
-            <div className={`text-3xl font-bold text-${instructions.color}-600`}>
-              {formatTime(countdown)}
-            </div>
-            <p className={`text-${instructions.color}-600 text-xs mt-1`}>
-              {paymentMethod === 'Pix' ? 'ou clique em "Já paguei"' : 'aguarde a confirmação'}
-            </p>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                Status
+              </p>
+              <p className="mt-3 text-lg font-semibold">Pagamento pendente</p>
+            </article>
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                Nova verificacao
+              </p>
+              <p className="mt-3 text-lg font-semibold">{countdown}s</p>
+            </article>
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                Proximo movimento
+              </p>
+              <p className="mt-3 text-lg font-semibold">Confirmar e continuar</p>
+            </article>
           </div>
+        </section>
 
-          {/* Instruções */}
-          <div className="text-left bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-            <p className="text-gray-800 text-sm font-semibold mb-3">
-              O que fazer agora:
-            </p>
-            <ul className="space-y-2">
-              {instructions.steps.map((step, index) => (
-                <li key={index} className="flex items-start text-gray-700 text-sm">
-                  <span className="text-blue-600 mr-2 mt-0.5">•</span>
-                  <span>{step}</span>
-                </li>
-              ))}
+        <section className="grid gap-6 md:grid-cols-2">
+          <article className="rounded-[28px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+            <h2 className="text-xl font-semibold tracking-[-0.03em]">
+              O que fazer agora
+            </h2>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-[#5f6f68]">
+              <li>Finalize o Pix ou aguarde a operadora se estiver usando cartao.</li>
+              <li>O sistema continua monitorando a confirmacao sem perder o contexto da oferta.</li>
+              <li>Se a confirmacao demorar demais, a operacao pode retomar o fluxo com follow-up.</li>
             </ul>
-          </div>
+          </article>
 
-          {/* Botões de ação */}
-          <div className="space-y-3">
-            <button
-              onClick={checkPaymentStatus}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Verificar status agora
-            </button>
-            
-            {paymentMethod === 'Pix' && (
+          <article className="rounded-[28px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+            <h2 className="text-xl font-semibold tracking-[-0.03em]">
+              Continuar acompanhando
+            </h2>
+            <div className="mt-6 flex flex-col gap-3">
               <button
-                onClick={() => router.push('/noemia')}
-                className="w-full bg-gray-200 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                onClick={() => void checkStatus()}
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white"
               >
-                Já paguei, voltar para atendimento
+                Verificar status agora
               </button>
-            )}
-            
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full bg-gray-200 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Atualizar página
-            </button>
-          </div>
-
-          {/* Ajuda */}
-          <div className="text-xs text-gray-500 mt-4 space-y-1">
-            <p>• Não feche esta página enquanto aguarda a confirmação</p>
-            <p>• Se o pagamento for confirmado e não for redirecionado, clique em "Verificar status agora"</p>
-            <p>• Em caso de problemas, entre em contato conosco</p>
-          </div>
-        </div>
+              <button
+                onClick={() => router.push("/noemia")}
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d]"
+              >
+                Voltar ao atendimento
+              </button>
+            </div>
+          </article>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
 
-export default function PagamentoPendente() {
+export default function PaymentPendingPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600"></div>
-      </div>
-    }>
-      <PagamentoPendenteContent />
+    <Suspense fallback={null}>
+      <PaymentPendingContent />
     </Suspense>
   );
 }

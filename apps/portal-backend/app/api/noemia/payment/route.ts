@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { generatePaymentLink, generatePaymentMessage } from "@/lib/payment/payment-service";
+import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
+import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 function createPaymentSupabaseClient() {
@@ -10,7 +12,7 @@ function createPaymentSupabaseClient() {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createPaymentSupabaseClient();
-    const { leadId, userId, message, intentionType } = await request.json();
+    const { leadId, userId, message, intentionType, offerCode } = await request.json();
 
     if (!leadId || !userId) {
       return NextResponse.json(
@@ -35,6 +37,10 @@ export async function POST(request: NextRequest) {
       .eq("lead_id", leadId)
       .in("status", ["pending", "approved"])
       .maybeSingle();
+    const selectedOffer =
+      typeof offerCode === "string" && offerCode.trim()
+        ? getRevenueOfferByCode(offerCode)
+        : getRevenueOfferByIntent(typeof intentionType === "string" ? intentionType : "");
 
     if (existingPayment && existingPayment.status === "pending") {
       const responseMessage = generatePaymentMessage({
@@ -49,6 +55,11 @@ export async function POST(request: NextRequest) {
         message: responseMessage,
         paymentUrl: existingPayment.payment_url,
         paymentId: existingPayment.external_id,
+        offer: {
+          code: selectedOffer.code,
+          name: selectedOffer.name,
+          kind: selectedOffer.kind
+        },
         alreadyExists: true
       });
     }
@@ -62,15 +73,60 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    try {
+      await recordRevenueTelemetry({
+        eventKey: "offer_presented",
+        pagePath: "/noemia",
+        payload: {
+          lead_id: leadId,
+          user_id: userId,
+          offer_code: selectedOffer.code,
+          offer_kind: selectedOffer.kind,
+          offer_name: selectedOffer.name,
+          intention_type: intentionType || "consultation",
+          monetization_source: "noemia",
+          monetization_path: `noemia_${selectedOffer.kind}_flow`
+        }
+      });
+
+      await recordRevenueTelemetry({
+        eventKey: "offer_acceptance_signal",
+        pagePath: "/noemia",
+        payload: {
+          lead_id: leadId,
+          user_id: userId,
+          offer_code: selectedOffer.code,
+          offer_kind: selectedOffer.kind,
+          source_message: message || "",
+          intention_type: intentionType || "consultation",
+          monetization_source: "noemia",
+          monetization_path: `noemia_${selectedOffer.kind}_flow`
+        }
+      });
+    } catch (trackingError) {
+      console.error("[noemia.payment] Failed to record offer telemetry", {
+        trackingError
+      });
+    }
+
     const paymentResponse = await generatePaymentLink({
       leadId,
       userId,
+      offerCode: selectedOffer.code,
+      intentionType,
+      monetizationPath: `noemia_${selectedOffer.kind}_flow`,
+      monetizationSource: "noemia",
       metadata: {
         intention_type: intentionType,
         original_message: message,
-        user_agent: request.headers.get("user-agent")
+        user_agent: request.headers.get("user-agent"),
+        offer_code: selectedOffer.code,
+        offer_kind: selectedOffer.kind,
+        offer_name: selectedOffer.name,
+        monetization_path: `noemia_${selectedOffer.kind}_flow`,
+        monetization_source: "noemia"
       }
-    });
+    } as any);
 
     if (!paymentResponse.success) {
       return NextResponse.json(
@@ -91,7 +147,10 @@ export async function POST(request: NextRequest) {
         payment_id: paymentResponse.paymentId,
         payment_url: paymentResponse.paymentUrl,
         amount: paymentResponse.amount,
-        intention_type: intentionType
+        intention_type: intentionType,
+        offer_code: selectedOffer.code,
+        offer_kind: selectedOffer.kind,
+        offer_name: selectedOffer.name
       },
       created_at: new Date().toISOString()
     });
@@ -110,7 +169,12 @@ export async function POST(request: NextRequest) {
       message: aiMessage,
       paymentUrl: paymentResponse.paymentUrl,
       paymentId: paymentResponse.paymentId,
-      amount: paymentResponse.amount
+      amount: paymentResponse.amount,
+      offer: {
+        code: selectedOffer.code,
+        name: selectedOffer.name,
+        kind: selectedOffer.kind
+      }
     });
   } catch (error) {
     console.error("[noemia.payment] Internal error", {
@@ -153,6 +217,7 @@ export async function GET(request: NextRequest) {
         external_id: payment.external_id,
         status: payment.status,
         amount: payment.amount,
+        metadata: payment.metadata || null,
         created_at: payment.created_at,
         updated_at: payment.updated_at,
         approved_at: payment.approved_at

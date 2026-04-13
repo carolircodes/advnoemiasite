@@ -3,6 +3,10 @@ import { createAdminSupabaseClient } from "../supabase/admin";
 export interface PaymentRequest {
   leadId: string;
   userId: string;
+  offerCode?: string;
+  intentionType?: string;
+  monetizationPath?: string;
+  monetizationSource?: string;
   metadata?: Record<string, any>;
 }
 
@@ -11,6 +15,11 @@ export interface PaymentResponse {
   paymentUrl?: string;
   paymentId?: string;
   amount?: number;
+  offer?: {
+    code: string;
+    name: string;
+    kind: string;
+  };
   message?: string;
   error?: string;
 }
@@ -50,6 +59,7 @@ export async function generatePaymentLink(request: PaymentRequest): Promise<Paym
       paymentUrl: data.paymentUrl,
       paymentId: data.paymentId,
       amount: data.amount,
+      offer: data.offer,
       message: data.message
     };
   } catch (error) {
@@ -107,7 +117,7 @@ Assim que o pagamento for confirmado, seguimos com seu atendimento prioritario.
 
 Link para pagamento: ${paymentResponse.paymentUrl}
 
-O valor da consulta e de R$ ${paymentResponse.amount?.toFixed(2)} e pode ser pago via Pix ou cartao de credito.
+O valor desta etapa e de R$ ${paymentResponse.amount?.toFixed(2)} e pode ser pago via Pix ou cartao de credito.
 
 Apos a confirmacao, voce recebera as proximas orientacoes automaticamente.`;
 }

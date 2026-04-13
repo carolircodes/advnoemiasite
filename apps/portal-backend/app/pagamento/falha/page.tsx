@@ -1,128 +1,95 @@
-'use client';
+"use client";
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-function PagamentoFalhaContent() {
-  const [reason, setReason] = useState<string>('');
+import { ProductEventBeacon } from "@/components/product-event-beacon";
+
+function getFailureReason(status: string) {
+  switch (status) {
+    case "rejected":
+      return "O pagamento foi rejeitado pela instituicao financeira ou pelo metodo escolhido.";
+    case "cancelled":
+      return "O checkout foi interrompido antes da confirmacao.";
+    default:
+      return "A confirmacao nao aconteceu neste momento.";
+  }
+}
+
+function PaymentFailureContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const paymentId = searchParams.get("payment_id");
+  const status = searchParams.get("collection_status") || "failed";
 
-  const paymentId = searchParams.get('payment_id');
-  const externalReference = searchParams.get('external_reference');
-
-  useEffect(() => {
-    // Determinar motivo da falha baseado nos parâmetros
-    if (searchParams.get('collection_status') === 'rejected') {
-      setReason('Pagamento rejeitado pela instituição financeira.');
-    } else if (searchParams.get('collection_status') === 'cancelled') {
-      setReason('Pagamento cancelado pelo usuário.');
-    } else if (searchParams.get('collection_status') === 'pending') {
-      setReason('Pagamento em processamento. Verificamos seu status e atualizaremos em breve.');
-    } else {
-      setReason('Ocorreu um erro durante o processamento do pagamento.');
-    }
-  }, [searchParams]);
-
-  const handleRetry = () => {
-    // Tentar gerar novo pagamento
-    if (externalReference) {
-      // Extrair leadId do external_reference
-      const match = externalReference.match(/consultation_(\d+)_\d+/);
-      if (match) {
-        const leadId = match[1];
-        router.push(`/noemia?lead=${leadId}&retry_payment=true`);
-      }
-    }
-  };
-
-  const handleContact = () => {
-    // Redirecionar para WhatsApp ou contato
-    window.open('https://wa.me/5511999999999?text=Olá!%20Tive%20problemas%20com%20o%20pagamento%20da%20consulta.', '_blank');
-  };
+  const reason = useMemo(() => getFailureReason(status), [status]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Pagamento não concluído</h1>
-          
-          <div className="text-left bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800 text-sm mb-2">
-              <strong>Motivo:</strong> {reason}
-            </p>
-            {paymentId && (
-              <p className="text-red-600 text-xs">
-                <strong>ID da transação:</strong> {paymentId}
-              </p>
-            )}
-          </div>
+    <main className="min-h-screen bg-[#f7f4ee] px-6 py-10 text-[#10261d]">
+      <ProductEventBeacon
+        eventKey="payment_failed"
+        eventGroup="revenue"
+        payload={{
+          payment_id: paymentId || "",
+          status
+        }}
+      />
 
-          <div className="space-y-3 mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-800 text-sm">
-                <strong>O que você pode fazer:</strong><br />
-                • Tentar o pagamento novamente com outro cartão<br />
-                • Usar o Pix para pagamento instantâneo<br />
-                • Entrar em contato conosco para ajuda
-              </p>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <section className="rounded-[32px] border border-[#efd7d7] bg-white p-8 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+          <div className="inline-flex rounded-full border border-[#efd7d7] bg-[#fff6f6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8a3f3f]">
+            Pagamento nao concluido
+          </div>
+          <h1 className="mt-6 text-4xl font-semibold tracking-[-0.03em]">
+            A jornada de pagamento precisa ser retomada.
+          </h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
+            {reason} O sistema manteve o contexto da oferta para facilitar uma
+            nova tentativa ou apoio humano sem perder a continuidade.
+          </p>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-2">
+          <article className="rounded-[28px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+            <h2 className="text-xl font-semibold tracking-[-0.03em]">
+              Como recuperar essa jornada
+            </h2>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-[#5f6f68]">
+              <li>Gerar um novo checkout com o mesmo contexto da oferta.</li>
+              <li>Tentar outro metodo de pagamento, como Pix.</li>
+              <li>Seguir com apoio humano se a cobranca precisar de orientacao adicional.</li>
+            </ul>
+          </article>
+
+          <article className="rounded-[28px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)]">
+            <h2 className="text-xl font-semibold tracking-[-0.03em]">
+              Continuar com seguranca
+            </h2>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                onClick={() => router.push("/noemia?retry_payment=true")}
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white"
+              >
+                Tentar novamente
+              </button>
+              <button
+                onClick={() => router.push("/noemia")}
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d]"
+              >
+                Voltar ao atendimento
+              </button>
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={handleRetry}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Tentar pagamento novamente
-            </button>
-            
-            <button
-              onClick={handleContact}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              Falar com atendente
-            </button>
-            
-            <button
-              onClick={() => router.push('/noemia')}
-              className="w-full bg-gray-200 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Voltar para o atendimento
-            </button>
-          </div>
-
-          <div className="text-xs text-gray-500 mt-4 space-y-1">
-            <p>• Pagamentos via Pix são processados instantaneamente</p>
-            <p>• Cartões de crédito podem demorar até 5 minutos para confirmar</p>
-            <p>• Em caso de dúvidas, entre em contato conosco</p>
-          </div>
-        </div>
+          </article>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
 
-export default function PagamentoFalha() {
+export default function PaymentFailurePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
-    }>
-      <PagamentoFalhaContent />
+    <Suspense fallback={null}>
+      <PaymentFailureContent />
     </Suspense>
   );
 }
