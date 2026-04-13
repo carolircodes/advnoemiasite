@@ -31,6 +31,7 @@ import {
 import { createClientWithInvite } from "@/lib/services/create-client";
 import { getStaffOverview } from "@/lib/services/dashboard";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
+import { buildExecutiveCockpitProjection } from "@/lib/services/premium-operational-model";
 import { updateIntakeRequestStatus } from "@/lib/services/public-intake";
 
 function getStringParam(
@@ -451,6 +452,7 @@ export default async function InternalLawyerPage({
       actionLabel: string;
     } => item !== null
   );
+  const cockpitProjection = buildExecutiveCockpitProjection(overview, intelligence);
 
   return (
     <AppFrame
@@ -488,6 +490,149 @@ export default async function InternalLawyerPage({
     >
       {error ? <div className="error-notice">{error}</div> : null}
       {success ? <div className="success-notice">{success}</div> : null}
+
+      <SectionCard
+        title="Cockpit estrategico"
+        description="Leitura executiva do dia para decidir com rapidez o que exige acao imediata, o que trava por dependencia e onde a operacao ainda forma receita."
+      >
+        <div className="notice">{cockpitProjection.focusHeadline}</div>
+
+        <div className="operational-band">
+          {cockpitProjection.radarCards.map((card) => (
+            <article
+              key={card.label}
+              className={`operational-band-card ${
+                card.tone === "critical"
+                  ? "critical"
+                  : card.tone === "warning"
+                    ? "warning"
+                    : card.tone === "success"
+                      ? "success"
+                      : "neutral"
+              }`}
+            >
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <p>{card.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid three">
+          {cockpitProjection.strategicCards.map((card) => (
+            <article key={card.label} className="summary-card">
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <p>{card.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid three">
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Prioridade imediata</span>
+            {cockpitProjection.priorityDeck.length ? (
+              <ul className="update-feed compact">
+                {cockpitProjection.priorityDeck.map((item) => (
+                  <li key={item.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{item.title}</strong>
+                        <span className="item-meta">{item.meta}</span>
+                      </div>
+                      <span className={`pill ${item.tone === "critical" ? "critical" : item.tone === "warning" ? "warning" : item.tone === "success" ? "success" : "muted"}`}>
+                        {item.tone === "critical"
+                          ? "Agir agora"
+                          : item.tone === "warning"
+                            ? "Puxando fila"
+                            : item.tone === "success"
+                              ? "Pronto"
+                              : "Monitorar"}
+                      </span>
+                    </div>
+                    <p className="update-body">{item.detail}</p>
+                    <div className="form-actions">
+                      <Link className="button secondary" href={item.href}>
+                        {item.actionLabel}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">
+                Nenhuma prioridade nova no momento. O cockpit continua atento para destacar o primeiro gargalo relevante.
+              </p>
+            )}
+          </div>
+
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Dependencias e bloqueios</span>
+            {cockpitProjection.dependencyDeck.length ? (
+              <ul className="update-feed compact">
+                {cockpitProjection.dependencyDeck.map((item) => (
+                  <li key={item.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{item.title}</strong>
+                        <span className="item-meta">{item.meta}</span>
+                      </div>
+                      <span className={`pill ${item.tone === "critical" ? "critical" : item.tone === "warning" ? "warning" : "muted"}`}>
+                        {item.tone === "critical" ? "Bloqueio critico" : item.tone === "warning" ? "Depende de retorno" : "Em acompanhamento"}
+                      </span>
+                    </div>
+                    <p className="update-body">{item.detail}</p>
+                    <div className="form-actions">
+                      <Link className="button secondary" href={item.href}>
+                        {item.actionLabel}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">
+                Nenhuma dependencia dominante agora. A operacao segue mais limpa entre equipe, cliente e agenda.
+              </p>
+            )}
+          </div>
+
+          <div className="subtle-panel stack">
+            <span className="shortcut-kicker">Receita e continuidade</span>
+            {cockpitProjection.revenueDeck.length ? (
+              <ul className="update-feed compact">
+                {cockpitProjection.revenueDeck.map((item) => (
+                  <li key={item.id} className="update-card">
+                    <div className="update-head">
+                      <div>
+                        <strong>{item.title}</strong>
+                        <span className="item-meta">{item.meta}</span>
+                      </div>
+                      <span className={`pill ${item.tone === "success" ? "success" : item.tone === "warning" ? "warning" : "muted"}`}>
+                        {item.tone === "success" ? "Mover agora" : item.tone === "warning" ? "Preparar" : "Leitura"}
+                      </span>
+                    </div>
+                    <p className="update-body">{item.detail}</p>
+                    <div className="form-actions">
+                      <Link className="button secondary" href={item.href}>
+                        {item.actionLabel}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">
+                Nenhuma oportunidade adicional destacada agora. O painel segue focado no que realmente destrava resultado.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="notice">
+          {cockpitProjection.consistencyNote}
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Busca e filtros"

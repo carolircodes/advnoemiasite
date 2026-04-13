@@ -12,15 +12,10 @@ import {
   getClientProfileSummary,
   getClientRequestsSummary
 } from "@/lib/services/client-workspace";
+import { buildClientPortalPremiumProjection } from "@/lib/services/premium-operational-model";
 
 import { ClientShell } from "./_components/client-shell";
-import {
-  ClientAgendaPreparationCard,
-  ClientCaseSummaryModule,
-  ClientDocumentsPreparationCard,
-  ClientEventsModule,
-  ClientRequestsModule
-} from "./_components/client-case-summary-module";
+import { ClientPremiumWorkspace } from "./_components/client-premium-workspace";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -102,9 +97,9 @@ export default async function ClientPage({
     successCode === "primeiro-acesso-concluido"
       ? {
           tone: "success" as const,
-          title: "Primeiro acesso concluido",
+          title: "Portal liberado",
           description:
-            "Seu acesso foi liberado com sucesso e o shell minimo do painel ja esta disponivel."
+            "Seu acesso foi confirmado e o acompanhamento ja esta organizado com status, proximos passos e historico recente."
         }
       : null,
     errorMessage
@@ -116,40 +111,32 @@ export default async function ClientPage({
       : null,
     {
       tone: "warning" as const,
-      title: "Como usar este painel",
+      title: "Leitura rapida do atendimento",
       description:
-        "Aqui voce acompanha o resumo do caso, documentos, agenda e historico recente. Se algum bloco estiver temporariamente indisponivel, a pagina continua aberta com seguranca."
+        "Este portal mostra primeiro o que esta acontecendo agora, o que depende de voce e quais movimentos a equipe ja registrou no caso."
     }
   ].filter(isNotice);
+  const premiumProjection = buildClientPortalPremiumProjection({
+    caseSummary: caseSummary.data,
+    documentsSummary: documentsSummary.data,
+    agendaSummary: agendaSummary.data,
+    requestsSummary: requestsSummary.data,
+    eventsSummary: eventsSummary.data
+  });
 
   return (
     <ClientShell profile={profileSummary.data} notices={notices}>
-      <ClientCaseSummaryModule
-        enabled={portalFeatures.clientCaseSummary}
-        result={caseSummary}
-      />
+      {!portalFeatures.clientCaseSummary ||
+      !portalFeatures.clientDocuments ||
+      !portalFeatures.clientAgenda ||
+      !portalFeatures.clientRequests ||
+      !portalFeatures.clientActivity ? (
+        <section className="rounded-3xl border border-[#eadfcf] bg-[#fbf7ef] px-5 py-4 text-sm leading-7 text-[#7b5c31]">
+          Alguns modulos seguem em fallback seguro por flag. O portal continua priorizando clareza de status, pendencias e proximos passos com os dados ja disponiveis.
+        </section>
+      ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ClientDocumentsPreparationCard
-          enabled={portalFeatures.clientDocuments}
-          result={documentsSummary}
-        />
-        <ClientAgendaPreparationCard
-          enabled={portalFeatures.clientAgenda}
-          result={agendaSummary}
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ClientRequestsModule
-          enabled={portalFeatures.clientRequests}
-          result={requestsSummary}
-        />
-        <ClientEventsModule
-          enabled={portalFeatures.clientActivity}
-          result={eventsSummary}
-        />
-      </div>
+      <ClientPremiumWorkspace projection={premiumProjection} />
     </ClientShell>
   );
 }

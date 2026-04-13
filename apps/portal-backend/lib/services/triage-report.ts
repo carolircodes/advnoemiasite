@@ -1,4 +1,5 @@
 import type { SchedulingPreferences } from "./conversation-state";
+import type { CommercialFunnelSnapshot } from "./commercial-funnel";
 import type { SocialAcquisitionSnapshot } from "./social-acquisition";
 
 type PublicCommentPolicySnapshot = {
@@ -53,6 +54,7 @@ type BuildTriageReportInput = {
   } | null;
   schedulingPreferences?: SchedulingPreferences | null;
   acquisitionContext?: SocialAcquisitionSnapshot | null;
+  commercialSnapshot?: CommercialFunnelSnapshot | null;
   publicCommentPolicy?: PublicCommentPolicySnapshot | null;
 };
 
@@ -182,8 +184,28 @@ export function buildTriageReport(input: BuildTriageReportInput) {
     content_origin_label: input.acquisitionContext?.contentOriginLabel || "",
     commercial_context: input.acquisitionContext?.commercialContext || "",
     intent_signal: input.acquisitionContext?.intentSignal || "",
+    commercial_funnel_stage: input.commercialSnapshot?.funnelStage || executiveFunnelStage,
+    commercial_stage_label: input.commercialSnapshot?.stageLabel || "",
+    consultation_intent_level: input.commercialSnapshot?.consultationIntentLevel || "",
+    consultation_invite_timing: input.commercialSnapshot?.consultationInviteTiming || "",
+    consultation_invite_state: input.commercialSnapshot?.consultationInviteState || "",
+    consultation_invite_copy: input.commercialSnapshot?.consultationInviteCopy || "",
+    consultation_value_angle: input.commercialSnapshot?.consultationValueAngle || "",
+    scheduling_readiness: input.commercialSnapshot?.schedulingReadiness || "",
+    scheduling_status: input.commercialSnapshot?.schedulingStatus || "",
+    human_handoff_mode: input.commercialSnapshot?.humanHandoffMode || "",
+    human_handoff_ready: input.commercialSnapshot?.humanHandoffReady || false,
+    commercial_follow_up_type: input.commercialSnapshot?.followUpType || "",
+    operator_priority: input.commercialSnapshot?.operatorPriority || "",
+    close_opportunity_state: input.commercialSnapshot?.closeOpportunityState || "",
+    next_best_action_detail: input.commercialSnapshot?.nextBestActionDetail || "",
+    objections_detected: input.commercialSnapshot?.objectionsDetected || [],
+    hesitation_signals: input.commercialSnapshot?.hesitationSignals || [],
+    value_signals: input.commercialSnapshot?.valueSignals || [],
+    urgency_signals: input.commercialSnapshot?.urgencySignals || [],
     recommended_operator_action:
       input.publicCommentPolicy?.operatorAction ||
+      input.commercialSnapshot?.nextBestActionDetail ||
       input.acquisitionContext?.recommendedOperatorAction ||
       input.nextBestAction ||
       "",
@@ -210,6 +232,7 @@ export function buildTriageReport(input: BuildTriageReportInput) {
         ? `Explicacao: ${input.conversationPolicy.explanationStage}`
         : "",
       input.conversationPolicy?.triageStage ? `Triagem: ${input.conversationPolicy.triageStage}` : "",
+      input.commercialSnapshot?.summaryLine ? `Comercial: ${input.commercialSnapshot.summaryLine}` : "",
       input.conversationPolicy?.schedulingComplete ? "Disponibilidade suficiente coletada" : "",
       input.conversationPolicy?.readyForLawyer ? "Consulta pronta para acao operacional" : "",
       input.conversationPolicy?.aiActiveOnChannel === false ||
@@ -245,6 +268,7 @@ export function buildInternalTriageSummary(input: BuildTriageReportInput) {
     `Explicacao: ${input.conversationPolicy?.explanationStage || input.conversationState?.explanationStage || "not_started"}`,
     `Consulta: ${input.conversationPolicy?.consultationStage || input.conversationState?.consultationStage || "not_offered"}`,
     `Funil: ${inferExecutiveFunnelStage(input)}`,
+    input.commercialSnapshot?.funnelStage ? `Comercial: ${input.commercialSnapshot.funnelStage}` : "",
     `Triagem: ${input.conversationPolicy?.triageStage || "not_started"}`,
     `Disponibilidade: ${input.schedulingPreferences?.availability || "nao coletada"}`,
     `Problema: ${asString(collectedData.problema_principal) || input.messageText}`,
@@ -268,6 +292,7 @@ export function buildUserFacingTriageSummary(input: BuildTriageReportInput) {
     `explicacao ${input.conversationPolicy?.explanationStage || "not_started"}`,
     `consulta ${report.status_consulta}`,
     `funil ${report.executive_funnel_stage}`,
+    report.commercial_stage_label ? `comercial ${report.commercial_stage_label}` : "",
     report.preferencias_agendamento ? `agenda ${report.preferencias_agendamento}` : "",
     report.lawyer_notification_generated ? "advogada notificada" : "",
     report.ai_active_on_channel ? "IA segue ativa" : ""

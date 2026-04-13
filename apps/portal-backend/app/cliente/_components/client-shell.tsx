@@ -72,9 +72,9 @@ export function ClientShell({
         </h1>
 
         <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
-          Este painel foi organizado para voce entender rapidamente o que esta
-          acontecendo no seu acompanhamento, quais informacoes ja estao
-          disponiveis e qual e o proximo passo dentro do portal.
+          Este portal foi organizado para mostrar com clareza onde seu
+          atendimento esta, o que ja foi resolvido, o que ainda depende de
+          voce e quais sao os proximos passos acompanhados pela equipe.
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -84,7 +84,7 @@ export function ClientShell({
             </p>
             <p className="mt-2 text-lg font-semibold text-[#10261d]">Ativa</p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Seu acesso foi validado antes da abertura desta area.
+              Seu acesso foi validado e o acompanhamento esta protegido neste ambiente.
             </p>
           </div>
 
@@ -94,7 +94,7 @@ export function ClientShell({
             </p>
             <p className="mt-2 text-lg font-semibold text-[#10261d]">Resumo claro</p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Caso, documentos, agenda e historico ficam em blocos separados para facilitar a leitura.
+              Status, documentos, agenda e timeline aparecem com hierarquia para leitura rapida.
             </p>
           </div>
 
@@ -104,7 +104,7 @@ export function ClientShell({
             </p>
             <p className="mt-2 text-lg font-semibold text-[#10261d]">Tudo em um lugar</p>
             <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Use os modulos abaixo para ver o que ja esta liberado e o que pede sua atencao.
+              O portal destaca primeiro o que pede sua acao e o que a equipe ja conduziu.
             </p>
           </div>
         </div>
@@ -122,13 +122,12 @@ export function ClientShell({
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <ClientSafeCard title="Boas-vindas e acesso">
           <p>
-            Esta area foi organizada para abrir com rapidez e mostrar primeiro
-            o que mais ajuda no acompanhamento do seu caso.
+            Esta area abre com prioridade no que realmente ajuda voce a se orientar:
+            etapa atual, pendencias, documentos, agenda e historico do atendimento.
           </p>
           <p className="mt-3">
-            Quando algum dado ainda nao estiver disponivel, voce continua vendo
-            o restante do painel normalmente e pode seguir pelos links
-            principais sem confusao.
+            Se algum dado estiver temporariamente indisponivel, o restante do
+            portal continua funcionando para manter a leitura clara e segura.
           </p>
         </ClientSafeCard>
 
@@ -200,7 +199,8 @@ export function ClientShell({
         </div>
         <p className="mt-4">
           Se algum modulo estiver temporariamente vazio ou indisponivel, o
-          painel continua mostrando o restante do acompanhamento com clareza.
+          portal continua mostrando o restante do acompanhamento com clareza e
+          sem perder a continuidade do caso.
         </p>
       </ClientSafeCard>
     </ClientShellFrame>

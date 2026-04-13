@@ -1,6 +1,7 @@
 import { createWebhookSupabaseClient } from "../supabase/webhook";
 import { clientMergeService } from "./client-merge";
 import { clientContextService } from "./client-context";
+import { recordProductEvent } from "./public-intake";
 
 export interface FollowUpEligibility {
   clientId: string;
@@ -23,7 +24,22 @@ export interface FollowUpMessage {
   clientId: string;
   pipelineId: string;
   channel: 'whatsapp' | 'instagram' | 'site' | 'portal';
-  messageType: 'reengagement' | 'post_contact_followup' | 'consultation_invite' | 'proposal_reminder' | 'contract_nudge' | 'inactive_reengagement' | 'document_request_nudge' | 'intake_completion_reminder' | 'strong_source_reengagement' | 'custom';
+  messageType:
+    | 'reengagement'
+    | 'post_contact_followup'
+    | 'consultation_invite'
+    | 'consultation_followup'
+    | 'scheduling_followup'
+    | 'pre_consultation_confirmation'
+    | 'no_show_reengagement'
+    | 'post_triage_useful'
+    | 'proposal_reminder'
+    | 'contract_nudge'
+    | 'inactive_reengagement'
+    | 'document_request_nudge'
+    | 'intake_completion_reminder'
+    | 'strong_source_reengagement'
+    | 'custom';
   content: string;
   scheduledFor?: Date;
   status?: 'draft' | 'scheduled' | 'sent' | 'delivered' | 'read' | 'replied' | 'failed' | 'cancelled' | 'no_response';
@@ -55,6 +71,47 @@ export interface FollowUpResultInput {
 
 class FollowUpEngine {
   private supabase = createWebhookSupabaseClient();
+
+  private async getLatestCommercialSnapshot(clientId: string) {
+    const { data: sessions } = await this.supabase
+      .from('conversation_sessions')
+      .select('id, created_at')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const sessionIds = (sessions || []).map((session) => session.id).filter(Boolean);
+
+    if (sessionIds.length === 0) {
+      return null;
+    }
+
+    const { data: summaries } = await this.supabase
+      .from('noemia_triage_summaries')
+      .select('session_id, user_friendly_summary, report_data, updated_at')
+      .in('session_id', sessionIds)
+      .order('updated_at', { ascending: false })
+      .limit(5);
+
+    if (!summaries?.length) {
+      return null;
+    }
+
+    const summary = summaries[0];
+    const report = (summary.report_data || {}) as Record<string, unknown>;
+
+    return {
+      summary: summary.user_friendly_summary || '',
+      commercialStage: typeof report.commercial_funnel_stage === 'string' ? report.commercial_funnel_stage : '',
+      consultationInviteState:
+        typeof report.consultation_invite_state === 'string' ? report.consultation_invite_state : '',
+      consultationValueAngle:
+        typeof report.consultation_value_angle === 'string' ? report.consultation_value_angle : '',
+      schedulingStatus: typeof report.scheduling_status === 'string' ? report.scheduling_status : '',
+      nextBestActionDetail:
+        typeof report.next_best_action_detail === 'string' ? report.next_best_action_detail : '',
+    };
+  }
 
   // Fase 5.1 - Função principal: getClientsEligibleForFollowUp
   async getClientsEligibleForFollowUp(limit: number = 50): Promise<FollowUpEligibility[]> {
@@ -273,14 +330,30 @@ class FollowUpEngine {
       }
 
       // Determinar tipo de mensagem
-      const messageType = input.messageType || this.mapStageToMessageType(
+      const commercialSnapshot = await this.getLatestCommercialSnapshot(input.clientId);
+      let messageType = input.messageType || this.mapStageToMessageType(
         clientContext.pipeline?.stage || 'new_lead',
         clientContext.pipeline?.lead_temperature || 'cold',
         Math.floor((Date.now() - new Date(clientContext.pipeline?.last_contact_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24))
       );
 
       // Gerar conteúdo da mensagem
-      const content = this.generateMessageContent(messageType, clientContext);
+      if (!input.messageType && commercialSnapshot) {
+        if (commercialSnapshot.schedulingStatus === 'collecting_preferences') {
+          messageType = 'scheduling_followup';
+        } else if (commercialSnapshot.schedulingStatus === 'pending_confirmation') {
+          messageType = 'pre_consultation_confirmation';
+        } else if (
+          commercialSnapshot.consultationInviteState === 'awaiting_response' ||
+          commercialSnapshot.consultationInviteState === 'invite_now'
+        ) {
+          messageType = 'consultation_followup';
+        } else if (commercialSnapshot.commercialStage === 'triage_useful') {
+          messageType = 'post_triage_useful';
+        }
+      }
+
+      const content = this.generateMessageContent(messageType, clientContext, commercialSnapshot);
 
       const followUpMessage: FollowUpMessage = {
         clientId: input.clientId,
@@ -306,11 +379,14 @@ class FollowUpEngine {
   }
 
   // Fase 5.4 - Gerar conteúdo da mensagem por contexto
-  private generateMessageContent(messageType: string, context: any): string {
+  private generateMessageContent(messageType: string, context: any, commercialSnapshot?: any): string {
     const saudacao = this.getSaudacao();
     const nome = context.client.full_name || '';
-    const area = context.pipeline?.area_interest || '';
     const dias = this.getDaysSinceLastContact(context.pipeline?.last_contact_at);
+    const valueAngle =
+      commercialSnapshot?.consultationValueAngle ||
+      'clareza sobre o melhor proximo passo com seguranca e contexto';
+    const nextActionDetail = commercialSnapshot?.nextBestActionDetail || '';
 
     // Fase 5.4 - Mensagens humanas e elegantes por estágio
     switch (messageType) {
@@ -328,6 +404,31 @@ Se você quiser continuar conversando sobre isso, estou aqui para ajudar.`;
         return `${saudacao}${nome ? ', ' + nome : ''}! Pelo que você me contou, faz sentido olhar isso com mais cuidado ${this.getEmoji('focus')}
 Quando a situação é analisada com mais detalhe, fica muito mais fácil entender quais próximos passos valem a pena no seu caso.
 Se você quiser, posso te explicar como funciona essa análise.`;
+
+      case 'consultation_followup':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Quis retomar sua conversa com mais cuidado.
+Pelo que você compartilhou, ainda faz sentido avançar para uma consulta mais cuidadosa, porque ela ajuda a trazer ${valueAngle}.
+Se estiver em um bom momento, posso seguir com você a partir daqui sem deixar essa continuidade morna.`;
+
+      case 'scheduling_followup':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Estou retomando seu atendimento para não perdermos o timing.
+Falta só alinharmos melhor o horário que funciona para você, para essa próxima etapa ficar organizada com tranquilidade.
+Se quiser, me diga o turno ou dia que tende a funcionar melhor e seguimos.`;
+
+      case 'pre_consultation_confirmation':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Passando para confirmar a continuidade do seu atendimento com todo cuidado.
+Seu caso já está em um ponto bom para consulta, e essa confirmação ajuda a preservar contexto e evitar ruído.
+Se estiver tudo certo, seguimos com a confirmação do melhor horário.`;
+
+      case 'no_show_reengagement':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Quis retomar com delicadeza porque sua consulta não avançou como esperado.
+Se ainda fizer sentido para você, conseguimos reorganizar essa continuidade sem precisar recomeçar a conversa do zero.
+Posso te ajudar a destravar isso com mais simplicidade.`;
+
+      case 'post_triage_useful':
+        return `${saudacao}${nome ? ', ' + nome : ''}! Sua conversa já trouxe contexto suficiente para uma leitura mais cuidadosa.
+Nessa fase, faz sentido transformar o que você contou em direção concreta para o caso.
+${nextActionDetail || 'Se quiser, posso te explicar com calma qual é o próximo passo mais indicado.'}`;
 
       case 'proposal_reminder':
         return `${saudacao}${nome ? ', ' + nome : ''}! Passando por aqui para retomar com você um ponto importante ${this.getEmoji('lightbulb')}
@@ -421,6 +522,24 @@ Estava pensando na nossa conversa e queria saber como está indo. Se precisar de
         clientId: input.clientId,
         scheduledFor: input.scheduledFor
       });
+
+      if (input.messageType === 'pre_consultation_confirmation') {
+        try {
+          await recordProductEvent({
+            eventKey: 'reminder_sent',
+            eventGroup: 'revenue_funnel',
+            payload: {
+              clientId: input.clientId,
+              pipelineId: input.pipelineId,
+              channel: input.channel,
+              messageType: input.messageType,
+              scheduledFor: input.scheduledFor.toISOString()
+            }
+          });
+        } catch (trackingError) {
+          console.error('FOLLOW_UP_REMINDER_EVENT_ERROR', trackingError);
+        }
+      }
 
       return true;
 

@@ -4,6 +4,7 @@
  */
 
 import { createWebhookSupabaseClient } from '../supabase/webhook';
+import { recordProductEvent } from './public-intake';
 
 interface FollowUpResponse {
   id: string;
@@ -109,6 +110,22 @@ class FollowUpResponseHandler {
         responseRecordId: responseRecord.responseId,
         followUpUpdated: updateResult
       });
+
+      try {
+        await recordProductEvent({
+          eventKey: 'reengaged',
+          eventGroup: 'revenue_funnel',
+          intakeRequestId: params.clientId,
+          payload: {
+            pipelineId: targetFollowUp.pipeline_id,
+            channel: params.channel,
+            followUpMessageId: targetFollowUp.id,
+            responseType: params.responseType
+          }
+        });
+      } catch (trackingError) {
+        console.error('FOLLOW_UP_REENGAGED_EVENT_ERROR', trackingError);
+      }
 
       return { 
         success: true, 

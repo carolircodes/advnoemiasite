@@ -11,6 +11,7 @@ export type PanelConversationStateProjection = {
   priorityLevel?: string | null;
   conversionScore?: number | null;
   nextBestAction?: string | null;
+  nextBestActionDetail?: string | null;
   handoffReason?: string | null;
   readyForLawyer: boolean;
   aiActiveOnChannel: boolean;
@@ -31,6 +32,24 @@ export type PanelConversationStateProjection = {
   contentType?: string | null;
   commercialContext?: string | null;
   intentSignal?: string | null;
+  commercialFunnelStage?: string | null;
+  commercialStageLabel?: string | null;
+  consultationIntentLevel?: string | null;
+  consultationInviteTiming?: string | null;
+  consultationInviteState?: string | null;
+  consultationInviteCopy?: string | null;
+  consultationValueAngle?: string | null;
+  schedulingReadiness?: string | null;
+  schedulingStatus?: string | null;
+  humanHandoffMode?: string | null;
+  humanHandoffReady?: boolean;
+  commercialFollowUpType?: string | null;
+  operatorPriority?: string | null;
+  closeOpportunityState?: string | null;
+  objectionsDetected?: string[] | null;
+  hesitationSignals?: string[] | null;
+  valueSignals?: string[] | null;
+  urgencySignals?: string[] | null;
   recommendedOperatorAction?: string | null;
   directTransitionStatus?: string | null;
   publicCommentDecision?: string | null;
@@ -62,6 +81,7 @@ export function projectPanelConversationState(summary: any): PanelConversationSt
           ? reportData.conversion_score
           : null,
     nextBestAction: reportData.next_best_action || null,
+    nextBestActionDetail: reportData.next_best_action_detail || null,
     handoffReason: summary.handoff_reason || triageData.handoff_policy?.reason || null,
     readyForLawyer:
       summary.conversation_status === "consultation_ready" ||
@@ -98,6 +118,28 @@ export function projectPanelConversationState(summary: any): PanelConversationSt
     contentType: reportData.content_type || null,
     commercialContext: reportData.commercial_context || null,
     intentSignal: reportData.intent_signal || null,
+    commercialFunnelStage: reportData.commercial_funnel_stage || null,
+    commercialStageLabel: reportData.commercial_stage_label || null,
+    consultationIntentLevel: reportData.consultation_intent_level || null,
+    consultationInviteTiming: reportData.consultation_invite_timing || null,
+    consultationInviteState: reportData.consultation_invite_state || null,
+    consultationInviteCopy: reportData.consultation_invite_copy || null,
+    consultationValueAngle: reportData.consultation_value_angle || null,
+    schedulingReadiness: reportData.scheduling_readiness || null,
+    schedulingStatus: reportData.scheduling_status || null,
+    humanHandoffMode: reportData.human_handoff_mode || null,
+    humanHandoffReady: reportData.human_handoff_ready === true,
+    commercialFollowUpType: reportData.commercial_follow_up_type || null,
+    operatorPriority: reportData.operator_priority || null,
+    closeOpportunityState: reportData.close_opportunity_state || null,
+    objectionsDetected: Array.isArray(reportData.objections_detected)
+      ? reportData.objections_detected
+      : null,
+    hesitationSignals: Array.isArray(reportData.hesitation_signals)
+      ? reportData.hesitation_signals
+      : null,
+    valueSignals: Array.isArray(reportData.value_signals) ? reportData.value_signals : null,
+    urgencySignals: Array.isArray(reportData.urgency_signals) ? reportData.urgency_signals : null,
     recommendedOperatorAction: reportData.recommended_operator_action || null,
     directTransitionStatus: reportData.direct_transition_status || null,
     publicCommentDecision: reportData.public_comment_decision || null,

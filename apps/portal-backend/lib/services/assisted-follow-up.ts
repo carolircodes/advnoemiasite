@@ -13,6 +13,7 @@ interface SendAssistedFollowUpParams {
   channel: 'whatsapp' | 'instagram';
   content: string;
   approvedBy: string;
+  messageType?: string;
   originalMessageId?: string;
 }
 
@@ -178,7 +179,8 @@ class AssistedFollowUpService {
         channel: params.channel,
         content: params.content,
         messageId: sendResult.messageId,
-        approvedBy: params.approvedBy
+        approvedBy: params.approvedBy,
+        messageType: params.messageType
       });
 
       if (!recordResult.success) {
@@ -455,6 +457,7 @@ class AssistedFollowUpService {
     content: string;
     messageId?: string;
     approvedBy: string;
+    messageType?: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
       // Se existe uma mensagem pré-programada, atualiza ela
@@ -486,7 +489,7 @@ class AssistedFollowUpService {
           .insert({
             client_id: params.clientId,
             pipeline_id: params.pipelineId,
-            message_type: 'assisted_send',
+            message_type: params.messageType || 'assisted_send',
             content: params.content,
             channel: params.channel,
             status: 'sent',

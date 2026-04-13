@@ -86,6 +86,7 @@ interface OperationalContact {
     priorityLevel?: string | null;
     conversionScore?: number | null;
     nextBestAction?: string | null;
+    nextBestActionDetail?: string | null;
     handoffReason?: string | null;
     readyForLawyer: boolean;
     aiActiveOnChannel: boolean;
@@ -111,6 +112,24 @@ interface OperationalContact {
     contentType?: string | null;
     commercialContext?: string | null;
     intentSignal?: string | null;
+    commercialFunnelStage?: string | null;
+    commercialStageLabel?: string | null;
+    consultationIntentLevel?: string | null;
+    consultationInviteTiming?: string | null;
+    consultationInviteState?: string | null;
+    consultationInviteCopy?: string | null;
+    consultationValueAngle?: string | null;
+    schedulingReadiness?: string | null;
+    schedulingStatus?: string | null;
+    humanHandoffMode?: string | null;
+    humanHandoffReady?: boolean;
+    commercialFollowUpType?: string | null;
+    operatorPriority?: string | null;
+    closeOpportunityState?: string | null;
+    objectionsDetected?: string[] | null;
+    hesitationSignals?: string[] | null;
+    valueSignals?: string[] | null;
+    urgencySignals?: string[] | null;
     recommendedOperatorAction?: string | null;
     directTransitionStatus?: string | null;
     publicCommentDecision?: string | null;
@@ -501,7 +520,8 @@ export default function OperationalPanel() {
           channel: selectedChannel,
           content: messageContent.trim(),
           approvedBy: 'staff_user', // TODO: pegar do contexto de autenticação
-          followUpMessageId: selectedContact.suggestedMessage ? undefined : undefined
+          followUpMessageId: selectedContact.suggestedMessage ? undefined : undefined,
+          messageType: selectedContact.suggestedMessage?.messageType
         }),
       });
 
@@ -1149,6 +1169,94 @@ export default function OperationalPanel() {
                       </p>
                     ) : null}
 
+                    {contact.conversationState.commercialStageLabel ||
+                    contact.conversationState.consultationIntentLevel ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Funil comercial:</span>{' '}
+                        {[
+                          contact.conversationState.commercialStageLabel,
+                          contact.conversationState.consultationIntentLevel
+                            ? `consulta ${contact.conversationState.consultationIntentLevel}`
+                            : '',
+                          contact.conversationState.closeOpportunityState
+                            ? `oportunidade ${contact.conversationState.closeOpportunityState}`
+                            : ''
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.consultationInviteState ||
+                    contact.conversationState.consultationInviteTiming ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Convite para consulta:</span>{' '}
+                        {[
+                          contact.conversationState.consultationInviteState,
+                          contact.conversationState.consultationInviteTiming
+                            ? `timing ${contact.conversationState.consultationInviteTiming}`
+                            : '',
+                          contact.conversationState.consultationValueAngle
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.schedulingStatus ||
+                    contact.conversationState.schedulingReadiness ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Prontidao de agenda:</span>{' '}
+                        {[
+                          contact.conversationState.schedulingStatus,
+                          contact.conversationState.schedulingReadiness
+                            ? `readiness ${contact.conversationState.schedulingReadiness}`
+                            : ''
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.humanHandoffMode ||
+                    contact.conversationState.commercialFollowUpType ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Follow-up e handoff:</span>{' '}
+                        {[
+                          contact.conversationState.commercialFollowUpType,
+                          contact.conversationState.humanHandoffMode,
+                          contact.conversationState.humanHandoffReady ? 'humano pronto' : ''
+                        ]
+                          .filter(Boolean)
+                          .join(' | ')}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.nextBestActionDetail ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Leitura de receita:</span>{' '}
+                        {contact.conversationState.nextBestActionDetail}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.consultationInviteCopy ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Framing sugerido:</span>{' '}
+                        {contact.conversationState.consultationInviteCopy}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.objectionsDetected?.length ||
+                    contact.conversationState.hesitationSignals?.length ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Atritos detectados:</span>{' '}
+                        {[
+                          ...(contact.conversationState.objectionsDetected || []),
+                          ...(contact.conversationState.hesitationSignals || [])
+                        ].join(' | ')}
+                      </p>
+                    ) : null}
+
                     {contact.conversationState.recommendedOperatorAction ? (
                       <p className="mt-3 text-sm text-[#5d6d66]">
                         <span className="font-medium text-[#10261d]">Acao recomendada pela origem:</span>{' '}
@@ -1207,10 +1315,12 @@ export default function OperationalPanel() {
                       Proxima melhor acao
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
-                      {contact.nextBestAction.title}
+                      {contact.conversationState?.nextBestActionDetail
+                        ? 'Mover oportunidade com criterio'
+                        : contact.nextBestAction.title}
                     </p>
                     <p className="mt-1 text-sm leading-6 text-[#56675f]">
-                      {contact.nextBestAction.detail}
+                      {contact.conversationState?.nextBestActionDetail || contact.nextBestAction.detail}
                     </p>
                   </div>
 

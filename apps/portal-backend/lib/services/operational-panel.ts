@@ -51,6 +51,7 @@ export interface OperationalContact {
     priorityLevel?: string | null;
     conversionScore?: number | null;
     nextBestAction?: string | null;
+    nextBestActionDetail?: string | null;
     handoffReason?: string | null;
     readyForLawyer: boolean;
     aiActiveOnChannel: boolean;
@@ -76,6 +77,24 @@ export interface OperationalContact {
     contentType?: string | null;
     commercialContext?: string | null;
     intentSignal?: string | null;
+    commercialFunnelStage?: string | null;
+    commercialStageLabel?: string | null;
+    consultationIntentLevel?: string | null;
+    consultationInviteTiming?: string | null;
+    consultationInviteState?: string | null;
+    consultationInviteCopy?: string | null;
+    consultationValueAngle?: string | null;
+    schedulingReadiness?: string | null;
+    schedulingStatus?: string | null;
+    humanHandoffMode?: string | null;
+    humanHandoffReady?: boolean;
+    commercialFollowUpType?: string | null;
+    operatorPriority?: string | null;
+    closeOpportunityState?: string | null;
+    objectionsDetected?: string[] | null;
+    hesitationSignals?: string[] | null;
+    valueSignals?: string[] | null;
+    urgencySignals?: string[] | null;
     recommendedOperatorAction?: string | null;
     directTransitionStatus?: string | null;
     publicCommentDecision?: string | null;
@@ -739,10 +758,8 @@ class OperationalPanel {
   }
 
   async getPanelData(filters: OperationalPanelFilters = {}, limit = 50, offset = 0) {
-    const [contactsResult, metrics] = await Promise.all([
-      this.getOperationalContacts(filters, limit, offset),
-      this.getOperationalMetrics()
-    ]);
+    const contactsResult = await this.getOperationalContacts(filters, limit, offset);
+    const metrics = this.buildMetricsFromContacts(contactsResult.contacts);
 
     return {
       contacts: contactsResult.contacts,
@@ -750,6 +767,95 @@ class OperationalPanel {
       metrics,
       filters
     };
+  }
+
+  private buildMetricsFromContacts(contacts: OperationalContact[]): OperationalPanelMetrics {
+    const metrics = this.getEmptyMetrics();
+
+    for (const contact of contacts) {
+      if (contact.isClient) {
+        metrics.totalClients += 1;
+      } else {
+        metrics.totalLeads += 1;
+      }
+
+      if (contact.leadTemperature === "warm" || contact.leadTemperature === "hot") {
+        metrics.warmHotLeads += 1;
+      }
+
+      if (!["closed_lost", "inactive"].includes(contact.pipelineStage)) {
+        metrics.activeConversations += 1;
+      }
+
+      if (
+        contact.followUpStatus === "pending" ||
+        contact.followUpStatus === "scheduled" ||
+        contact.conversationState?.commercialFollowUpType
+      ) {
+        metrics.followUpPending += 1;
+      }
+
+      if (
+        contact.conversationState?.consultationIntentLevel === "emerging" ||
+        contact.conversationState?.consultationIntentLevel === "clear" ||
+        contact.conversationState?.consultationIntentLevel === "accepted"
+      ) {
+        metrics.consultationIntent += 1;
+      }
+
+      if (
+        contact.conversationState?.consultationInviteState === "invite_now" ||
+        contact.pipelineStage === "consultation_offered"
+      ) {
+        metrics.consultationOffered += 1;
+      }
+
+      if (
+        contact.conversationState?.schedulingStatus === "pending_confirmation" ||
+        contact.conversationState?.schedulingStatus === "confirmed" ||
+        contact.pipelineStage === "consultation_scheduled"
+      ) {
+        metrics.consultationScheduled += 1;
+      }
+
+      if (contact.conversationState?.humanHandoffReady || contact.conversationState?.readyForLawyer) {
+        metrics.consultationReady += 1;
+        metrics.humanHandoffReady += 1;
+      }
+
+      if (contact.pipelineStage === "proposal_sent") {
+        metrics.proposalSent += 1;
+      }
+
+      if (contact.pipelineStage === "contract_pending") {
+        metrics.contractPending += 1;
+      }
+
+      if (["closed_lost", "inactive"].includes(contact.pipelineStage)) {
+        metrics.inactiveLost += 1;
+      }
+
+      if (contact.isOverdue) {
+        metrics.overdueCount += 1;
+        if (contact.nextFollowUpAt) {
+          const next = new Date(contact.nextFollowUpAt);
+          const today = new Date();
+          if (
+            next.getFullYear() === today.getFullYear() &&
+            next.getMonth() === today.getMonth() &&
+            next.getDate() === today.getDate()
+          ) {
+            metrics.todayOverdue += 1;
+          }
+        }
+      }
+
+      if (contact.priorityLabel === "high") {
+        metrics.topPriorities += 1;
+      }
+    }
+
+    return metrics;
   }
 }
 

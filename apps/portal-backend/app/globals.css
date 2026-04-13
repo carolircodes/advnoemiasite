@@ -546,6 +546,11 @@ body:not(.auth-page) .field-full textarea {
   color: var(--accent-strong);
 }
 
+.pill.critical {
+  background: rgba(142, 67, 59, 0.12);
+  color: var(--danger);
+}
+
 .pill.muted {
   background: rgba(16, 32, 29, 0.08);
   color: var(--text);

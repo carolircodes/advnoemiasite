@@ -7,6 +7,12 @@ import {
 } from "../config/channel-automation-features";
 import { acquisitionContentService } from "./acquisition-content";
 import { antiSpamGuard } from "./anti-spam-guard";
+import {
+  applyCommercialInviteRefinement,
+  buildCommercialFunnelSnapshot,
+  trackCommercialEvent,
+  type CommercialFunnelSnapshot
+} from "./commercial-funnel";
 import { conversationPersistence } from "./conversation-persistence";
 import { evaluateInstagramCommentPolicy } from "./instagram-comment-policy";
 import { instagramCommentContext } from "./instagram-comment-context";
@@ -666,6 +672,7 @@ function buildSessionSummaryPayload(args: {
   conversationState?: string;
   consultationStage?: string;
   acquisitionSummary?: string;
+  commercialSummary?: string;
 }) {
   return [
     `acquisition=${args.acquisitionSummary || "not_resolved"}`,
@@ -677,6 +684,7 @@ function buildSessionSummaryPayload(args: {
     `followUpState=${args.followUpState}`,
     `conversionSignal=${args.conversionSignal}`,
     `nextBestAction=${args.nextBestAction}`,
+    `commercial=${args.commercialSummary || "not_resolved"}`,
     `materialSent=${args.materialSent ? "yes" : "no"}`,
     `handoffTriggered=${args.handoffTriggered ? "yes" : "no"}`,
     `handoffReason=${args.handoffReason || "none"}`
@@ -771,6 +779,7 @@ async function saveTriageAndHandoff(
   pipelineId?: string | null,
   nextBestAction?: string,
   acquisitionSnapshot?: SocialAcquisitionSnapshot | null,
+  commercialSnapshot?: CommercialFunnelSnapshot | null,
   publicCommentPolicy?: {
     decision: string;
     safetyDecision: string;
@@ -795,6 +804,7 @@ async function saveTriageAndHandoff(
       conversationPolicy: conversationPolicy || null,
       schedulingPreferences: conversationState?.contactPreferences || null,
       acquisitionContext: acquisitionSnapshot || null,
+      commercialSnapshot: commercialSnapshot || null,
       publicCommentPolicy: publicCommentPolicy || null
     });
 
@@ -824,6 +834,7 @@ async function saveTriageAndHandoff(
         legitimate: conversationPolicy?.legitimateHandoff || false,
         recorded: conversationPolicy?.operationalHandoffRecorded || false
       },
+      commercial_status: commercialSnapshot?.funnelStage,
       report
     } satisfies TriageData;
 
@@ -850,6 +861,7 @@ async function saveTriageAndHandoff(
         conversationPolicy: conversationPolicy || null,
         schedulingPreferences: conversationState?.contactPreferences || null,
         acquisitionContext: acquisitionSnapshot || null,
+        commercialSnapshot: commercialSnapshot || null,
         publicCommentPolicy: publicCommentPolicy || null
       }),
       userFriendlySummary: buildUserFacingTriageSummary({
@@ -867,6 +879,7 @@ async function saveTriageAndHandoff(
         conversationPolicy: conversationPolicy || null,
         schedulingPreferences: conversationState?.contactPreferences || null,
         acquisitionContext: acquisitionSnapshot || null,
+        commercialSnapshot: commercialSnapshot || null,
         publicCommentPolicy: publicCommentPolicy || null
       }),
       conversationStatus: conversationPolicy?.state,
@@ -1015,6 +1028,123 @@ async function trackAcquisitionBootstrapEvents(args: {
       eventGroup: "acquisition",
       snapshot: args.snapshot,
       sessionId: args.sessionId
+    });
+  }
+}
+
+async function trackCommercialTelemetry(args: {
+  snapshot: CommercialFunnelSnapshot;
+  acquisitionSnapshot?: SocialAcquisitionSnapshot | null;
+  sessionId: string;
+}) {
+  await trackCommercialEvent({
+    eventName: "close_opportunity_state",
+    sessionId: args.sessionId,
+    acquisitionContext: args.acquisitionSnapshot,
+    snapshot: args.snapshot,
+    payload: {
+      state: args.snapshot.closeOpportunityState
+    }
+  });
+
+  await trackCommercialEvent({
+    eventName: "next_best_action",
+    sessionId: args.sessionId,
+    acquisitionContext: args.acquisitionSnapshot,
+    snapshot: args.snapshot,
+    payload: {
+      action: args.snapshot.nextBestAction,
+      detail: args.snapshot.nextBestActionDetail
+    }
+  });
+
+  await trackCommercialEvent({
+    eventName: args.snapshot.leadBucket === "hot"
+      ? "hot_lead"
+      : args.snapshot.leadBucket === "warm"
+        ? "warm_lead"
+        : "cold_lead",
+    sessionId: args.sessionId,
+    acquisitionContext: args.acquisitionSnapshot,
+    snapshot: args.snapshot
+  });
+
+  if (
+    args.snapshot.funnelStage === "triage_in_progress" ||
+    args.snapshot.funnelStage === "triage_useful"
+  ) {
+    await trackCommercialEvent({
+      eventName:
+        args.snapshot.funnelStage === "triage_useful" ? "triage_useful" : "triage_in_progress",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot
+    });
+  }
+
+  if (args.snapshot.consultationIntentLevel === "clear" || args.snapshot.consultationIntentLevel === "accepted") {
+    await trackCommercialEvent({
+      eventName: "consultation_intent_detected",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot
+    });
+  }
+
+  if (
+    args.snapshot.consultationInviteState === "invite_now" ||
+    args.snapshot.consultationInviteState === "awaiting_response"
+  ) {
+    await trackCommercialEvent({
+      eventName: "consultation_invited",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot,
+      payload: {
+        consultationInviteCopy: args.snapshot.consultationInviteCopy
+      }
+    });
+  }
+
+  if (
+    args.snapshot.funnelStage === "consultation_accepted" ||
+    args.snapshot.consultationIntentLevel === "accepted"
+  ) {
+    await trackCommercialEvent({
+      eventName: "consultation_accepted",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot
+    });
+  }
+
+  if (args.snapshot.schedulingStatus === "collecting_preferences") {
+    await trackCommercialEvent({
+      eventName: "scheduling_started",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot
+    });
+  }
+
+  if (
+    args.snapshot.schedulingStatus === "pending_confirmation" ||
+    args.snapshot.schedulingStatus === "confirmed"
+  ) {
+    await trackCommercialEvent({
+      eventName: "scheduling_completed",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot
+    });
+  }
+
+  if (args.snapshot.humanHandoffReady) {
+    await trackCommercialEvent({
+      eventName: "human_handoff_ready",
+      sessionId: args.sessionId,
+      acquisitionContext: args.acquisitionSnapshot,
+      snapshot: args.snapshot
     });
   }
 }
@@ -1227,6 +1357,7 @@ async function handleInstagramCommentEntry(args: {
     args.pipelineId,
     commentPolicy.inviteToDm ? "continue_triage" : "close",
     finalSnapshot,
+    null,
     {
       decision: commentPolicy.decision,
       safetyDecision: commentPolicy.safetyDecision,
@@ -1896,7 +2027,16 @@ export async function processChannelConversationEvent(
             conversationPolicy.nextBestAction === "finalize_consultation"
           ? "continue_triage"
           : "answer_and_ask_one_question";
+  const commercialSnapshot = buildCommercialFunnelSnapshot({
+    channel: event.channel,
+    messageText: event.messageText,
+    leadStage,
+    conversationState,
+    conversationPolicy,
+    acquisitionContext: acquisitionSnapshot
+  });
   let replyText = appendMaterialToReply(coreResponse.reply, materialRecommendation);
+  replyText = applyCommercialInviteRefinement(replyText, commercialSnapshot);
   let direction: MessageDirection = coreResponse.usedFallback ? "fallback" : "reply";
 
   logRouterEvent(
@@ -1983,6 +2123,12 @@ export async function processChannelConversationEvent(
     );
   }
 
+  await trackCommercialTelemetry({
+    snapshot: commercialSnapshot,
+    acquisitionSnapshot,
+    sessionId: session.id
+  });
+
   if (!normalizeText(replyText)) {
     logRouterEvent(
       "CHANNEL_ROUTER_RESPONSE_SKIPPED",
@@ -2027,10 +2173,15 @@ export async function processChannelConversationEvent(
       conversationPolicy.handoffAllowed || conversationPolicy.operationalHandoffRecorded,
     human_followup_pending: conversationPolicy.humanFollowUpPending,
     follow_up_ready: conversationPolicy.followUpReady,
+    commercial_funnel_stage: commercialSnapshot.funnelStage,
+    commercial_follow_up_type: commercialSnapshot.followUpType,
+    commercial_next_best_action: commercialSnapshot.nextBestAction,
+    commercial_close_opportunity_state: commercialSnapshot.closeOpportunityState,
     last_router_at: new Date().toISOString()
   };
   const sessionSummary = buildSessionSummaryPayload({
     acquisitionSummary: buildAcquisitionSummary(acquisitionSnapshot),
+    commercialSummary: commercialSnapshot.summaryLine,
     detectedTheme,
     leadStage,
     triageStatus,
@@ -2253,6 +2404,7 @@ export async function processChannelConversationEvent(
       pipelineId,
       nextBestAction,
       acquisitionSnapshot,
+      commercialSnapshot,
       null
     );
 

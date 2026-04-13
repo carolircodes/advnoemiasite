@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const { action, clientId, pipelineId, filters, limit, offset, actionType, value, notes, channel, content, approvedBy, followUpMessageId } = body;
+    const { action, clientId, pipelineId, filters, limit, offset, actionType, value, notes, channel, content, approvedBy, followUpMessageId, messageType } = body;
 
     if (action === 'getPanelData') {
       // Obter dados completos do painel
@@ -119,7 +119,8 @@ export async function POST(request: NextRequest) {
         channel,
         content,
         approvedBy,
-        followUpMessageId
+        followUpMessageId,
+        messageType
       });
 
       return NextResponse.json({

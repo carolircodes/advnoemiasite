@@ -77,7 +77,16 @@ function buildCandidate(contact: CommercialAutomationContact): Omit<CommercialAu
       ruleKey: "consultation-restart",
       label: "Retomar consulta oferecida",
       detail: "O lead ja recebeu convite de consulta e ainda pode converter nesta janela.",
-      messageType: "consultation_invite"
+      messageType: "consultation_followup"
+    };
+  }
+
+  if (contact.pipelineStage === "consultation_scheduled" && contact.daysSinceLastContact >= 1) {
+    return {
+      ruleKey: "consultation-confirmation",
+      label: "Confirmar consulta encaminhada",
+      detail: "A consulta ja entrou em fase operacional e merece confirmacao elegante para evitar no-show.",
+      messageType: "pre_consultation_confirmation"
     };
   }
 
