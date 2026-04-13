@@ -8,9 +8,40 @@ import {
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
-const APP_SECRET = process.env.WHATSAPP_APP_SECRET?.trim();
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const APP_SECRET =
+  process.env.WHATSAPP_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
+const ACCESS_TOKEN =
+  process.env.WHATSAPP_ACCESS_TOKEN?.trim() || process.env.META_WHATSAPP_ACCESS_TOKEN?.trim();
+const PHONE_NUMBER_ID =
+  process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() ||
+  process.env.META_WHATSAPP_PHONE_NUMBER_ID?.trim();
+const APP_SECRET_SOURCE = process.env.WHATSAPP_APP_SECRET?.trim()
+  ? "WHATSAPP_APP_SECRET"
+  : process.env.META_APP_SECRET?.trim()
+    ? "META_APP_SECRET"
+    : null;
+const ACCESS_TOKEN_SOURCE = process.env.WHATSAPP_ACCESS_TOKEN?.trim()
+  ? "WHATSAPP_ACCESS_TOKEN"
+  : process.env.META_WHATSAPP_ACCESS_TOKEN?.trim()
+    ? "META_WHATSAPP_ACCESS_TOKEN"
+    : null;
+const PHONE_NUMBER_ID_SOURCE = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim()
+  ? "WHATSAPP_PHONE_NUMBER_ID"
+  : process.env.META_WHATSAPP_PHONE_NUMBER_ID?.trim()
+    ? "META_WHATSAPP_PHONE_NUMBER_ID"
+    : null;
+
+type WhatsAppOutboundContext = {
+  channel?: string;
+  externalUserId?: string;
+  eventId?: string;
+  sessionId?: string | null;
+  pipelineId?: string | null;
+  messageType?: string | null;
+  responseType?: string | null;
+  responseLength?: number | null;
+  reason?: string | null;
+};
 
 function logEvent(
   event: string,
@@ -127,17 +158,39 @@ async function sendTypingIndicator(to: string) {
   }
 }
 
-async function sendWhatsAppResponse(to: string, message: string) {
+async function sendWhatsAppResponse(
+  to: string,
+  message: string,
+  context?: WhatsAppOutboundContext
+) {
+  logEvent("WHATSAPP_OUTBOUND_SEND_START", {
+    channel: context?.channel || "whatsapp",
+    externalUserId: context?.externalUserId || to,
+    eventId: context?.eventId || null,
+    sessionId: context?.sessionId || null,
+    pipelineId: context?.pipelineId || null,
+    messageType: context?.messageType || "text",
+    responseType: context?.responseType || "text",
+    responseLength: context?.responseLength ?? message.length,
+    reason: context?.reason || null
+  });
+
   if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-    logEvent(
-      "WHATSAPP_SEND_SKIPPED_MISSING_CONFIG",
-      {
-        to,
-        hasAccessToken: !!ACCESS_TOKEN,
-        hasPhoneNumberId: !!PHONE_NUMBER_ID
-      },
-      "error"
-    );
+    logEvent("WHATSAPP_OUTBOUND_SEND_ERROR", {
+      channel: context?.channel || "whatsapp",
+      externalUserId: context?.externalUserId || to,
+      eventId: context?.eventId || null,
+      sessionId: context?.sessionId || null,
+      pipelineId: context?.pipelineId || null,
+      messageType: context?.messageType || "text",
+      responseType: context?.responseType || "text",
+      responseLength: context?.responseLength ?? message.length,
+      reason: "missing_config",
+      hasAccessToken: !!ACCESS_TOKEN,
+      hasPhoneNumberId: !!PHONE_NUMBER_ID,
+      accessTokenSource: ACCESS_TOKEN_SOURCE,
+      phoneNumberIdSource: PHONE_NUMBER_ID_SOURCE
+    }, "error");
     return false;
   }
 
@@ -160,28 +213,68 @@ async function sendWhatsAppResponse(to: string, message: string) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logEvent(
-        "WHATSAPP_SEND_ERROR",
-        {
-          to,
-          status: response.status,
-          errorText: errorText.slice(0, 500)
-        },
-        "error"
-      );
+      let errorBody: Record<string, any> | null = null;
+
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = null;
+      }
+
+      logEvent("WHATSAPP_OUTBOUND_SEND_ERROR", {
+        channel: context?.channel || "whatsapp",
+        externalUserId: context?.externalUserId || to,
+        eventId: context?.eventId || null,
+        sessionId: context?.sessionId || null,
+        pipelineId: context?.pipelineId || null,
+        messageType: context?.messageType || "text",
+        responseType: context?.responseType || "text",
+        responseLength: context?.responseLength ?? message.length,
+        reason: context?.reason || "api_error",
+        errorStatus: response.status,
+        errorCode: errorBody?.error?.code || null,
+        errorSubcode: errorBody?.error?.error_subcode || null,
+        errorText: errorText.slice(0, 500)
+      }, "error");
       return false;
     }
 
+    const responseBody = await response.json().catch(() => null);
+
+    logEvent("WHATSAPP_OUTBOUND_SEND_SUCCESS", {
+      channel: context?.channel || "whatsapp",
+      externalUserId: context?.externalUserId || to,
+      eventId: context?.eventId || null,
+      sessionId: context?.sessionId || null,
+      pipelineId: context?.pipelineId || null,
+      messageType: context?.messageType || "text",
+      responseType: context?.responseType || "text",
+      responseLength: context?.responseLength ?? message.length,
+      outboundMessageId:
+        Array.isArray((responseBody as any)?.messages) &&
+        typeof (responseBody as any).messages[0]?.id === "string"
+          ? (responseBody as any).messages[0].id
+          : null,
+      reason: context?.reason || null,
+      status: response.status
+    });
+
     return true;
   } catch (error) {
-    logEvent(
-      "WHATSAPP_SEND_EXCEPTION",
-      {
-        to,
-        error: error instanceof Error ? error.message : String(error)
-      },
-      "error"
-    );
+    logEvent("WHATSAPP_OUTBOUND_SEND_ERROR", {
+      channel: context?.channel || "whatsapp",
+      externalUserId: context?.externalUserId || to,
+      eventId: context?.eventId || null,
+      sessionId: context?.sessionId || null,
+      pipelineId: context?.pipelineId || null,
+      messageType: context?.messageType || "text",
+      responseType: context?.responseType || "text",
+      responseLength: context?.responseLength ?? message.length,
+      reason: context?.reason || "exception",
+      errorStatus: null,
+      errorCode: null,
+      error: error instanceof Error ? error.message : String(error)
+    }, "error");
     return false;
   }
 }
@@ -222,7 +315,9 @@ export async function POST(request: NextRequest) {
       logEvent(
         "WHATSAPP_SIGNATURE_SECRET_MISSING",
         {
-          note: "WHATSAPP_APP_SECRET is required when signature enforcement is active."
+          note: "WHATSAPP_APP_SECRET or META_APP_SECRET is required when signature enforcement is active.",
+          enforceSignature,
+          appSecretSource: APP_SECRET_SOURCE
         },
         "error"
       );
@@ -236,7 +331,9 @@ export async function POST(request: NextRequest) {
     logEvent(
       "WHATSAPP_SIGNATURE_VALIDATION_DISABLED",
       {
-        note: "WHATSAPP_APP_SECRET is not configured. Signature validation is unavailable."
+        note: "WHATSAPP_APP_SECRET/META_APP_SECRET is not configured. Signature validation is unavailable.",
+        enforceSignature,
+        appSecretSource: APP_SECRET_SOURCE
       },
       "warn"
     );
@@ -245,7 +342,9 @@ export async function POST(request: NextRequest) {
         logEvent(
           "WHATSAPP_SIGNATURE_INVALID_REJECTED",
           {
-            note: "Webhook rejected because the signature is invalid."
+            note: "Webhook rejected because the signature is invalid.",
+            enforceSignature,
+            appSecretSource: APP_SECRET_SOURCE
           },
           "warn"
         );
@@ -256,7 +355,9 @@ export async function POST(request: NextRequest) {
       logEvent(
         "WHATSAPP_SIGNATURE_INVALID_BUT_ACCEPTED",
         {
-          note: "Webhook kept in shadow validation mode to avoid operational interruption."
+          note: "Webhook kept in shadow validation mode to avoid operational interruption.",
+          enforceSignature,
+          appSecretSource: APP_SECRET_SOURCE
         },
         "warn"
       );
@@ -294,6 +395,18 @@ export async function POST(request: NextRequest) {
           if (!message.from || message.from === PHONE_NUMBER_ID) {
             continue;
           }
+
+          logEvent("WHATSAPP_INBOUND_ACCEPTED", {
+            channel: "whatsapp",
+            externalUserId: message.from,
+            eventId: message.messageId || null,
+            sessionId: null,
+            pipelineId: null,
+            messageType: message.type,
+            responseType: null,
+            responseLength: null,
+            reason: null
+          });
 
           await processChannelConversationEvent(
             {

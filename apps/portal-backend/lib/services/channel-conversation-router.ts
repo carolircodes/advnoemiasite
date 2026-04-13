@@ -36,7 +36,21 @@ export type ChannelConversationEvent = {
 };
 
 type RouterTransport = {
-  sendText: (recipientId: string, messageText: string) => Promise<boolean>;
+  sendText: (
+    recipientId: string,
+    messageText: string,
+    context?: {
+      channel: SupportedChannel;
+      eventId: string;
+      externalUserId: string;
+      sessionId?: string | null;
+      pipelineId?: string | null;
+      messageType?: string | null;
+      responseType?: string | null;
+      responseLength?: number | null;
+      reason?: string | null;
+    }
+  ) => Promise<boolean>;
   markAsRead?: (messageId: string) => Promise<boolean>;
   sendTypingIndicator?: (recipientId: string) => Promise<boolean>;
 };
@@ -115,6 +129,47 @@ function logRouterEvent(
       data
     })
   );
+}
+
+function extractPipelineId(session: ConversationSession | null | undefined) {
+  const rawPipelineId = session?.metadata?.pipelineId ?? session?.metadata?.pipeline_id;
+
+  return typeof rawPipelineId === "string" && rawPipelineId.trim().length > 0
+    ? rawPipelineId
+    : null;
+}
+
+function buildRouterLogContext(args: {
+  event: ChannelConversationEvent;
+  eventId: string;
+  session?: ConversationSession | null;
+  messageType?: string | null;
+  pipelineId?: string | null;
+  reason?: string | null;
+  responseLength?: number | null;
+  responseType?: string | null;
+  errorCode?: string | number | null;
+  errorStatus?: number | null;
+  extra?: Record<string, unknown>;
+}) {
+  const pipelineId = args.pipelineId ?? extractPipelineId(args.session);
+
+  return {
+    channel: args.event.channel,
+    source: args.event.source,
+    externalUserId: args.event.externalUserId,
+    externalMessageId: args.event.externalMessageId || null,
+    eventId: args.eventId,
+    sessionId: args.session?.id || null,
+    pipelineId,
+    messageType: args.messageType ?? normalizeMessageType(args.event.messageType),
+    responseType: args.responseType ?? null,
+    responseLength: args.responseLength ?? null,
+    reason: args.reason ?? null,
+    errorCode: args.errorCode ?? null,
+    errorStatus: args.errorStatus ?? null,
+    ...(args.extra ?? {})
+  };
 }
 
 function normalizeMessageType(value: string | undefined) {
@@ -734,115 +789,201 @@ export async function processChannelConversationEvent(
     externalUserId: event.externalUserId,
     messageType
   });
+  try {
+    if (!channelAutomationFeatures.unifiedConversationRouter) {
+      logRouterEvent(
+        "CHANNEL_ROUTER_EARLY_RETURN",
+        buildRouterLogContext({
+          event,
+          eventId,
+          messageType,
+          reason: "router_disabled"
+        }),
+        "warn"
+      );
 
-  if (!channelAutomationFeatures.unifiedConversationRouter) {
-    return {
-      direction: "ignored",
-      sessionId: null,
-      eventId,
-      usedFallback: false,
-      handoffTriggered: false,
-      replySent: false,
-      detectedTheme: "geral",
-      currentIntent: "router_disabled",
-      leadStage: "initial",
-      triageStatus: "not_started",
-      logs: {
-        reason: "router_disabled"
-      }
-    };
-  }
-
-  if (shouldUseUnsupportedFallback(event)) {
-    const unsupportedReply = buildUnsupportedFallback(event.channel);
-    const sent = await transport.sendText(event.externalUserId, unsupportedReply);
-
-    if (sent) {
-      await antiSpamGuard.markEventProcessed({
-        channel: event.channel,
-        externalEventId: eventId,
-        externalMessageId: event.externalMessageId,
-        externalUserId: event.externalUserId,
-        messageText: event.messageText,
-        messageType
-      });
+      return {
+        direction: "ignored",
+        sessionId: null,
+        eventId,
+        usedFallback: false,
+        handoffTriggered: false,
+        replySent: false,
+        detectedTheme: "geral",
+        currentIntent: "router_disabled",
+        leadStage: "initial",
+        triageStatus: "not_started",
+        logs: {
+          reason: "router_disabled"
+        }
+      };
     }
 
-    return {
-      direction: "fallback",
-      sessionId: null,
-      eventId,
-      usedFallback: true,
-      handoffTriggered: false,
-      replySent: sent,
-      detectedTheme: "geral",
-      currentIntent: "unsupported_message",
-      leadStage: "initial",
-      triageStatus: "not_started",
-      logs: {
-        reason: "unsupported_message",
-        messageType
+    if (shouldUseUnsupportedFallback(event)) {
+      const unsupportedReply = buildUnsupportedFallback(event.channel);
+
+      logRouterEvent(
+        "CHANNEL_ROUTER_EARLY_RETURN",
+        buildRouterLogContext({
+          event,
+          eventId,
+          messageType,
+          reason: "unsupported_message",
+          responseType: "text",
+          responseLength: unsupportedReply.length
+        }),
+        "warn"
+      );
+
+      const sent = await transport.sendText(event.externalUserId, unsupportedReply, {
+        channel: event.channel,
+        eventId,
+        externalUserId: event.externalUserId,
+        sessionId: null,
+        pipelineId: null,
+        messageType,
+        responseType: "text",
+        responseLength: unsupportedReply.length,
+        reason: "unsupported_message"
+      });
+
+      if (sent) {
+        await antiSpamGuard.markEventProcessed({
+          channel: event.channel,
+          externalEventId: eventId,
+          externalMessageId: event.externalMessageId,
+          externalUserId: event.externalUserId,
+          messageText: event.messageText,
+          messageType
+        });
+      } else {
+        logRouterEvent(
+          "CHANNEL_ROUTER_RESPONSE_SKIPPED",
+          buildRouterLogContext({
+            event,
+            eventId,
+            messageType,
+            reason: "unsupported_message_send_failed",
+            responseType: "text",
+            responseLength: unsupportedReply.length
+          }),
+          "warn"
+        );
       }
-    };
-  }
 
-  const guardResult = await antiSpamGuard.shouldRespondToEvent({
-    channel: event.channel,
-    externalEventId: eventId,
-    externalMessageId: event.externalMessageId,
-    externalUserId: event.externalUserId,
-    messageText: event.messageText,
-    isEcho: event.isEcho,
-    messageType
-  });
+      return {
+        direction: "fallback",
+        sessionId: null,
+        eventId,
+        usedFallback: true,
+        handoffTriggered: false,
+        replySent: sent,
+        detectedTheme: "geral",
+        currentIntent: "unsupported_message",
+        leadStage: "initial",
+        triageStatus: "not_started",
+        logs: {
+          reason: "unsupported_message",
+          messageType
+        }
+      };
+    }
 
-  if (!guardResult.shouldRespond) {
-    return {
-      direction: "ignored",
-      sessionId: null,
-      eventId,
-      usedFallback: false,
-      handoffTriggered: false,
-      replySent: false,
-      detectedTheme: "geral",
-      currentIntent: "guard_blocked",
-      leadStage: "initial",
-      triageStatus: "not_started",
-      logs: {
-        reason: guardResult.reason || "guard_blocked"
-      }
-    };
-  }
+    const guardResult = await antiSpamGuard.shouldRespondToEvent({
+      channel: event.channel,
+      externalEventId: eventId,
+      externalMessageId: event.externalMessageId,
+      externalUserId: event.externalUserId,
+      messageText: event.messageText,
+      isEcho: event.isEcho,
+      messageType
+    });
 
-  if (event.externalMessageId && transport.markAsRead) {
-    await transport.markAsRead(event.externalMessageId);
-  }
+    if (!guardResult.shouldRespond) {
+      logRouterEvent(
+        "CHANNEL_ROUTER_EARLY_RETURN",
+        buildRouterLogContext({
+          event,
+          eventId,
+          messageType,
+          reason: guardResult.reason || "guard_blocked"
+        }),
+        "info"
+      );
 
-  if (transport.sendTypingIndicator && event.source !== "instagram_comment") {
-    await transport.sendTypingIndicator(event.externalUserId);
-  }
+      return {
+        direction: "ignored",
+        sessionId: null,
+        eventId,
+        usedFallback: false,
+        handoffTriggered: false,
+        replySent: false,
+        detectedTheme: "geral",
+        currentIntent: "guard_blocked",
+        leadStage: "initial",
+        triageStatus: "not_started",
+        logs: {
+          reason: guardResult.reason || "guard_blocked"
+        }
+      };
+    }
 
-  let session = await conversationPersistence.getOrCreateSession(event.channel, event.externalUserId);
-  const isCommentSource = event.source === "instagram_comment" && !!event.commentContext;
+    if (event.externalMessageId && transport.markAsRead) {
+      await transport.markAsRead(event.externalMessageId);
+    }
 
-  if (session.handoff_to_human) {
-    return {
-      direction: "ignored",
-      sessionId: session.id,
-      eventId,
-      usedFallback: false,
-      handoffTriggered: true,
-      replySent: false,
-      detectedTheme: session.case_area || "geral",
-      currentIntent: session.current_intent || "handoff_active",
-      leadStage: "handoff",
-      triageStatus: "handoff",
-      handoffReason: "handoff_ja_ativo",
-      logs: {
-        reason: "handoff_active"
-      }
-    };
-  }
+    if (transport.sendTypingIndicator && event.source !== "instagram_comment") {
+      await transport.sendTypingIndicator(event.externalUserId);
+    }
+
+    let session = await conversationPersistence.getOrCreateSession(event.channel, event.externalUserId);
+    const isCommentSource = event.source === "instagram_comment" && !!event.commentContext;
+    const handoffAlreadyActive = Boolean(session.handoff_to_human);
+    let pipelineId = extractPipelineId(session);
+
+    if (handoffAlreadyActive && event.channel !== "whatsapp") {
+      logRouterEvent(
+        "CHANNEL_ROUTER_EARLY_RETURN",
+        buildRouterLogContext({
+          event,
+          eventId,
+          session,
+          messageType,
+          pipelineId,
+          reason: "handoff_active"
+        }),
+        "warn"
+      );
+      logRouterEvent(
+        "CHANNEL_ROUTER_RESPONSE_SKIPPED",
+        buildRouterLogContext({
+          event,
+          eventId,
+          session,
+          messageType,
+          pipelineId,
+          reason: "handoff_active"
+        }),
+        "warn"
+      );
+
+      return {
+        direction: "ignored",
+        sessionId: session.id,
+        eventId,
+        usedFallback: false,
+        handoffTriggered: true,
+        replySent: false,
+        detectedTheme: session.case_area || "geral",
+        currentIntent: session.current_intent || "handoff_active",
+        leadStage: "handoff",
+        triageStatus: "handoff",
+        handoffReason: "handoff_ja_ativo",
+        logs: {
+          reason: "handoff_active"
+        }
+      };
+    }
 
   if (isCommentSource) {
     const commentContext = event.commentContext!;
@@ -861,11 +1002,12 @@ export async function processChannelConversationEvent(
         .split(/\s+/)
         .map((item) => item.trim())
         .filter(Boolean)
-        .slice(0, 5),
+      .slice(0, 5),
       priority: "medium",
       intent_level: "medium",
       confidence: 0.7
     });
+    pipelineId = extractPipelineId(session);
   } else {
     await safeSaveMessage(session.id, event.externalMessageId, "user", event.messageText, "inbound", {
       channel: event.channel,
@@ -876,6 +1018,21 @@ export async function processChannelConversationEvent(
       messageType
     });
   }
+
+    logRouterEvent(
+      "CHANNEL_ROUTER_PRE_CONTEXT",
+      buildRouterLogContext({
+        event,
+        eventId,
+        session,
+        messageType,
+        pipelineId,
+        extra: {
+          handoffAlreadyActive,
+          isCommentSource
+        }
+      })
+    );
 
   const recentMessages = await conversationPersistence.getRecentMessages(session.id, 12);
   const history = recentMessages
@@ -957,20 +1114,38 @@ export async function processChannelConversationEvent(
               ? "leve, acolhedora e natural para DM/comentario"
               : "objetiva, clara e humana para WhatsApp"
         }
-      : {
+        : {
           source: event.source,
           topic: baseTheme
         }
   };
+
+  const preparedContext = isCommentSource
+    ? await instagramCommentContext.enrichNoemiaContext(session.id, baseContext)
+    : baseContext;
+
+  logRouterEvent(
+    "CHANNEL_ROUTER_PRE_NOEMIA",
+    buildRouterLogContext({
+      event,
+      eventId,
+      session,
+      messageType,
+      pipelineId,
+      extra: {
+        historyCount: history.length,
+        baseTheme,
+        handoffAlreadyActive
+      }
+    })
+  );
 
   const coreResponse = await processNoemiaCore({
     channel: event.channel,
     userType: "visitor",
     message: event.messageText,
     history,
-    context: isCommentSource
-      ? await instagramCommentContext.enrichNoemiaContext(session.id, baseContext)
-      : baseContext,
+    context: preparedContext,
     metadata: {
       sessionId: session.id,
       userId: event.externalUserId,
@@ -979,6 +1154,24 @@ export async function processChannelConversationEvent(
       source: event.source
     }
   });
+
+  logRouterEvent(
+    "CHANNEL_ROUTER_POST_NOEMIA",
+    buildRouterLogContext({
+      event,
+      eventId,
+      session,
+      messageType,
+      pipelineId,
+      responseType: "text",
+      responseLength: normalizeText(coreResponse.reply).length,
+      extra: {
+        noemiaSource: coreResponse.source,
+        usedFallback: coreResponse.usedFallback,
+        openaiUsed: coreResponse.metadata.openaiUsed
+      }
+    })
+  );
 
   const detectedTheme = coreResponse.metadata.classification?.theme || baseTheme;
   const handoffDecision = detectNeedForHumanHandoff(
@@ -1033,6 +1226,24 @@ export async function processChannelConversationEvent(
     direction = "handoff";
   }
 
+  if (!normalizeText(replyText)) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_RESPONSE_SKIPPED",
+      buildRouterLogContext({
+        event,
+        eventId,
+        session,
+        messageType,
+        pipelineId,
+        reason: "empty_reply_generated"
+      }),
+      "warn"
+    );
+
+    replyText = buildSafeFallbackReply();
+    direction = "fallback";
+  }
+
   const mergedMetadata = {
     ...(session.metadata || {}),
     router_last_event_id: eventId,
@@ -1056,13 +1267,64 @@ export async function processChannelConversationEvent(
   });
 
   let finalReplyText = replyText;
-  let sent = await transport.sendText(event.externalUserId, finalReplyText);
+
+  logRouterEvent(
+    "CHANNEL_ROUTER_PRE_OUTBOUND_SEND",
+    buildRouterLogContext({
+      event,
+      eventId,
+      session,
+      messageType,
+      pipelineId,
+      responseType: "text",
+      responseLength: finalReplyText.length,
+      reason: direction === "handoff" ? handoffDecision.reason || "handoff" : direction
+    })
+  );
+
+  let sent = await transport.sendText(event.externalUserId, finalReplyText, {
+    channel: event.channel,
+    eventId,
+    externalUserId: event.externalUserId,
+    sessionId: session.id,
+    pipelineId,
+    messageType,
+    responseType: "text",
+    responseLength: finalReplyText.length,
+    reason: direction === "handoff" ? handoffDecision.reason || "handoff" : direction
+  });
   let finalUsedFallback = coreResponse.usedFallback;
   let finalDirection = direction;
 
   if (!sent && channelAutomationFeatures.whatsappEmergencyFallback) {
     const safeFallback = buildSafeFallbackReply();
-    const fallbackSent = await transport.sendText(event.externalUserId, safeFallback);
+
+    logRouterEvent(
+      "CHANNEL_ROUTER_PRE_OUTBOUND_SEND",
+      buildRouterLogContext({
+        event,
+        eventId,
+        session,
+        messageType,
+        pipelineId,
+        responseType: "text",
+        responseLength: safeFallback.length,
+        reason: "emergency_fallback"
+      }),
+      "warn"
+    );
+
+    const fallbackSent = await transport.sendText(event.externalUserId, safeFallback, {
+      channel: event.channel,
+      eventId,
+      externalUserId: event.externalUserId,
+      sessionId: session.id,
+      pipelineId,
+      messageType,
+      responseType: "text",
+      responseLength: safeFallback.length,
+      reason: "emergency_fallback"
+    });
 
     if (fallbackSent) {
       finalReplyText = safeFallback;
@@ -1127,6 +1389,21 @@ export async function processChannelConversationEvent(
       messageText: event.messageText,
       messageType
     });
+  } else {
+    logRouterEvent(
+      "CHANNEL_ROUTER_RESPONSE_SKIPPED",
+      buildRouterLogContext({
+        event,
+        eventId,
+        session,
+        messageType,
+        pipelineId,
+        responseType: "text",
+        responseLength: finalReplyText.length,
+        reason: "outbound_send_failed"
+      }),
+      "error"
+    );
   }
 
   logRouterEvent("CHANNEL_ROUTER_COMPLETED", {
@@ -1179,4 +1456,18 @@ export async function processChannelConversationEvent(
       handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber
     }
   };
+  } catch (error) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_FATAL",
+      buildRouterLogContext({
+        event,
+        eventId,
+        messageType,
+        reason: error instanceof Error ? error.message : String(error)
+      }),
+      "error"
+    );
+
+    throw error;
+  }
 }
