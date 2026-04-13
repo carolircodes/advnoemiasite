@@ -15,14 +15,18 @@ interface ContextLinkParams {
  * Gera link contextual para triagem ou NoemIA
  */
 export function generateContextLink(params: ContextLinkParams): string {
-  const baseUrl = 'https://advnoemia.com.br';
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim() ||
+    'https://portal.advnoemia.com.br';
   
   // Determinar página destino baseada no tema e origem
-  let destination = 'triagem.html';
+  let destination = 'triagem';
   
   // Se vier da NoemIA ou for análise inicial, direcionar para NoemIA
   if (params.origem === 'noemia' || params.origem === 'noemia-home') {
-    destination = 'noemia.html';
+    destination = 'noemia';
   }
   
   // Construir parâmetros URL
@@ -59,7 +63,7 @@ export function generateContextLink(params: ContextLinkParams): string {
 export function generateTriageLink(params: ContextLinkParams): string {
   return generateContextLink({
     ...params,
-    pagina: 'triagem.html'
+    pagina: 'triagem'
   });
 }
 
@@ -69,7 +73,7 @@ export function generateTriageLink(params: ContextLinkParams): string {
 export function generateNoemiaLink(params: ContextLinkParams): string {
   return generateContextLink({
     ...params,
-    pagina: 'noemia.html'
+    pagina: 'noemia'
   });
 }
 
@@ -154,8 +158,12 @@ export function generateUTMLink(
   },
   customParams?: Record<string, string>
 ): string {
-  const baseUrl = 'https://advnoemia.com.br';
-  const page = destination === 'triagem' ? 'triagem.html' : 'noemia.html';
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim() ||
+    'https://portal.advnoemia.com.br';
+  const page = destination === 'triagem' ? 'triagem' : 'noemia';
   
   const urlParams = new URLSearchParams();
   

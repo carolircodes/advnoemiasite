@@ -35,6 +35,15 @@ import {
   buildUserFacingTriageSummary
 } from "./triage-report";
 import { traceOperationalEvent } from "../observability/operational-trace";
+import {
+  generatePaymentLink,
+  generatePaymentMessage
+} from "../payment/payment-service";
+import {
+  getRevenueOfferByCode,
+  getRevenueOfferByIntent
+} from "./revenue-architecture";
+import { recordRevenueTelemetry } from "./revenue-telemetry";
 
 type SupportedChannel = "instagram" | "whatsapp";
 type ConversationSource = "instagram_comment" | "instagram_dm" | "whatsapp_inbound";
@@ -169,6 +178,26 @@ type PriorityIntentDecision = {
   conversionSignal: ConversionSignal;
 };
 
+type PaymentIntentDecision = {
+  shouldGenerate: boolean;
+  explicitRequestDetected: boolean;
+  offerCode: string;
+  intentionType: string;
+  reason: string | null;
+};
+
+type ChannelPaymentResult = {
+  replyText: string;
+  paymentUrl: string;
+  paymentId: string | null;
+  amount: number | null;
+  offerCode: string;
+  intentionType: string;
+  leadId: string;
+};
+
+const DEFAULT_PUBLIC_APP_URL = "https://portal.advnoemia.com.br";
+
 function logRouterEvent(
   event: string,
   data: Record<string, unknown>,
@@ -250,6 +279,30 @@ function normalizeMessageType(value: string | undefined) {
 
 function normalizeText(value: string | undefined | null) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getActivePublicAppUrl() {
+  const configuredBaseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim();
+
+  return (configuredBaseUrl || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
+}
+
+function buildActiveTriageUrl(origin: string, theme?: string) {
+  const params = new URLSearchParams();
+
+  if (theme && theme.trim() && theme !== "geral") {
+    params.set("tema", theme);
+  }
+
+  if (origin.trim()) {
+    params.set("origem", origin);
+  }
+
+  const query = params.toString();
+  return `${getActivePublicAppUrl()}/triagem${query ? `?${query}` : ""}`;
 }
 
 function buildDeterministicEventId(event: ChannelConversationEvent) {
@@ -599,23 +652,23 @@ function materialLinkByTheme(theme: string) {
   const links: Record<string, { title: string; url: string }> = {
     previdenciario: {
       title: "Guia de aposentadoria",
-      url: "https://advnoemiapaixao.com.br/triagem.html?origem=instagram-previdenciario"
+      url: buildActiveTriageUrl("instagram-previdenciario", "previdenciario")
     },
     bancario: {
       title: "Orientacao inicial sobre descontos e banco",
-      url: "https://advnoemiapaixao.com.br/triagem.html?origem=instagram-bancario"
+      url: buildActiveTriageUrl("instagram-bancario", "bancario")
     },
     familia: {
       title: "Orientacao inicial sobre familia",
-      url: "https://advnoemiapaixao.com.br/triagem.html?origem=instagram-familia"
+      url: buildActiveTriageUrl("instagram-familia", "familia")
     },
     civil: {
       title: "Orientacao inicial sobre direito civil",
-      url: "https://advnoemiapaixao.com.br/triagem.html?origem=instagram-civil"
+      url: buildActiveTriageUrl("instagram-civil", "civil")
     },
     geral: {
       title: "Triagem inicial do escritorio",
-      url: "https://advnoemiapaixao.com.br/triagem.html?origem=atendimento-canais"
+      url: buildActiveTriageUrl("atendimento-canais")
     }
   };
 
@@ -628,6 +681,348 @@ function appendMaterialToReply(reply: string, material: MaterialRecommendation |
   }
 
   return `${reply}\n\nSeparei um material que pode te ajudar justamente nesse ponto: ${material.url}\n\nSe fizer sentido, me diz o que mais pesa hoje na sua situacao para eu te orientar no proximo passo.`;
+}
+
+function detectExplicitPaymentIntent(messageText: string) {
+  const normalizedMessage = messageText.toLowerCase();
+
+  return [
+    "link de pagamento",
+    "link para pagamento",
+    "link pra pagamento",
+    "link para pagar",
+    "link pra pagar",
+    "envia o link",
+    "me manda o link",
+    "gera o link",
+    "gerar o link",
+    "quero pagar",
+    "pagar agora",
+    "posso pagar",
+    "como pagar",
+    "checkout",
+    "pix",
+    "cartao",
+    "cartão",
+    "cobranca",
+    "cobrança",
+    "teste de pagamento",
+    "teste autorizado"
+  ].some((token) => normalizedMessage.includes(token));
+}
+
+function resolvePaymentIntentDecision(messageText: string): PaymentIntentDecision {
+  const normalizedMessage = messageText.toLowerCase();
+  const explicitRequestDetected = detectExplicitPaymentIntent(messageText);
+
+  let offerCode = "consultation_initial";
+  let intentionType = "consultation";
+
+  if (normalizedMessage.includes("analise") || normalizedMessage.includes("análise")) {
+    offerCode = "case_analysis_premium";
+    intentionType = "analysis";
+  } else if (normalizedMessage.includes("continuidade")) {
+    offerCode = "strategic_continuity";
+    intentionType = "continuity";
+  } else if (normalizedMessage.includes("retorno")) {
+    offerCode = "return_session";
+    intentionType = "return";
+  }
+
+  const selectedOffer = getRevenueOfferByCode(offerCode);
+  const selectedIntentOffer = getRevenueOfferByIntent(intentionType);
+
+  return {
+    shouldGenerate: explicitRequestDetected,
+    explicitRequestDetected,
+    offerCode: selectedOffer.code || selectedIntentOffer.code,
+    intentionType,
+    reason: explicitRequestDetected ? "explicit_payment_request" : null
+  };
+}
+
+async function ensureChannelRevenueLead(args: {
+  session: ConversationSession;
+  event: ChannelConversationEvent;
+  detectedTheme: string;
+}) {
+  const supabase = conversationPersistence.supabaseClient;
+  const cachedLeadId = normalizeText(
+    typeof args.session.metadata?.revenue_lead_id === "string"
+      ? args.session.metadata.revenue_lead_id
+      : typeof args.session.metadata?.lead_id === "string"
+        ? args.session.metadata.lead_id
+        : ""
+  );
+
+  if (cachedLeadId) {
+    return cachedLeadId;
+  }
+
+  const normalizedPhone = args.event.externalUserId.replace(/\D/g, "");
+  if (!normalizedPhone) {
+    return args.session.id;
+  }
+
+  const existingLeadLookup = await supabase
+    .from("noemia_leads")
+    .select("id")
+    .eq("phone", normalizedPhone)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingLeadLookup.error) {
+    const message = existingLeadLookup.error.message || "";
+    if (
+      message.includes("Could not find the table 'public.noemia_leads'") ||
+      message.toLowerCase().includes("schema cache")
+    ) {
+      logRouterEvent(
+        "CHANNEL_ROUTER_PAYMENT_LEAD_FALLBACK",
+        {
+          channel: args.event.channel,
+          source: args.event.source,
+          sessionId: args.session.id,
+          eventId: args.event.externalEventId || args.event.externalMessageId || null,
+          externalUserId: args.event.externalUserId,
+          reason: "noemia_leads_unavailable_using_session_id",
+          fallbackLeadId: args.session.id
+        },
+        "warn"
+      );
+      return args.session.id;
+    }
+  }
+
+  const existingLead = existingLeadLookup.data;
+  if (existingLead?.id) {
+    return existingLead.id as string;
+  }
+
+  const insertedLead = await supabase
+    .from("noemia_leads")
+    .insert({
+      name: `Contato WhatsApp ${normalizedPhone.slice(-4)}`,
+      email: `whatsapp-${normalizedPhone}@lead.noemia.local`,
+      phone: normalizedPhone,
+      message: args.event.messageText,
+      status: "new",
+      lead_status: "new",
+      funnel_stage: "middle",
+      urgency: "medium",
+      source: "whatsapp",
+      topic: args.detectedTheme,
+      metadata: {
+        channel: args.event.channel,
+        source: args.event.source,
+        session_id: args.session.id,
+        external_user_id: args.event.externalUserId,
+        payment_ready: true
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select("id")
+    .single();
+
+  if (insertedLead.error || !insertedLead.data?.id) {
+    const message = insertedLead.error?.message || "";
+    if (
+      message.includes("Could not find the table 'public.noemia_leads'") ||
+      message.toLowerCase().includes("schema cache")
+    ) {
+      logRouterEvent(
+        "CHANNEL_ROUTER_PAYMENT_LEAD_FALLBACK",
+        {
+          channel: args.event.channel,
+          source: args.event.source,
+          sessionId: args.session.id,
+          eventId: args.event.externalEventId || args.event.externalMessageId || null,
+          externalUserId: args.event.externalUserId,
+          reason: "noemia_leads_insert_unavailable_using_session_id",
+          fallbackLeadId: args.session.id
+        },
+        "warn"
+      );
+      return args.session.id;
+    }
+
+    logRouterEvent(
+      "CHANNEL_ROUTER_PAYMENT_LEAD_CREATE_ERROR",
+      {
+        channel: args.event.channel,
+        source: args.event.source,
+        sessionId: args.session.id,
+        eventId: args.event.externalEventId || args.event.externalMessageId || null,
+        externalUserId: args.event.externalUserId,
+        reason: insertedLead.error?.message || "lead_insert_failed"
+      },
+      "error"
+    );
+    return args.session.id;
+  }
+
+  return insertedLead.data.id as string;
+}
+
+async function maybeGenerateChannelPayment(args: {
+  event: ChannelConversationEvent;
+  eventId: string;
+  session: ConversationSession;
+  detectedTheme: string;
+  pipelineId: string | null;
+}) {
+  if (args.event.channel !== "whatsapp") {
+    return null;
+  }
+
+  const paymentIntent = resolvePaymentIntentDecision(args.event.messageText);
+  if (!paymentIntent.shouldGenerate) {
+    return null;
+  }
+
+  const leadId = await ensureChannelRevenueLead({
+    session: args.session,
+    event: args.event,
+    detectedTheme: args.detectedTheme
+  });
+
+  if (!leadId) {
+    return {
+      replyText:
+        "Entendi que voce quer seguir para o pagamento, mas houve uma falha ao preparar o seu cadastro financeiro agora. Pode me pedir novamente em instantes que eu gero o link assim que a base responder.",
+      paymentUrl: "",
+      paymentId: null,
+      amount: null,
+      offerCode: paymentIntent.offerCode,
+      intentionType: paymentIntent.intentionType,
+      leadId: ""
+    } satisfies ChannelPaymentResult;
+  }
+
+  const selectedOffer = getRevenueOfferByCode(paymentIntent.offerCode);
+
+  try {
+    await recordRevenueTelemetry({
+      eventKey: "offer_presented",
+      pagePath: "/whatsapp",
+      payload: {
+        lead_id: leadId,
+        user_id: args.event.externalUserId,
+        offer_code: selectedOffer.code,
+        offer_kind: selectedOffer.kind,
+        offer_name: selectedOffer.name,
+        intention_type: paymentIntent.intentionType,
+        monetization_source: "whatsapp",
+        monetization_path: `whatsapp_${selectedOffer.kind}_flow`
+      }
+    });
+
+    await recordRevenueTelemetry({
+      eventKey: "offer_acceptance_signal",
+      pagePath: "/whatsapp",
+      payload: {
+        lead_id: leadId,
+        user_id: args.event.externalUserId,
+        offer_code: selectedOffer.code,
+        offer_kind: selectedOffer.kind,
+        offer_name: selectedOffer.name,
+        intention_type: paymentIntent.intentionType,
+        monetization_source: "whatsapp",
+        monetization_path: `whatsapp_${selectedOffer.kind}_flow`,
+        source_message: args.event.messageText
+      }
+    });
+  } catch (trackingError) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_PAYMENT_TELEMETRY_ERROR",
+      {
+        channel: args.event.channel,
+        source: args.event.source,
+        sessionId: args.session.id,
+        eventId: args.eventId,
+        pipelineId: args.pipelineId,
+        reason:
+          trackingError instanceof Error ? trackingError.message : String(trackingError),
+        leadId,
+        offerCode: selectedOffer.code
+      },
+      "warn"
+    );
+  }
+
+  const paymentResponse = await generatePaymentLink({
+    leadId,
+    userId: args.event.externalUserId,
+    offerCode: selectedOffer.code,
+    intentionType: paymentIntent.intentionType,
+    monetizationPath: `whatsapp_${selectedOffer.kind}_flow`,
+    monetizationSource: "whatsapp",
+    metadata: {
+      channel: args.event.channel,
+      source: args.event.source,
+      session_id: args.session.id,
+      event_id: args.eventId,
+      external_user_id: args.event.externalUserId,
+      offer_code: selectedOffer.code,
+      offer_kind: selectedOffer.kind,
+      detected_theme: args.detectedTheme,
+      original_message: args.event.messageText
+    }
+  });
+
+  if (!paymentResponse.success || !paymentResponse.paymentUrl) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_PAYMENT_LINK_ERROR",
+      {
+        channel: args.event.channel,
+        source: args.event.source,
+        sessionId: args.session.id,
+        eventId: args.eventId,
+        pipelineId: args.pipelineId,
+        reason: paymentResponse.error || "payment_link_generation_failed",
+        leadId,
+        offerCode: selectedOffer.code
+      },
+      "error"
+    );
+
+    return {
+      replyText:
+        "Entendi que voce quer seguir para o pagamento, mas houve uma falha tecnica ao gerar o link agora. Pode me pedir novamente em instantes que eu tento de novo sem perder o contexto.",
+      paymentUrl: "",
+      paymentId: null,
+      amount: null,
+      offerCode: selectedOffer.code,
+      intentionType: paymentIntent.intentionType,
+      leadId
+    } satisfies ChannelPaymentResult;
+  }
+
+  logRouterEvent("CHANNEL_ROUTER_PAYMENT_LINK_GENERATED", {
+    channel: args.event.channel,
+    source: args.event.source,
+    sessionId: args.session.id,
+    eventId: args.eventId,
+    pipelineId: args.pipelineId,
+    reason: paymentIntent.reason,
+    leadId,
+    offerCode: selectedOffer.code,
+    paymentId: paymentResponse.paymentId || null,
+    paymentUrl: paymentResponse.paymentUrl,
+    paymentAmount: paymentResponse.amount || null
+  });
+
+  return {
+    replyText: generatePaymentMessage(paymentResponse),
+    paymentUrl: paymentResponse.paymentUrl,
+    paymentId: paymentResponse.paymentId || null,
+    amount: paymentResponse.amount || null,
+    offerCode: selectedOffer.code,
+    intentionType: paymentIntent.intentionType,
+    leadId
+  } satisfies ChannelPaymentResult;
 }
 
 function inferFollowUpState(
@@ -2037,6 +2432,16 @@ export async function processChannelConversationEvent(
   });
   let replyText = appendMaterialToReply(coreResponse.reply, materialRecommendation);
   replyText = applyCommercialInviteRefinement(replyText, commercialSnapshot);
+  const paymentResult = await maybeGenerateChannelPayment({
+    event,
+    eventId,
+    session,
+    detectedTheme,
+    pipelineId
+  });
+  if (paymentResult) {
+    replyText = paymentResult.replyText;
+  }
   let direction: MessageDirection = coreResponse.usedFallback ? "fallback" : "reply";
 
   logRouterEvent(
@@ -2173,6 +2578,14 @@ export async function processChannelConversationEvent(
       conversationPolicy.handoffAllowed || conversationPolicy.operationalHandoffRecorded,
     human_followup_pending: conversationPolicy.humanFollowUpPending,
     follow_up_ready: conversationPolicy.followUpReady,
+    revenue_lead_id:
+      paymentResult?.leadId || session.metadata?.revenue_lead_id || session.metadata?.lead_id || null,
+    payment_offer_code: paymentResult?.offerCode || session.metadata?.payment_offer_code || null,
+    payment_intention_type:
+      paymentResult?.intentionType || session.metadata?.payment_intention_type || null,
+    payment_url: paymentResult?.paymentUrl || session.metadata?.payment_url || null,
+    payment_id: paymentResult?.paymentId || session.metadata?.payment_id || null,
+    payment_amount: paymentResult?.amount || session.metadata?.payment_amount || null,
     commercial_funnel_stage: commercialSnapshot.funnelStage,
     commercial_follow_up_type: commercialSnapshot.followUpType,
     commercial_next_best_action: commercialSnapshot.nextBestAction,
@@ -2289,6 +2702,10 @@ export async function processChannelConversationEvent(
       addressRequestDetected: priorityIntentDecision.addressRequestDetected,
       whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
       handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber,
+      paymentGenerated: Boolean(paymentResult?.paymentUrl),
+      paymentUrl: paymentResult?.paymentUrl || null,
+      paymentId: paymentResult?.paymentId || null,
+      paymentOfferCode: paymentResult?.offerCode || null,
       responseTime: coreResponse.metadata.responseTime,
       classification: coreResponse.metadata.classification
     });
@@ -2459,6 +2876,10 @@ export async function processChannelConversationEvent(
     aiActiveOnChannel: conversationPolicy.aiActiveOnChannel,
     operationalHandoffRecorded: conversationPolicy.operationalHandoffRecorded,
     materialUrl: materialRecommendation?.url || null,
+    paymentGenerated: Boolean(paymentResult?.paymentUrl),
+    paymentUrl: paymentResult?.paymentUrl || null,
+    paymentId: paymentResult?.paymentId || null,
+    paymentOfferCode: paymentResult?.offerCode || null,
     replySent: sent,
     consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
     addressRequestDetected: priorityIntentDecision.addressRequestDetected,
@@ -2507,6 +2928,10 @@ export async function processChannelConversationEvent(
       consultationIntentDetected: priorityIntentDecision.consultationIntentDetected,
       addressRequestDetected: priorityIntentDecision.addressRequestDetected,
       whatsappHandoffRecommended: priorityIntentDecision.whatsappHandoffRecommended,
+      paymentGenerated: Boolean(paymentResult?.paymentUrl),
+      paymentUrl: paymentResult?.paymentUrl || null,
+      paymentId: paymentResult?.paymentId || null,
+      paymentOfferCode: paymentResult?.offerCode || null,
       handoffPhoneUsed: channelCommercialConfig.consultationWhatsappNumber,
       handoffAlreadyActive
     }

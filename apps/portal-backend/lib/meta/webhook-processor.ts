@@ -3,6 +3,14 @@ import { generateContextLink } from './link-generator';
 import { sendWhatsAppMessage } from './whatsapp-service';
 import { logMetaEvent } from './logging';
 
+function buildLegacySafeTriageLink(theme?: string) {
+  return generateContextLink({
+    tema: theme,
+    origem: 'whatsapp',
+    campanha: 'legacy-meta-webhook'
+  });
+}
+
 /**
  * Processa eventos recebidos da Meta (Instagram + WhatsApp)
  */
@@ -193,17 +201,17 @@ function buildCommentResponse(theme: string, contextLink: string): string {
  */
 function buildWhatsAppResponse(theme: string, senderPhone: string): string {
   const responses = {
-    aposentadoria: `Olá! 👋\n\nVi que você tem uma questão sobre aposentadoria. Para te atender com mais precisão, preparei uma triagem inicial:\n\n🔗 advnoemia.com.br/triagem.html?tema=aposentadoria&origem=whatsapp\n\nPreencha os dados que já vou te encaminhar para a advogada!`,
+    aposentadoria: `Olá! 👋\n\nVi que você tem uma questão sobre aposentadoria. Para te atender com mais precisão, preparei uma triagem inicial:\n\n🔗 ${buildLegacySafeTriageLink('aposentadoria')}\n\nPreencha os dados que já vou te encaminhar para a advogada!`,
     
-    bancario: `Olá! 👋\n\nEntendi sua questão bancária. Para resolver isso rápido, preparei uma triagem específica:\n\n🔗 advnoemia.com.br/triagem.html?tema=bancario&origem=whatsapp\n\nPreencha que já vamos conversar sobre seu caso!`,
+    bancario: `Olá! 👋\n\nEntendi sua questão bancária. Para resolver isso rápido, preparei uma triagem específica:\n\n🔗 ${buildLegacySafeTriageLink('bancario')}\n\nPreencha que já vamos conversar sobre seu caso!`,
     
-    familia: `Olá! 👋\n\nVi sua mensagem sobre direito de família. Preparei um atendimento direcionado:\n\n🔗 advnoemia.com.br/triagem.html?tema=familia&origem=whatsapp\n\nOrganize suas informações que já agendamos sua consulta!`,
+    familia: `Olá! 👋\n\nVi sua mensagem sobre direito de família. Preparei um atendimento direcionado:\n\n🔗 ${buildLegacySafeTriageLink('familia')}\n\nOrganize suas informações que já agendamos sua consulta!`,
     
-    consumidor: `Olá! 👋\n\nEntendi seu problema de consumo. Tenho um caminho rápido para você:\n\n🔗 advnoemia.com.br/triagem.html?tema=consumidor&origem=whatsapp\n\nPreencha a triagem que já resolvemos sua situação!`,
+    consumidor: `Olá! 👋\n\nEntendi seu problema de consumo. Tenho um caminho rápido para você:\n\n🔗 ${buildLegacySafeTriageLink('consumidor')}\n\nPreencha a triagem que já resolvemos sua situação!`,
     
-    civil: `Olá! 👋\n\nVi sua dúvida jurídica. Para te ajudar melhor:\n\n🔗 advnoemia.com.br/triagem.html?tema=civil&origem=whatsapp\n\nPreencha seus dados que já falamos sobre seu caso!`,
+    civil: `Olá! 👋\n\nVi sua dúvida jurídica. Para te ajudar melhor:\n\n🔗 ${buildLegacySafeTriageLink('civil')}\n\nPreencha seus dados que já falamos sobre seu caso!`,
     
-    default: `Olá! 👋\n\nPara te atender da melhor forma, preparei uma triagem inicial:\n\n🔗 advnoemia.com.br/triagem.html?origem=whatsapp\n\nLá você conta seu caso e já conversamos!`
+    default: `Olá! 👋\n\nPara te atender da melhor forma, preparei uma triagem inicial:\n\n🔗 ${buildLegacySafeTriageLink()}\n\nLá você conta seu caso e já conversamos!`
   };
 
   return responses[theme as keyof typeof responses] || responses.default;
