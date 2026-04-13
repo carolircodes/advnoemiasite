@@ -15,6 +15,7 @@ type BuildTriageReportInput = {
     collectedData?: object;
     leadTemperature?: string;
     priorityLevel?: string;
+    conversionScore?: number;
     triageCompleteness?: number;
     explanationStage?: string;
     conversationStatus?: string;
@@ -66,6 +67,47 @@ function listUrgencySignals(collectedData: Record<string, unknown>) {
   return signals;
 }
 
+function inferExecutiveFunnelStage(input: BuildTriageReportInput) {
+  const consultationStage =
+    input.conversationPolicy?.consultationStage || input.conversationState?.consultationStage || "not_offered";
+  const conversationStatus =
+    input.conversationPolicy?.state || input.conversationState?.conversationStatus || "ai_active";
+  const completeness = input.conversationState?.triageCompleteness || 0;
+
+  if (consultationStage === "scheduled_pending_confirmation") return "consulta_agendada";
+  if (consultationStage === "ready_for_lawyer" || conversationStatus === "consultation_ready") {
+    return "pronto_para_contato_humano";
+  }
+  if (
+    consultationStage === "availability_collected" ||
+    consultationStage === "collecting_availability" ||
+    consultationStage === "interest_detected" ||
+    consultationStage === "offered"
+  ) {
+    return "intencao_de_consulta";
+  }
+  if (completeness >= 45) return "triagem_em_avanco";
+  return "entrada_em_conversa";
+}
+
+function inferFunnelMomentum(input: BuildTriageReportInput) {
+  const leadTemperature = input.conversationState?.leadTemperature || "";
+  const completeness = input.conversationState?.triageCompleteness || 0;
+  const consultationStage =
+    input.conversationPolicy?.consultationStage || input.conversationState?.consultationStage || "not_offered";
+
+  if (consultationStage === "scheduled_pending_confirmation" || consultationStage === "ready_for_lawyer") {
+    return "forte";
+  }
+  if (leadTemperature === "hot" || completeness >= 70) {
+    return "forte";
+  }
+  if (leadTemperature === "warm" || completeness >= 40) {
+    return "moderado";
+  }
+  return "inicial";
+}
+
 export function buildTriageReport(input: BuildTriageReportInput) {
   const collectedData = (input.conversationState?.collectedData || {}) as Record<string, unknown>;
   const problemaPrincipal =
@@ -76,6 +118,8 @@ export function buildTriageReport(input: BuildTriageReportInput) {
   const documentTypes = asStringArray(collectedData.tipos_documentos);
   const keywords = asStringArray(collectedData.palavras_chave);
   const schedulingPreferences = input.schedulingPreferences || {};
+  const executiveFunnelStage = inferExecutiveFunnelStage(input);
+  const funnelMomentum = inferFunnelMomentum(input);
   const availabilityParts = [
     schedulingPreferences.availability,
     schedulingPreferences.period ? `turno ${schedulingPreferences.period}` : "",
@@ -116,6 +160,11 @@ export function buildTriageReport(input: BuildTriageReportInput) {
     sessao_relacionada: input.sessionId,
     pipeline_id: input.pipelineId || null,
     next_best_action: input.nextBestAction || "",
+    executive_funnel_stage: executiveFunnelStage,
+    funnel_momentum: funnelMomentum,
+    lead_temperature: input.conversationState?.leadTemperature || "",
+    conversion_score: input.conversationState?.conversionScore || 0,
+    priority_level: input.conversationState?.priorityLevel || "",
     observacoes_uteis: [
       input.handoffReason ? `Motivo operacional: ${input.handoffReason}` : "",
       input.handoffReasonCode ? `Codigo do motivo: ${input.handoffReasonCode}` : "",
@@ -158,6 +207,7 @@ export function buildInternalTriageSummary(input: BuildTriageReportInput) {
     `Estado: ${input.conversationPolicy?.state || input.conversationState?.conversationStatus || "ai_active"}`,
     `Explicacao: ${input.conversationPolicy?.explanationStage || input.conversationState?.explanationStage || "not_started"}`,
     `Consulta: ${input.conversationPolicy?.consultationStage || input.conversationState?.consultationStage || "not_offered"}`,
+    `Funil: ${inferExecutiveFunnelStage(input)}`,
     `Triagem: ${input.conversationPolicy?.triageStage || "not_started"}`,
     `Disponibilidade: ${input.schedulingPreferences?.availability || "nao coletada"}`,
     `Problema: ${asString(collectedData.problema_principal) || input.messageText}`,
@@ -179,6 +229,7 @@ export function buildUserFacingTriageSummary(input: BuildTriageReportInput) {
     `estado ${input.conversationPolicy?.state || input.leadStage}`,
     `explicacao ${input.conversationPolicy?.explanationStage || "not_started"}`,
     `consulta ${report.status_consulta}`,
+    `funil ${report.executive_funnel_stage}`,
     report.preferencias_agendamento ? `agenda ${report.preferencias_agendamento}` : "",
     report.lawyer_notification_generated ? "advogada notificada" : "",
     report.ai_active_on_channel ? "IA segue ativa" : ""

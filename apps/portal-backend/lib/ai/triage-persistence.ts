@@ -7,7 +7,7 @@ import {
   buildTriageReport,
   buildUserFacingTriageSummary
 } from "../services/triage-report";
-import { NoemiaCoreInput, ConversationState } from "./noemia-core";
+import type { ConversationState, NoemiaCoreInput } from "./core-types";
 
 export async function saveTriageData(
   input: NoemiaCoreInput,
@@ -49,6 +49,10 @@ export async function saveTriageData(
     prejuizo_ativo: conversationState.collectedData.prejuizo_ativo,
     palavras_chave: conversationState.collectedData.palavras_chave,
     completude: conversationState.triageCompleteness,
+    lead_temperature: conversationState.leadTemperature,
+    priority_level: conversationState.priorityLevel,
+    conversion_score: conversationState.conversionScore,
+    commercial_status: conversationState.commercialStatus,
     conversation_status: conversationState.conversationStatus,
     triage_stage: conversationState.triageStage,
     explanation_stage: conversationState.explanationStage,

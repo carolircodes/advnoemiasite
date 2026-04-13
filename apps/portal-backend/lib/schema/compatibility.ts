@@ -23,6 +23,31 @@ type CompatibilityReport = {
 let cachedCompatibilityReport: CompatibilityReport | null = null;
 let compatibilityCheckPromise: Promise<CompatibilityReport> | null = null;
 
+const REQUIRED_TABLES_BY_SURFACE: Record<OperationalSurface, string[]> = {
+  meta_webhook: [
+    "conversation_sessions",
+    "processed_webhook_events",
+    "noemia_triage_summaries"
+  ],
+  whatsapp_webhook: [
+    "conversation_sessions",
+    "processed_webhook_events",
+    "noemia_triage_summaries"
+  ],
+  channel_router: [
+    "conversation_sessions",
+    "processed_webhook_events",
+    "noemia_triage_summaries"
+  ],
+  public_intake: ["product_events"],
+  internal_panel: [
+    "conversation_sessions",
+    "noemia_triage_summaries",
+    "follow_up_messages",
+    "product_events"
+  ]
+};
+
 export function getOfficialSchemaVersion() {
   return OFFICIAL_SCHEMA_GOVERNANCE.schemaVersion;
 }
@@ -39,44 +64,50 @@ export function shouldEnforceOperationalSchemaCompatibility() {
 }
 
 async function fetchCompatibilityReport(): Promise<CompatibilityReport> {
+  return fetchCompatibilityReportForSurface("internal_panel");
+}
+
+async function fetchCompatibilityReportForSurface(
+  surface: OperationalSurface
+): Promise<CompatibilityReport> {
   const supabase = createAdminSupabaseClient();
-  const expectedEntries = Object.entries(OFFICIAL_SCHEMA_GOVERNANCE.requiredTables);
-  const tableNames = expectedEntries.map(([table]) => table);
+  const expectedEntries = Object.entries(OFFICIAL_SCHEMA_GOVERNANCE.requiredTables).filter(
+    ([table]) => REQUIRED_TABLES_BY_SURFACE[surface].includes(table)
+  );
+  const missing: CompatibilityReport["missing"] = [];
 
-  const { data, error } = await supabase
-    .schema("information_schema")
-    .from("columns")
-    .select("table_name,column_name")
-    .eq("table_schema", "public")
-    .in("table_name", tableNames);
+  for (const [table, requiredColumns] of expectedEntries) {
+    const missingColumns: string[] = [];
 
-  if (error) {
-    throw new Error(`Failed to inspect schema compatibility: ${error.message}`);
-  }
+    for (const column of requiredColumns) {
+      const { error } = await supabase.from(table).select(column).limit(1);
 
-  const actualColumnsByTable = new Map<string, Set<string>>();
-  for (const row of data || []) {
-    const tableName = String((row as { table_name?: unknown }).table_name || "");
-    const columnName = String((row as { column_name?: unknown }).column_name || "");
+      if (!error) {
+        continue;
+      }
 
-    if (!actualColumnsByTable.has(tableName)) {
-      actualColumnsByTable.set(tableName, new Set());
+      const message = error.message.toLowerCase();
+      const missingRelation =
+        message.includes("relation") && message.includes("does not exist");
+      const missingColumn =
+        (message.includes("column") && message.includes("does not exist")) ||
+        message.includes(`could not find the '${column.toLowerCase()}' column`);
+
+      if (missingRelation || missingColumn) {
+        missingColumns.push(column);
+        continue;
+      }
+
+      throw new Error(`Failed to inspect schema compatibility: ${error.message}`);
     }
 
-    actualColumnsByTable.get(tableName)?.add(columnName);
-  }
-
-  const missing = expectedEntries
-    .map(([table, requiredColumns]) => {
-      const existingColumns = actualColumnsByTable.get(table) || new Set<string>();
-      const missingColumns = requiredColumns.filter((column) => !existingColumns.has(column));
-
-      return {
+    if (missingColumns.length > 0) {
+      missing.push({
         table,
         columns: missingColumns
-      };
-    })
-    .filter((entry) => entry.columns.length > 0);
+      });
+    }
+  }
 
   return {
     ok: missing.length === 0,
@@ -105,7 +136,10 @@ export async function getOperationalSchemaCompatibilityReport() {
 }
 
 export async function assertOperationalSchemaCompatibility(surface: OperationalSurface) {
-  const report = await getOperationalSchemaCompatibilityReport();
+  const report =
+    surface === "internal_panel"
+      ? await getOperationalSchemaCompatibilityReport()
+      : await fetchCompatibilityReportForSurface(surface);
 
   if (report.ok) {
     return report;

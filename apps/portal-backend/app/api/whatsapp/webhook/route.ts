@@ -456,14 +456,21 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logEvent(
       "WHATSAPP_WEBHOOK_PROCESSING_ERROR",
       {
-        error: error instanceof Error ? error.message : String(error)
+        error: errorMessage
       },
       "error"
     );
 
-    return NextResponse.json({ error: "Failed to process WhatsApp webhook" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Failed to process WhatsApp webhook",
+        detail: process.env.CHANNEL_VALIDATION_EXPOSE_ERRORS === "true" ? errorMessage : undefined
+      },
+      { status: 500 }
+    );
   }
 }

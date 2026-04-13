@@ -80,6 +80,12 @@ interface OperationalContact {
     triageStage?: string;
     explanationStage?: string;
     consultationStage?: string;
+    executiveFunnelStage?: string | null;
+    funnelMomentum?: string | null;
+    leadTemperature?: string | null;
+    priorityLevel?: string | null;
+    conversionScore?: number | null;
+    nextBestAction?: string | null;
     handoffReason?: string | null;
     readyForLawyer: boolean;
     aiActiveOnChannel: boolean;
@@ -107,6 +113,10 @@ interface OperationalContact {
 interface OperationalMetrics {
   totalLeads: number;
   warmHotLeads: number;
+  activeConversations: number;
+  consultationIntent: number;
+  consultationReady: number;
+  humanHandoffReady: number;
   followUpPending: number;
   consultationOffered: number;
   consultationScheduled: number;
@@ -725,7 +735,29 @@ export default function OperationalPanel() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Total de leads" value={metrics.totalLeads} icon={<Users className="h-6 w-6" />} />
           <MetricCard
-            label="Leads quentes"
+            label="Conversas ativas"
+            value={metrics.activeConversations}
+            icon={<MessageSquare className="h-6 w-6" />}
+          />
+          <MetricCard
+            label="Consulta em vista"
+            value={metrics.consultationIntent}
+            icon={<Calendar className="h-6 w-6" />}
+            tone="orange"
+          />
+          <MetricCard
+            label="Prontas para acao humana"
+            value={metrics.humanHandoffReady}
+            icon={<Target className="h-6 w-6" />}
+            tone="red"
+          />
+        </div>
+      ) : null}
+
+      {metrics ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Leads mornos/quentes"
             value={metrics.warmHotLeads}
             icon={<TrendingUp className="h-6 w-6" />}
             tone="orange"
@@ -734,6 +766,12 @@ export default function OperationalPanel() {
             label="Follow-up pendente"
             value={metrics.followUpPending}
             icon={<Clock className="h-6 w-6" />}
+            tone="yellow"
+          />
+          <MetricCard
+            label="Consulta pronta"
+            value={metrics.consultationReady}
+            icon={<CheckCircle className="h-6 w-6" />}
             tone="yellow"
           />
           <MetricCard
@@ -1005,6 +1043,16 @@ export default function OperationalPanel() {
                       <StatusChip tone={contact.conversationState.readyForLawyer ? 'green' : 'neutral'}>
                         {formatConversationStateLabel(contact.conversationState.conversationStatus)}
                       </StatusChip>
+                      {contact.conversationState.executiveFunnelStage ? (
+                        <StatusChip tone="purple">
+                          Funil: {contact.conversationState.executiveFunnelStage}
+                        </StatusChip>
+                      ) : null}
+                      {contact.conversationState.funnelMomentum ? (
+                        <StatusChip tone={contact.conversationState.funnelMomentum === 'forte' ? 'green' : contact.conversationState.funnelMomentum === 'moderado' ? 'orange' : 'neutral'}>
+                          Momento: {contact.conversationState.funnelMomentum}
+                        </StatusChip>
+                      ) : null}
                       <StatusChip tone={contact.conversationState.aiActiveOnChannel ? 'blue' : 'red'}>
                         {contact.conversationState.aiActiveOnChannel ? 'IA segue ativa' : 'IA inativa'}
                       </StatusChip>
@@ -1033,6 +1081,13 @@ export default function OperationalPanel() {
                       <p className="mt-3 text-sm text-[#5d6d66]">
                         <span className="font-medium text-[#10261d]">Preferencia registrada:</span>{' '}
                         {contact.conversationState.schedulingPreferences.availability}
+                      </p>
+                    ) : null}
+
+                    {contact.conversationState.nextBestAction ? (
+                      <p className="mt-3 text-sm text-[#5d6d66]">
+                        <span className="font-medium text-[#10261d]">Proxima acao sugerida pela conversa:</span>{' '}
+                        {contact.conversationState.nextBestAction}
                       </p>
                     ) : null}
 

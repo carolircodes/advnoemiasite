@@ -30,6 +30,20 @@ import {
   detectUserIntent as detectConversationIntent
 } from "./message-classifier";
 import { buildSystemPrompt as buildNoemiaSystemPrompt } from "./system-prompt";
+import {
+  initializeConversationState as initializeManagedConversationState,
+  updateConversationState as updateManagedConversationState
+} from "./state-manager";
+import {
+  evaluatePolicyHandoff as evaluateManagedPolicyHandoff,
+  shouldAdvanceToNextStage as shouldAdvanceManagedStage
+} from "./handoff-orchestrator";
+import {
+  generateFallbackResponse as generateManagedFallbackResponse,
+  generateInternalSummary as generateManagedInternalSummary,
+  generateTriageResponse as generateManagedTriageResponse,
+  generateUserFriendlySummary as generateManagedUserFriendlySummary
+} from "./response-composer";
 
 export type {
   ClassifiedIntent,
@@ -2871,11 +2885,12 @@ export async function processNoemiaCore(
 
   const classification = classifyIncomingMessage(input.message);
   const currentConversationState =
-    input.conversationState || initializeConversationState();
-  const newConversationState = updateConversationState(
+    input.conversationState || initializeManagedConversationState();
+  const newConversationState = updateManagedConversationState(
     currentConversationState,
     input.message,
-    classification
+    classification,
+    evaluateManagedPolicyHandoff
   );
 
   console.log(
@@ -3021,11 +3036,35 @@ export async function processNoemiaCore(
 
     const fallbackReply =
       effectiveAudience === "visitor"
-        ? generateTriageResponse(newConversationState, classification, input.message)
-        : generateFallbackResponse(
+        ? generateManagedTriageResponse(newConversationState, classification, input.message, {
+            getSaudacao,
+            detectLegalArea,
+            detectLeadIntention,
+            getLeadProfile,
+            detectBuyingIntention,
+            generateFastConversionMessage,
+            generateClosingMessage,
+            shouldFastConversion,
+            shouldSkipQuestions,
+            getVariationWithoutRepetition,
+            adaptMessageForLead,
+            addIntelligentEmpathy,
+            personalizeMessage,
+            adaptMessageTone,
+            shouldAdvanceToNextStage: shouldAdvanceManagedStage
+          })
+        : generateManagedFallbackResponse(
             intent,
             effectiveAudience,
-            detectedTheme || undefined
+            detectedTheme || undefined,
+            {
+              getSaudacao,
+              detectLegalArea,
+              getVariationWithoutRepetition,
+              addIntelligentEmpathy,
+              personalizeMessage,
+              adaptMessageTone
+            }
           );
 
     return {

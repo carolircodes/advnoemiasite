@@ -5,6 +5,12 @@ export type PanelConversationStateProjection = {
   triageStage?: string | null;
   explanationStage?: string | null;
   consultationStage?: string | null;
+  executiveFunnelStage?: string | null;
+  funnelMomentum?: string | null;
+  leadTemperature?: string | null;
+  priorityLevel?: string | null;
+  conversionScore?: number | null;
+  nextBestAction?: string | null;
   handoffReason?: string | null;
   readyForLawyer: boolean;
   aiActiveOnChannel: boolean;
@@ -29,6 +35,17 @@ export function projectPanelConversationState(summary: any): PanelConversationSt
     triageStage: triageData.triage_stage || null,
     explanationStage: summary.explanation_stage || triageData.explanation_stage || null,
     consultationStage: summary.consultation_stage || triageData.consultation_stage || null,
+    executiveFunnelStage: reportData.executive_funnel_stage || null,
+    funnelMomentum: reportData.funnel_momentum || null,
+    leadTemperature: triageData.lead_temperature || reportData.lead_temperature || null,
+    priorityLevel: triageData.priority_level || reportData.priority_level || null,
+    conversionScore:
+      typeof triageData.conversion_score === "number"
+        ? triageData.conversion_score
+        : typeof reportData.conversion_score === "number"
+          ? reportData.conversion_score
+          : null,
+    nextBestAction: reportData.next_best_action || null,
     handoffReason: summary.handoff_reason || triageData.handoff_policy?.reason || null,
     readyForLawyer:
       summary.conversation_status === "consultation_ready" ||

@@ -35,6 +35,10 @@ export interface TriageData {
   // Metadados
   palavras_chave?: string[];
   completude?: number;
+  lead_temperature?: string;
+  priority_level?: string;
+  conversion_score?: number;
+  commercial_status?: string;
   conversation_status?: string;
   triage_stage?: string;
   explanation_stage?: string;
@@ -78,6 +82,11 @@ export interface TriageData {
     canal_origem?: string;
     pipeline_id?: string | null;
     next_best_action?: string;
+    executive_funnel_stage?: string;
+    funnel_momentum?: string;
+    lead_temperature?: string;
+    conversion_score?: number;
+    priority_level?: string;
   };
 }
 

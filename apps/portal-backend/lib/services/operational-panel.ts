@@ -45,6 +45,12 @@ export interface OperationalContact {
     triageStage?: string | null;
     explanationStage?: string | null;
     consultationStage?: string | null;
+    executiveFunnelStage?: string | null;
+    funnelMomentum?: string | null;
+    leadTemperature?: string | null;
+    priorityLevel?: string | null;
+    conversionScore?: number | null;
+    nextBestAction?: string | null;
     handoffReason?: string | null;
     readyForLawyer: boolean;
     aiActiveOnChannel: boolean;
@@ -84,6 +90,10 @@ export interface OperationalPanelFilters {
 export interface OperationalPanelMetrics {
   totalLeads: number;
   warmHotLeads: number;
+  activeConversations: number;
+  consultationIntent: number;
+  consultationReady: number;
+  humanHandoffReady: number;
   followUpPending: number;
   consultationOffered: number;
   consultationScheduled: number;
@@ -582,6 +592,10 @@ class OperationalPanel {
       const metrics: OperationalPanelMetrics = {
         totalLeads: 0,
         warmHotLeads: 0,
+        activeConversations: 0,
+        consultationIntent: 0,
+        consultationReady: 0,
+        humanHandoffReady: 0,
         followUpPending: 0,
         consultationOffered: 0,
         consultationScheduled: 0,
@@ -612,6 +626,10 @@ class OperationalPanel {
           metrics.warmHotLeads++;
         }
 
+        if (pipeline.stage !== "closed_lost" && pipeline.stage !== "inactive") {
+          metrics.activeConversations++;
+        }
+
         if (pipeline.follow_up_status === "pending" || pipeline.follow_up_status === "scheduled") {
           metrics.followUpPending++;
         }
@@ -619,9 +637,13 @@ class OperationalPanel {
         switch (pipeline.stage) {
           case "consultation_offered":
             metrics.consultationOffered++;
+            metrics.consultationIntent++;
             break;
           case "consultation_scheduled":
             metrics.consultationScheduled++;
+            metrics.consultationIntent++;
+            metrics.consultationReady++;
+            metrics.humanHandoffReady++;
             break;
           case "proposal_sent":
             metrics.proposalSent++;
@@ -674,6 +696,10 @@ class OperationalPanel {
     return {
       totalLeads: 0,
       warmHotLeads: 0,
+      activeConversations: 0,
+      consultationIntent: 0,
+      consultationReady: 0,
+      humanHandoffReady: 0,
       followUpPending: 0,
       consultationOffered: 0,
       consultationScheduled: 0,
