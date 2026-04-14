@@ -74,7 +74,9 @@ export function ClientShell({
         <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
           Este portal foi organizado para mostrar com clareza onde seu
           atendimento esta, o que ja foi resolvido, o que ainda depende de
-          voce e quais sao os proximos passos acompanhados pela equipe.
+          voce e quais sao os proximos passos acompanhados pela equipe, sem
+          misturar essa leitura juridica com futuras experiencias premium do
+          ecossistema.
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">

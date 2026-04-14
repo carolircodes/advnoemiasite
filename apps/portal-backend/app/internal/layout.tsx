@@ -16,23 +16,25 @@ const menuItems = [
   { id: 'casos', label: 'Casos', href: '/internal/advogada/casos' },
   { id: 'agenda', label: 'Agenda', href: '/internal/advogada/agenda' },
   { id: 'documentos', label: 'Documentos', href: '/internal/advogada/documentos' },
-  { id: 'automacoes', label: 'Automações', href: '/internal/advogada/automacoes' },
+  { id: 'automacoes', label: 'Automacoes', href: '/internal/advogada/automacoes' },
   { id: 'canais', label: 'Canais', href: '/internal/advogada/canais' },
-  { id: 'inteligencia', label: 'Inteligência', href: '/internal/advogada/inteligencia' },
-  { id: 'configuracoes', label: 'Configurações', href: '/internal/advogada/configuracoes' }
+  { id: 'inteligencia', label: 'Inteligencia', href: '/internal/advogada/inteligencia' },
+  { id: 'ecossistema', label: 'Ecossistema', href: '/internal/advogada/ecossistema' },
+  { id: 'configuracoes', label: 'Configuracoes', href: '/internal/advogada/configuracoes' }
 ];
 
 const subtitles: Record<string, string> = {
-  'Painel Operacional': 'Gestão de leads e operações',
-  'Leads': 'Captura e qualificação de leads',
-  'Atendimento': 'Gestão de atendimento ao cliente',
-  'Casos': 'Acompanhamento de processos',
-  'Agenda': 'Compromissos e consultas',
-  'Documentos': 'Gestão documental',
-  'Automações': 'Fluxos automatizados',
-  'Canais': 'WhatsApp e Instagram',
-  'Inteligência': 'Análises e insights',
-  'Configurações': 'Configurações do sistema'
+  'Painel Operacional': 'Gestao de leads e operacoes',
+  Leads: 'Captura e qualificacao de leads',
+  Atendimento: 'Gestao de atendimento ao cliente',
+  Casos: 'Acompanhamento de processos',
+  Agenda: 'Compromissos e consultas',
+  Documentos: 'Gestao documental',
+  Automacoes: 'Fluxos automatizados',
+  Canais: 'WhatsApp e Instagram',
+  Inteligencia: 'Analises e insights',
+  Ecossistema: 'Catalogo, recorrencia e expansao premium',
+  Configuracoes: 'Configuracoes do sistema'
 };
 
 export default function InternalLayout({ children }: LayoutProps) {
@@ -47,7 +49,9 @@ export default function InternalLayout({ children }: LayoutProps) {
         (item.href === '/internal/advogada/leads' &&
           currentPath.startsWith('/internal/advogada/leads')) ||
         (item.href === '/internal/advogada/casos' &&
-          currentPath.startsWith('/internal/advogada/casos'))
+          currentPath.startsWith('/internal/advogada/casos')) ||
+        (item.href === '/internal/advogada/ecossistema' &&
+          currentPath.startsWith('/internal/advogada/ecossistema'))
       );
     });
 
@@ -70,7 +74,7 @@ export default function InternalLayout({ children }: LayoutProps) {
 
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}

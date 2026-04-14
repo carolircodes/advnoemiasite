@@ -1,6 +1,6 @@
 {
   "sourceOfTruth": "supabase/migrations",
-  "schemaVersion": "phase-6.5-2026-04-13",
+  "schemaVersion": "phase-12-2026-04-14",
   "requiredTables": {
     "conversation_sessions": [
       "id",
@@ -55,6 +55,56 @@
       "page_path",
       "session_id",
       "payload"
+    ],
+    "ecosystem_catalog_items": [
+      "id",
+      "slug",
+      "vertical",
+      "catalog_kind",
+      "delivery_kind",
+      "access_model",
+      "availability_status",
+      "portal_workspace",
+      "legal_boundary"
+    ],
+    "ecosystem_plan_tiers": [
+      "id",
+      "code",
+      "headline",
+      "cadence",
+      "status",
+      "portal_workspace"
+    ],
+    "ecosystem_subscriptions": [
+      "id",
+      "profile_id",
+      "plan_tier_id",
+      "status",
+      "cadence",
+      "current_period_ends_at"
+    ],
+    "ecosystem_access_grants": [
+      "id",
+      "profile_id",
+      "catalog_item_id",
+      "grant_status",
+      "portal_workspace",
+      "access_scope"
+    ],
+    "ecosystem_content_tracks": [
+      "id",
+      "slug",
+      "status",
+      "access_model",
+      "portal_workspace",
+      "certification_enabled"
+    ],
+    "ecosystem_communities": [
+      "id",
+      "slug",
+      "status",
+      "access_model",
+      "portal_workspace"
     ]
   }
 }

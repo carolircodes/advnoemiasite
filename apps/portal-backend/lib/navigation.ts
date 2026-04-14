@@ -59,3 +59,8 @@ export function buildInternalDocumentsHref(clientId?: string | null, caseId?: st
   const query = searchParams.toString();
   return query ? `/documentos?${query}` : "/documentos";
 }
+
+export function buildInternalEcosystemHref(hash?: string) {
+  const safeHash = hash ? `#${hash}` : "";
+  return `/internal/advogada/ecossistema${safeHash}`;
+}
