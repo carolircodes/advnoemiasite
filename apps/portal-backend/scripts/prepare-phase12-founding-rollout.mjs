@@ -11,7 +11,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const key = process.env.SUPABASE_SECRET_KEY?.trim();
 
 if (!url || !key) {
-  console.error("[phase12.7-prepare] NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY missing.");
+  console.error("[phase12.9-prepare] NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY missing.");
   process.exit(1);
 }
 
@@ -82,16 +82,17 @@ async function main() {
     const progress = progressByProfile.get(profile.id) || null;
     const grantMetadata = metadata(grant?.metadata);
     const membershipMetadata = metadata(membership?.metadata);
-    const progressMetadata = metadata(progress?.metadata);
     const founderState =
       grant?.grant_status === "active" &&
       ["founding_beta", "active_founder", "founding_live"].includes(grant.access_scope)
         ? "active_founder"
-        : membership?.status === "invited"
-          ? "invited"
-          : grant?.access_scope === "waitlist"
-            ? "waitlist"
-            : "deferred";
+        : grant?.access_scope === "reserved_interest"
+          ? "reserved_interest"
+          : membership?.status === "invited"
+            ? "invited"
+            : grant?.access_scope === "waitlist"
+              ? "waitlist"
+              : "deferred";
 
     return {
       profile_id: profile.id,
@@ -101,24 +102,21 @@ async function main() {
       source_channel:
         grantMetadata.source_channel ||
         membershipMetadata.source_channel ||
-        progressMetadata.source_channel ||
         grant?.access_origin ||
         membership?.entitlement_origin ||
         "curadoria_interna",
-      membership_state: membership?.status || "none",
-      subscription_reference: subscription?.source_of_activation || "none",
-      content_status: progress?.status || "not_started",
       progress_percent: progress?.progress_percent || 0,
+      content_status: progress?.status || "not_started",
       recommendation:
-        founderState === "active_founder" && progress?.status !== "completed"
-          ? "drive_completion_and_weekly_return"
-          : founderState === "active_founder"
-            ? "preserve_completion_and_retention"
+        founderState === "active_founder"
+          ? "deepen_social_density"
+          : founderState === "reserved_interest"
+            ? "promote_priority_reserve"
             : founderState === "invited"
-              ? "convert_invite_with_context"
+              ? "convert_invite"
               : founderState === "waitlist"
-                ? "nurture_editorial_desire"
-                : "keep_in_curated_observation"
+                ? "densify_waitlist"
+                : "hold_in_curated_observation"
     };
   });
 
@@ -126,15 +124,16 @@ async function main() {
     JSON.stringify(
       {
         preparedAt: new Date().toISOString(),
-        phase: "12.7",
+        phase: "12.9",
         operation: {
-          mode: "retention_maturity_live",
-          objective: "consolidar retorno, progresso real, conclusao e papel editorial do site"
+          mode: "reserve_interest_density",
+          objective: "transformar desejo em reserva qualificada e aproximar a comunidade dos thresholds de monetizacao"
         },
         states: {
           active_founder: candidates.filter((item) => item.founder_state === "active_founder").length,
           invited: candidates.filter((item) => item.founder_state === "invited").length,
-          waitlist: candidates.filter((item) => item.founder_state === "waitlist").length
+          waitlist: candidates.filter((item) => item.founder_state === "waitlist").length,
+          reserved_interest: candidates.filter((item) => item.founder_state === "reserved_interest").length
         },
         candidates
       },
@@ -145,6 +144,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("[phase12.7-prepare] Failed:", error.message);
+  console.error("[phase12.9-prepare] Failed:", error.message);
   process.exit(1);
 });

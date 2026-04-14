@@ -203,6 +203,18 @@ export default async function ClientEcosystemBenefitsPage({
           <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.experienceRule}</p>
         </ClientSafeCard>
 
+        <ClientSafeCard title="Reserva Prioritaria E Interesse Futuro">
+          <ul className="space-y-4">
+            {operations.reservePolicy.reserveStates.map((state) => (
+              <li key={state} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+                {state}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.reserveSignalRule}</p>
+          <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.promotionRule}</p>
+        </ClientSafeCard>
+
         <ClientSafeCard title="Onboarding premium do primeiro ciclo">
           <ul className="space-y-4">
             <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">

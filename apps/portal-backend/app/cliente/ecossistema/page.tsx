@@ -288,6 +288,11 @@ export default async function ClientEcosystemHubPage() {
           <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.experienceRule}</p>
           <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.upgradeRule}</p>
         </div>
+        <div className="mt-5 rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Reserva prioritaria</p>
+          <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.reserveSignalRule}</p>
+          <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.promotionRule}</p>
+        </div>
       </ClientSafeCard>
 
       <ClientSafeCard title="Ritmo Vivo Do Circulo">

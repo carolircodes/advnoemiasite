@@ -4,6 +4,7 @@ export type FounderState =
   | "invited"
   | "active_founder"
   | "waitlist"
+  | "reserved_interest"
   | "deferred"
   | "rejected_when_needed";
 
@@ -88,6 +89,11 @@ export type CommunityOperationsBlueprint = {
     experienceRule: string;
     upgradeRule: string;
   };
+  reservePolicy: {
+    reserveStates: Array<"interested" | "waitlist" | "reserved_priority" | "founder_active">;
+    reserveSignalRule: string;
+    promotionRule: string;
+  };
   onboarding: CommunityOnboardingStep[];
   valueLoops: CommunityValueLoop[];
   retentionRoutines: RetentionRoutine[];
@@ -126,6 +132,7 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         "invited",
         "active_founder",
         "waitlist",
+        "reserved_interest",
         "deferred",
         "rejected_when_needed"
       ],
@@ -134,6 +141,7 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         "preferir entrada por convite ou origem qualificada",
         "manter lotes pequenos para onboarding cuidadoso",
         "usar waitlist para desejo alto sem abrir a porta cedo demais",
+        "usar reserved_interest quando ja houver desejo de continuidade e apetite futuro pago, mas ainda sem convite imediato",
         "usar deferred ou rejected_when_needed quando o interesse existir, mas a aderencia ao momento fundador ainda nao justificar entrada"
       ]
     },
@@ -148,6 +156,13 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         "A waitlist deve soar como reserva nobre e observacao cuidadosa, nunca como fila generica ou tatica de escassez barata.",
       upgradeRule:
         "Mover para convite apenas quando houver afinidade, capacidade operacional e sinal claro de desejo, progresso e participacao."
+    },
+    reservePolicy: {
+      reserveStates: ["interested", "waitlist", "reserved_priority", "founder_active"],
+      reserveSignalRule:
+        "Reserved priority so aparece quando houver desejo futuro pago declarado, origem qualificada e nota curatorial favoravel.",
+      promotionRule:
+        "Promover waitlist para reserved_priority antes do convite quando a pessoa ja demonstrar continuidade, afinidade editorial e apetite explicito por plano fundador futuro."
     },
     onboarding: [
       {

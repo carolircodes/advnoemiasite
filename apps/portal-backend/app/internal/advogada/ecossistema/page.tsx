@@ -31,6 +31,16 @@ export default async function EcosystemPage() {
   ]);
   const operations = getCommunityOperationsBlueprint();
   const firstCatalogItem = overview.latestCatalogItems[0] || null;
+  const readinessCurrent: Record<string, number> = {
+    active_founders: premiumJourney.activeFoundersCount,
+    engaged_founders: premiumJourney.engagedFoundersCount,
+    average_progress_percent: premiumJourney.averageProgressPercent,
+    completed_content_count: premiumJourney.completedContentCount,
+    qualified_waitlist: premiumJourney.waitlistCount + premiumJourney.reservedInterestCount,
+    editorial_origin_signals: premiumJourney.siteOriginCount + premiumJourney.articlesOriginCount,
+    paid_interest_signals: premiumJourney.paidInterestCount,
+    cooling_risk_count: premiumJourney.coolingRiskCount
+  };
 
   return (
     <AppFrame
@@ -60,6 +70,7 @@ export default async function EcosystemPage() {
         { label: "Convites", value: String(premiumJourney.invitedFoundersCount) },
         { label: "Aceites", value: String(premiumJourney.acceptedInvitesCount) },
         { label: "Waitlist", value: String(premiumJourney.waitlistCount) },
+        { label: "Reserva", value: String(premiumJourney.reservedInterestCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
@@ -121,6 +132,12 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.waitlistCount}</strong>
             <p>Perfis em observacao para entrada futura, sem abrir aquisicao massiva.</p>
             <span className="pill muted">espera elegante</span>
+          </div>
+          <div className="summary-card">
+            <span>Reserva prioritaria</span>
+            <strong>{premiumJourney.reservedInterestCount}</strong>
+            <p>Interessadas que ja sairam da espera generica e entraram na fila premium de prioridade.</p>
+            <span className="pill success">reserva</span>
           </div>
           <div className="summary-card">
             <span>Convites aceitos</span>
@@ -433,7 +450,9 @@ export default async function EcosystemPage() {
           {operations.readinessThresholds.map((threshold) => (
             <div key={threshold.key} className="summary-card">
               <span>{threshold.label}</span>
-              <strong>{threshold.target} {threshold.unit}</strong>
+              <strong>
+                {readinessCurrent[threshold.key] ?? 0} / {threshold.target} {threshold.unit}
+              </strong>
               <p>{threshold.reason}</p>
             </div>
           ))}

@@ -35,6 +35,8 @@ type EcosystemTelemetryBeaconProps = {
     | "premium_interest_signal"
     | "waitlist_interest"
     | "paid_interest_signal"
+    | "reserved_priority_signal"
+    | "monetization_readiness_signal"
     | "founder_engagement_score"
     | "churn_risk"
     | "expansion_revenue_signal"

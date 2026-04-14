@@ -19,7 +19,13 @@ export const PREMIUM_JOURNEY_ANCHOR = {
 } as const;
 
 type JourneyTone = "success" | "warning" | "muted" | "critical";
-type EntryStage = "active_founder" | "invited" | "waitlist" | "deferred" | "open_interest";
+type EntryStage =
+  | "active_founder"
+  | "invited"
+  | "waitlist"
+  | "reserved_interest"
+  | "deferred"
+  | "open_interest";
 
 type PremiumSubscriptionSnapshot = {
   hasLiveProvider: boolean;
@@ -112,6 +118,7 @@ export type InternalPremiumJourneySnapshot = {
   invitedFoundersCount: number;
   activeFoundersCount: number;
   waitlistCount: number;
+  reservedInterestCount: number;
   acceptedInvitesCount: number;
   premiumInterestCount: number;
   paidInterestCount: number;
@@ -128,6 +135,8 @@ export type InternalPremiumJourneySnapshot = {
   coolingRiskCount: number;
   siteOriginCount: number;
   articlesOriginCount: number;
+  reservedPrioritySignals: number;
+  monetizationReadinessSignals: number;
   sourceSummary: Array<{
     label: string;
     count: number;
@@ -391,6 +400,8 @@ export async function getClientPremiumJourney(
       ? "active_founder"
       : membership?.status === "invited"
         ? "invited"
+        : founderAccessScope === "reserved_interest"
+          ? "reserved_interest"
         : founderAccessScope === "waitlist"
           ? "waitlist"
           : grantMetadata.entry_state === "deferred"
@@ -412,6 +423,8 @@ export async function getClientPremiumJourney(
       ? "prioridade_fundadora"
       : founderStage === "invited"
         ? "janela_curada"
+        : founderStage === "reserved_interest"
+          ? "prioridade_reservada"
         : founderStage === "waitlist"
           ? "observacao_privada"
           : "avaliacao");
@@ -423,6 +436,8 @@ export async function getClientPremiumJourney(
       ? "afinidade alta, entrada aprovada e onboarding em andamento"
       : founderStage === "invited"
         ? "afinidade confirmada e janela de entrada reservada"
+        : founderStage === "reserved_interest"
+          ? "desejo pago declarado e prioridade curatorial para a proxima chamada"
         : founderStage === "waitlist"
           ? "desejo validado com entrada ainda em observacao"
           : "interesse detectado, aguardando aderencia ao lote"
@@ -431,6 +446,7 @@ export async function getClientPremiumJourney(
     active_founder: "Founder ativo",
     invited: "Convite curado aberto",
     waitlist: "Lista privada em andamento",
+    reserved_interest: "Reserva prioritaria",
     deferred: "Entrada adiada com elegancia",
     open_interest: "Observacao inicial"
   };
@@ -439,6 +455,8 @@ export async function getClientPremiumJourney(
       "Seu acesso ja foi materializado com grant, membership e onboarding premium ligados ao Circulo Essencial.",
     invited:
       "Seu convite ja existe dentro do lote atual, com entrada pequena, cuidadosa e sem abertura geral.",
+    reserved_interest:
+      "Seu interesse ja subiu para uma reserva prioritaria, sinalizando apetite real por continuidade futura sem ativar cobranca agora.",
     waitlist:
       "Seu interesse ja entrou na observacao privada do Circulo, com prioridade e contexto preservados.",
     deferred:
@@ -449,6 +467,8 @@ export async function getClientPremiumJourney(
   const nextStepMap: Record<EntryStage, string> = {
     active_founder: "Aprofundar onboarding, consumir a trilha inaugural e voltar ao ritual semanal.",
     invited: "Concluir a entrada fundadora pelo portal e ativar a primeira experiencia comunitaria.",
+    reserved_interest:
+      "Fortalecer sinais de permanencia e aguardar a proxima chamada curada com prioridade alta.",
     waitlist: "Aguardar avaliacao curatorial e fortalecer sinais reais de afinidade e participacao.",
     deferred: "Manter o interesse aquecido pelos canais certos ate surgir aderencia para um lote futuro.",
     open_interest: "Entrar na lista privada com elegancia e deixar o desejo ser lido antes da liberacao."
@@ -456,6 +476,7 @@ export async function getClientPremiumJourney(
   const ctaMap: Record<EntryStage, string> = {
     active_founder: "Entrar na experiencia fundadora",
     invited: "Aceitar convite fundador",
+    reserved_interest: "Manter prioridade reservada",
     waitlist: "Acompanhar lista privada",
     deferred: "Manter interesse qualificado",
     open_interest: "Pedir observacao curada"
@@ -487,6 +508,8 @@ export async function getClientPremiumJourney(
           ? "Founder ativo em acesso gratuito privado"
           : founderStage === "invited"
             ? "Convite fundador em aberto"
+            : founderStage === "reserved_interest"
+              ? "Reserva prioritaria em andamento"
             : founderStage === "waitlist"
               ? "Lista privada em observacao"
               : "Private beta com entrada curada",
@@ -496,7 +519,9 @@ export async function getClientPremiumJourney(
     access: {
       hasAccess: hasActiveGrant,
       statusLabel:
-        founderStage === "waitlist"
+        founderStage === "reserved_interest"
+          ? "Reserva prioritaria"
+          : founderStage === "waitlist"
           ? "Waitlist privada"
           : founderStage === "invited"
             ? "Convite fundador"
@@ -507,6 +532,8 @@ export async function getClientPremiumJourney(
         ? `Seu acesso fundador esta ativo com escopo ${founderAccessScope}, preservando comunidade, conteudo e valor percebido sem ativar cobranca agora.`
         : founderStage === "invited"
           ? "Seu convite ja esta reservado no lote atual. O proximo passo e concluir a entrada com a mesma linguagem premium usada para os founders ja ativos."
+          : founderStage === "reserved_interest"
+            ? "Seu interesse ja foi promovido para a camada de reserva prioritaria, sinalizando continuidade e apetite por uma futura chamada fundadora paga."
           : founderStage === "waitlist"
             ? "Seu interesse esta materializado na lista privada com prioridade curatorial, sem prometer entrada imediata nem transformar a experiencia em fila generica."
             : "Esta experiencia premium continua protegida por curadoria, waitlist elegante e gating semantico entre founder ativo, convidado e interesse futuro.",
@@ -637,6 +664,8 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
         "retention_signal",
         "premium_interest_signal",
         "paid_interest_signal",
+        "reserved_priority_signal",
+        "monetization_readiness_signal",
         "founder_engagement_score"
       ])
       .order("occurred_at", { ascending: false })
@@ -666,6 +695,9 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       ["founding_beta", "active_founder", "founding_live"].includes(item.access_scope)
   ).length;
   const waitlistCount = grants.filter((item) => item.access_scope === "waitlist").length;
+  const reservedInterestCount = grants.filter(
+    (item) => item.access_scope === "reserved_interest"
+  ).length;
   const activeGrants = grants.filter((item) => item.grant_status === "active").length;
   const completedContentCount = progressItems.filter((item) => item.status === "completed").length;
   const totalProgressPercent = progressItems.reduce(
@@ -685,6 +717,12 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
   ).length;
   const paidInterestCount = telemetryEvents.filter(
     (item) => item.event_key === "paid_interest_signal"
+  ).length;
+  const reservedPrioritySignals = telemetryEvents.filter(
+    (item) => item.event_key === "reserved_priority_signal"
+  ).length;
+  const monetizationReadinessSignals = telemetryEvents.filter(
+    (item) => item.event_key === "monetization_readiness_signal"
   ).length;
   const founderEngagementEvents = telemetryEvents.filter(
     (item) => item.event_key === "founder_engagement_score"
@@ -742,9 +780,12 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
     invitedFoundersCount,
     activeFoundersCount,
     waitlistCount,
+    reservedInterestCount,
     acceptedInvitesCount,
     premiumInterestCount,
     paidInterestCount,
+    reservedPrioritySignals,
+    monetizationReadinessSignals,
     founderEngagementEvents,
     engagedFoundersCount,
     activeMemberships: memberships.filter((item) => item.status === "active").length,
@@ -766,6 +807,6 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       .sort((left, right) => right.count - left.count)
       .slice(0, 5),
     summary:
-      "O Circulo Essencial agora enxerga founder ativo, convites, waitlist real, onboarding, valor consumido, retencao, desejo e prontidao futura para monetizacao como uma unica jornada executiva."
+      "O Circulo Essencial agora enxerga founder ativo, convites, waitlist, reserva prioritaria, onboarding, valor consumido, retencao, desejo e prontidao futura para monetizacao como uma unica jornada executiva."
   };
 }

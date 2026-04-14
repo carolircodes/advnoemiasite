@@ -15,6 +15,7 @@
     "prepare:phase12:traction": "node scripts/prepare-phase12-founding-rollout.mjs",
     "materialize:phase12:curated-lot": "node scripts/materialize-phase12-curated-lot.mjs",
     "materialize:phase12:retention": "node scripts/materialize-phase12-retention-maturity.mjs",
+    "materialize:phase12:reserve": "node scripts/materialize-phase12-reserve-interest.mjs",
     "bootstrap:phase12:live": "node scripts/bootstrap-phase12-recurring-live.mjs",
     "telemetry:phase12:smoke": "node scripts/emit-phase12-telemetry-smoke.mjs",
     "validate:channels": "node scripts/channel-assisted-validation.mjs",
