@@ -47,6 +47,16 @@ export async function GET(request: NextRequest) {
         | "ai_control"
         | "hot"
         | null) || undefined,
+      founderScope: (searchParams.get("founderScope") as
+        | "all"
+        | "founder"
+        | "waitlist"
+        | null) || undefined,
+      paymentState: (searchParams.get("paymentState") as
+        | "all"
+        | "pending"
+        | "approved"
+        | null) || undefined,
       includeArchived: searchParams.get("includeArchived") === "true"
     };
 
@@ -115,9 +125,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, data: result });
     }
 
+    if (action === "addThreadNote") {
+      const result = await conversationInboxService.addThreadNote({
+        threadId: payload.threadId,
+        body: payload.body,
+        kind: payload.kind,
+        isSensitive: payload.isSensitive,
+        authorId: access.profile.id,
+        authorName: access.profile.full_name
+      });
+
+      return NextResponse.json({ ok: true, data: result });
+    }
+
     return NextResponse.json(
       {
-        error: "Acao invalida. Use sendHumanReply ou updateThreadState."
+        error: "Acao invalida. Use sendHumanReply, updateThreadState ou addThreadNote."
       },
       { status: 400 }
     );

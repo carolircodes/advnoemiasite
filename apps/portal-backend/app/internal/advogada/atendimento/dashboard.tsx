@@ -22,6 +22,12 @@ type Metrics = {
   hotThreads: number;
   founderOrWaitlistThreads: number;
   paymentPendingThreads: number;
+  aiControlledThreads: number;
+  humanControlledThreads: number;
+  followUpPendingCount: number;
+  whatsappVolume: number;
+  firstResponseTimeMinutes: number | null;
+  humanResponseTimeMinutes: number | null;
 };
 
 type ThreadItem = {
@@ -120,6 +126,14 @@ type ThreadDetail = {
     createdAt: string;
     summary: string;
   }>;
+  notes: Array<{
+    id: string;
+    body: string;
+    kind: string;
+    isSensitive: boolean;
+    authorName: string | null;
+    createdAt: string;
+  }>;
 };
 
 type ApiPayload = {
@@ -134,6 +148,8 @@ type Filters = {
   waitingFor: string;
   priority: string;
   inboxMode: string;
+  founderScope: string;
+  paymentState: string;
 };
 
 const initialFilters: Filters = {
@@ -141,7 +157,9 @@ const initialFilters: Filters = {
   status: "all",
   waitingFor: "all",
   priority: "all",
-  inboxMode: "all"
+  inboxMode: "all",
+  founderScope: "all",
+  paymentState: "all"
 };
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -233,6 +251,8 @@ export function ConversationInboxDashboard() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [composer, setComposer] = useState("");
+  const [noteComposer, setNoteComposer] = useState("");
+  const [noteKind, setNoteKind] = useState("operational");
   const [error, setError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
@@ -314,6 +334,38 @@ export function ConversationInboxDashboard() {
     }
   }
 
+  async function updateThreadState(payload: Record<string, unknown>) {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/internal/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "updateThreadState",
+          threadId: selectedThreadId,
+          ...payload
+        })
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "Falha ao atualizar ownership da thread.");
+      }
+
+      await loadInbox();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Falha ao atualizar a thread.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function sendHumanReply() {
     if (!selectedThreadId || !composer.trim()) {
       return;
@@ -343,6 +395,40 @@ export function ConversationInboxDashboard() {
       await loadInbox();
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "Falha ao enviar resposta.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function addThreadNote() {
+    if (!selectedThreadId || !noteComposer.trim()) {
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/internal/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "addThreadNote",
+          threadId: selectedThreadId,
+          body: noteComposer,
+          kind: noteKind
+        })
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "Falha ao registrar nota interna.");
+      }
+
+      setNoteComposer("");
+      await loadInbox();
+    } catch (noteError) {
+      setError(noteError instanceof Error ? noteError.message : "Falha ao salvar nota.");
     } finally {
       setSending(false);
     }
@@ -384,8 +470,56 @@ export function ConversationInboxDashboard() {
         <MetricCard label="Threads quentes" value={payload?.metrics.hotThreads || 0} icon={<Flame className="h-5 w-5" />} />
       </section>
 
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({ ...current, inboxMode: "needs_human", waitingFor: "human" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Fila do dia</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Aguardando humano</p>
+          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.waitingHumanCount || 0} threads pedindo comando manual.</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({ ...current, inboxMode: "hot" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Prioridade</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Quentes</p>
+          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.hotThreads || 0} conversas com maior peso operacional.</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({ ...current, paymentState: "pending" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Receita</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Pagamento pendente</p>
+          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.paymentPendingThreads || 0} threads com decisao comercial em aberto.</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({ ...current, founderScope: "founder" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Ecossistema</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Founder e waitlist</p>
+          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.founderOrWaitlistThreads || 0} conversas ligadas ao circulo premium.</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({ ...initialFilters }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Reset</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Visao completa</p>
+          <p className="mt-1 text-sm text-[#67786f]">Volta para a leitura integral da central operacional.</p>
+        </button>
+      </section>
+
       <section className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <input
             value={filters.search}
             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
@@ -433,6 +567,24 @@ export function ConversationInboxDashboard() {
             <option value="customer_turn">Esperando cliente</option>
             <option value="ai_control">IA no comando</option>
             <option value="hot">Somente quentes</option>
+          </select>
+          <select
+            value={filters.founderScope}
+            onChange={(event) => setFilters((current) => ({ ...current, founderScope: event.target.value }))}
+            className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+          >
+            <option value="all">Founder e waitlist</option>
+            <option value="founder">Somente founder</option>
+            <option value="waitlist">Somente waitlist</option>
+          </select>
+          <select
+            value={filters.paymentState}
+            onChange={(event) => setFilters((current) => ({ ...current, paymentState: event.target.value }))}
+            className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+          >
+            <option value="all">Estado de pagamento</option>
+            <option value="pending">Pagamento pendente</option>
+            <option value="approved">Pagamento aprovado</option>
           </select>
         </div>
       </section>
@@ -512,6 +664,12 @@ export function ConversationInboxDashboard() {
                   <Chip className={toneForOwner(selectedThread.thread.ownerMode)}>
                     ownership {selectedThread.thread.ownerMode}
                   </Chip>
+                  <Chip className="border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]">
+                    fila {selectedThread.thread.waitingFor}
+                  </Chip>
+                  <Chip className="border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]">
+                    thread {selectedThread.thread.threadStatus}
+                  </Chip>
                 </>
               ) : null}
             </div>
@@ -552,6 +710,30 @@ export function ConversationInboxDashboard() {
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
                     Marcar como lida e assumir fila
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void updateThreadState({ ownerMode: "human", waitingFor: "human", threadStatus: "waiting_human", handoffState: "active" })}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Assumir como humano
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void updateThreadState({ ownerMode: "ai", waitingFor: "ai", threadStatus: "ai_active", handoffState: "resolved", aiEnabled: true })}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Devolver para IA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void updateThreadState({ threadStatus: "archived", waitingFor: "none" })}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Arquivar
                   </button>
                 </div>
                 <textarea
@@ -630,6 +812,62 @@ export function ConversationInboxDashboard() {
           </div>
 
           <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
+            <h2 className="text-lg font-semibold text-[#10261d]">Memoria operacional</h2>
+            {selectedThread ? (
+              <>
+                <div className="mt-4 flex gap-2">
+                  <select
+                    value={noteKind}
+                    onChange={(event) => setNoteKind(event.target.value)}
+                    className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-3 py-2 text-sm text-[#10261d] outline-none"
+                  >
+                    <option value="operational">Nota operacional</option>
+                    <option value="next_action">Proxima acao</option>
+                    <option value="context">Contexto</option>
+                    <option value="sensitive">Sensivel</option>
+                  </select>
+                </div>
+                <textarea
+                  value={noteComposer}
+                  onChange={(event) => setNoteComposer(event.target.value)}
+                  placeholder="Registrar observacao interna, contexto ou proxima acao."
+                  rows={4}
+                  className="mt-3 w-full rounded-[1.4rem] border border-[#d8cfbf] bg-[#fcfaf6] px-4 py-3 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addThreadNote()}
+                  disabled={sending || !noteComposer.trim()}
+                  className="mt-3 rounded-full bg-[#10261d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#18362a] disabled:opacity-60"
+                >
+                  Salvar nota interna
+                </button>
+                <div className="mt-4 space-y-3">
+                  {selectedThread.notes.length ? (
+                    selectedThread.notes.map((note) => (
+                      <div key={note.id} className="rounded-2xl border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+                        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">
+                          <span>{note.kind}</span>
+                          {note.isSensitive ? <span>sensivel</span> : null}
+                          <span>{formatDateTime(note.createdAt)}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-[#20342b]">{note.body}</p>
+                        <p className="mt-2 text-xs text-[#6f7f77]">{note.authorName || "Equipe interna"}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[#6b7b72]">Ainda nao existem notas internas registradas nesta thread.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="mt-4 text-sm text-[#6b7b72]">
+                As notas internas guardam memoria operacional, proxima acao e contexto sensivel.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
             <h2 className="text-lg font-semibold text-[#10261d]">Rastro operacional</h2>
             {selectedThread?.events.length ? (
               <div className="mt-4 space-y-3">
@@ -656,7 +894,7 @@ export function ConversationInboxDashboard() {
             <div className="mt-4 space-y-3 text-sm text-[#4e6057]">
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><Bot className="h-4 w-4" /> Threads com IA</span>
-                <strong>{payload?.threads.filter((thread) => thread.ownerMode === "ai").length || 0}</strong>
+                <strong>{payload?.metrics.aiControlledThreads || 0}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Founder e waitlist</span>
@@ -665,6 +903,22 @@ export function ConversationInboxDashboard() {
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Pagamento pendente</span>
                 <strong>{payload?.metrics.paymentPendingThreads || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Threads humanas</span>
+                <strong>{payload?.metrics.humanControlledThreads || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> 1a resposta media</span>
+                <strong>{payload?.metrics.firstResponseTimeMinutes ? `${payload.metrics.firstResponseTimeMinutes} min` : "n/d"}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Resposta humana media</span>
+                <strong>{payload?.metrics.humanResponseTimeMinutes ? `${payload.metrics.humanResponseTimeMinutes} min` : "n/d"}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume WhatsApp</span>
+                <strong>{payload?.metrics.whatsappVolume || 0}</strong>
               </div>
             </div>
           </div>

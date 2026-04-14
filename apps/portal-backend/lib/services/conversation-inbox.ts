@@ -25,6 +25,8 @@ export type ConversationInboxFilters = {
   priority?: Priority | "all";
   waitingFor?: WaitingFor | "all";
   inboxMode?: "all" | "needs_human" | "customer_turn" | "ai_control" | "hot";
+  founderScope?: "all" | "founder" | "waitlist";
+  paymentState?: "all" | "pending" | "approved";
   includeArchived?: boolean;
 };
 
@@ -176,6 +178,18 @@ type EventRow = {
   created_at: string;
 };
 
+type NoteRow = {
+  id: string;
+  session_id: string;
+  author_id: string | null;
+  author_name: string | null;
+  note_body: string;
+  note_kind: "operational" | "next_action" | "sensitive" | "context";
+  is_sensitive: boolean;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type ConversationThreadListItem = {
   id: string;
   channel: ConversationChannel;
@@ -272,6 +286,14 @@ export type ConversationThreadDetail = {
     createdAt: string;
     summary: string;
   }>;
+  notes: Array<{
+    id: string;
+    body: string;
+    kind: string;
+    isSensitive: boolean;
+    authorName: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type ConversationInboxMetrics = {
@@ -283,6 +305,12 @@ export type ConversationInboxMetrics = {
   hotThreads: number;
   founderOrWaitlistThreads: number;
   paymentPendingThreads: number;
+  aiControlledThreads: number;
+  humanControlledThreads: number;
+  followUpPendingCount: number;
+  whatsappVolume: number;
+  firstResponseTimeMinutes: number | null;
+  humanResponseTimeMinutes: number | null;
 };
 
 function asString(value: unknown) {
@@ -371,9 +399,33 @@ function buildEventSummary(event: EventRow) {
       return `Handoff ajustado para ${asString(data.handoffState) || "novo estado"}.`;
     case "ownership_updated":
       return `Ownership movido para ${asString(data.ownerMode) || "novo modo"}.`;
+    case "thread_note_added":
+      return "Nota interna adicionada a memoria operacional.";
     default:
       return asString(data.summary) || "Evento operacional registrado.";
   }
+}
+
+function toMinutes(start: string | null | undefined, end: string | null | undefined) {
+  if (!start || !end) {
+    return null;
+  }
+
+  const diff = new Date(end).getTime() - new Date(start).getTime();
+  if (Number.isNaN(diff) || diff < 0) {
+    return null;
+  }
+
+  return diff / 60000;
+}
+
+function average(values: Array<number | null>) {
+  const valid = values.filter((value): value is number => typeof value === "number");
+  if (!valid.length) {
+    return null;
+  }
+
+  return Number((valid.reduce((sum, value) => sum + value, 0) / valid.length).toFixed(1));
 }
 
 class ConversationInboxService {
@@ -707,6 +759,22 @@ class ConversationInboxService {
       return false;
     }
 
+    if (filters.founderScope === "founder" && !item.hasFounderContext) {
+      return false;
+    }
+
+    if (filters.founderScope === "waitlist" && !item.hasWaitlistContext) {
+      return false;
+    }
+
+    if (filters.paymentState === "pending" && !item.hasPaymentPending) {
+      return false;
+    }
+
+    if (filters.paymentState === "approved" && !item.paymentApproved) {
+      return false;
+    }
+
     if (
       filters.search &&
       !matchesSearch(filters.search, [
@@ -743,6 +811,13 @@ class ConversationInboxService {
     const allItems = sessions.map((session) => this.buildThreadItem(session, bundle));
     const items = allItems.filter((item) => this.applyThreadFilters(item, filters)).slice(0, limit);
 
+    const firstResponseTimes = sessions.map((session) =>
+      toMinutes(session.last_inbound_at, session.last_outbound_at)
+    );
+    const humanResponseTimes = sessions.map((session) =>
+      toMinutes(session.last_inbound_at, session.last_human_reply_at)
+    );
+
     const metrics = allItems.reduce<ConversationInboxMetrics>(
       (accumulator, item) => {
         accumulator.totalOpenThreads += ["closed", "archived"].includes(item.threadStatus) ? 0 : 1;
@@ -753,6 +828,10 @@ class ConversationInboxService {
         accumulator.hotThreads += item.hot ? 1 : 0;
         accumulator.founderOrWaitlistThreads += item.hasFounderContext || item.hasWaitlistContext ? 1 : 0;
         accumulator.paymentPendingThreads += item.hasPaymentPending ? 1 : 0;
+        accumulator.aiControlledThreads += item.ownerMode === "ai" ? 1 : 0;
+        accumulator.humanControlledThreads += item.ownerMode === "human" ? 1 : 0;
+        accumulator.followUpPendingCount += item.waitingFor === "human" || item.waitingFor === "client" ? 1 : 0;
+        accumulator.whatsappVolume += item.channel === "whatsapp" ? 1 : 0;
         return accumulator;
       },
       {
@@ -763,7 +842,13 @@ class ConversationInboxService {
         handoffCount: 0,
         hotThreads: 0,
         founderOrWaitlistThreads: 0,
-        paymentPendingThreads: 0
+        paymentPendingThreads: 0,
+        aiControlledThreads: 0,
+        humanControlledThreads: 0,
+        followUpPendingCount: 0,
+        whatsappVolume: 0,
+        firstResponseTimeMinutes: average(firstResponseTimes),
+        humanResponseTimeMinutes: average(humanResponseTimes)
       }
     );
 
@@ -826,6 +911,17 @@ class ConversationInboxService {
 
     if (eventsError) {
       throw new Error(`Nao foi possivel carregar os eventos da thread: ${eventsError.message}`);
+    }
+
+    const { data: notesData, error: notesError } = await this.supabase
+      .from("conversation_notes")
+      .select("*")
+      .eq("session_id", threadId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (notesError) {
+      throw new Error(`Nao foi possivel carregar as notas da thread: ${notesError.message}`);
     }
 
     return {
@@ -915,6 +1011,14 @@ class ConversationInboxService {
         actorLabel: event.actor_label,
         createdAt: event.created_at,
         summary: buildEventSummary(event)
+      })),
+      notes: ((notesData || []) as NoteRow[]).map((note) => ({
+        id: note.id,
+        body: note.note_body,
+        kind: note.note_kind,
+        isSensitive: note.is_sensitive,
+        authorName: note.author_name,
+        createdAt: note.created_at
       }))
     };
   }
@@ -983,7 +1087,9 @@ class ConversationInboxService {
       delivery_status: sendResult.success ? "accepted" : "failed",
       error_message: sendResult.error || null,
       is_read: true,
-      read_at: now
+      read_at: now,
+      received_at: now,
+      failed_at: sendResult.success ? null : now
     });
 
     if (!sendResult.success) {
@@ -1043,6 +1149,61 @@ class ConversationInboxService {
     });
 
     return { ok: true, messageId: sendResult.messageId || null };
+  }
+
+  async addThreadNote(input: {
+    threadId: string;
+    body: string;
+    authorId: string;
+    authorName: string;
+    kind?: "operational" | "next_action" | "sensitive" | "context";
+    isSensitive?: boolean;
+  }) {
+    const body = input.body.trim();
+
+    if (!body) {
+      throw new Error("A nota interna nao pode estar vazia.");
+    }
+
+    const kind = input.kind || "operational";
+    const now = new Date().toISOString();
+
+    const { error } = await this.supabase.from("conversation_notes").insert({
+      session_id: input.threadId,
+      author_id: input.authorId,
+      author_name: input.authorName,
+      note_body: body,
+      note_kind: kind,
+      is_sensitive: Boolean(input.isSensitive),
+      metadata: {}
+    });
+
+    if (error) {
+      throw new Error(`Nao foi possivel registrar a nota: ${error.message}`);
+    }
+
+    await this.supabase
+      .from("conversation_sessions")
+      .update({
+        internal_notes: kind === "next_action" ? body : undefined,
+        updated_at: now
+      })
+      .eq("id", input.threadId);
+
+    await this.createEvent({
+      sessionId: input.threadId,
+      eventType: "thread_note_added",
+      actorType: "human",
+      actorId: input.authorId,
+      actorLabel: input.authorName,
+      eventData: {
+        summary: "Nota interna adicionada a memoria operacional da thread.",
+        noteKind: kind,
+        sensitive: Boolean(input.isSensitive)
+      }
+    });
+
+    return { ok: true };
   }
 
   async updateThreadState(input: {
