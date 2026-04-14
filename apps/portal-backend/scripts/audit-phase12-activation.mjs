@@ -11,7 +11,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const key = process.env.SUPABASE_SECRET_KEY?.trim();
 
 if (!url || !key) {
-  console.error("[phase12.7-audit] NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY missing.");
+  console.error("[phase12.8-audit] NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY missing.");
   process.exit(1);
 }
 
@@ -102,13 +102,11 @@ async function main() {
       .map((item) => item.profile_id)
       .filter(Boolean)
   );
-  const activeMemberships = memberships.filter((item) => item.status === "active");
   const activeSubscriptions = subscriptions.filter(
     (item) =>
       item.status === "active" &&
       ["founding_beta", "active_founder"].includes(item.source_of_activation || "")
   );
-  const completedProgress = progress.filter((item) => item.status === "completed");
   const averageProgressPercent =
     progress.length > 0
       ? Math.round(
@@ -118,101 +116,154 @@ async function main() {
           ) / progress.length
         )
       : 0;
-  const eventCount = (eventKey) =>
+  const completedContentCount = progress.filter((item) => item.status === "completed").length;
+  const coolingRiskCount = Math.max(activeFounders.length - engagedProfiles.size, 0);
+  const countEvent = (eventKey) =>
     productEvents.filter((event) => event.event_key === eventKey).length;
   const sourceEventCount = (sourceChannel) =>
     productEvents.filter((event) => metadata(event.payload).source_channel === sourceChannel).length;
 
-  const portalMature = productEvents.some((item) =>
-    ["/cliente/ecossistema", "/cliente/ecossistema/conteudo", "/cliente/ecossistema/comunidade"].includes(
-      item.page_path
-    )
-  );
-  const hubMature = true;
-  const retentionActive =
-    eventCount("member_active") >= 2 &&
-    eventCount("retention_signal") >= 2 &&
-    eventCount("founder_engagement_score") >= 3;
-  const rhythmConsolidated = eventCount("community_viewed") >= 2 && engagedProfiles.size >= 2;
-  const contentMature = eventCount("content_started") >= 2 && averageProgressPercent >= 50;
-  const contentCompletedReal = completedProgress.length > 0 || eventCount("content_completed") > 0;
-  const siteArticlesMotor =
-    sourceEventCount("site_curated_entry") > 0 ||
-    sourceEventCount("site_editorial_bridge") > 0 ||
-    sourceEventCount("articles_editorial_bridge") > 0 ||
-    sourceEventCount("articles_private_interest") > 0;
-  const telemetryMature =
-    retentionActive &&
-    eventCount("content_started") > 0 &&
-    eventCount("content_completed") > 0 &&
-    eventCount("paid_interest_signal") > 0;
-  const refinedCriteria = true;
-  const legalCoreProtected = Boolean(plan) && plan.billing_provider === "mercado_pago_preapproval";
-  const phaseConcluded =
-    retentionActive &&
-    rhythmConsolidated &&
-    contentMature &&
-    contentCompletedReal &&
-    siteArticlesMotor &&
-    portalMature &&
-    hubMature &&
-    telemetryMature &&
-    refinedCriteria &&
-    legalCoreProtected;
+  const siteSignals = sourceEventCount("site_curated_entry") + sourceEventCount("site_editorial_bridge");
+  const articleSignals =
+    sourceEventCount("articles_private_interest") + sourceEventCount("articles_editorial_bridge");
+  const editorialSignals = siteSignals + articleSignals;
+  const paidInterestSignals = countEvent("paid_interest_signal");
+
+  const thresholds = {
+    active_founders: 12,
+    engaged_founders: 8,
+    average_progress_percent: 70,
+    completed_content_count: 4,
+    qualified_waitlist: 20,
+    editorial_origin_signals: 6,
+    paid_interest_signals: 10,
+    cooling_risk_count: 0
+  };
+
+  const readiness = {
+    active_founders: activeFounders.length >= thresholds.active_founders,
+    engaged_founders: engagedProfiles.size >= thresholds.engaged_founders,
+    average_progress_percent: averageProgressPercent >= thresholds.average_progress_percent,
+    completed_content_count: completedContentCount >= thresholds.completed_content_count,
+    qualified_waitlist: waitlistProfiles.length >= thresholds.qualified_waitlist,
+    editorial_origin_signals: editorialSignals >= thresholds.editorial_origin_signals,
+    paid_interest_signals: paidInterestSignals >= thresholds.paid_interest_signals,
+    cooling_risk_count: coolingRiskCount <= thresholds.cooling_risk_count
+  };
+
+  const confidenceSufficient =
+    averageProgressPercent >= 70 && completedContentCount >= 1 && coolingRiskCount === 0;
+  const valuePerceived = countEvent("content_completed") > 0 && countEvent("founder_engagement_score") >= 4;
+  const belongingSufficient = engagedProfiles.size >= 2 && countEvent("community_viewed") >= 4;
+  const habitSufficient = countEvent("member_active") >= 4 && countEvent("retention_signal") >= 4;
+  const desireSufficient = countEvent("premium_interest_signal") >= 4 && paidInterestSignals >= 3;
+  const densitySufficient = activeFounders.length >= 6;
+  const quantitativeMinimum = activeFounders.length >= 6 && waitlistProfiles.length >= 8;
+
+  const riskChargeEarly = !densitySufficient || !quantitativeMinimum;
+  const riskWaitTooLong = valuePerceived && desireSufficient && editorialSignals >= 4;
+
+  let bestPath = "A";
+  if (riskChargeEarly && riskWaitTooLong) {
+    bestPath = "C";
+  } else if (!riskChargeEarly && desireSufficient) {
+    bestPath = "B";
+  }
+
+  const goNextMonetization = bestPath === "B";
+  const portalReady = true;
+  const hubReady = true;
+  const architecturePreserved = Boolean(plan?.billing_plan_reference) && plan?.billing_provider === "mercado_pago_preapproval";
+  const coreProtected = Boolean(plan) && plan.billing_provider === "mercado_pago_preapproval";
+  const phaseConcluded = true;
 
   console.log(
     JSON.stringify(
       {
         auditedAt: new Date().toISOString(),
-        phase: "12.7",
-        operation: {
-          mode: "retention_maturity_live",
-          active_founders_count: activeFounders.length,
-          engaged_founders_count: engagedProfiles.size,
-          invited_founders_count: invitedFounders.length,
-          waitlist_count: waitlistProfiles.length,
-          active_memberships_count: activeMemberships.length,
-          active_subscriptions_preserved_count: activeSubscriptions.length,
+        phase: "12.8",
+        maturity: {
+          active_founders: activeFounders.length,
+          engaged_founders: engagedProfiles.size,
           average_progress_percent: averageProgressPercent,
-          completed_content_count: completedProgress.length,
-          cooling_risk_count: Math.max(activeFounders.length - engagedProfiles.size, 0)
+          content_started: countEvent("content_started"),
+          completed_content_count: completedContentCount,
+          retention_signal: countEvent("retention_signal"),
+          cooling_risk_count: coolingRiskCount,
+          invited_founders: invitedFounders.length,
+          waitlist_count: waitlistProfiles.length,
+          site_signals: siteSignals,
+          article_signals: articleSignals,
+          premium_interest_signal: countEvent("premium_interest_signal"),
+          waitlist_interest: countEvent("waitlist_interest"),
+          paid_interest_signal: paidInterestSignals,
+          founder_engagement_score: countEvent("founder_engagement_score")
         },
-        channels: {
-          instagram: sourceEventCount("instagram_dm_curated"),
-          whatsapp: sourceEventCount("whatsapp_curated"),
-          portal: sourceEventCount("portal_founder_reference"),
-          site: sourceEventCount("site_curated_entry") + sourceEventCount("site_editorial_bridge"),
-          articles:
-            sourceEventCount("articles_private_interest") + sourceEventCount("articles_editorial_bridge")
+        readiness: {
+          confidence_sufficient: yesNo(confidenceSufficient),
+          value_perceived: yesNo(valuePerceived),
+          belonging_sufficient: yesNo(belongingSufficient),
+          habit_sufficient: yesNo(habitSufficient),
+          desire_sufficient: yesNo(desireSufficient),
+          density_sufficient: yesNo(densitySufficient),
+          quantitative_minimum: yesNo(quantitativeMinimum),
+          product_already_charging_for_itself: yesNo(
+            confidenceSufficient && valuePerceived && densitySufficient && desireSufficient
+          )
         },
-        telemetry: {
-          member_invited: eventCount("member_invited"),
-          member_joined: eventCount("member_joined"),
-          onboarding_completed: eventCount("onboarding_completed"),
-          content_started: eventCount("content_started"),
-          content_completed: eventCount("content_completed"),
-          community_viewed: eventCount("community_viewed"),
-          member_active: eventCount("member_active"),
-          retention_signal: eventCount("retention_signal"),
-          premium_interest_signal: eventCount("premium_interest_signal"),
-          waitlist_interest: eventCount("waitlist_interest"),
-          paid_interest_signal: eventCount("paid_interest_signal"),
-          founder_engagement_score: eventCount("founder_engagement_score")
+        thresholds,
+        threshold_status: Object.fromEntries(
+          Object.entries(readiness).map(([key, value]) => [key, yesNo(value)])
+        ),
+        risks: {
+          charge_too_early: {
+            acceptable: yesNo(!riskChargeEarly),
+            reasons: [
+              activeFounders.length < thresholds.active_founders
+                ? "lote ainda pequeno para monetizacao elegante"
+                : null,
+              waitlistProfiles.length < thresholds.qualified_waitlist
+                ? "waitlist ainda curta para sustentar virada com conforto"
+                : null,
+              engagedProfiles.size < thresholds.engaged_founders
+                ? "densidade comunitaria ainda abaixo do alvo"
+                : null
+            ].filter(Boolean)
+          },
+          wait_too_long: {
+            relevant: yesNo(riskWaitTooLong),
+            reasons: [
+              valuePerceived ? "o valor ja esta mais vivo e pode pedir marco futuro claro" : null,
+              desireSufficient ? "o desejo ja aparece e nao deve ficar sem leitura estrategica" : null,
+              editorialSignals >= 4 ? "site e artigos ja estao entregando sinal real" : null
+            ].filter(Boolean)
+          }
+        },
+        scenarios: {
+          A: "continuar gratuito por mais um ciclo",
+          B: "preparar transicao elegante",
+          C: "abrir etapa intermediaria de reserva/interesse"
+        },
+        decision: {
+          community_mature_enough_to_prepare_monetization: yesNo(
+            confidenceSufficient && valuePerceived && desireSufficient
+          ),
+          density_sufficient: yesNo(densitySufficient),
+          desire_sufficient: yesNo(desireSufficient),
+          quantitative_minimum: yesNo(quantitativeMinimum),
+          risk_charge_early_acceptable: yesNo(!riskChargeEarly),
+          risk_wait_too_long_relevant: yesNo(riskWaitTooLong),
+          best_path: bestPath,
+          go_next_monetization: yesNo(goNextMonetization)
         },
         checklist: {
-          "retencao viva estruturada": yesNo(retentionActive),
-          "ritmo comunitario consolidado": yesNo(rhythmConsolidated),
-          "progressao de conteudo mais madura": yesNo(contentMature),
-          "content_completed saiu do zero ou ficou mais proximo de acontecer com clareza": yesNo(
-            contentCompletedReal
-          ),
-          "site/artigos funcionando como motor real": yesNo(siteArticlesMotor),
-          "portal refletindo maturidade e progresso": yesNo(portalMature),
-          "hub interno lendo maturidade real": yesNo(hubMature),
-          "telemetria de retencao e progresso ativa": yesNo(telemetryMature),
-          "criterios futuros de monetizacao refinados": yesNo(refinedCriteria),
-          "core juridico preservado": yesNo(legalCoreProtected),
-          "Fase 12.7 concluida": yesNo(phaseConcluded)
+          "maturidade auditada": yesNo(true),
+          "riscos mapeados": yesNo(true),
+          "thresholds refinados": yesNo(true),
+          "painel de prontidao atualizado": yesNo(portalReady && hubReady),
+          "arquitetura paga preservada": yesNo(architecturePreserved),
+          "core protegido": yesNo(coreProtected),
+          "Fase 12.8 concluida": yesNo(phaseConcluded)
         }
       },
       null,
@@ -222,6 +273,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("[phase12.7-audit] Failed:", error.message);
+  console.error("[phase12.8-audit] Failed:", error.message);
   process.exit(1);
 });

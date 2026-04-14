@@ -425,6 +425,37 @@ export default async function EcosystemPage() {
         </div>
       </SectionCard>
 
+      <SectionCard
+        title="Checkpoint Executivo De Monetizacao"
+        description="Este painel compara a maturidade atual com os thresholds alvo para decidir o timing da futura cobranca."
+      >
+        <div className="summary-grid compact">
+          {operations.readinessThresholds.map((threshold) => (
+            <div key={threshold.key} className="summary-card">
+              <span>{threshold.label}</span>
+              <strong>{threshold.target} {threshold.unit}</strong>
+              <p>{threshold.reason}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Cenarios De Evolucao"
+        description="A decisao de monetizacao nao e binaria por impulso: ela precisa respeitar risco, marca e densidade comunitaria."
+      >
+        <div className="summary-grid compact">
+          {operations.monetizationScenarios.map((scenario) => (
+            <div key={scenario.id} className="summary-card">
+              <span>Cenario {scenario.id}</span>
+              <strong>{scenario.title}</strong>
+              <p>{scenario.advantage}</p>
+              <p>{scenario.risk}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
       <div className="grid two">
         <SectionCard
           id="telemetria-expansao"

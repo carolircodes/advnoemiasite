@@ -50,6 +50,25 @@ export type MonetizationCriterion = {
   reason: string;
 };
 
+export type MonetizationScenario = {
+  id: "A" | "B" | "C";
+  title: string;
+  advantage: string;
+  risk: string;
+  requirement: string;
+  brandImpact: string;
+  communityImpact: string;
+  recurrenceImpact: string;
+};
+
+export type MonetizationReadinessThreshold = {
+  key: string;
+  label: string;
+  target: number;
+  unit: string;
+  reason: string;
+};
+
 export type CommunityOperationsBlueprint = {
   positioning: {
     currentMode: string;
@@ -75,6 +94,8 @@ export type CommunityOperationsBlueprint = {
   contentCheckpoints: ContentCheckpoint[];
   channelBridges: CommunityChannelBridge[];
   monetizationCriteria: MonetizationCriterion[];
+  readinessThresholds: MonetizationReadinessThreshold[];
+  monetizationScenarios: MonetizationScenario[];
 };
 
 export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint {
@@ -293,6 +314,96 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         label: "Paid interest",
         threshold: ">= 10 sinais explicitos de interesse futuro pago e >= 4 vindos de site/artigos",
         reason: "A transicao para pago deve responder a desejo declarado, nao a ansiedade de monetizar."
+      }
+    ],
+    readinessThresholds: [
+      {
+        key: "active_founders",
+        label: "Founders ativos",
+        target: 12,
+        unit: "founders",
+        reason: "A camada paga precisa nascer com massa minima real."
+      },
+      {
+        key: "engaged_founders",
+        label: "Founders engajados",
+        target: 8,
+        unit: "founders",
+        reason: "Sem densidade de retorno, a cobranca parece precoce."
+      },
+      {
+        key: "average_progress_percent",
+        label: "Progresso medio",
+        target: 70,
+        unit: "%",
+        reason: "Consumo consistente sustenta valor percebido."
+      },
+      {
+        key: "completed_content_count",
+        label: "Conclusoes reais",
+        target: 4,
+        unit: "conclusoes",
+        reason: "Conclusao e prova concreta de valor, nao so promessa."
+      },
+      {
+        key: "qualified_waitlist",
+        label: "Waitlist qualificada",
+        target: 20,
+        unit: "pessoas",
+        reason: "A demanda precisa estar formada antes da virada."
+      },
+      {
+        key: "editorial_origin_signals",
+        label: "Sinais editoriais",
+        target: 6,
+        unit: "sinais",
+        reason: "Site e artigos precisam provar motor proprio."
+      },
+      {
+        key: "paid_interest_signals",
+        label: "Paid interest",
+        target: 10,
+        unit: "sinais",
+        reason: "Desejo pago declarado reduz risco de timing errado."
+      },
+      {
+        key: "cooling_risk_count",
+        label: "Risco de esfriamento",
+        target: 0,
+        unit: "riscos",
+        reason: "Cobrar com esfriamento alto cria pressao prematura."
+      }
+    ],
+    monetizationScenarios: [
+      {
+        id: "A",
+        title: "Continuar gratuito por mais um ciclo",
+        advantage: "Aumenta densidade social, conclusao e prova de valor sem pressa.",
+        risk: "Gratuidade pode se cristalizar se nao houver marco futuro claro.",
+        requirement: "Manter ritmo semanal, ampliar conclusoes e crescer waitlist qualificada.",
+        brandImpact: "Preserva aura premium e paciencia estrategica.",
+        communityImpact: "Fortalece pertencimento antes da cobranca.",
+        recurrenceImpact: "Adia receita, mas melhora a chance de recorrencia saudavel."
+      },
+      {
+        id: "B",
+        title: "Preparar transicao elegante em janela curta",
+        advantage: "Aproveita o momento de maturidade e organiza uma virada premium controlada.",
+        risk: "Com lote ainda pequeno, a conversao pode parecer precoce e socialmente rala.",
+        requirement: "Bater thresholds de massa, engajamento e waitlist antes do anuncio.",
+        brandImpact: "Pode reforcar premium se o timing estiver maduro.",
+        communityImpact: "Exige narrativa cuidadosa para nao quebrar a experiencia fundadora.",
+        recurrenceImpact: "Acelera receita, mas cobra mais disciplina de transicao."
+      },
+      {
+        id: "C",
+        title: "Abrir etapa intermediaria de reserva e interesse",
+        advantage: "Formaliza desejo pago sem cobrar ainda e mede apetite real.",
+        risk: "Se ficar longa demais, vira zona cinzenta sem decisao.",
+        requirement: "Estruturar reserva elegante com thresholds e janela bem definidos.",
+        brandImpact: "Mantem sofisticação e prepara a marca para a virada.",
+        communityImpact: "Cria expectativa sem quebrar a camada fundadora atual.",
+        recurrenceImpact: "Prepara o terreno comercial sem ativar billing."
       }
     ]
   };
