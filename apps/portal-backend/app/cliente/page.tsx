@@ -12,6 +12,7 @@ import {
   getClientProfileSummary,
   getClientRequestsSummary
 } from "@/lib/services/client-workspace";
+import { getClientPremiumJourney } from "@/lib/services/ecosystem-journey";
 import { getClientEcosystemWorkspace } from "@/lib/services/ecosystem-platform";
 import { buildClientPortalPremiumProjection } from "@/lib/services/premium-operational-model";
 
@@ -86,7 +87,8 @@ export default async function ClientPage({
     agendaSummary,
     requestsSummary,
     eventsSummary,
-    ecosystemWorkspace
+    ecosystemWorkspace,
+    premiumJourney
   ] = await Promise.all([
     getClientProfileSummary(profile),
     getClientCaseSummary(profile),
@@ -94,7 +96,8 @@ export default async function ClientPage({
     getClientAgendaSummary(profile),
     getClientRequestsSummary(profile),
     getClientEventsSummary(profile),
-    getClientEcosystemWorkspace(profile)
+    getClientEcosystemWorkspace(profile),
+    getClientPremiumJourney(profile)
   ]);
 
   const notices = [
@@ -141,7 +144,7 @@ export default async function ClientPage({
       ) : null}
 
       <ClientPremiumWorkspace projection={premiumProjection} />
-      <ClientEcosystemFoundation workspace={ecosystemWorkspace} />
+      <ClientEcosystemFoundation workspace={ecosystemWorkspace} journey={premiumJourney} />
     </ClientShell>
   );
 }

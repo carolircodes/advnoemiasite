@@ -64,3 +64,19 @@ export function buildInternalEcosystemHref(hash?: string) {
   const safeHash = hash ? `#${hash}` : "";
   return `/internal/advogada/ecossistema${safeHash}`;
 }
+
+export function buildClientEcosystemHubHref() {
+  return "/cliente/ecossistema";
+}
+
+export function buildClientEcosystemBenefitsHref() {
+  return "/cliente/ecossistema/beneficios";
+}
+
+export function buildClientEcosystemContentHref() {
+  return "/cliente/ecossistema/conteudo";
+}
+
+export function buildClientEcosystemCommunityHref() {
+  return "/cliente/ecossistema/comunidade";
+}

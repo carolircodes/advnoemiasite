@@ -6,6 +6,7 @@ import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { buildInternalEcosystemHref } from "@/lib/navigation";
+import { getInternalPremiumJourneySnapshot } from "@/lib/services/ecosystem-journey";
 import { getEcosystemExecutiveOverview } from "@/lib/services/ecosystem-platform";
 
 function toneClass(tone: "success" | "warning" | "muted" | "critical") {
@@ -23,7 +24,10 @@ function toneClass(tone: "success" | "warning" | "muted" | "critical") {
 
 export default async function EcosystemPage() {
   const profile = await requireProfile(["advogada", "admin"]);
-  const overview = await getEcosystemExecutiveOverview(45);
+  const [overview, premiumJourney] = await Promise.all([
+    getEcosystemExecutiveOverview(45),
+    getInternalPremiumJourneySnapshot()
+  ]);
   const firstCatalogItem = overview.latestCatalogItems[0] || null;
 
   return (
@@ -48,8 +52,8 @@ export default async function EcosystemPage() {
       ]}
       highlights={[
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
-        { label: "Catalogo", value: overview.catalogSummary[0]?.value || "0" },
-        { label: "Recorrencia", value: overview.recurrenceSummary[0]?.value || "0" },
+        { label: "Oferta ancora", value: premiumJourney.anchorTitle },
+        { label: "Beta ativo", value: String(premiumJourney.betaAudienceCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
@@ -82,6 +86,47 @@ export default async function EcosystemPage() {
         eventKey="product_viewed"
         payload={{ surface: "internal_ecosystem_hub", page: "/internal/advogada/ecossistema" }}
       />
+
+      <SectionCard
+        title="Primeira jornada premium ativa"
+        description="A ancora inicial do ecossistema saiu da fundacao e agora opera como beta privado controlado, com grant, plano, trilha e comunidade conectados."
+      >
+        <div className="summary-grid compact">
+          <div className="summary-card">
+            <span>Oferta ancora</span>
+            <strong>{premiumJourney.anchorTitle}</strong>
+            <p>{premiumJourney.anchorSubtitle}</p>
+            <span className="pill warning">{premiumJourney.statusLabel}</span>
+          </div>
+          <div className="summary-card">
+            <span>Beta controlado</span>
+            <strong>{premiumJourney.betaAudienceCount}</strong>
+            <p>Perfis com grant ativo na primeira jornada premium.</p>
+            <span className="pill success">grant ativo</span>
+          </div>
+          <div className="summary-card">
+            <span>Assinaturas beta</span>
+            <strong>{premiumJourney.activeSubscriptions}</strong>
+            <p>Assinaturas em modo manual_beta, sem cobranca recorrente operacional.</p>
+            <span className="pill success">billing offline</span>
+          </div>
+          <div className="summary-card">
+            <span>Conteudo desbloqueado</span>
+            <strong>{premiumJourney.contentUnlocks}</strong>
+            <p>Trilha inaugural liberada para a audiencia beta controlada.</p>
+            <span className="pill success">conteudo ligado</span>
+          </div>
+          <div className="summary-card">
+            <span>Comunidade conectada</span>
+            <strong>{premiumJourney.activeMemberships}</strong>
+            <p>Membros ativos na extensao comunitaria da jornada ancora.</p>
+            <span className="pill success">membership ativo</span>
+          </div>
+        </div>
+        <p className="empty-state" style={{ marginTop: "20px" }}>
+          {premiumJourney.summary}
+        </p>
+      </SectionCard>
 
       <SectionCard
         id="arquitetura-oficial"
