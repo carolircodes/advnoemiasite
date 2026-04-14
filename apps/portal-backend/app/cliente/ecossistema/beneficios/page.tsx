@@ -68,14 +68,22 @@ export default async function ClientEcosystemBenefitsPage({
               }
             : {
                 tone: "warning",
-                title: "Operacao fundadora",
+                title: "Founder private beta",
                 description:
-                  "Esta area organiza billing, beneficios e acesso do Circulo Essencial como ativacao fundadora controlada, sem misturar a assinatura com o fluxo juridico principal."
+                  "Esta area organiza beneficios, acesso e desejo do Circulo Essencial como comunidade fundadora gratuita, sem misturar a experiencia premium com o fluxo juridico principal."
               }
       ]}
     >
       <EcosystemTelemetryBeacon
         eventKey="plan_viewed"
+        payload={{
+          surface: "client_ecosystem_benefits",
+          page: "/cliente/ecossistema/beneficios",
+          journey: "circulo_essencial"
+        }}
+      />
+      <EcosystemTelemetryBeacon
+        eventKey="premium_interest_signal"
         payload={{
           surface: "client_ecosystem_benefits",
           page: "/cliente/ecossistema/beneficios",
@@ -92,9 +100,9 @@ export default async function ClientEcosystemBenefitsPage({
           }}
         />
       ) : null}
-      {journey.access.hasAccess ? (
+      {!journey.access.hasAccess ? (
         <EcosystemTelemetryBeacon
-          eventKey="subscription_authorized"
+          eventKey="waitlist_interest"
           payload={{
             surface: "client_ecosystem_benefits",
             page: "/cliente/ecossistema/beneficios",
@@ -114,7 +122,7 @@ export default async function ClientEcosystemBenefitsPage({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Cadencia modelada</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.plan.cadenceLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              A recorrencia agora roda em camada propria, com billing recorrente separado do checkout juridico e liberacao fundadora sob curadoria.
+              A recorrencia permanece modelada em camada propria, mas fica dormente enquanto o founder private beta amadurece valor, confianca e desejo.
             </p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
@@ -125,15 +133,15 @@ export default async function ClientEcosystemBenefitsPage({
         </div>
       </ClientSafeCard>
 
-      <ClientSafeCard title="Gestao elegante da assinatura">
+      <ClientSafeCard title="Gestao elegante da fase fundadora">
         <div className="grid gap-4 md:grid-cols-3">
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Lifecycle</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Estado fundador</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.lifecycleLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.detail}</p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Billing</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Camada paga futura</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.billingLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.nextBillingLabel}</p>
           </article>
@@ -141,63 +149,28 @@ export default async function ClientEcosystemBenefitsPage({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Politica fundadora</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              A migracao do beta preserva beneficios fundadores, rastreabilidade do entitlement e a historia da primeira fundadora.
+              O founding beta preserva beneficios fundadores, rastreabilidade do entitlement e a historia do grupo inicial sem antecipar cobranca.
             </p>
           </article>
         </div>
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          {journey.subscription.canStartLive ? (
-            <TrackedLink
-              href={journey.subscription.startHref}
-              eventKey="subscription_started"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_benefits", target: "start_live" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
-            >
-              Ativar assinatura live
-            </TrackedLink>
-          ) : null}
-          {journey.subscription.canPause ? (
-            <TrackedLink
-              href={journey.subscription.pauseHref}
-              eventKey="subscription_paused"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_benefits", target: "pause" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-            >
-              Pausar
-            </TrackedLink>
-          ) : null}
-          {journey.subscription.canResume ? (
-            <TrackedLink
-              href={journey.subscription.resumeHref}
-              eventKey="access_restored"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_benefits", target: "resume" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-            >
-              Retomar
-            </TrackedLink>
-          ) : null}
-          {journey.subscription.canCancel ? (
-            <TrackedLink
-              href={journey.subscription.cancelHref}
-              eventKey="subscription_canceled"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_benefits", target: "cancel" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-            >
-              Cancelar
-            </TrackedLink>
-          ) : null}
           <TrackedLink
-            href={journey.subscription.syncHref}
-            eventKey="retention_signal"
+            href={journey.links.content}
+            eventKey="founder_engagement_score"
             eventGroup="ecosystem"
-            trackingPayload={{ surface: "client_ecosystem_benefits", target: "sync" }}
+            trackingPayload={{ surface: "client_ecosystem_benefits", target: "content" }}
+            className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
+          >
+            Abrir valor fundador
+          </TrackedLink>
+          <TrackedLink
+            href={journey.links.hub}
+            eventKey="paid_interest_signal"
+            eventGroup="ecosystem"
+            trackingPayload={{ surface: "client_ecosystem_benefits", target: "future_paid" }}
             className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
           >
-            Sincronizar status
+            Manifestar interesse futuro
           </TrackedLink>
         </div>
       </ClientSafeCard>
@@ -206,13 +179,13 @@ export default async function ClientEcosystemBenefitsPage({
         <ClientSafeCard title="Onboarding premium do primeiro ciclo">
           <ul className="space-y-4">
             <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-              Confirmacao elegante da autorizacao recorrente com linguagem de entrada fundadora.
+              Boas-vindas elegantes com linguagem de entrada fundadora e framing de exclusividade cuidadosa.
             </li>
             <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
               Acesso imediato ao hub, conteudo inaugural e comunidade reservada do Circulo.
             </li>
             <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-              Continuidade apresentada como permanencia premium, nao como mera cobranca mensal.
+              Continuidade apresentada como permanencia premium, nao como futura cobranca apressada.
             </li>
           </ul>
         </ClientSafeCard>
@@ -233,10 +206,10 @@ export default async function ClientEcosystemBenefitsPage({
 
         <ClientSafeCard title="Politica de ativacao controlada">
           <p>
-            O acesso beta e live acontece por grant manual, convite ou checkout autorizado dentro de uma curadoria interna enxuta. Isso preserva a sobriedade da marca, evita abertura precoce e impede que a camada premium contamine o fluxo juridico principal.
+            O acesso fundador acontece por grant manual, convite e curadoria interna enxuta. Isso preserva a sobriedade da marca, evita abertura precoce e impede que a camada premium contamine o fluxo juridico principal.
           </p>
           <p className="mt-3">
-            O portal mostra com elegancia a diferenca entre plano modelado, autorizacao recorrente, acesso concedido e experiencia fundadora ainda reservada.
+            O portal mostra com elegancia a diferenca entre valor fundador ativo, entrada reservada e futura camada paga preservada para depois.
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <TrackedLink

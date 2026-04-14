@@ -38,10 +38,10 @@ export default async function ClientEcosystemHubPage() {
       notices={[
         {
           tone: journey.access.hasAccess ? "success" : "warning",
-          title: journey.access.hasAccess ? "Jornada fundadora ativa" : "Operacao fundadora controlada",
+          title: journey.access.hasAccess ? "Founder ativo no Circulo" : "Entrada privada em curadoria",
           description: journey.access.hasAccess
-            ? "Seu portal agora reconhece uma jornada premium viva, com assinatura, acesso, conteudo e comunidade conectados sem tocar no core juridico."
-            : "A jornada premium inaugural ja existe com framing, workspace e semantica de acesso. A liberacao continua curada, pequena e sofisticada."
+            ? "Seu portal agora reconhece uma jornada fundadora gratuita, com acesso, conteudo e comunidade conectados sem tocar no core juridico."
+            : "A jornada premium inaugural ja existe com framing, workspace e semantica de acesso. A entrada continua curada, pequena e sofisticada."
         }
       ]}
     >
@@ -59,7 +59,7 @@ export default async function ClientEcosystemHubPage() {
       />
       {journey.access.hasAccess ? (
         <EcosystemTelemetryBeacon
-          eventKey="founding_live_activated"
+          eventKey="member_active"
           payload={{
             surface: "client_ecosystem_hub",
             page: "/cliente/ecossistema",
@@ -77,6 +77,24 @@ export default async function ClientEcosystemHubPage() {
           }}
         />
       ) : null}
+      {!journey.access.hasAccess ? (
+        <EcosystemTelemetryBeacon
+          eventKey="waitlist_interest"
+          payload={{
+            surface: "client_ecosystem_hub",
+            page: "/cliente/ecossistema",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
+      <EcosystemTelemetryBeacon
+        eventKey="premium_interest_signal"
+        payload={{
+          surface: "client_ecosystem_hub",
+          page: "/cliente/ecossistema",
+          journey: "circulo_essencial"
+        }}
+      />
 
       <ClientSafeCard title="Hub premium do ecossistema">
         <div className="rounded-[28px] border border-[#e7e0d5] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,244,238,0.96))] p-5">
@@ -102,95 +120,65 @@ export default async function ClientEcosystemHubPage() {
               {journey.beta.label}
             </span>
             <span className="inline-flex rounded-full bg-[#eef4ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#456055]">
-              Operacao fundadora controlada
+              Gratuito, privado e fundador
             </span>
           </div>
         </div>
       </ClientSafeCard>
 
-      <ClientSafeCard title="Assinatura recorrente do Circulo Essencial">
+      <ClientSafeCard title="Posicionamento fundador do Circulo Essencial">
         <div className="grid gap-4 md:grid-cols-3">
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Lifecycle
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Momento</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.lifecycleLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.detail}</p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Billing
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Monetizacao</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.billingLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
               {journey.subscription.providerLabel}. {journey.subscription.nextBillingLabel}
             </p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Status fundador
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Status fundador</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              O beneficio de quem entrou cedo permanece separado da camada juridica e protegido na transicao elegante de founding beta para founding live.
+              O beneficio de quem entrou cedo permanece separado da camada juridica e protegido enquanto a futura camada paga fica preservada para depois.
             </p>
           </article>
         </div>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          {journey.subscription.canStartLive ? (
-            <TrackedLink
-              href={journey.subscription.startHref}
-              eventKey="subscription_started"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_hub", target: "start_live" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
-            >
-              Ativar assinatura live
-            </TrackedLink>
-          ) : null}
-          {journey.subscription.canPause ? (
-            <TrackedLink
-              href={journey.subscription.pauseHref}
-              eventKey="subscription_paused"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_hub", target: "pause" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-            >
-              Pausar assinatura
-            </TrackedLink>
-          ) : null}
-          {journey.subscription.canResume ? (
-            <TrackedLink
-              href={journey.subscription.resumeHref}
-              eventKey="access_restored"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_hub", target: "resume" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-            >
-              Retomar assinatura
-            </TrackedLink>
-          ) : null}
-          {journey.subscription.canCancel ? (
-            <TrackedLink
-              href={journey.subscription.cancelHref}
-              eventKey="subscription_canceled"
-              eventGroup="ecosystem"
-              trackingPayload={{ surface: "client_ecosystem_hub", target: "cancel" }}
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-            >
-              Cancelar ao final do ciclo
-            </TrackedLink>
-          ) : null}
           <TrackedLink
-            href={journey.subscription.syncHref}
-            eventKey="retention_signal"
+            href={journey.links.benefits}
+            eventKey="premium_interest_signal"
             eventGroup="ecosystem"
-            trackingPayload={{ surface: "client_ecosystem_hub", target: "sync" }}
+            trackingPayload={{ surface: "client_ecosystem_hub", target: "benefits" }}
+            className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
+          >
+            Ver beneficios do founder
+          </TrackedLink>
+          <TrackedLink
+            href={journey.links.community}
+            eventKey="founder_engagement_score"
+            eventGroup="ecosystem"
+            trackingPayload={{ surface: "client_ecosystem_hub", target: "community" }}
             className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
           >
-            Atualizar status da assinatura
+            Fortalecer pertencimento
           </TrackedLink>
+          {!journey.access.hasAccess ? (
+            <TrackedLink
+              href={journey.links.benefits}
+              eventKey="waitlist_interest"
+              eventGroup="ecosystem"
+              trackingPayload={{ surface: "client_ecosystem_hub", target: "waitlist" }}
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
+            >
+              Entrar na lista privada
+            </TrackedLink>
+          ) : null}
         </div>
       </ClientSafeCard>
 
@@ -238,14 +226,14 @@ export default async function ClientEcosystemHubPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Onboarding</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">Acesso com contexto</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              Billing, trilha e comunidade aparecem como uma unica recepcao premium e legivel.
+              Framing, trilha e comunidade aparecem como uma unica recepcao premium e legivel.
             </p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Continuidade</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">Retencao desde o primeiro ciclo</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              A experiencia ja nasce preparada para medir permanencia, valor percebido e sinais iniciais de risco.
+              A experiencia ja nasce preparada para medir permanencia, valor percebido, desejo e sinais de prontidao para monetizacao futura.
             </p>
           </article>
         </div>
@@ -265,7 +253,7 @@ export default async function ClientEcosystemHubPage() {
             </span>
             <strong className="mt-3 block text-base">Ler framing, beneficios e politica de acesso</strong>
             <span className="mt-2 block text-sm leading-6 text-[#5f6f68]">
-              A camada de plano organiza a experiencia premium e a ativacao fundadora sem poluir o portal com urgencia barata.
+              A camada de plano organiza a experiencia premium gratuita e preserva a monetizacao futura sem poluir o portal com urgencia barata.
             </span>
           </TrackedLink>
 

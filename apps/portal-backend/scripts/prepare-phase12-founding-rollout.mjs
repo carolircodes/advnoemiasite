@@ -22,52 +22,45 @@ const supabase = createClient(url, key, {
   }
 });
 
-const INITIAL_TARGET = 3;
+const INITIAL_TARGET = 5;
 
 async function main() {
-  const [
-    grantsResult,
-    subscriptionsResult,
-    membershipsResult,
-    profilesResult
-  ] = await Promise.all([
-    supabase
-      .from("ecosystem_access_grants")
-      .select("profile_id,grant_status,access_scope,created_at")
-      .in("access_scope", ["founding_beta", "founding_live"])
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("ecosystem_subscriptions")
-      .select("profile_id,status,source_of_activation,payment_provider,created_at")
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("ecosystem_community_memberships")
-      .select("profile_id,status,access_level,created_at")
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("profiles")
-      .select("id,full_name,email,role,created_at")
-      .eq("role", "cliente")
-      .order("created_at", { ascending: true })
-  ]);
+  const [grantsResult, membershipsResult, subscriptionsResult, profilesResult] =
+    await Promise.all([
+      supabase
+        .from("ecosystem_access_grants")
+        .select("profile_id,grant_status,access_scope,created_at")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("ecosystem_community_memberships")
+        .select("profile_id,status,access_level,last_active_at,created_at")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("ecosystem_subscriptions")
+        .select("profile_id,status,source_of_activation,payment_provider,created_at")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("id,full_name,email,role,created_at")
+        .eq("role", "cliente")
+        .order("created_at", { ascending: true })
+    ]);
 
-  for (const result of [grantsResult, subscriptionsResult, membershipsResult, profilesResult]) {
+  for (const result of [
+    grantsResult,
+    membershipsResult,
+    subscriptionsResult,
+    profilesResult
+  ]) {
     if (result.error) {
       throw new Error(result.error.message);
     }
   }
 
   const grants = grantsResult.data || [];
-  const subscriptions = subscriptionsResult.data || [];
   const memberships = membershipsResult.data || [];
+  const subscriptions = subscriptionsResult.data || [];
   const profiles = profilesResult.data || [];
-
-  const liveByProfile = new Map();
-  for (const subscription of subscriptions) {
-    if (subscription.payment_provider === "mercado_pago_preapproval") {
-      liveByProfile.set(subscription.profile_id, subscription);
-    }
-  }
 
   const membershipByProfile = new Map();
   for (const membership of memberships) {
@@ -83,34 +76,40 @@ async function main() {
     }
   }
 
-  const eligibleProfiles = profiles
+  const candidates = profiles
     .map((profile) => {
       const grant = grantByProfile.get(profile.id) || null;
-      const live = liveByProfile.get(profile.id) || null;
       const membership = membershipByProfile.get(profile.id) || null;
-      const betaSubscription = subscriptions.find(
+      const founderSubscription = subscriptions.find(
         (item) =>
           item.profile_id === profile.id && item.source_of_activation === "founding_beta"
       );
 
-      const eligible =
-        Boolean(grant && grant.grant_status === "active") &&
-        !live &&
-        (grant.access_scope === "founding_beta" || betaSubscription);
-
-      if (!eligible) {
+      if (!grant || grant.grant_status !== "active") {
         return null;
       }
+
+      const founderState =
+        grant.access_scope === "waitlist"
+          ? "waitlist"
+          : membership?.status === "invited"
+            ? "invited"
+            : "active_founder";
 
       return {
         profile_id: profile.id,
         full_name: profile.full_name,
         email: profile.email,
-        current_founding_state: grant?.access_scope || "founding_beta",
-        community_state: membership?.status || "invited",
-        recommendation: "curated_invite_for_live_authorization",
-        rationale:
-          "perfil fundador ativo sem assinatura live vinculada; pronto para convite manual e autorizacao recorrente controlada"
+        founder_state: founderState,
+        grant_scope: grant.access_scope,
+        membership_state: membership?.status || "invited",
+        subscription_reference: founderSubscription?.source_of_activation || "manual_founder",
+        recommendation:
+          founderState === "active_founder"
+            ? "preserve_and_deepen_value"
+            : founderState === "invited"
+              ? "complete_onboarding"
+              : "nurture_waitlist_desire"
       };
     })
     .filter(Boolean)
@@ -120,15 +119,15 @@ async function main() {
     JSON.stringify(
       {
         preparedAt: new Date().toISOString(),
-        phase: "12.4",
+        phase: "12.4-reoriented",
         operation: {
-          rollout_mode: "controlled_founding_live",
+          mode: "free_private_founding",
           initial_target: INITIAL_TARGET,
           invite_policy: "curated_invitation_only",
           eligibility:
-            "founding_beta ativo com grant preservado, membership coerente e ausencia de assinatura live vigente"
+            "founder com grant ativo, entrada curada e comunidade privada sem cobranca ativa"
         },
-        candidates: eligibleProfiles
+        candidates
       },
       null,
       2

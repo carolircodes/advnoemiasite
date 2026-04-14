@@ -39,14 +39,7 @@ async function query(table, columns, configure) {
 }
 
 async function main() {
-  const [
-    plans,
-    subscriptions,
-    grants,
-    memberships,
-    billingEvents,
-    productEvents
-  ] = await Promise.all([
+  const [plans, subscriptions, grants, memberships, productEvents] = await Promise.all([
     query(
       "ecosystem_plan_tiers",
       "id,code,name,status,billing_provider,billing_plan_reference,billing_status",
@@ -54,7 +47,7 @@ async function main() {
     ),
     query(
       "ecosystem_subscriptions",
-      "id,status,source_of_activation,payment_provider,billing_status,renewal_mode,current_period_ends_at,next_billing_at,created_at,profile_id"
+      "id,status,source_of_activation,payment_provider,billing_status,renewal_mode,created_at,profile_id"
     ),
     query(
       "ecosystem_access_grants",
@@ -65,152 +58,110 @@ async function main() {
       "id,profile_id,status,access_level,entitlement_origin,created_at"
     ),
     query(
-      "ecosystem_billing_events",
-      "id,profile_id,provider,provider_event_type,billing_status,provider_reference,occurred_at"
-    ),
-    query(
       "product_events",
       "id,event_key,event_group,page_path,profile_id,occurred_at,payload",
       (q) =>
-        q
-          .eq("event_group", "ecosystem")
-          .in("event_key", [
-            "subscription_started",
-            "subscription_authorized",
-            "subscription_active",
-            "founding_live_activated",
-            "access_granted",
-            "community_access_granted",
-            "content_continuity_signal",
-            "recurring_revenue_signal",
-            "onboarding_completed",
-            "retention_signal"
-          ])
+        q.eq("event_group", "ecosystem").in("event_key", [
+          "member_invited",
+          "member_joined",
+          "onboarding_completed",
+          "content_started",
+          "content_completed",
+          "community_viewed",
+          "member_active",
+          "retention_signal",
+          "premium_interest_signal",
+          "waitlist_interest",
+          "paid_interest_signal",
+          "founder_engagement_score"
+        ])
     )
   ]);
 
   const plan = plans[0] || null;
-  const foundingBetaSubscriptions = subscriptions.filter(
-    (item) => item.source_of_activation === "founding_beta"
-  );
-  const foundingLiveSubscriptions = subscriptions.filter(
-    (item) => item.source_of_activation === "founding_live"
-  );
-  const liveSubscriptions = subscriptions.filter(
-    (item) => item.payment_provider === "mercado_pago_preapproval"
-  );
-  const activeLiveSubscriptions = liveSubscriptions.filter(
-    (item) => item.status === "active"
-  );
-  const pendingAuthorizations = liveSubscriptions.filter(
+  const activeFounders = grants.filter(
     (item) =>
-      item.billing_status === "pending_authorization" || item.status === "incomplete"
+      item.grant_status === "active" &&
+      ["founding_beta", "active_founder", "founding_live"].includes(item.access_scope)
   );
-  const foundingLiveGrants = grants.filter(
-    (item) => item.access_scope === "founding_live" && item.grant_status === "active"
-  );
-  const activeGrants = grants.filter((item) => item.grant_status === "active");
+  const invitedFounders = memberships.filter((item) => item.status === "invited");
+  const waitlistProfiles = grants.filter((item) => item.access_scope === "waitlist");
   const activeMemberships = memberships.filter((item) => item.status === "active");
-  const eligibleFoundingProfiles = new Set([
-    ...foundingBetaSubscriptions.map((item) => item.profile_id),
-    ...grants
-      .filter(
-        (item) =>
-          item.grant_status === "active" &&
-          ["founding_beta", "founding_live"].includes(item.access_scope)
-      )
-      .map((item) => item.profile_id)
-  ]);
-  const liveProfiles = new Set(liveSubscriptions.map((item) => item.profile_id));
-  const controlledActivationCandidates = [...eligibleFoundingProfiles].filter(
-    (profileId) => !liveProfiles.has(profileId)
-  );
+  const activeSubscriptions = subscriptions.filter((item) => item.status === "active");
 
-  const eventCounts = new Map();
-  for (const event of productEvents) {
-    eventCounts.set(event.event_key, (eventCounts.get(event.event_key) || 0) + 1);
-  }
+  const countEvent = (eventKey) =>
+    productEvents.filter((event) => event.event_key === eventKey).length;
 
-  const firstActivationPrepared =
-    Boolean(plan?.billing_plan_reference) &&
-    controlledActivationCandidates.length > 0;
-  const firstActivationHomologated = activeLiveSubscriptions.length > 0;
-  const endToEndValidated =
-    firstActivationHomologated &&
-    foundingLiveGrants.length > 0 &&
-    activeMemberships.length > 0 &&
-    billingEvents.some((item) => item.provider === "mercado_pago_preapproval");
-  const betaToLivePrepared =
-    foundingBetaSubscriptions.length > 0 &&
-    (foundingLiveSubscriptions.length > 0 ||
-      grants.some((item) => item.access_scope === "founding_beta"));
-  const portalReflectsRealLife =
-    productEvents.some((item) =>
-      ["/cliente/ecossistema", "/cliente/ecossistema/beneficios"].includes(item.page_path)
-    );
-  const hubReflectsOperation =
-    productEvents.some((item) => item.page_path === "/internal/advogada/ecossistema") ||
-    billingEvents.length > 0;
-  const telemetryActive =
-    (eventCounts.get("subscription_started") || 0) > 0 ||
-    (eventCounts.get("subscription_authorized") || 0) > 0 ||
-    (eventCounts.get("founding_live_activated") || 0) > 0;
-  const legalCoreProtected =
+  const repositionedFreeFounding =
     Boolean(plan) &&
     plan.billing_provider === "mercado_pago_preapproval" &&
-    !billingEvents.some((item) => item.provider === "mercado_pago" && item.provider_event_type === "legal_checkout");
+    plan.billing_status === "live_ready";
+  const freeFoundingOrganized = activeFounders.length > 0 || invitedFounders.length > 0;
+  const onboardingReady = countEvent("onboarding_completed") > 0 || activeMemberships.length > 0;
+  const portalReflectsFreePremium = productEvents.some((item) =>
+    ["/cliente/ecossistema", "/cliente/ecossistema/beneficios", "/cliente/ecossistema/conteudo", "/cliente/ecossistema/comunidade"].includes(item.page_path)
+  );
+  const engagementTelemetryActive =
+    countEvent("member_active") > 0 ||
+    countEvent("premium_interest_signal") > 0 ||
+    countEvent("founder_engagement_score") > 0;
+  const waitlistPrepared =
+    waitlistProfiles.length > 0 || countEvent("waitlist_interest") > 0;
+  const paidArchitecturePreserved =
+    Boolean(plan?.billing_plan_reference) && subscriptions.every((item) => item.payment_provider !== "mercado_pago_preapproval");
+  const legalCoreProtected = Boolean(plan) && plan.billing_provider === "mercado_pago_preapproval";
   const phaseConcluded =
-    firstActivationPrepared &&
-    portalReflectsRealLife &&
-    hubReflectsOperation &&
-    telemetryActive &&
+    repositionedFreeFounding &&
+    freeFoundingOrganized &&
+    onboardingReady &&
+    portalReflectsFreePremium &&
+    engagementTelemetryActive &&
+    paidArchitecturePreserved &&
     legalCoreProtected;
 
-  const summary = {
-    auditedAt: new Date().toISOString(),
-    phase: "12.4",
-    operation: {
-      initial_subscriber_target: 3,
-      rollout_mode: "controlled_founding_live",
-      eligibility:
-        "pagadoras convidadas, founding_beta preservado e autorizacao recorrente validada com curadoria manual",
-      invite_policy: "curated_invitation_only",
-      founding_beta_count: foundingBetaSubscriptions.length,
-      founding_live_count: foundingLiveSubscriptions.length,
-      controlled_activation_candidates_count: controlledActivationCandidates.length,
-      live_subscribers_count: liveSubscriptions.length,
-      active_live_subscribers_count: activeLiveSubscriptions.length,
-      pending_authorizations_count: pendingAuthorizations.length,
-      active_grants_count: activeGrants.length,
-      founding_live_grants_count: foundingLiveGrants.length,
-      active_memberships_count: activeMemberships.length
-    },
-    telemetry: {
-      subscription_started: eventCounts.get("subscription_started") || 0,
-      subscription_authorized: eventCounts.get("subscription_authorized") || 0,
-      subscription_active: eventCounts.get("subscription_active") || 0,
-      founding_live_activated: eventCounts.get("founding_live_activated") || 0,
-      access_granted: eventCounts.get("access_granted") || 0,
-      community_access_granted: eventCounts.get("community_access_granted") || 0,
-      content_continuity_signal: eventCounts.get("content_continuity_signal") || 0,
-      recurring_revenue_signal: eventCounts.get("recurring_revenue_signal") || 0,
-      onboarding_completed: eventCounts.get("onboarding_completed") || 0,
-      retention_signal: eventCounts.get("retention_signal") || 0
-    },
-    checklist: {
-      "primeira ativacao live preparada": yesNo(firstActivationPrepared),
-      "primeira assinatura live efetivamente homologada": yesNo(firstActivationHomologated),
-      "fluxo recorrente ponta a ponta validado": yesNo(endToEndValidated),
-      "founding_beta -> founding_live preparado ou executado": yesNo(betaToLivePrepared),
-      "portal refletindo assinatura live real": yesNo(portalReflectsRealLife),
-      "hub interno refletindo operacao fundadora": yesNo(hubReflectsOperation),
-      "telemetria registrando ativacao live": yesNo(telemetryActive),
-      "core juridico preservado": yesNo(legalCoreProtected),
-      "fase 12.4 concluida": yesNo(phaseConcluded)
-    }
-  };
-
-  console.log(JSON.stringify(summary, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        auditedAt: new Date().toISOString(),
+        phase: "12.4-reoriented",
+        operation: {
+          mode: "free_private_founding",
+          active_founders_count: activeFounders.length,
+          invited_founders_count: invitedFounders.length,
+          waitlist_count: waitlistProfiles.length,
+          active_memberships_count: activeMemberships.length,
+          active_subscriptions_preserved_count: activeSubscriptions.length
+        },
+        telemetry: {
+          member_invited: countEvent("member_invited"),
+          member_joined: countEvent("member_joined"),
+          onboarding_completed: countEvent("onboarding_completed"),
+          content_started: countEvent("content_started"),
+          content_completed: countEvent("content_completed"),
+          community_viewed: countEvent("community_viewed"),
+          member_active: countEvent("member_active"),
+          retention_signal: countEvent("retention_signal"),
+          premium_interest_signal: countEvent("premium_interest_signal"),
+          waitlist_interest: countEvent("waitlist_interest"),
+          paid_interest_signal: countEvent("paid_interest_signal"),
+          founder_engagement_score: countEvent("founder_engagement_score")
+        },
+        checklist: {
+          "Circulo Essencial reposicionado como fundador gratuito": yesNo(repositionedFreeFounding),
+          "operacao fundadora gratuita organizada": yesNo(freeFoundingOrganized),
+          "onboarding premium pronto": yesNo(onboardingReady),
+          "portal refletindo fase gratuita premium": yesNo(portalReflectsFreePremium),
+          "telemetria de engajamento e desejo ativa": yesNo(engagementTelemetryActive),
+          "waitlist/interesse futuro preparado": yesNo(waitlistPrepared),
+          "arquitetura paga preservada para depois": yesNo(paidArchitecturePreserved),
+          "core juridico preservado": yesNo(legalCoreProtected),
+          "fase concluida": yesNo(phaseConcluded)
+        }
+      },
+      null,
+      2
+    )
+  );
 }
 
 main().catch((error) => {

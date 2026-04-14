@@ -53,9 +53,9 @@ export default async function EcosystemPage() {
       highlights={[
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
         { label: "Oferta ancora", value: premiumJourney.anchorTitle },
-        { label: "Founding beta", value: String(premiumJourney.betaAudienceCount) },
-        { label: "Founding live", value: String(premiumJourney.foundingLiveCount) },
-        { label: "Live", value: String(premiumJourney.liveSubscribersCount) },
+        { label: "Founders ativos", value: String(premiumJourney.activeFoundersCount) },
+        { label: "Convites", value: String(premiumJourney.invitedFoundersCount) },
+        { label: "Waitlist", value: String(premiumJourney.waitlistCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
@@ -91,7 +91,7 @@ export default async function EcosystemPage() {
 
       <SectionCard
         title="Primeira jornada premium ativa"
-        description="A ancora inicial do ecossistema agora opera como ativacao fundadora controlada, com grant, autorizacao recorrente, trilha e comunidade conectados."
+        description="A ancora inicial do ecossistema agora opera como comunidade fundadora gratuita, privada e curada, com grants, onboarding, trilha e comunidade conectados."
       >
         <div className="summary-grid compact">
           <div className="summary-card">
@@ -101,36 +101,40 @@ export default async function EcosystemPage() {
             <span className="pill warning">{premiumJourney.statusLabel}</span>
           </div>
           <div className="summary-card">
-            <span>Founding beta</span>
-            <strong>{premiumJourney.betaAudienceCount}</strong>
-            <p>Perfis curatoriais preservados enquanto a ativacao live acontece sem pressa e sem ruido.</p>
+            <span>Founders ativos</span>
+            <strong>{premiumJourney.activeFoundersCount}</strong>
+            <p>Perfis com acesso fundador ativo dentro da operacao gratuita e privada.</p>
             <span className="pill success">grant ativo</span>
           </div>
           <div className="summary-card">
-            <span>Founding live</span>
-            <strong>{premiumJourney.foundingLiveCount}</strong>
-            <p>Fundadores que ja carregam entitlement live real dentro da jornada ancora.</p>
-            <span className="pill success">fundador live</span>
+            <span>Convites pendentes</span>
+            <strong>{premiumJourney.invitedFoundersCount}</strong>
+            <p>Entradas curatoriais ainda em fase de convite ou onboarding inicial.</p>
+            <span className="pill warning">convite</span>
           </div>
           <div className="summary-card">
-            <span>Assinantes live</span>
-            <strong>{premiumJourney.liveSubscribersCount}</strong>
-            <p>Perfis que ja iniciaram ou ativaram a assinatura recorrente operacional.</p>
-            <span className="pill success">billing live</span>
+            <span>Waitlist qualificada</span>
+            <strong>{premiumJourney.waitlistCount}</strong>
+            <p>Perfis em observacao para entrada futura, sem abrir aquisicao massiva.</p>
+            <span className="pill muted">espera elegante</span>
           </div>
           <div className="summary-card">
-            <span>Autorizacoes pendentes</span>
-            <strong>{premiumJourney.pendingAuthorizationsCount}</strong>
-            <p>Assinaturas iniciadas que ainda aguardam a autorizacao final da pagadora.</p>
-            <span className={premiumJourney.pendingAuthorizationsCount > 0 ? "pill warning" : "pill muted"}>
-              fila controlada
-            </span>
+            <span>Interesse premium</span>
+            <strong>{premiumJourney.premiumInterestCount}</strong>
+            <p>Sinais de desejo e atencao em torno da proposta fundadora.</p>
+            <span className="pill success">desejo</span>
           </div>
           <div className="summary-card">
-            <span>Assinaturas ativas</span>
+            <span>Prontidao paga futura</span>
+            <strong>{premiumJourney.paidInterestCount}</strong>
+            <p>Sinais de interesse numa futura camada paga, sem ativar cobranca agora.</p>
+            <span className="pill warning">monetizacao depois</span>
+          </div>
+          <div className="summary-card">
+            <span>Assinaturas preservadas</span>
             <strong>{premiumJourney.activeSubscriptions}</strong>
-            <p>Assinaturas efetivamente ativas no lifecycle premium, ja separadas do core juridico.</p>
-            <span className="pill success">lifecycle ativo</span>
+            <p>Arquitetura de assinatura pronta e preservada, mas dormente neste momento estrategico.</p>
+            <span className="pill muted">dormente</span>
           </div>
           <div className="summary-card">
             <span>Conteudo desbloqueado</span>
@@ -153,7 +157,7 @@ export default async function EcosystemPage() {
           <div className="summary-card">
             <span>Onboarding concluido</span>
             <strong>{premiumJourney.onboardingCompletedCount}</strong>
-            <p>Entradas fundadoras que ja viraram experiencia recebida, nao apenas cobranca aprovada.</p>
+            <p>Entradas fundadoras que ja viraram experiencia recebida, nao apenas acesso liberado.</p>
             <span className="pill success">entrada nobre</span>
           </div>
           <div className="summary-card">
@@ -163,12 +167,10 @@ export default async function EcosystemPage() {
             <span className="pill success">retencao</span>
           </div>
           <div className="summary-card">
-            <span>Risco de churn</span>
-            <strong>{premiumJourney.churnRiskCount}</strong>
-            <p>Assinaturas em pausa, past_due ou sinais equivalentes dentro do lifecycle recorrente.</p>
-            <span className={premiumJourney.churnRiskCount > 0 ? "pill warning" : "pill muted"}>
-              risco
-            </span>
+            <span>Engajamento fundador</span>
+            <strong>{premiumJourney.founderEngagementEvents}</strong>
+            <p>Interacoes que fortalecem pertencimento, consumo e desejo dentro da comunidade privada.</p>
+            <span className="pill success">engajamento</span>
           </div>
         </div>
         <p className="empty-state" style={{ marginTop: "20px" }}>

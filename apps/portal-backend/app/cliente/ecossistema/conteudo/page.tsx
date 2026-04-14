@@ -52,16 +52,42 @@ export default async function ClientEcosystemContentPage() {
               journey: "circulo_essencial"
             }}
           />
+          <EcosystemTelemetryBeacon
+            eventKey="member_active"
+            payload={{
+              surface: "client_ecosystem_content",
+              page: "/cliente/ecossistema/conteudo",
+              journey: "circulo_essencial"
+            }}
+          />
+          <EcosystemTelemetryBeacon
+            eventKey="founder_engagement_score"
+            payload={{
+              surface: "client_ecosystem_content",
+              page: "/cliente/ecossistema/conteudo",
+              journey: "circulo_essencial"
+            }}
+          />
         </>
       ) : (
-        <EcosystemTelemetryBeacon
-          eventKey="product_viewed"
-          payload={{
-            surface: "client_ecosystem_content_locked",
-            page: "/cliente/ecossistema/conteudo",
-            journey: "circulo_essencial"
-          }}
-        />
+        <>
+          <EcosystemTelemetryBeacon
+            eventKey="product_viewed"
+            payload={{
+              surface: "client_ecosystem_content_locked",
+              page: "/cliente/ecossistema/conteudo",
+              journey: "circulo_essencial"
+            }}
+          />
+          <EcosystemTelemetryBeacon
+            eventKey="premium_interest_signal"
+            payload={{
+              surface: "client_ecosystem_content_locked",
+              page: "/cliente/ecossistema/conteudo",
+              journey: "circulo_essencial"
+            }}
+          />
+        </>
       )}
 
       <ClientSafeCard title="Biblioteca de Clareza Estrategica">
@@ -80,7 +106,7 @@ export default async function ClientEcosystemContentPage() {
         <ClientSafeCard title="Trilha inaugural">
           <p className="text-lg font-semibold text-[#10261d]">{journey.content.title}</p>
           <p className="mt-2 text-sm leading-7 text-[#5f6f68]">
-            A jornada premium inicial abre com uma unidade reservada que posiciona a cliente dentro do ecossistema, com framing de continuidade e leitura curada.
+            A jornada premium inicial abre com uma unidade reservada que posiciona a cliente dentro do ecossistema, com framing de continuidade, leitura curada e valor percebido crescente.
           </p>
           <div className="mt-5 rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Primeira unidade</p>
@@ -92,8 +118,8 @@ export default async function ClientEcosystemContentPage() {
         <ClientSafeCard title={journey.access.hasAccess ? "Consumo liberado" : "Acesso ainda reservado"}>
           <p>
             {journey.access.hasAccess
-              ? "Seu grant beta ja libera esta trilha. O progresso fica rastreado por unidade, preservando a sensacao de experiencia premium real."
-              : "A trilha ja esta pronta e conectada ao plano ancora, mas continua reservada ate a liberacao do grant beta."}
+              ? "Seu grant fundador ja libera esta trilha. O progresso fica rastreado por unidade, preservando a sensacao de experiencia premium real."
+              : "A trilha ja esta pronta e conectada ao plano ancora, mas continua reservada ate a liberacao do grant fundador."}
           </p>
           <div className="mt-5 flex flex-col gap-3">
             <TrackedLink

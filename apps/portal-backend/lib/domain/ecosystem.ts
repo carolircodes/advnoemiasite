@@ -124,6 +124,7 @@ export const ecosystemEventKeys = [
   "subscription_paused",
   "subscription_canceled",
   "founding_live_activated",
+  "member_invited",
   "community_access_granted",
   "content_unlocked",
   "content_started",
@@ -135,6 +136,10 @@ export const ecosystemEventKeys = [
   "retention_signal",
   "content_continuity_signal",
   "onboarding_completed",
+  "premium_interest_signal",
+  "waitlist_interest",
+  "paid_interest_signal",
+  "founder_engagement_score",
   "churn_risk",
   "expansion_revenue_signal",
   "recurring_revenue_signal"

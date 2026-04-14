@@ -513,22 +513,14 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
   const liveSubscriptions = subscriptions.filter(
     (item) => item.payment_provider === "mercado_pago_preapproval"
   );
-  const pendingAuthorizations = subscriptions.filter(
-    (item) =>
-      item.payment_provider === "mercado_pago_preapproval" &&
-      (item.billing_status === "pending_authorization" || item.status === "incomplete")
-  );
   const foundingSubscriptions = subscriptions.filter(
     (item) => item.source_of_activation === "founding_beta"
   );
-  const foundingLiveSubscriptions = subscriptions.filter(
-    (item) => item.source_of_activation === "founding_live"
-  );
-  const pastDueSubscriptions = subscriptions.filter(
-    (item) => item.status === "past_due" || item.billing_status === "past_due"
-  );
+  const founderWaitlistGrants = accessGrants.filter((item) => item.access_scope === "waitlist");
   const activeGrants = accessGrants.filter((item) => item.grant_status === "active");
-  const foundingLiveGrants = accessGrants.filter((item) => item.access_scope === "founding_live");
+  const activeFounderGrants = accessGrants.filter((item) =>
+    ["founding_beta", "active_founder", "founding_live"].includes(item.access_scope)
+  );
   const completedProgress = progressItems.filter((item) => item.status === "completed");
   const activeMemberships = memberships.filter((item) => item.status === "active");
 
@@ -604,14 +596,14 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         label: "Planos cadastrados",
         value: formatCount(plans.length),
         detail:
-          `${plans.filter((item) => item.status === "published" || item.status === "private_beta").length} plano(s) prontos para ganhar ativacao real.`,
+          `${plans.filter((item) => item.status === "published" || item.status === "private_beta").length} plano(s) prontos para monetizacao futura, sem ativacao precoce agora.`,
         tone: plans.length > 0 ? "success" : "warning"
       },
       {
-        label: "Assinaturas mapeadas",
+        label: "Assinaturas preservadas",
         value: formatCount(subscriptions.length),
         detail:
-          `${activeSubscriptions.length} ativa(s), ${pausedSubscriptions.length} pausada(s), ${liveSubscriptions.length} live e sem misturar recorrencia com pagamento transacional do core.`,
+          `${activeSubscriptions.length} ativa(s), ${pausedSubscriptions.length} pausada(s), ${liveSubscriptions.length} com provedor e todas preservadas sem misturar recorrencia com pagamento transacional do core.`,
         tone: subscriptions.length > 0 ? "success" : "warning"
       },
       {
@@ -622,23 +614,19 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         tone: accessGrants.length > 0 ? "success" : "warning"
       },
       {
-        label: "Transicao beta -> live",
-        value: formatCount(foundingLiveSubscriptions.length),
+        label: "Fundadores ativos",
+        value: formatCount(activeFounderGrants.length),
         detail:
-          `${foundingSubscriptions.length} fundador(es) beta preservados, ${pendingAuthorizations.length} autorizacao(oes) pendente(s) e ${pastDueSubscriptions.length} sinal(is) de risco no lifecycle recorrente.`,
+          `${foundingSubscriptions.length} fundador(es) preservados em beta privado e ${activeMemberships.length} membership(s) sustentando a operacao gratuita e curada.`,
         tone:
-          foundingLiveSubscriptions.length > 0
-            ? "success"
-            : pendingAuthorizations.length > 0 || pastDueSubscriptions.length > 0
-              ? "warning"
-              : "muted"
+          activeFounderGrants.length > 0 ? "success" : "warning"
       },
       {
-        label: "Founding live habilitado",
-        value: formatCount(foundingLiveGrants.length),
+        label: "Waitlist elegante",
+        value: formatCount(founderWaitlistGrants.length),
         detail:
-          `${activeMemberships.length} membership(s) ativa(s) e grants sincronizados para a experiencia fundadora real.`,
-        tone: foundingLiveGrants.length > 0 ? "success" : "warning"
+          "A base ja consegue segurar desejo futuro pago sem abrir escopo, ruido ou aquisicao massiva.",
+        tone: founderWaitlistGrants.length > 0 ? "success" : "muted"
       }
     ],
     contentSummary: [
@@ -692,45 +680,49 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         tone: telemetryEvents.length > 0 ? "success" : "warning"
       },
       {
-        label: "Interesse em recorrencia",
+        label: "Interesse premium",
         value: formatCount(
-          (telemetryCounts.get("subscription_interest") || 0) +
-            (telemetryCounts.get("plan_viewed") || 0)
+          (telemetryCounts.get("premium_interest_signal") || 0) +
+            (telemetryCounts.get("plan_viewed") || 0) +
+            (telemetryCounts.get("waitlist_interest") || 0)
         ),
-        detail: "Visualizacao de plano e sinal de interesse ja entram em leitura executiva separada do checkout juridico.",
+        detail: "Visualizacao de plano, desejo e fila privada entram em leitura executiva separada do checkout juridico.",
         tone:
-          (telemetryCounts.get("subscription_interest") || 0) > 0 ||
-          (telemetryCounts.get("plan_viewed") || 0) > 0
+          (telemetryCounts.get("premium_interest_signal") || 0) > 0 ||
+          (telemetryCounts.get("plan_viewed") || 0) > 0 ||
+          (telemetryCounts.get("waitlist_interest") || 0) > 0
             ? "success"
             : "muted"
       },
       {
-        label: "Ativacoes fundadoras",
+        label: "Engajamento fundador",
         value: formatCount(
-          (telemetryCounts.get("subscription_authorized") || 0) +
-            (telemetryCounts.get("founding_live_activated") || 0) +
+          (telemetryCounts.get("member_joined") || 0) +
+            (telemetryCounts.get("member_active") || 0) +
+            (telemetryCounts.get("founder_engagement_score") || 0) +
             (telemetryCounts.get("onboarding_completed") || 0)
         ),
         detail:
-          "A operacao fundadora agora le autorizacao, ativacao live e onboarding como uma unica jornada recorrente controlada.",
+          "A operacao fundadora agora le convite, onboarding, atividade e aprofundamento de valor como uma unica jornada privada controlada.",
         tone:
-          (telemetryCounts.get("subscription_authorized") || 0) > 0 ||
-          (telemetryCounts.get("founding_live_activated") || 0) > 0 ||
+          (telemetryCounts.get("member_joined") || 0) > 0 ||
+          (telemetryCounts.get("member_active") || 0) > 0 ||
+          (telemetryCounts.get("founder_engagement_score") || 0) > 0 ||
           (telemetryCounts.get("onboarding_completed") || 0) > 0
             ? "success"
             : "warning"
       },
       {
-        label: "Sinais de risco",
+        label: "Prontidao para monetizacao",
         value: formatCount(
-          (telemetryCounts.get("churn_risk") || 0) +
-            (telemetryCounts.get("subscription_canceled") || 0)
+          (telemetryCounts.get("paid_interest_signal") || 0) +
+            (telemetryCounts.get("subscription_interest") || 0)
         ),
-        detail: "Churn e cancelamento ganharam trilha propria para a expansao nao nascer cega.",
+        detail: "Sinais de interesse futuro pago ajudam a definir quando a cobranca pode nascer forte, natural e elegante.",
         tone:
-          (telemetryCounts.get("churn_risk") || 0) > 0 ||
-          (telemetryCounts.get("subscription_canceled") || 0) > 0
-            ? "warning"
+          (telemetryCounts.get("paid_interest_signal") || 0) > 0 ||
+          (telemetryCounts.get("subscription_interest") || 0) > 0
+            ? "success"
             : "muted"
       }
     ],

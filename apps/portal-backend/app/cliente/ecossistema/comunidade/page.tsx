@@ -44,7 +44,7 @@ export default async function ClientEcosystemCommunityPage() {
       />
       {journey.community.joined ? (
         <EcosystemTelemetryBeacon
-          eventKey="member_joined"
+          eventKey="member_active"
           payload={{
             surface: "client_ecosystem_community",
             page: "/cliente/ecossistema/comunidade",
@@ -52,6 +52,14 @@ export default async function ClientEcosystemCommunityPage() {
           }}
         />
       ) : null}
+      <EcosystemTelemetryBeacon
+        eventKey="founder_engagement_score"
+        payload={{
+          surface: "client_ecosystem_community",
+          page: "/cliente/ecossistema/comunidade",
+          journey: "circulo_essencial"
+        }}
+      />
 
       <ClientSafeCard title="Sala Reservada do Circulo">
         <div className="rounded-[28px] border border-[#e7e0d5] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,244,238,0.96))] p-5">
@@ -68,18 +76,18 @@ export default async function ClientEcosystemCommunityPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ClientSafeCard title="Papel da comunidade">
           <p>
-            A comunidade foi desenhada como extensao natural do Circulo Essencial: um espaco de continuidade e pertencimento premium, conectado ao plano e ao conteudo, sem se confundir com o atendimento juridico principal.
+            A comunidade foi desenhada como extensao natural do Circulo Essencial: um espaco de continuidade e pertencimento premium, gratuito por enquanto, conectado ao conteudo e sem se confundir com o atendimento juridico principal.
           </p>
           <p className="mt-3">
-            Entrada, permanencia e saida seguem semantica propria para preservar elegancia, previsibilidade e fronteira clara entre core e ecossistema.
+            Entrada, permanencia e saida seguem semantica propria para preservar elegancia, previsibilidade, desejo e fronteira clara entre core e ecossistema.
           </p>
         </ClientSafeCard>
 
         <ClientSafeCard title={journey.community.joined ? "Membership ativo" : "Entrada reservada"}>
           <p>
             {journey.community.joined
-              ? "Seu membership comunitario ja esta ativo como parte da primeira jornada premium."
-              : "A comunidade continua reservada e sera liberada em conjunto com o grant beta, mantendo a ativacao sob controle."}
+              ? "Seu membership comunitario ja esta ativo como parte da primeira jornada fundadora gratuita."
+              : "A comunidade continua reservada e sera liberada em conjunto com o grant fundador, mantendo a ativacao sob controle."}
           </p>
           <div className="mt-5 flex flex-col gap-3">
             <TrackedLink

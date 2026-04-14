@@ -25,27 +25,47 @@ const supabase = createClient(url, key, {
 const basePayload = {
   phase: "12.4",
   controlled: true,
-  source: "phase12_4_smoke_test"
+  source: "phase12_4_free_founding_smoke"
 };
 
 const events = [
   {
-    event_key: "subscription_started",
+    event_key: "premium_interest_signal",
     event_group: "ecosystem",
     page_path: "/cliente/ecossistema/beneficios",
     payload: {
       ...basePayload,
-      surface: "client_ecosystem_founder_activation"
+      surface: "client_ecosystem_founder_interest"
     }
   },
   {
-    event_key: "founding_live_activated",
+    event_key: "founder_engagement_score",
     event_group: "ecosystem",
     page_path: "/internal/advogada/ecossistema",
     payload: {
       ...basePayload,
       surface: "internal_ecosystem_hub",
-      section: "founding_live"
+      section: "free_private_founding"
+    }
+  },
+  {
+    event_key: "waitlist_interest",
+    event_group: "ecosystem",
+    page_path: "/cliente/ecossistema/beneficios",
+    payload: {
+      ...basePayload,
+      surface: "client_ecosystem_waitlist",
+      section: "future_entry"
+    }
+  },
+  {
+    event_key: "paid_interest_signal",
+    event_group: "ecosystem",
+    page_path: "/cliente/ecossistema/beneficios",
+    payload: {
+      ...basePayload,
+      surface: "client_ecosystem_future_paid",
+      section: "monetization_readiness"
     }
   }
 ];
