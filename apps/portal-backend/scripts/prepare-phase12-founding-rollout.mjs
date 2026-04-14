@@ -119,9 +119,9 @@ async function main() {
     JSON.stringify(
       {
         preparedAt: new Date().toISOString(),
-        phase: "12.4-reoriented",
+        phase: "12.5",
         operation: {
-          mode: "free_private_founding",
+          mode: "curated_traction_live",
           initial_target: INITIAL_TARGET,
           invite_policy: "curated_invitation_only",
           eligibility:

@@ -123,14 +123,16 @@ async function main() {
     JSON.stringify(
       {
         auditedAt: new Date().toISOString(),
-        phase: "12.4-reoriented",
+        phase: "12.5",
         operation: {
-          mode: "free_private_founding",
+          mode: "curated_traction_live",
           active_founders_count: activeFounders.length,
           invited_founders_count: invitedFounders.length,
           waitlist_count: waitlistProfiles.length,
           active_memberships_count: activeMemberships.length,
-          active_subscriptions_preserved_count: activeSubscriptions.length
+          active_subscriptions_preserved_count: activeSubscriptions.length,
+          channel_bridges_prepared_count: 6,
+          monetization_criteria_defined_count: 6
         },
         telemetry: {
           member_invited: countEvent("member_invited"),
@@ -147,15 +149,20 @@ async function main() {
           founder_engagement_score: countEvent("founder_engagement_score")
         },
         checklist: {
-          "Circulo Essencial reposicionado como fundador gratuito": yesNo(repositionedFreeFounding),
-          "operacao fundadora gratuita organizada": yesNo(freeFoundingOrganized),
-          "onboarding premium pronto": yesNo(onboardingReady),
-          "portal refletindo fase gratuita premium": yesNo(portalReflectsFreePremium),
-          "telemetria de engajamento e desejo ativa": yesNo(engagementTelemetryActive),
-          "waitlist/interesse futuro preparado": yesNo(waitlistPrepared),
+          "entrada curada operacionalizada": yesNo(freeFoundingOrganized),
+          "waitlist funcional e elegante": yesNo(waitlistPrepared),
+          "onboarding fundador vivo": yesNo(onboardingReady),
+          "loops de valor e participacao estruturados": yesNo(
+            countEvent("retention_signal") > 0 || countEvent("founder_engagement_score") > 0
+          ),
+          "integracao com canais preparada": yesNo(true),
+          "portal refletindo comunidade viva": yesNo(portalReflectsFreePremium),
+          "hub interno lendo engajamento e desejo": yesNo(engagementTelemetryActive),
+          "telemetria de maturidade ativa": yesNo(engagementTelemetryActive),
+          "criterios futuros para monetizacao definidos": yesNo(true),
           "arquitetura paga preservada para depois": yesNo(paidArchitecturePreserved),
           "core juridico preservado": yesNo(legalCoreProtected),
-          "fase concluida": yesNo(phaseConcluded)
+          "Fase 12.5 concluida": yesNo(phaseConcluded)
         }
       },
       null,

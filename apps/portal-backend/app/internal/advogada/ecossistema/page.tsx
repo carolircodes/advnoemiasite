@@ -6,6 +6,7 @@ import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { buildInternalEcosystemHref } from "@/lib/navigation";
+import { getCommunityOperationsBlueprint } from "@/lib/services/ecosystem-community-operations";
 import { getInternalPremiumJourneySnapshot } from "@/lib/services/ecosystem-journey";
 import { getEcosystemExecutiveOverview } from "@/lib/services/ecosystem-platform";
 
@@ -28,6 +29,7 @@ export default async function EcosystemPage() {
     getEcosystemExecutiveOverview(45),
     getInternalPremiumJourneySnapshot()
   ]);
+  const operations = getCommunityOperationsBlueprint();
   const firstCatalogItem = overview.latestCatalogItems[0] || null;
 
   return (
@@ -178,6 +180,67 @@ export default async function EcosystemPage() {
         </p>
       </SectionCard>
 
+      <div className="grid two">
+        <SectionCard
+          title="Operacao Curada De Entrada"
+          description="A curadoria deixa de ser ideia solta e passa a ter lote, estados, capacidade e regras de aprovacao."
+        >
+          <div className="summary-grid compact">
+            <div className="summary-card">
+              <span>Lote maximo</span>
+              <strong>{operations.entryPolicy.lotSize}</strong>
+              <p>Capacidade maxima por rodada de entrada para manter a experiencia nobre.</p>
+            </div>
+            <div className="summary-card">
+              <span>Convites simultaneos</span>
+              <strong>{operations.entryPolicy.maxConcurrentInvites}</strong>
+              <p>Limite operacional para preservar onboarding, acompanhamento e leitura qualitativa.</p>
+            </div>
+            <div className="summary-card">
+              <span>Estados curatoriais</span>
+              <strong>{operations.entryPolicy.founderStates.join(" | ")}</strong>
+              <p>Convite, founder ativo, waitlist e deferred agora formam a malha oficial da operacao.</p>
+            </div>
+          </div>
+          <ul className="update-feed" style={{ marginTop: "20px" }}>
+            {operations.entryPolicy.approvalLogic.map((rule) => (
+              <li key={rule} className="update-card">
+                <div className="update-head">
+                  <div>
+                    <strong>Regra de aprovacao</strong>
+                    <span className="item-meta">Entrada pequena e premium</span>
+                  </div>
+                  <span className="tag soft">Curadoria</span>
+                </div>
+                <p className="update-body">{rule}</p>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+
+        <SectionCard
+          title="Canais Prioritarios"
+          description="A comunidade passa a receber trafego qualificado com ponte pratica e sem abrir geral."
+        >
+          <ul className="update-feed">
+            {operations.channelBridges.map((channel) => (
+              <li key={channel.channel} className="update-card">
+                <div className="update-head">
+                  <div>
+                    <strong>{channel.label}</strong>
+                    <span className="item-meta">{channel.entryMode}</span>
+                  </div>
+                  <span className="tag soft">{channel.telemetryEvent}</span>
+                </div>
+                <p className="update-body">
+                  {channel.curationRule}. CTA: {channel.ctaLabel}.
+                </p>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      </div>
+
       <SectionCard
         id="arquitetura-oficial"
         title="Arquitetura oficial do ecossistema"
@@ -274,6 +337,21 @@ export default async function EcosystemPage() {
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="Criterios De Futura Monetizacao"
+        description="A cobranca futura so entra quando a comunidade provar vida, desejo e maturidade suficientes."
+      >
+        <div className="summary-grid compact">
+          {operations.monetizationCriteria.map((criterion) => (
+            <div key={criterion.label} className="summary-card">
+              <span>{criterion.label}</span>
+              <strong>{criterion.threshold}</strong>
+              <p>{criterion.reason}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
 
       <div className="grid two">
         <SectionCard

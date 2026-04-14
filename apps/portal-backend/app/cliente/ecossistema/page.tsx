@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
 import { TrackedLink } from "@/components/tracked-link";
 import { requireProfile } from "@/lib/auth/guards";
+import { getCommunityOperationsBlueprint } from "@/lib/services/ecosystem-community-operations";
 import { getClientProfileSummary } from "@/lib/services/client-workspace";
 import { getClientPremiumJourney } from "@/lib/services/ecosystem-journey";
 
@@ -31,6 +32,7 @@ export default async function ClientEcosystemHubPage() {
     getClientProfileSummary(profile),
     getClientPremiumJourney(profile)
   ]);
+  const operations = getCommunityOperationsBlueprint();
 
   return (
     <ClientShell
@@ -236,6 +238,51 @@ export default async function ClientEcosystemHubPage() {
               A experiencia ja nasce preparada para medir permanencia, valor percebido, desejo e sinais de prontidao para monetizacao futura.
             </p>
           </article>
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Entrada Curada E Lista Privada">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Politica de entrada</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">
+              Lotes de ate {operations.entryPolicy.lotSize} founders
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              No maximo {operations.entryPolicy.maxConcurrentInvites} convites simultaneos para manter onboarding cuidadoso.
+            </p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Estados curatoriais</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">
+              {operations.entryPolicy.founderStates.join(" | ")}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              A curadoria diferencia convite, founder ativo, waitlist e deferimento sem perder elegancia.
+            </p>
+          </article>
+        </div>
+        <div className="mt-5 rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Lista privada</p>
+          <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.experienceRule}</p>
+          <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.upgradeRule}</p>
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Ritmo Vivo Do Circulo">
+        <div className="grid gap-4 md:grid-cols-3">
+          {operations.valueLoops.map((loop) => (
+            <article
+              key={loop.loop}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {loop.cadence}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{loop.title}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{loop.detail}</p>
+            </article>
+          ))}
         </div>
       </ClientSafeCard>
 

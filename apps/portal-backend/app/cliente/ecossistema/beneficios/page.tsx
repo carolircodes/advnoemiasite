@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
 import { TrackedLink } from "@/components/tracked-link";
 import { requireProfile } from "@/lib/auth/guards";
+import { getCommunityOperationsBlueprint } from "@/lib/services/ecosystem-community-operations";
 import { getClientProfileSummary } from "@/lib/services/client-workspace";
 import { getClientPremiumJourney } from "@/lib/services/ecosystem-journey";
 
@@ -48,6 +49,7 @@ export default async function ClientEcosystemBenefitsPage({
     getClientProfileSummary(profile),
     getClientPremiumJourney(profile)
   ]);
+  const operations = getCommunityOperationsBlueprint();
 
   return (
     <ClientShell
@@ -176,6 +178,17 @@ export default async function ClientEcosystemBenefitsPage({
       </ClientSafeCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <ClientSafeCard title="Waitlist Elegante E Prioridade Futura">
+          <ul className="space-y-4">
+            {operations.waitlistPolicy.prioritySignals.map((signal) => (
+              <li key={signal} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+                {signal}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.experienceRule}</p>
+        </ClientSafeCard>
+
         <ClientSafeCard title="Onboarding premium do primeiro ciclo">
           <ul className="space-y-4">
             <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
@@ -233,6 +246,23 @@ export default async function ClientEcosystemBenefitsPage({
           </div>
         </ClientSafeCard>
       </div>
+
+      <ClientSafeCard title="Quando A Camada Paga Fara Sentido">
+        <div className="grid gap-4 md:grid-cols-2">
+          {operations.monetizationCriteria.map((criterion) => (
+            <article
+              key={criterion.label}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {criterion.threshold}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{criterion.label}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{criterion.reason}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
     </ClientShell>
   );
 }

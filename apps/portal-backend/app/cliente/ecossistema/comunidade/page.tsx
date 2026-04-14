@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
 import { TrackedLink } from "@/components/tracked-link";
 import { requireProfile } from "@/lib/auth/guards";
+import { getCommunityOperationsBlueprint } from "@/lib/services/ecosystem-community-operations";
 import { getClientProfileSummary } from "@/lib/services/client-workspace";
 import { getClientPremiumJourney } from "@/lib/services/ecosystem-journey";
 
@@ -31,6 +32,7 @@ export default async function ClientEcosystemCommunityPage() {
     getClientProfileSummary(profile),
     getClientPremiumJourney(profile)
   ]);
+  const operations = getCommunityOperationsBlueprint();
 
   return (
     <ClientShell profile={profileSummary.data}>
@@ -111,6 +113,23 @@ export default async function ClientEcosystemCommunityPage() {
           </div>
         </ClientSafeCard>
       </div>
+
+      <ClientSafeCard title="Rituais Da Comunidade">
+        <div className="grid gap-4 md:grid-cols-3">
+          {operations.valueLoops.map((loop) => (
+            <article
+              key={loop.loop}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {loop.cadence}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{loop.title}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{loop.detail}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
     </ClientShell>
   );
 }
