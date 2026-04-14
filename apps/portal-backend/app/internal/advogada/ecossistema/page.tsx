@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
@@ -52,11 +53,36 @@ export default async function EcosystemPage() {
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
-        { href: "#arquitetura-oficial", label: "Ver arquitetura" },
-        { href: "#catalogo-premium", label: "Abrir catalogo", tone: "secondary" },
-        { href: "#telemetria-expansao", label: "Abrir telemetria", tone: "secondary" }
+        {
+          href: "#arquitetura-oficial",
+          label: "Ver arquitetura",
+          trackingEventKey: "product_viewed",
+          trackingEventGroup: "ecosystem",
+          trackingPayload: { surface: "internal_ecosystem_hub", section: "architecture" }
+        },
+        {
+          href: "#catalogo-premium",
+          label: "Abrir catalogo",
+          tone: "secondary",
+          trackingEventKey: "product_selected",
+          trackingEventGroup: "ecosystem",
+          trackingPayload: { surface: "internal_ecosystem_hub", section: "catalog" }
+        },
+        {
+          href: "#telemetria-expansao",
+          label: "Abrir telemetria",
+          tone: "secondary",
+          trackingEventKey: "recurring_revenue_signal",
+          trackingEventGroup: "ecosystem",
+          trackingPayload: { surface: "internal_ecosystem_hub", section: "telemetry" }
+        }
       ]}
     >
+      <EcosystemTelemetryBeacon
+        eventKey="product_viewed"
+        payload={{ surface: "internal_ecosystem_hub", page: "/internal/advogada/ecossistema" }}
+      />
+
       <SectionCard
         id="arquitetura-oficial"
         title="Arquitetura oficial do ecossistema"

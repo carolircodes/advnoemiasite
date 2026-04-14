@@ -1,4 +1,5 @@
 import type { ClientEcosystemWorkspace } from "@/lib/services/ecosystem-platform";
+import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
 
 import { ClientSafeCard } from "./client-safe-card";
 
@@ -34,6 +35,11 @@ export function ClientEcosystemFoundation({
 }) {
   return (
     <>
+      <EcosystemTelemetryBeacon
+        eventKey="product_viewed"
+        payload={{ surface: "client_ecosystem_foundation", page: "/cliente" }}
+      />
+
       <ClientSafeCard title="Camadas premium do portal">
         <div className="rounded-[28px] border border-[#e7e0d5] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,244,238,0.96))] p-5">
           <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">

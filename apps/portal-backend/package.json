@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "validate:schema": "node scripts/check-schema-governance.mjs",
+    "audit:phase12": "node scripts/audit-phase12-activation.mjs",
+    "telemetry:phase12:smoke": "node scripts/emit-phase12-telemetry-smoke.mjs",
     "validate:channels": "node scripts/channel-assisted-validation.mjs",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
     "notifications:process": "node scripts/process-notifications.mjs",
