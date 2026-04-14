@@ -101,6 +101,9 @@ export default async function ClientEcosystemContentPage() {
             {journey.content.statusLabel}
           </h1>
           <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{journey.content.detail}</p>
+          <p className="mt-3 text-sm font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+            {journey.content.completionLabel}
+          </p>
         </div>
       </ClientSafeCard>
 
@@ -121,7 +124,7 @@ export default async function ClientEcosystemContentPage() {
           <p>
             {journey.access.hasAccess
               ? "Seu grant fundador ja libera esta trilha. O progresso fica rastreado por unidade, preservando a sensacao de experiencia premium real."
-              : "A trilha ja esta pronta e conectada ao plano ancora, mas continua reservada ate a liberacao do grant fundador."}
+              : `A trilha ja esta pronta e conectada ao plano ancora, mas continua reservada. Estado atual: ${journey.entry.label}.`}
           </p>
           <div className="mt-5 flex flex-col gap-3">
             <TrackedLink
@@ -148,15 +151,15 @@ export default async function ClientEcosystemContentPage() {
 
       <ClientSafeCard title="Progressao E Retorno">
         <div className="grid gap-4 md:grid-cols-3">
-          {operations.onboarding.map((item) => (
+          {operations.contentCheckpoints.map((item) => (
             <article
-              key={item.step}
+              key={item.label}
               className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-                Passo {item.step}
+                {item.milestone}
               </p>
-              <p className="mt-3 text-lg font-semibold text-[#10261d]">{item.title}</p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{item.label}</p>
               <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{item.detail}</p>
             </article>
           ))}

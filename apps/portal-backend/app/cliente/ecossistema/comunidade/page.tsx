@@ -89,7 +89,7 @@ export default async function ClientEcosystemCommunityPage() {
           <p>
             {journey.community.joined
               ? "Seu membership comunitario ja esta ativo como parte da primeira jornada fundadora gratuita."
-              : "A comunidade continua reservada e sera liberada em conjunto com o grant fundador, mantendo a ativacao sob controle."}
+              : `${journey.entry.label}. A comunidade continua reservada e sera liberada em conjunto com o grant fundador, mantendo a ativacao sob controle.`}
           </p>
           <div className="mt-5 flex flex-col gap-3">
             <TrackedLink
@@ -126,6 +126,23 @@ export default async function ClientEcosystemCommunityPage() {
               </p>
               <p className="mt-3 text-lg font-semibold text-[#10261d]">{loop.title}</p>
               <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{loop.detail}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Retencao E Retorno">
+        <div className="grid gap-4 md:grid-cols-3">
+          {operations.retentionRoutines.map((routine) => (
+            <article
+              key={routine.label}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {routine.cadence}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{routine.label}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{routine.objective}</p>
             </article>
           ))}
         </div>

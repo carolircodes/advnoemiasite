@@ -522,7 +522,27 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
     ["founding_beta", "active_founder", "founding_live"].includes(item.access_scope)
   );
   const completedProgress = progressItems.filter((item) => item.status === "completed");
+  const averageProgressPercent =
+    progressItems.length > 0
+      ? Math.round(
+          progressItems.reduce(
+            (sum, item) => sum + (typeof item.progress_percent === "number" ? item.progress_percent : 0),
+            0
+          ) / progressItems.length
+        )
+      : 0;
   const activeMemberships = memberships.filter((item) => item.status === "active");
+  const sourceFromPayload = (payload: unknown) => {
+    return payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>).source_channel
+      : null;
+  };
+  const siteSignals = telemetryEvents.filter(
+    (item) => sourceFromPayload(item.payload) === "site_curated_entry" || sourceFromPayload(item.payload) === "site_editorial_bridge"
+  ).length;
+  const articleSignals = telemetryEvents.filter(
+    (item) => sourceFromPayload(item.payload) === "articles_private_interest" || sourceFromPayload(item.payload) === "articles_editorial_bridge"
+  ).length;
 
   const telemetryCounts = new Map<string, number>();
   for (const key of ecosystemEventKeys) {
@@ -648,6 +668,12 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         detail:
           "Telemetria de conteudo ja consegue medir inicio e conclusao sem poluir os eventos do atendimento juridico.",
         tone: contentStarted > 0 ? "success" : "muted"
+      },
+      {
+        label: "Progresso medio",
+        value: formatPercent(averageProgressPercent),
+        detail: "A leitura executiva agora acompanha quanto da trilha inaugural ja virou valor real.",
+        tone: averageProgressPercent > 0 ? "success" : "muted"
       }
     ],
     communitySummary: [
@@ -724,6 +750,12 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
           (telemetryCounts.get("subscription_interest") || 0) > 0
             ? "success"
             : "muted"
+      },
+      {
+        label: "Motor editorial",
+        value: formatCount(siteSignals + articleSignals),
+        detail: "Site e artigos entram na leitura como origem real de desejo, progresso e maturidade.",
+        tone: siteSignals + articleSignals > 0 ? "success" : "muted"
       }
     ],
     portalExperienceSummary: [

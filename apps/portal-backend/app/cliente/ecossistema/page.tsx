@@ -40,10 +40,10 @@ export default async function ClientEcosystemHubPage() {
       notices={[
         {
           tone: journey.access.hasAccess ? "success" : "warning",
-          title: journey.access.hasAccess ? "Founder ativo no Circulo" : "Entrada privada em curadoria",
+          title: journey.access.hasAccess ? "Founder ativo no Circulo" : journey.entry.label,
           description: journey.access.hasAccess
             ? "Seu portal agora reconhece uma jornada fundadora gratuita, com acesso, conteudo e comunidade conectados sem tocar no core juridico."
-            : "A jornada premium inaugural ja existe com framing, workspace e semantica de acesso. A entrada continua curada, pequena e sofisticada."
+            : journey.entry.detail
         }
       ]}
     >
@@ -122,7 +122,7 @@ export default async function ClientEcosystemHubPage() {
               {journey.beta.label}
             </span>
             <span className="inline-flex rounded-full bg-[#eef4ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#456055]">
-              Gratuito, privado e fundador
+              {journey.entry.label}
             </span>
           </div>
         </div>
@@ -144,9 +144,9 @@ export default async function ClientEcosystemHubPage() {
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Status fundador</p>
-            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.entry.label}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              O beneficio de quem entrou cedo permanece separado da camada juridica e protegido enquanto a futura camada paga fica preservada para depois.
+              {journey.entry.detail}
             </p>
           </article>
         </div>
@@ -159,7 +159,9 @@ export default async function ClientEcosystemHubPage() {
             trackingPayload={{ surface: "client_ecosystem_hub", target: "benefits" }}
             className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
           >
-            Ver beneficios do founder
+            {journey.entry.stage === "active_founder"
+              ? "Ver beneficios do founder"
+              : journey.entry.ctaLabel}
           </TrackedLink>
           <TrackedLink
             href={journey.links.community}
@@ -200,6 +202,10 @@ export default async function ClientEcosystemHubPage() {
           <p className="text-lg font-semibold text-[#10261d]">{journey.content.title}</p>
           <p className="mt-2">{journey.content.detail}</p>
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+            Progresso real
+          </p>
+          <p className="mt-2 text-base font-semibold text-[#10261d]">{journey.content.completionLabel}</p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
             Primeira unidade
           </p>
           <p className="mt-2 text-base font-semibold text-[#10261d]">{journey.content.unitTitle}</p>
@@ -237,6 +243,21 @@ export default async function ClientEcosystemHubPage() {
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
               A experiencia ja nasce preparada para medir permanencia, valor percebido, desejo e sinais de prontidao para monetizacao futura.
             </p>
+          </article>
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Estado Curatorial Da Sua Entrada">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Origem</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.entry.originLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.entry.eligibilityLabel}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Proximo passo</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.entry.priorityLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.entry.nextStepLabel}</p>
           </article>
         </div>
       </ClientSafeCard>
@@ -283,6 +304,42 @@ export default async function ClientEcosystemHubPage() {
               <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{loop.detail}</p>
             </article>
           ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Retorno E Maturidade Da Jornada">
+        <div className="grid gap-4 md:grid-cols-3">
+          {operations.retentionRoutines.map((routine) => (
+            <article
+              key={routine.label}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {routine.cadence}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{routine.label}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{routine.objective}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Site E Artigos Como Ponte Premium">
+        <div className="grid gap-4 md:grid-cols-2">
+          {operations.channelBridges
+            .filter((channel) => channel.channel === "site" || channel.channel === "articles")
+            .map((channel) => (
+              <article
+                key={channel.channel}
+                className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                  {channel.label}
+                </p>
+                <p className="mt-3 text-lg font-semibold text-[#10261d]">{channel.ctaLabel}</p>
+                <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{channel.curationRule}</p>
+              </article>
+            ))}
         </div>
       </ClientSafeCard>
 

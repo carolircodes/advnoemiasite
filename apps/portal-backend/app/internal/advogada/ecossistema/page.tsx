@@ -56,7 +56,9 @@ export default async function EcosystemPage() {
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
         { label: "Oferta ancora", value: premiumJourney.anchorTitle },
         { label: "Founders ativos", value: String(premiumJourney.activeFoundersCount) },
+        { label: "Engajados", value: String(premiumJourney.engagedFoundersCount) },
         { label: "Convites", value: String(premiumJourney.invitedFoundersCount) },
+        { label: "Aceites", value: String(premiumJourney.acceptedInvitesCount) },
         { label: "Waitlist", value: String(premiumJourney.waitlistCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
@@ -121,6 +123,12 @@ export default async function EcosystemPage() {
             <span className="pill muted">espera elegante</span>
           </div>
           <div className="summary-card">
+            <span>Convites aceitos</span>
+            <strong>{premiumJourney.acceptedInvitesCount}</strong>
+            <p>Entradas que ja sairam do convite e viraram movimento fundador materializado.</p>
+            <span className="pill success">entrada real</span>
+          </div>
+          <div className="summary-card">
             <span>Interesse premium</span>
             <strong>{premiumJourney.premiumInterestCount}</strong>
             <p>Sinais de desejo e atencao em torno da proposta fundadora.</p>
@@ -173,6 +181,30 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.founderEngagementEvents}</strong>
             <p>Interacoes que fortalecem pertencimento, consumo e desejo dentro da comunidade privada.</p>
             <span className="pill success">engajamento</span>
+          </div>
+          <div className="summary-card">
+            <span>Founders engajados</span>
+            <strong>{premiumJourney.engagedFoundersCount}</strong>
+            <p>Perfis com sinais reais de retorno e presenca viva no ciclo atual.</p>
+            <span className="pill success">ritmo</span>
+          </div>
+          <div className="summary-card">
+            <span>Conteudo concluido</span>
+            <strong>{premiumJourney.completedContentCount}</strong>
+            <p>Conclusoes reais da trilha inaugural como prova de valor percebido.</p>
+            <span className="pill success">conclusao</span>
+          </div>
+          <div className="summary-card">
+            <span>Progresso medio</span>
+            <strong>{premiumJourney.averageProgressPercent}%</strong>
+            <p>Leitura agregada de avancos concretos da jornada fundadora.</p>
+            <span className="pill success">progresso</span>
+          </div>
+          <div className="summary-card">
+            <span>Risco de esfriamento</span>
+            <strong>{premiumJourney.coolingRiskCount}</strong>
+            <p>Founders ativos sem sinais equivalentes de retorno no ciclo recente.</p>
+            <span className="pill warning">atencao</span>
           </div>
         </div>
         <p className="empty-state" style={{ marginTop: "20px" }}>
@@ -240,6 +272,46 @@ export default async function EcosystemPage() {
           </ul>
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="Origem Dos Interessados"
+        description="A leitura executiva agora mostra de onde a comunidade esta sendo povoada e quais canais estao realmente alimentando o Circulo com aderencia."
+      >
+        <div className="summary-grid compact">
+          {premiumJourney.sourceSummary.map((source) => (
+            <div key={source.label} className="summary-card">
+              <span>{source.label}</span>
+              <strong>{source.count}</strong>
+              <p>Registros curatoriais, grants, memberships e subscriptions ligados a esta origem.</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Maturidade De Conteudo E Retencao"
+        description="A leitura executiva agora acompanha nao so entrada, mas permanencia, progresso e conclusao."
+      >
+        <div className="summary-grid compact">
+          {operations.retentionRoutines.map((routine) => (
+            <div key={routine.label} className="summary-card">
+              <span>{routine.label}</span>
+              <strong>{routine.cadence}</strong>
+              <p>{routine.objective}</p>
+            </div>
+          ))}
+          <div className="summary-card">
+            <span>Site como motor</span>
+            <strong>{premiumJourney.siteOriginCount}</strong>
+            <p>Registros curatoriais ligados a entradas, desejo ou progresso vindos do site.</p>
+          </div>
+          <div className="summary-card">
+            <span>Artigos como motor</span>
+            <strong>{premiumJourney.articlesOriginCount}</strong>
+            <p>Registros curatoriais e sinais editoriais ligados a artigos e pontes de profundidade.</p>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard
         id="arquitetura-oficial"

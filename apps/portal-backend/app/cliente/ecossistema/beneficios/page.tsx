@@ -70,9 +70,8 @@ export default async function ClientEcosystemBenefitsPage({
               }
             : {
                 tone: "warning",
-                title: "Founder private beta",
-                description:
-                  "Esta area organiza beneficios, acesso e desejo do Circulo Essencial como comunidade fundadora gratuita, sem misturar a experiencia premium com o fluxo juridico principal."
+                title: journey.entry.label,
+                description: journey.entry.detail
               }
       ]}
     >
@@ -149,9 +148,9 @@ export default async function ClientEcosystemBenefitsPage({
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Politica fundadora</p>
-            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.entry.label}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              O founding beta preserva beneficios fundadores, rastreabilidade do entitlement e a historia do grupo inicial sem antecipar cobranca.
+              {journey.entry.nextStepLabel}
             </p>
           </article>
         </div>
@@ -178,6 +177,21 @@ export default async function ClientEcosystemBenefitsPage({
       </ClientSafeCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <ClientSafeCard title="Origem, prioridade e elegibilidade">
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Origem curatorial</p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.entry.originLabel}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.entry.eligibilityLabel}</p>
+            </article>
+            <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Prioridade</p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.entry.priorityLabel}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.entry.detail}</p>
+            </article>
+          </div>
+        </ClientSafeCard>
+
         <ClientSafeCard title="Waitlist Elegante E Prioridade Futura">
           <ul className="space-y-4">
             {operations.waitlistPolicy.prioritySignals.map((signal) => (
@@ -261,6 +275,27 @@ export default async function ClientEcosystemBenefitsPage({
               <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{criterion.reason}</p>
             </article>
           ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Motor Editorial Do Circulo">
+        <div className="grid gap-4 md:grid-cols-2">
+          {operations.channelBridges
+            .filter((channel) => channel.channel === "site" || channel.channel === "articles")
+            .map((channel) => (
+              <article
+                key={channel.channel}
+                className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                  {channel.label}
+                </p>
+                <p className="mt-3 text-lg font-semibold text-[#10261d]">{channel.entryMode}</p>
+                <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+                  {channel.curationRule}. CTA: {channel.ctaLabel}.
+                </p>
+              </article>
+            ))}
         </div>
       </ClientSafeCard>
     </ClientShell>

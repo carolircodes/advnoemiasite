@@ -19,6 +19,7 @@ export const PREMIUM_JOURNEY_ANCHOR = {
 } as const;
 
 type JourneyTone = "success" | "warning" | "muted" | "critical";
+type EntryStage = "active_founder" | "invited" | "waitlist" | "deferred" | "open_interest";
 
 type PremiumSubscriptionSnapshot = {
   hasLiveProvider: boolean;
@@ -72,6 +73,8 @@ export type ClientPremiumJourneySnapshot = {
     unlocked: boolean;
     statusLabel: string;
     detail: string;
+    progressPercent: number;
+    completionLabel: string;
   };
   community: {
     title: string;
@@ -89,6 +92,17 @@ export type ClientPremiumJourneySnapshot = {
     label: string;
     detail: string;
   };
+  entry: {
+    stage: EntryStage;
+    label: string;
+    detail: string;
+    statusLabel: string;
+    originLabel: string;
+    eligibilityLabel: string;
+    nextStepLabel: string;
+    priorityLabel: string;
+    ctaLabel: string;
+  };
 };
 
 export type InternalPremiumJourneySnapshot = {
@@ -98,15 +112,26 @@ export type InternalPremiumJourneySnapshot = {
   invitedFoundersCount: number;
   activeFoundersCount: number;
   waitlistCount: number;
+  acceptedInvitesCount: number;
   premiumInterestCount: number;
   paidInterestCount: number;
   founderEngagementEvents: number;
+  engagedFoundersCount: number;
   activeMemberships: number;
   activeSubscriptions: number;
   activeGrants: number;
   contentUnlocks: number;
+  completedContentCount: number;
+  averageProgressPercent: number;
   onboardingCompletedCount: number;
   retentionSignalCount: number;
+  coolingRiskCount: number;
+  siteOriginCount: number;
+  articlesOriginCount: number;
+  sourceSummary: Array<{
+    label: string;
+    count: number;
+  }>;
   summary: string;
 };
 
@@ -147,6 +172,24 @@ function getBillingLabel(status: string | null | undefined) {
     default:
       return status ? status.replaceAll("_", " ") : "Monetizacao futura preservada";
   }
+}
+
+function readMetadataRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function prettifyOrigin(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "Curadoria interna";
+  }
+
+  return value.replaceAll("_", " ");
+}
+
+function narrativeValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
 }
 
 function buildSubscriptionSnapshot(args: {
@@ -235,7 +278,7 @@ export async function getClientPremiumJourney(
       .limit(10),
     supabase
       .from("ecosystem_access_grants")
-      .select("id,grant_status,access_scope,starts_at,ends_at,metadata")
+      .select("id,grant_status,access_scope,starts_at,ends_at,metadata,access_origin")
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -261,7 +304,7 @@ export async function getClientPremiumJourney(
       .maybeSingle(),
     supabase
       .from("ecosystem_community_memberships")
-      .select("id,status,access_level,last_active_at")
+      .select("id,status,access_level,last_active_at,metadata,entitlement_origin")
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -339,6 +382,84 @@ export async function getClientPremiumJourney(
   const hasJoinedCommunity = membership?.status === "active";
   const founderAccessScope = grant?.access_scope || "waitlist";
   const founderMembershipLevel = membership?.access_level || "waitlist";
+  const grantMetadata = readMetadataRecord(grant?.metadata);
+  const membershipMetadata = readMetadataRecord(membership?.metadata);
+  const subscriptionMetadata = readMetadataRecord(effectiveSubscription?.metadata);
+  const founderStage: EntryStage =
+    hasActiveGrant &&
+    ["founding_beta", "active_founder", "founding_live"].includes(founderAccessScope)
+      ? "active_founder"
+      : membership?.status === "invited"
+        ? "invited"
+        : founderAccessScope === "waitlist"
+          ? "waitlist"
+          : grantMetadata.entry_state === "deferred"
+            ? "deferred"
+            : "open_interest";
+  const founderOrigin =
+    grantMetadata.source_channel ||
+    membershipMetadata.source_channel ||
+    subscriptionMetadata.source_channel ||
+    grant?.access_origin ||
+    membership?.entitlement_origin ||
+    effectiveSubscription?.source_of_activation ||
+    "curadoria_interna";
+  const founderPriority =
+    grantMetadata.priority_tier ||
+    membershipMetadata.priority_tier ||
+    subscriptionMetadata.priority_tier ||
+    (founderStage === "active_founder"
+      ? "prioridade_fundadora"
+      : founderStage === "invited"
+        ? "janela_curada"
+        : founderStage === "waitlist"
+          ? "observacao_privada"
+          : "avaliacao");
+  const founderEligibility = narrativeValue(
+    grantMetadata.eligibility_reason ||
+      membershipMetadata.eligibility_reason ||
+      subscriptionMetadata.eligibility_reason,
+    founderStage === "active_founder"
+      ? "afinidade alta, entrada aprovada e onboarding em andamento"
+      : founderStage === "invited"
+        ? "afinidade confirmada e janela de entrada reservada"
+        : founderStage === "waitlist"
+          ? "desejo validado com entrada ainda em observacao"
+          : "interesse detectado, aguardando aderencia ao lote"
+  );
+  const entryLabelMap: Record<EntryStage, string> = {
+    active_founder: "Founder ativo",
+    invited: "Convite curado aberto",
+    waitlist: "Lista privada em andamento",
+    deferred: "Entrada adiada com elegancia",
+    open_interest: "Observacao inicial"
+  };
+  const entryDetailMap: Record<EntryStage, string> = {
+    active_founder:
+      "Seu acesso ja foi materializado com grant, membership e onboarding premium ligados ao Circulo Essencial.",
+    invited:
+      "Seu convite ja existe dentro do lote atual, com entrada pequena, cuidadosa e sem abertura geral.",
+    waitlist:
+      "Seu interesse ja entrou na observacao privada do Circulo, com prioridade e contexto preservados.",
+    deferred:
+      "Seu interesse foi reconhecido, mas a entrada ficou reservada para um momento de aderencia operacional melhor.",
+    open_interest:
+      "O Circulo continua privado. O portal apresenta o valor da comunidade sem forcar acesso precoce."
+  };
+  const nextStepMap: Record<EntryStage, string> = {
+    active_founder: "Aprofundar onboarding, consumir a trilha inaugural e voltar ao ritual semanal.",
+    invited: "Concluir a entrada fundadora pelo portal e ativar a primeira experiencia comunitaria.",
+    waitlist: "Aguardar avaliacao curatorial e fortalecer sinais reais de afinidade e participacao.",
+    deferred: "Manter o interesse aquecido pelos canais certos ate surgir aderencia para um lote futuro.",
+    open_interest: "Entrar na lista privada com elegancia e deixar o desejo ser lido antes da liberacao."
+  };
+  const ctaMap: Record<EntryStage, string> = {
+    active_founder: "Entrar na experiencia fundadora",
+    invited: "Aceitar convite fundador",
+    waitlist: "Acompanhar lista privada",
+    deferred: "Manter interesse qualificado",
+    open_interest: "Pedir observacao curada"
+  };
 
   const firstModule = track?.ecosystem_content_modules?.[0];
   const firstUnit = firstModule?.ecosystem_content_units?.[0];
@@ -360,23 +481,35 @@ export async function getClientPremiumJourney(
       description:
         catalog?.description ||
         "O Circulo Essencial organiza acesso fundador, conteudo, comunidade e desejo futuro pago em uma experiencia gratuita, privada e altamente curada.",
-      ctaLabel: hasActiveGrant
-        ? "Entrar na experiencia fundadora"
-        : "Entrar na lista privada",
-      statusLabel: hasActiveGrant
-        ? "Founder ativo em acesso gratuito privado"
-        : "Private beta com entrada curada",
+      ctaLabel: ctaMap[founderStage],
+      statusLabel:
+        founderStage === "active_founder"
+          ? "Founder ativo em acesso gratuito privado"
+          : founderStage === "invited"
+            ? "Convite fundador em aberto"
+            : founderStage === "waitlist"
+              ? "Lista privada em observacao"
+              : "Private beta com entrada curada",
       statusTone: getTone(hasActiveGrant, true),
       workspaceLabel: "Hub premium do ecossistema"
     },
     access: {
       hasAccess: hasActiveGrant,
-      statusLabel: grant
-        ? accessGrantStatusLabels[grant.grant_status as keyof typeof accessGrantStatusLabels]
-        : "Sem grant ativo",
+      statusLabel:
+        founderStage === "waitlist"
+          ? "Waitlist privada"
+          : founderStage === "invited"
+            ? "Convite fundador"
+            : grant
+              ? accessGrantStatusLabels[grant.grant_status as keyof typeof accessGrantStatusLabels]
+              : "Sem grant ativo",
       detail: hasActiveGrant
         ? `Seu acesso fundador esta ativo com escopo ${founderAccessScope}, preservando comunidade, conteudo e valor percebido sem ativar cobranca agora.`
-        : "Esta experiencia premium continua protegida por curadoria, waitlist elegante e gating semantico entre founder ativo, convidado e interesse futuro.",
+        : founderStage === "invited"
+          ? "Seu convite ja esta reservado no lote atual. O proximo passo e concluir a entrada com a mesma linguagem premium usada para os founders ja ativos."
+          : founderStage === "waitlist"
+            ? "Seu interesse esta materializado na lista privada com prioridade curatorial, sem prometer entrada imediata nem transformar a experiencia em fila generica."
+            : "Esta experiencia premium continua protegida por curadoria, waitlist elegante e gating semantico entre founder ativo, convidado e interesse futuro.",
       tone: getTone(hasActiveGrant, true)
     },
     plan: {
@@ -411,7 +544,14 @@ export async function getClientPremiumJourney(
         : "Conteudo reservado",
       detail: hasActiveGrant
         ? "A trilha premium agora conversa com a experiencia fundadora gratuita, com continuidade de consumo e percepcao de valor preservadas."
-        : "A trilha existe como ativo fundador reservado, liberado apenas via curadoria para aumentar desejo e coerencia."
+        : "A trilha existe como ativo fundador reservado, liberado apenas via curadoria para aumentar desejo e coerencia.",
+      progressPercent: progress?.progress_percent || 0,
+      completionLabel:
+        progress?.status === "completed"
+          ? "Jornada inaugural concluida"
+          : progress?.status === "in_progress"
+            ? `Progresso atual: ${progress?.progress_percent || 0}%`
+            : "Primeiro passo aguardando inicio"
     },
     community: {
       title: community?.title || "Circulo Reservado",
@@ -435,6 +575,17 @@ export async function getClientPremiumJourney(
     beta: {
       label: hasActiveGrant ? "Founder privado ativo" : "Entrada em curadoria",
       detail: subscription.detail
+    },
+    entry: {
+      stage: founderStage,
+      label: entryLabelMap[founderStage],
+      detail: entryDetailMap[founderStage],
+      statusLabel: founderStage.replaceAll("_", " "),
+      originLabel: prettifyOrigin(founderOrigin),
+      eligibilityLabel: founderEligibility,
+      nextStepLabel: nextStepMap[founderStage],
+      priorityLabel: prettifyOrigin(founderPriority),
+      ctaLabel: ctaMap[founderStage]
     }
   };
 }
@@ -457,22 +608,22 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       .maybeSingle(),
     supabase
       .from("ecosystem_access_grants")
-      .select("id,grant_status,access_scope")
+      .select("id,grant_status,access_scope,metadata,access_origin")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("ecosystem_community_memberships")
-      .select("id,status,access_level")
+      .select("id,status,access_level,metadata,entitlement_origin")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("ecosystem_subscriptions")
-      .select("id,status,source_of_activation,payment_provider,billing_status")
+      .select("id,status,source_of_activation,payment_provider,billing_status,metadata")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("ecosystem_content_progress")
-      .select("id,status")
+      .select("id,status,progress_percent")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
@@ -481,6 +632,7 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       .eq("event_group", "ecosystem")
       .in("event_key", [
         "member_invited",
+        "member_joined",
         "onboarding_completed",
         "retention_signal",
         "premium_interest_signal",
@@ -515,6 +667,13 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
   ).length;
   const waitlistCount = grants.filter((item) => item.access_scope === "waitlist").length;
   const activeGrants = grants.filter((item) => item.grant_status === "active").length;
+  const completedContentCount = progressItems.filter((item) => item.status === "completed").length;
+  const totalProgressPercent = progressItems.reduce(
+    (sum, item) => sum + (typeof item.progress_percent === "number" ? item.progress_percent : 0),
+    0
+  );
+  const averageProgressPercent =
+    progressItems.length > 0 ? Math.round(totalProgressPercent / progressItems.length) : 0;
   const onboardingCompletedCount = telemetryEvents.filter(
     (item) => item.event_key === "onboarding_completed"
   ).length;
@@ -530,6 +689,46 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
   const founderEngagementEvents = telemetryEvents.filter(
     (item) => item.event_key === "founder_engagement_score"
   ).length;
+  const engagedFoundersCount = Math.min(
+    activeFoundersCount,
+    telemetryEvents.filter(
+      (item) =>
+        item.event_key === "founder_engagement_score" || item.event_key === "member_active"
+    ).length
+  );
+  const acceptedInvitesCount = telemetryEvents.filter(
+    (item) => item.event_key === "member_joined"
+  ).length;
+  const coolingRiskCount = Math.max(activeFoundersCount - engagedFoundersCount, 0);
+  const sourceCounts = new Map<string, number>();
+  const incrementSource = (value: unknown) => {
+    if (typeof value !== "string" || !value.trim()) {
+      return;
+    }
+
+    sourceCounts.set(value, (sourceCounts.get(value) || 0) + 1);
+  };
+
+  for (const grant of grants) {
+    const metadata = readMetadataRecord(grant.metadata);
+    incrementSource(metadata.source_channel || grant.access_origin);
+  }
+
+  for (const membership of memberships) {
+    const metadata = readMetadataRecord(membership.metadata);
+    incrementSource(metadata.source_channel || membership.entitlement_origin);
+  }
+
+  for (const subscription of subscriptions) {
+    const metadata = readMetadataRecord(subscription.metadata);
+    incrementSource(metadata.source_channel || subscription.source_of_activation);
+  }
+
+  const siteOriginCount =
+    (sourceCounts.get("site_curated_entry") || 0) + (sourceCounts.get("site_editorial_bridge") || 0);
+  const articlesOriginCount =
+    (sourceCounts.get("articles_private_interest") || 0) +
+    (sourceCounts.get("articles_editorial_bridge") || 0);
 
   return {
     anchorTitle: catalogResult.data?.title || "Circulo Essencial",
@@ -543,16 +742,30 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
     invitedFoundersCount,
     activeFoundersCount,
     waitlistCount,
+    acceptedInvitesCount,
     premiumInterestCount,
     paidInterestCount,
     founderEngagementEvents,
+    engagedFoundersCount,
     activeMemberships: memberships.filter((item) => item.status === "active").length,
     activeSubscriptions: subscriptions.filter((item) => item.status === "active").length,
     activeGrants,
     contentUnlocks: progressItems.length,
+    completedContentCount,
+    averageProgressPercent,
     onboardingCompletedCount,
     retentionSignalCount,
+    coolingRiskCount,
+    siteOriginCount,
+    articlesOriginCount,
+    sourceSummary: Array.from(sourceCounts.entries())
+      .map(([label, count]) => ({
+        label: prettifyOrigin(label),
+        count
+      }))
+      .sort((left, right) => right.count - left.count)
+      .slice(0, 5),
     summary:
-      "O Circulo Essencial agora enxerga founder ativo, convites, onboarding, valor consumido, retencao, desejo e prontidao futura para monetizacao como uma unica jornada executiva."
+      "O Circulo Essencial agora enxerga founder ativo, convites, waitlist real, onboarding, valor consumido, retencao, desejo e prontidao futura para monetizacao como uma unica jornada executiva."
   };
 }

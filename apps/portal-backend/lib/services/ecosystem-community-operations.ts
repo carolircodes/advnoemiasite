@@ -1,6 +1,11 @@
 import "server-only";
 
-export type FounderState = "invited" | "active_founder" | "waitlist" | "deferred";
+export type FounderState =
+  | "invited"
+  | "active_founder"
+  | "waitlist"
+  | "deferred"
+  | "rejected_when_needed";
 
 export type CommunityChannelBridge = {
   channel: "instagram" | "site" | "whatsapp" | "telegram" | "portal" | "articles";
@@ -21,6 +26,20 @@ export type CommunityValueLoop = {
   loop: string;
   title: string;
   cadence: string;
+  detail: string;
+  telemetryFocus: string;
+};
+
+export type RetentionRoutine = {
+  label: string;
+  cadence: string;
+  objective: string;
+  telemetryFocus: string;
+};
+
+export type ContentCheckpoint = {
+  label: string;
+  milestone: string;
   detail: string;
   telemetryFocus: string;
 };
@@ -52,6 +71,8 @@ export type CommunityOperationsBlueprint = {
   };
   onboarding: CommunityOnboardingStep[];
   valueLoops: CommunityValueLoop[];
+  retentionRoutines: RetentionRoutine[];
+  contentCheckpoints: ContentCheckpoint[];
   channelBridges: CommunityChannelBridge[];
   monetizationCriteria: MonetizationCriterion[];
 };
@@ -59,12 +80,12 @@ export type CommunityOperationsBlueprint = {
 export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint {
   return {
     positioning: {
-      currentMode: "free_private_founding",
+      currentMode: "free_private_founding_maturity",
       freeNow: [
         "comunidade privada do Circulo Essencial",
         "trilha inaugural com acesso fundador",
-        "rituais iniciais de pertencimento",
-        "portal premium com progressao e curadoria"
+        "rituais semanais de pertencimento",
+        "portal premium com progresso, retorno e curadoria"
       ],
       reservedNow: [
         "camada paga de assinatura",
@@ -73,19 +94,26 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         "segunda oferta monetizada"
       ],
       eleganceRule:
-        "Comunicar convite, pertencimento e valor percebido crescente sem urgencia barata nem linguagem de empurrao.",
+        "Comunicar retorno, pertencimento e valor percebido crescente sem urgencia barata nem linguagem de empurrao.",
       paidLayerPreservation:
-        "A recorrencia permanece pronta, mas dormente, para ser ativada apenas quando o desejo, a atividade e a retencao sustentarem uma cobranca elegante."
+        "A recorrencia permanece pronta, mas dormente, para ser ativada apenas quando desejo, atividade, conclusao e retencao sustentarem uma cobranca elegante."
     },
     entryPolicy: {
-      lotSize: 5,
-      maxConcurrentInvites: 3,
-      founderStates: ["invited", "active_founder", "waitlist", "deferred"],
+      lotSize: 3,
+      maxConcurrentInvites: 2,
+      founderStates: [
+        "invited",
+        "active_founder",
+        "waitlist",
+        "deferred",
+        "rejected_when_needed"
+      ],
       approvalLogic: [
         "priorizar pessoas com afinidade real com a proposta do Circulo",
         "preferir entrada por convite ou origem qualificada",
         "manter lotes pequenos para onboarding cuidadoso",
-        "usar waitlist para desejo alto sem abrir a porta cedo demais"
+        "usar waitlist para desejo alto sem abrir a porta cedo demais",
+        "usar deferred ou rejected_when_needed quando o interesse existir, mas a aderencia ao momento fundador ainda nao justificar entrada"
       ]
     },
     waitlistPolicy: {
@@ -96,15 +124,15 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         "founder_engagement_score"
       ],
       experienceRule:
-        "A waitlist deve soar como reserva nobre e observacao cuidadosa, nunca como fila genérica ou tática de escassez barata.",
+        "A waitlist deve soar como reserva nobre e observacao cuidadosa, nunca como fila generica ou tatica de escassez barata.",
       upgradeRule:
-        "Mover para convite apenas quando houver afinidade, capacidade operacional e sinal claro de desejo/participacao."
+        "Mover para convite apenas quando houver afinidade, capacidade operacional e sinal claro de desejo, progresso e participacao."
     },
     onboarding: [
       {
         step: "01",
         title: "Convite curado",
-        detail: "A entrada acontece por selecao, com framing de founder e explicacao clara do porquê da reserva."
+        detail: "A entrada acontece por selecao, com framing de founder e explicacao clara do porque da reserva."
       },
       {
         step: "02",
@@ -134,15 +162,55 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         loop: "conteudo_ancora",
         title: "Conteudo ancora fundador",
         cadence: "1 novo desbloqueio curado",
-        detail: "Material que reforca sofisticação, utilidade e a sensação de que vale a pena permanecer.",
+        detail: "Material que reforca sofisticacao, utilidade e a sensacao de que vale a pena permanecer.",
         telemetryFocus: "content_started"
       },
       {
         loop: "pertencimento",
         title: "Sinal de pertencimento",
-        cadence: "contínuo",
-        detail: "Micro-rituais que lembram a pessoa de que ela está em um circulo pequeno, vivo e valioso.",
+        cadence: "continuo",
+        detail: "Micro-rituais lembram a pessoa de que ela esta em um circulo pequeno, vivo e valioso.",
         telemetryFocus: "founder_engagement_score"
+      }
+    ],
+    retentionRoutines: [
+      {
+        label: "Pulso fundador semanal",
+        cadence: "toda semana",
+        objective: "gerar retorno previsivel com member_active e retention_signal",
+        telemetryFocus: "retention_signal"
+      },
+      {
+        label: "Microcheck de pertencimento",
+        cadence: "2 toques por ciclo",
+        objective: "lembrar a founder de voltar sem transformar a comunidade em canal ruidoso",
+        telemetryFocus: "founder_engagement_score"
+      },
+      {
+        label: "Revisao de esfriamento",
+        cadence: "revisao executiva",
+        objective: "identificar risco de esfriamento e reacender a jornada com contexto",
+        telemetryFocus: "member_active"
+      }
+    ],
+    contentCheckpoints: [
+      {
+        label: "Inicio da trilha",
+        milestone: "content_started",
+        detail: "a founder entra na trilha e percebe direcao clara desde o primeiro passo",
+        telemetryFocus: "content_started"
+      },
+      {
+        label: "Avanco guiado",
+        milestone: "checkpoint_intermediario",
+        detail: "microcopy e pertencimento empurram o consumo para alem da abertura inicial",
+        telemetryFocus: "founder_engagement_score"
+      },
+      {
+        label: "Conclusao inaugural",
+        milestone: "content_completed",
+        detail: "a primeira conclusao vira prova de valor, nao so liberacao de conteudo",
+        telemetryFocus: "content_completed"
       }
     ],
     channelBridges: [
@@ -157,10 +225,10 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
       {
         channel: "site",
         label: "Site",
-        entryMode: "pagina institucional e pontos de CTA seletivos",
-        ctaLabel: "Solicitar observacao na lista privada",
-        curationRule: "apresentar o Circulo como extensao premium do ecossistema, nao como grupo aberto",
-        telemetryEvent: "waitlist_interest"
+        entryMode: "pagina institucional, CTA discreto e ponte de valor",
+        ctaLabel: "Entrar em observacao curada",
+        curationRule: "apresentar o Circulo como extensao premium do ecossistema e motor de valor, nao como grupo aberto",
+        telemetryEvent: "premium_interest_signal"
       },
       {
         channel: "whatsapp",
@@ -181,49 +249,49 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
       {
         channel: "portal",
         label: "Portal",
-        entryMode: "hub premium e beneficios",
+        entryMode: "hub premium, beneficios e progresso",
         ctaLabel: "Fortalecer pertencimento",
-        curationRule: "tratar o founder atual como referencia de experiencia e termometro de maturidade",
+        curationRule: "tratar o founder atual como referencia de experiencia, retorno e termometro de maturidade",
         telemetryEvent: "founder_engagement_score"
       },
       {
         channel: "articles",
         label: "Conteudos e artigos",
-        entryMode: "pontes editoriais",
-        ctaLabel: "Ler e pedir observacao curada",
-        curationRule: "capturar desejo a partir de profundidade e afinidade, nao de isca genérica",
+        entryMode: "pontes editoriais e leitura aprofundada",
+        ctaLabel: "Ler, aprofundar e pedir observacao curada",
+        curationRule: "capturar desejo a partir de profundidade, progresso e afinidade, nao de isca generica",
         telemetryEvent: "paid_interest_signal"
       }
     ],
     monetizationCriteria: [
       {
         label: "Founders ativos",
-        threshold: ">= 12 founders ativos",
+        threshold: ">= 12 founders ativos e >= 8 engajados semanalmente",
         reason: "A cobranca futura precisa nascer com massa minima de pertencimento real."
       },
       {
         label: "Atividade semanal",
-        threshold: ">= 70% com sinal semanal de member_active ou founder_engagement_score",
+        threshold: ">= 75% com sinal semanal de member_active ou founder_engagement_score",
         reason: "Sem pulso vivo, a monetizacao vira pressa em vez de evolucao natural."
       },
       {
         label: "Consumo de conteudo",
-        threshold: ">= 60% iniciando conteudo e >= 35% concluindo a trilha inaugural",
+        threshold: ">= 70% iniciando conteudo e >= 50% concluindo a trilha inaugural",
         reason: "Valor percebido precisa estar comprovado no uso, nao so na narrativa."
       },
       {
         label: "Retencao inicial",
-        threshold: ">= 75% mantendo sinais de retorno apos 30 dias",
+        threshold: ">= 80% mantendo sinais de retorno apos 30 dias",
         reason: "Retencao valida que a comunidade sustenta continuidade antes de cobrar."
       },
       {
         label: "Waitlist qualificada",
-        threshold: ">= 25 pessoas com sinais reais de desejo",
+        threshold: ">= 20 pessoas com sinais reais de desejo e origem rastreavel",
         reason: "A espera precisa indicar demanda madura, nao curiosidade vazia."
       },
       {
         label: "Paid interest",
-        threshold: ">= 8 sinais explicitos de interesse futuro pago",
+        threshold: ">= 10 sinais explicitos de interesse futuro pago e >= 4 vindos de site/artigos",
         reason: "A transicao para pago deve responder a desejo declarado, nao a ansiedade de monetizar."
       }
     ]
