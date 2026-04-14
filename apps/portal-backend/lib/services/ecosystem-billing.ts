@@ -74,6 +74,7 @@ type SyncResult = {
 
 const BILLING_PROVIDER = "mercado_pago_preapproval";
 const PLAN_REASON = "Circulo Essencial | assinatura premium do ecossistema";
+const ACTIVATION_PHASE = "12.4";
 
 function createMercadoPagoClient() {
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
@@ -328,7 +329,7 @@ export async function ensureCirculoEssencialBillingPlan(): Promise<BillingPlanBo
 
   const nextMetadata = {
     ...(plan.billing_metadata || {}),
-    phase: "12.3",
+    phase: ACTIVATION_PHASE,
     provider_plan_ready: true,
     anchor_subscription_plan: true,
     init_point: providerInitPoint
@@ -344,7 +345,7 @@ export async function ensureCirculoEssencialBillingPlan(): Promise<BillingPlanBo
       billing_metadata: nextMetadata,
       metadata: {
         ...asJson(plan.billing_metadata),
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         billing_mode: "operational_live"
       }
     })
@@ -408,9 +409,10 @@ export async function startCirculoEssencialSubscriptionCheckout(
     amount: toMoney(plan.price_amount),
     currencyCode: plan.currency_code,
     payload: {
-      phase: "12.3",
+      phase: ACTIVATION_PHASE,
       init_point: checkoutUrl,
-      founding_transition: Boolean(foundingBeta)
+      founding_transition: Boolean(foundingBeta),
+      operation_mode: "controlled_founding_live"
     }
   });
 
@@ -419,10 +421,11 @@ export async function startCirculoEssencialSubscriptionCheckout(
     eventKey: "subscription_interest",
     pagePath: "/cliente/ecossistema/beneficios",
     payload: {
-      phase: "12.3",
+      phase: ACTIVATION_PHASE,
       journey: "circulo_essencial",
       founding_transition: Boolean(foundingBeta),
-      provider: BILLING_PROVIDER
+      provider: BILLING_PROVIDER,
+      operation_mode: "controlled_founding_live"
     }
   });
 
@@ -486,7 +489,7 @@ export async function syncSubscriptionEntitlementsById(
             : null,
         metadata: {
           ...asJson(grantData.metadata),
-          phase: "12.3",
+          phase: ACTIVATION_PHASE,
           entitlement_source: source,
           billing_status: subscription.billing_status,
           live_subscription_id: subscription.id
@@ -510,7 +513,7 @@ export async function syncSubscriptionEntitlementsById(
       access_origin: "subscription_lifecycle",
       last_synced_at: safeNow(),
       metadata: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         entitlement_source: source,
         billing_status: subscription.billing_status,
         live_subscription_id: subscription.id
@@ -529,7 +532,7 @@ export async function syncSubscriptionEntitlementsById(
         left_at: entitlement.membershipStatus === "left" ? safeNow() : null,
         metadata: {
           ...asJson(membershipData.metadata),
-          phase: "12.3",
+          phase: ACTIVATION_PHASE,
           entitlement_source: source,
           live_subscription_id: subscription.id
         }
@@ -545,7 +548,7 @@ export async function syncSubscriptionEntitlementsById(
       joined_at: entitlement.membershipStatus === "active" ? safeNow() : null,
       entitlement_origin: "subscription_lifecycle",
       metadata: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         entitlement_source: source,
         live_subscription_id: subscription.id
       }
@@ -563,10 +566,26 @@ export async function syncSubscriptionEntitlementsById(
           : "access_revoked",
       pagePath: "/cliente/ecossistema",
       payload: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         journey: "circulo_essencial",
         subscription_id: subscription.id,
-        next_grant_status: entitlement.accessGrantStatus
+        next_grant_status: entitlement.accessGrantStatus,
+        access_scope: accessScope
+      }
+    });
+  }
+
+  if (entitlement.accessGrantStatus === "active") {
+    await insertRecurringTelemetry({
+      profileId: subscription.profile_id,
+      eventKey: accessScope === "founding_live" ? "founding_live_activated" : "access_granted",
+      pagePath: "/cliente/ecossistema",
+      payload: {
+        phase: ACTIVATION_PHASE,
+        journey: "circulo_essencial",
+        subscription_id: subscription.id,
+        access_scope: accessScope,
+        source
       }
     });
   }
@@ -577,9 +596,24 @@ export async function syncSubscriptionEntitlementsById(
       eventKey: membershipData?.status ? "member_retained" : "member_joined",
       pagePath: "/cliente/ecossistema/comunidade",
       payload: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         journey: "circulo_essencial",
         subscription_id: subscription.id
+      }
+    });
+  }
+
+  if (entitlement.membershipStatus === "active") {
+    await insertRecurringTelemetry({
+      profileId: subscription.profile_id,
+      eventKey: "community_access_granted",
+      pagePath: "/cliente/ecossistema/comunidade",
+      payload: {
+        phase: ACTIVATION_PHASE,
+        journey: "circulo_essencial",
+        subscription_id: subscription.id,
+        access_level: membershipLevel,
+        source
       }
     });
   }
@@ -590,9 +624,33 @@ export async function syncSubscriptionEntitlementsById(
       eventKey: "content_continuity_signal",
       pagePath: "/cliente/ecossistema/conteudo",
       payload: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         journey: "circulo_essencial",
         subscription_id: subscription.id
+      }
+    });
+
+    await insertRecurringTelemetry({
+      profileId: subscription.profile_id,
+      eventKey: "onboarding_completed",
+      pagePath: "/cliente/ecossistema",
+      payload: {
+        phase: ACTIVATION_PHASE,
+        journey: "circulo_essencial",
+        subscription_id: subscription.id,
+        operation_mode: "controlled_founding_live"
+      }
+    });
+
+    await insertRecurringTelemetry({
+      profileId: subscription.profile_id,
+      eventKey: "retention_signal",
+      pagePath: "/cliente/ecossistema",
+      payload: {
+        phase: ACTIVATION_PHASE,
+        journey: "circulo_essencial",
+        subscription_id: subscription.id,
+        retention_stage: "initial_founder_window"
       }
     });
   }
@@ -685,12 +743,12 @@ export async function syncSubscriptionFromPreapprovalId(
         next_billing_at: providerSubscription.next_payment_date || null,
         last_billing_event_at: safeNow(),
         billing_metadata: {
-          phase: "12.3",
+          phase: ACTIVATION_PHASE,
           provider_status: providerSubscription.status || mapped.billingStatus,
           payer_email: providerSubscription.payer_email || null
         },
         metadata: {
-          phase: "12.3",
+          phase: ACTIVATION_PHASE,
           founding_transition: Boolean(foundingBeta?.id),
           founding_benefits_preserved: Boolean(foundingBeta?.id)
         }
@@ -734,14 +792,14 @@ export async function syncSubscriptionFromPreapprovalId(
       last_billing_event_at: safeNow(),
       billing_metadata: {
         ...asJson(current.billing_metadata),
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         provider_status: providerSubscription.status || mapped.billingStatus,
         provider_next_payment_date: providerSubscription.next_payment_date || null,
         source
       },
       metadata: {
         ...asJson(current.metadata),
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         live_provider_connected: true
       }
     })
@@ -774,18 +832,32 @@ export async function syncSubscriptionFromPreapprovalId(
     providerReference,
     externalReference,
     payload: {
-      phase: "12.3",
+      phase: ACTIVATION_PHASE,
       source,
       next_payment_date: providerSubscription.next_payment_date || null
     }
   });
+
+  if (mapped.billingStatus === "authorized") {
+    await insertRecurringTelemetry({
+      profileId: current.profile_id,
+      eventKey: "subscription_authorized",
+      pagePath: "/cliente/ecossistema/beneficios",
+      payload: {
+        phase: ACTIVATION_PHASE,
+        journey: "circulo_essencial",
+        subscription_id: current.id,
+        provider_status: providerSubscription.status || mapped.billingStatus
+      }
+    });
+  }
 
   await insertRecurringTelemetry({
     profileId: current.profile_id,
     eventKey,
     pagePath: "/cliente/ecossistema/beneficios",
     payload: {
-      phase: "12.3",
+      phase: ACTIVATION_PHASE,
       journey: "circulo_essencial",
       subscription_id: current.id,
       provider_status: providerSubscription.status || mapped.billingStatus
@@ -798,7 +870,7 @@ export async function syncSubscriptionFromPreapprovalId(
       eventKey: "recurring_revenue_signal",
       pagePath: "/internal/advogada/ecossistema",
       payload: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         journey: "circulo_essencial",
         subscription_id: current.id,
         provider: BILLING_PROVIDER
@@ -812,7 +884,7 @@ export async function syncSubscriptionFromPreapprovalId(
       eventKey: "churn_risk",
       pagePath: "/internal/advogada/ecossistema",
       payload: {
-        phase: "12.3",
+        phase: ACTIVATION_PHASE,
         journey: "circulo_essencial",
         subscription_id: current.id,
         risk: "past_due"

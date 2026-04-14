@@ -53,7 +53,8 @@ export default async function EcosystemPage() {
       highlights={[
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
         { label: "Oferta ancora", value: premiumJourney.anchorTitle },
-        { label: "Beta ativo", value: String(premiumJourney.betaAudienceCount) },
+        { label: "Founding beta", value: String(premiumJourney.betaAudienceCount) },
+        { label: "Founding live", value: String(premiumJourney.foundingLiveCount) },
         { label: "Live", value: String(premiumJourney.liveSubscribersCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
@@ -90,7 +91,7 @@ export default async function EcosystemPage() {
 
       <SectionCard
         title="Primeira jornada premium ativa"
-        description="A ancora inicial do ecossistema saiu da fundacao e agora opera como beta privado controlado, com grant, plano, trilha e comunidade conectados."
+        description="A ancora inicial do ecossistema agora opera como ativacao fundadora controlada, com grant, autorizacao recorrente, trilha e comunidade conectados."
       >
         <div className="summary-grid compact">
           <div className="summary-card">
@@ -100,10 +101,16 @@ export default async function EcosystemPage() {
             <span className="pill warning">{premiumJourney.statusLabel}</span>
           </div>
           <div className="summary-card">
-            <span>Beta controlado</span>
+            <span>Founding beta</span>
             <strong>{premiumJourney.betaAudienceCount}</strong>
-            <p>Perfis com grant ativo na primeira jornada premium.</p>
+            <p>Perfis curatoriais preservados enquanto a ativacao live acontece sem pressa e sem ruido.</p>
             <span className="pill success">grant ativo</span>
+          </div>
+          <div className="summary-card">
+            <span>Founding live</span>
+            <strong>{premiumJourney.foundingLiveCount}</strong>
+            <p>Fundadores que ja carregam entitlement live real dentro da jornada ancora.</p>
+            <span className="pill success">fundador live</span>
           </div>
           <div className="summary-card">
             <span>Assinantes live</span>
@@ -112,10 +119,18 @@ export default async function EcosystemPage() {
             <span className="pill success">billing live</span>
           </div>
           <div className="summary-card">
-            <span>Assinaturas beta</span>
+            <span>Autorizacoes pendentes</span>
+            <strong>{premiumJourney.pendingAuthorizationsCount}</strong>
+            <p>Assinaturas iniciadas que ainda aguardam a autorizacao final da pagadora.</p>
+            <span className={premiumJourney.pendingAuthorizationsCount > 0 ? "pill warning" : "pill muted"}>
+              fila controlada
+            </span>
+          </div>
+          <div className="summary-card">
+            <span>Assinaturas ativas</span>
             <strong>{premiumJourney.activeSubscriptions}</strong>
-            <p>Assinaturas em modo manual_beta, sem cobranca recorrente operacional.</p>
-            <span className="pill success">billing offline</span>
+            <p>Assinaturas efetivamente ativas no lifecycle premium, ja separadas do core juridico.</p>
+            <span className="pill success">lifecycle ativo</span>
           </div>
           <div className="summary-card">
             <span>Conteudo desbloqueado</span>
@@ -128,6 +143,24 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.activeMemberships}</strong>
             <p>Membros ativos na extensao comunitaria da jornada ancora.</p>
             <span className="pill success">membership ativo</span>
+          </div>
+          <div className="summary-card">
+            <span>Grants ativos</span>
+            <strong>{premiumJourney.activeGrants}</strong>
+            <p>Acessos premium ativos refletidos de forma rastreavel no portal e no billing.</p>
+            <span className="pill success">grant sincronizado</span>
+          </div>
+          <div className="summary-card">
+            <span>Onboarding concluido</span>
+            <strong>{premiumJourney.onboardingCompletedCount}</strong>
+            <p>Entradas fundadoras que ja viraram experiencia recebida, nao apenas cobranca aprovada.</p>
+            <span className="pill success">entrada nobre</span>
+          </div>
+          <div className="summary-card">
+            <span>Sinais iniciais de retencao</span>
+            <strong>{premiumJourney.retentionSignalCount}</strong>
+            <p>Leituras precoces de continuidade para a operacao fundadora crescer com disciplina.</p>
+            <span className="pill success">retencao</span>
           </div>
           <div className="summary-card">
             <span>Risco de churn</span>

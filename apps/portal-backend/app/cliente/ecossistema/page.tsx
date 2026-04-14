@@ -38,10 +38,10 @@ export default async function ClientEcosystemHubPage() {
       notices={[
         {
           tone: journey.access.hasAccess ? "success" : "warning",
-          title: journey.access.hasAccess ? "Jornada premium ativa" : "Beta privado controlado",
+          title: journey.access.hasAccess ? "Jornada fundadora ativa" : "Operacao fundadora controlada",
           description: journey.access.hasAccess
-            ? "Seu portal agora reconhece uma jornada premium viva, com acesso, conteudo e comunidade conectados sem tocar no core juridico."
-            : "A jornada premium inaugural ja existe com framing, workspace e semantica de acesso. A liberacao continua curada e controlada."
+            ? "Seu portal agora reconhece uma jornada premium viva, com assinatura, acesso, conteudo e comunidade conectados sem tocar no core juridico."
+            : "A jornada premium inaugural ja existe com framing, workspace e semantica de acesso. A liberacao continua curada, pequena e sofisticada."
         }
       ]}
     >
@@ -59,7 +59,17 @@ export default async function ClientEcosystemHubPage() {
       />
       {journey.access.hasAccess ? (
         <EcosystemTelemetryBeacon
-          eventKey="access_granted"
+          eventKey="founding_live_activated"
+          payload={{
+            surface: "client_ecosystem_hub",
+            page: "/cliente/ecossistema",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
+      {journey.access.hasAccess ? (
+        <EcosystemTelemetryBeacon
+          eventKey="onboarding_completed"
           payload={{
             surface: "client_ecosystem_hub",
             page: "/cliente/ecossistema",
@@ -91,6 +101,9 @@ export default async function ClientEcosystemHubPage() {
             <span className="inline-flex rounded-full bg-[#f3ede2] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#7b5c31]">
               {journey.beta.label}
             </span>
+            <span className="inline-flex rounded-full bg-[#eef4ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#456055]">
+              Operacao fundadora controlada
+            </span>
           </div>
         </div>
       </ClientSafeCard>
@@ -119,7 +132,7 @@ export default async function ClientEcosystemHubPage() {
             </p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              O beneficio de quem entrou cedo permanece separado da camada juridica e protegido na transicao para live.
+              O beneficio de quem entrou cedo permanece separado da camada juridica e protegido na transicao elegante de founding beta para founding live.
             </p>
           </article>
         </div>
@@ -212,6 +225,32 @@ export default async function ClientEcosystemHubPage() {
         </ClientSafeCard>
       </div>
 
+      <ClientSafeCard title="Experiencia fundadora">
+        <div className="grid gap-4 md:grid-cols-3">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Entrada</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">Curadoria antes de escala</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              Os primeiros membros entram como selecao cuidadosa, nao como abertura massiva.
+            </p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Onboarding</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">Acesso com contexto</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              Billing, trilha e comunidade aparecem como uma unica recepcao premium e legivel.
+            </p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Continuidade</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">Retencao desde o primeiro ciclo</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              A experiencia ja nasce preparada para medir permanencia, valor percebido e sinais iniciais de risco.
+            </p>
+          </article>
+        </div>
+      </ClientSafeCard>
+
       <ClientSafeCard title="Navegacao da jornada">
         <div className="grid gap-4 md:grid-cols-3">
           <TrackedLink
@@ -226,7 +265,7 @@ export default async function ClientEcosystemHubPage() {
             </span>
             <strong className="mt-3 block text-base">Ler framing, beneficios e politica de acesso</strong>
             <span className="mt-2 block text-sm leading-6 text-[#5f6f68]">
-              A camada de plano organiza a experiencia premium sem acionar cobranca recorrente real.
+              A camada de plano organiza a experiencia premium e a ativacao fundadora sem poluir o portal com urgencia barata.
             </span>
           </TrackedLink>
 

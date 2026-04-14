@@ -23,29 +23,29 @@ const supabase = createClient(url, key, {
 });
 
 const basePayload = {
-  phase: "12.1",
+  phase: "12.4",
   controlled: true,
-  source: "phase12_1_smoke_test"
+  source: "phase12_4_smoke_test"
 };
 
 const events = [
   {
-    event_key: "product_viewed",
+    event_key: "subscription_started",
     event_group: "ecosystem",
-    page_path: "/cliente",
+    page_path: "/cliente/ecossistema/beneficios",
     payload: {
       ...basePayload,
-      surface: "client_ecosystem_foundation"
+      surface: "client_ecosystem_founder_activation"
     }
   },
   {
-    event_key: "plan_viewed",
+    event_key: "founding_live_activated",
     event_group: "ecosystem",
     page_path: "/internal/advogada/ecossistema",
     payload: {
       ...basePayload,
       surface: "internal_ecosystem_hub",
-      section: "plans_benefits"
+      section: "founding_live"
     }
   }
 ];

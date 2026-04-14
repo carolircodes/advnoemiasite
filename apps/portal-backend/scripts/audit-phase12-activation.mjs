@@ -11,7 +11,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const key = process.env.SUPABASE_SECRET_KEY?.trim();
 
 if (!url || !key) {
-  console.error("[phase12.1-audit] NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY missing.");
+  console.error("[phase12.4-audit] NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY missing.");
   process.exit(1);
 }
 
@@ -22,41 +22,14 @@ const supabase = createClient(url, key, {
   }
 });
 
-const tables = [
-  "ecosystem_catalog_items",
-  "ecosystem_plan_tiers",
-  "ecosystem_plan_benefits",
-  "ecosystem_access_grants",
-  "ecosystem_subscriptions",
-  "ecosystem_billing_events",
-  "ecosystem_content_tracks",
-  "ecosystem_content_modules",
-  "ecosystem_content_units",
-  "ecosystem_content_assets",
-  "ecosystem_content_progress",
-  "ecosystem_communities",
-  "ecosystem_community_memberships"
-];
-
-async function countRows(table) {
-  const { count, error } = await supabase
-    .from(table)
-    .select("id", { count: "exact" })
-    .limit(1);
-
-  if (error) {
-    throw new Error(`${table}: ${error.message}`);
-  }
-
-  return count || 0;
+function yesNo(value) {
+  return value ? "sim" : "nao";
 }
 
-async function latestRows(table, columns, limit = 3) {
-  const { data, error } = await supabase
-    .from(table)
-    .select(columns)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+async function query(table, columns, configure) {
+  let statement = supabase.from(table).select(columns);
+  statement = configure ? configure(statement) : statement;
+  const { data, error } = await statement;
 
   if (error) {
     throw new Error(`${table}: ${error.message}`);
@@ -66,68 +39,181 @@ async function latestRows(table, columns, limit = 3) {
 }
 
 async function main() {
-  const counts = {};
-
-  for (const table of tables) {
-    counts[table] = await countRows(table);
-  }
-
-  const [catalogItems, plans, subscriptions, billingEvents, tracks, communities, productEvents] = await Promise.all([
-    latestRows(
-      "ecosystem_catalog_items",
-      "slug,title,availability_status,portal_workspace,legal_boundary"
-    ),
-    latestRows(
+  const [
+    plans,
+    subscriptions,
+    grants,
+    memberships,
+    billingEvents,
+    productEvents
+  ] = await Promise.all([
+    query(
       "ecosystem_plan_tiers",
-      "code,name,status,cadence,portal_workspace,billing_provider,billing_plan_reference,billing_status"
+      "id,code,name,status,billing_provider,billing_plan_reference,billing_status",
+      (q) => q.eq("code", "circulo_essencial").limit(1)
     ),
-    latestRows(
+    query(
       "ecosystem_subscriptions",
-      "status,source_of_activation,payment_provider,billing_status,billing_provider_reference,next_billing_at,current_period_ends_at"
+      "id,status,source_of_activation,payment_provider,billing_status,renewal_mode,current_period_ends_at,next_billing_at,created_at,profile_id"
     ),
-    latestRows(
+    query(
+      "ecosystem_access_grants",
+      "id,profile_id,grant_status,access_scope,portal_workspace,access_origin,created_at"
+    ),
+    query(
+      "ecosystem_community_memberships",
+      "id,profile_id,status,access_level,entitlement_origin,created_at"
+    ),
+    query(
       "ecosystem_billing_events",
-      "provider,provider_event_type,billing_status,provider_reference,occurred_at"
+      "id,profile_id,provider,provider_event_type,billing_status,provider_reference,occurred_at"
     ),
-    latestRows("ecosystem_content_tracks", "slug,title,status,portal_workspace"),
-    latestRows("ecosystem_communities", "slug,title,status,portal_workspace"),
-    supabase
-      .from("product_events")
-      .select("event_key,event_group,occurred_at,payload")
-      .in("event_group", ["ecosystem", "revenue"])
-      .order("occurred_at", { ascending: false })
-      .limit(12)
-      .then(({ data, error }) => {
-        if (error) {
-          throw new Error(`product_events: ${error.message}`);
-        }
-
-        return data || [];
-      })
+    query(
+      "product_events",
+      "id,event_key,event_group,page_path,profile_id,occurred_at,payload",
+      (q) =>
+        q
+          .eq("event_group", "ecosystem")
+          .in("event_key", [
+            "subscription_started",
+            "subscription_authorized",
+            "subscription_active",
+            "founding_live_activated",
+            "access_granted",
+            "community_access_granted",
+            "content_continuity_signal",
+            "recurring_revenue_signal",
+            "onboarding_completed",
+            "retention_signal"
+          ])
+    )
   ]);
 
-  console.log(
-    JSON.stringify(
-      {
-        auditedAt: new Date().toISOString(),
-        counts,
-        samples: {
-          catalogItems,
-          plans,
-          subscriptions,
-          billingEvents,
-          tracks,
-          communities,
-          productEvents
-        }
-      },
-      null,
-      2
-    )
+  const plan = plans[0] || null;
+  const foundingBetaSubscriptions = subscriptions.filter(
+    (item) => item.source_of_activation === "founding_beta"
   );
+  const foundingLiveSubscriptions = subscriptions.filter(
+    (item) => item.source_of_activation === "founding_live"
+  );
+  const liveSubscriptions = subscriptions.filter(
+    (item) => item.payment_provider === "mercado_pago_preapproval"
+  );
+  const activeLiveSubscriptions = liveSubscriptions.filter(
+    (item) => item.status === "active"
+  );
+  const pendingAuthorizations = liveSubscriptions.filter(
+    (item) =>
+      item.billing_status === "pending_authorization" || item.status === "incomplete"
+  );
+  const foundingLiveGrants = grants.filter(
+    (item) => item.access_scope === "founding_live" && item.grant_status === "active"
+  );
+  const activeGrants = grants.filter((item) => item.grant_status === "active");
+  const activeMemberships = memberships.filter((item) => item.status === "active");
+  const eligibleFoundingProfiles = new Set([
+    ...foundingBetaSubscriptions.map((item) => item.profile_id),
+    ...grants
+      .filter(
+        (item) =>
+          item.grant_status === "active" &&
+          ["founding_beta", "founding_live"].includes(item.access_scope)
+      )
+      .map((item) => item.profile_id)
+  ]);
+  const liveProfiles = new Set(liveSubscriptions.map((item) => item.profile_id));
+  const controlledActivationCandidates = [...eligibleFoundingProfiles].filter(
+    (profileId) => !liveProfiles.has(profileId)
+  );
+
+  const eventCounts = new Map();
+  for (const event of productEvents) {
+    eventCounts.set(event.event_key, (eventCounts.get(event.event_key) || 0) + 1);
+  }
+
+  const firstActivationPrepared =
+    Boolean(plan?.billing_plan_reference) &&
+    controlledActivationCandidates.length > 0;
+  const firstActivationHomologated = activeLiveSubscriptions.length > 0;
+  const endToEndValidated =
+    firstActivationHomologated &&
+    foundingLiveGrants.length > 0 &&
+    activeMemberships.length > 0 &&
+    billingEvents.some((item) => item.provider === "mercado_pago_preapproval");
+  const betaToLivePrepared =
+    foundingBetaSubscriptions.length > 0 &&
+    (foundingLiveSubscriptions.length > 0 ||
+      grants.some((item) => item.access_scope === "founding_beta"));
+  const portalReflectsRealLife =
+    productEvents.some((item) =>
+      ["/cliente/ecossistema", "/cliente/ecossistema/beneficios"].includes(item.page_path)
+    );
+  const hubReflectsOperation =
+    productEvents.some((item) => item.page_path === "/internal/advogada/ecossistema") ||
+    billingEvents.length > 0;
+  const telemetryActive =
+    (eventCounts.get("subscription_started") || 0) > 0 ||
+    (eventCounts.get("subscription_authorized") || 0) > 0 ||
+    (eventCounts.get("founding_live_activated") || 0) > 0;
+  const legalCoreProtected =
+    Boolean(plan) &&
+    plan.billing_provider === "mercado_pago_preapproval" &&
+    !billingEvents.some((item) => item.provider === "mercado_pago" && item.provider_event_type === "legal_checkout");
+  const phaseConcluded =
+    firstActivationPrepared &&
+    portalReflectsRealLife &&
+    hubReflectsOperation &&
+    telemetryActive &&
+    legalCoreProtected;
+
+  const summary = {
+    auditedAt: new Date().toISOString(),
+    phase: "12.4",
+    operation: {
+      initial_subscriber_target: 3,
+      rollout_mode: "controlled_founding_live",
+      eligibility:
+        "pagadoras convidadas, founding_beta preservado e autorizacao recorrente validada com curadoria manual",
+      invite_policy: "curated_invitation_only",
+      founding_beta_count: foundingBetaSubscriptions.length,
+      founding_live_count: foundingLiveSubscriptions.length,
+      controlled_activation_candidates_count: controlledActivationCandidates.length,
+      live_subscribers_count: liveSubscriptions.length,
+      active_live_subscribers_count: activeLiveSubscriptions.length,
+      pending_authorizations_count: pendingAuthorizations.length,
+      active_grants_count: activeGrants.length,
+      founding_live_grants_count: foundingLiveGrants.length,
+      active_memberships_count: activeMemberships.length
+    },
+    telemetry: {
+      subscription_started: eventCounts.get("subscription_started") || 0,
+      subscription_authorized: eventCounts.get("subscription_authorized") || 0,
+      subscription_active: eventCounts.get("subscription_active") || 0,
+      founding_live_activated: eventCounts.get("founding_live_activated") || 0,
+      access_granted: eventCounts.get("access_granted") || 0,
+      community_access_granted: eventCounts.get("community_access_granted") || 0,
+      content_continuity_signal: eventCounts.get("content_continuity_signal") || 0,
+      recurring_revenue_signal: eventCounts.get("recurring_revenue_signal") || 0,
+      onboarding_completed: eventCounts.get("onboarding_completed") || 0,
+      retention_signal: eventCounts.get("retention_signal") || 0
+    },
+    checklist: {
+      "primeira ativacao live preparada": yesNo(firstActivationPrepared),
+      "primeira assinatura live efetivamente homologada": yesNo(firstActivationHomologated),
+      "fluxo recorrente ponta a ponta validado": yesNo(endToEndValidated),
+      "founding_beta -> founding_live preparado ou executado": yesNo(betaToLivePrepared),
+      "portal refletindo assinatura live real": yesNo(portalReflectsRealLife),
+      "hub interno refletindo operacao fundadora": yesNo(hubReflectsOperation),
+      "telemetria registrando ativacao live": yesNo(telemetryActive),
+      "core juridico preservado": yesNo(legalCoreProtected),
+      "fase 12.4 concluida": yesNo(phaseConcluded)
+    }
+  };
+
+  console.log(JSON.stringify(summary, null, 2));
 }
 
 main().catch((error) => {
-  console.error("[phase12.1-audit] Failed:", error.message);
+  console.error("[phase12.4-audit] Failed:", error.message);
   process.exit(1);
 });

@@ -68,9 +68,9 @@ export default async function ClientEcosystemBenefitsPage({
               }
             : {
                 tone: "warning",
-                title: "Continuidade premium",
+                title: "Operacao fundadora",
                 description:
-                  "Esta area organiza billing, beneficios e acesso do Circulo Essencial sem misturar a assinatura com o fluxo juridico principal."
+                  "Esta area organiza billing, beneficios e acesso do Circulo Essencial como ativacao fundadora controlada, sem misturar a assinatura com o fluxo juridico principal."
               }
       ]}
     >
@@ -92,6 +92,16 @@ export default async function ClientEcosystemBenefitsPage({
           }}
         />
       ) : null}
+      {journey.access.hasAccess ? (
+        <EcosystemTelemetryBeacon
+          eventKey="subscription_authorized"
+          payload={{
+            surface: "client_ecosystem_benefits",
+            page: "/cliente/ecossistema/beneficios",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
 
       <ClientSafeCard title="Planos e beneficios do Circulo Essencial">
         <div className="grid gap-4 md:grid-cols-3">
@@ -104,7 +114,7 @@ export default async function ClientEcosystemBenefitsPage({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Cadencia modelada</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.plan.cadenceLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              A recorrencia agora roda em camada propria, com billing recorrente separado do checkout juridico.
+              A recorrencia agora roda em camada propria, com billing recorrente separado do checkout juridico e liberacao fundadora sob curadoria.
             </p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
@@ -131,7 +141,7 @@ export default async function ClientEcosystemBenefitsPage({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Politica fundadora</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              A migracao do beta preserva beneficios fundadores e rastreabilidade do entitlement.
+              A migracao do beta preserva beneficios fundadores, rastreabilidade do entitlement e a historia da primeira fundadora.
             </p>
           </article>
         </div>
@@ -193,6 +203,20 @@ export default async function ClientEcosystemBenefitsPage({
       </ClientSafeCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <ClientSafeCard title="Onboarding premium do primeiro ciclo">
+          <ul className="space-y-4">
+            <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              Confirmacao elegante da autorizacao recorrente com linguagem de entrada fundadora.
+            </li>
+            <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              Acesso imediato ao hub, conteudo inaugural e comunidade reservada do Circulo.
+            </li>
+            <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              Continuidade apresentada como permanencia premium, nao como mera cobranca mensal.
+            </li>
+          </ul>
+        </ClientSafeCard>
+
         <ClientSafeCard title="Beneficios ativos nesta primeira jornada">
           <ul className="space-y-4">
             <li className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
@@ -209,10 +233,10 @@ export default async function ClientEcosystemBenefitsPage({
 
         <ClientSafeCard title="Politica de ativacao controlada">
           <p>
-            O acesso beta acontece por grant manual e curadoria interna. Isso preserva a sobriedade da marca, evita abertura precoce e impede que a camada premium contamine o fluxo juridico principal.
+            O acesso beta e live acontece por grant manual, convite ou checkout autorizado dentro de uma curadoria interna enxuta. Isso preserva a sobriedade da marca, evita abertura precoce e impede que a camada premium contamine o fluxo juridico principal.
           </p>
           <p className="mt-3">
-            O portal mostra com elegancia a diferenca entre plano modelado, acesso concedido e experiencia ainda reservada.
+            O portal mostra com elegancia a diferenca entre plano modelado, autorizacao recorrente, acesso concedido e experiencia fundadora ainda reservada.
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <TrackedLink

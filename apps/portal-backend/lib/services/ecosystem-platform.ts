@@ -513,13 +513,22 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
   const liveSubscriptions = subscriptions.filter(
     (item) => item.payment_provider === "mercado_pago_preapproval"
   );
+  const pendingAuthorizations = subscriptions.filter(
+    (item) =>
+      item.payment_provider === "mercado_pago_preapproval" &&
+      (item.billing_status === "pending_authorization" || item.status === "incomplete")
+  );
   const foundingSubscriptions = subscriptions.filter(
     (item) => item.source_of_activation === "founding_beta"
+  );
+  const foundingLiveSubscriptions = subscriptions.filter(
+    (item) => item.source_of_activation === "founding_live"
   );
   const pastDueSubscriptions = subscriptions.filter(
     (item) => item.status === "past_due" || item.billing_status === "past_due"
   );
   const activeGrants = accessGrants.filter((item) => item.grant_status === "active");
+  const foundingLiveGrants = accessGrants.filter((item) => item.access_scope === "founding_live");
   const completedProgress = progressItems.filter((item) => item.status === "completed");
   const activeMemberships = memberships.filter((item) => item.status === "active");
 
@@ -614,10 +623,22 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
       },
       {
         label: "Transicao beta -> live",
-        value: formatCount(liveSubscriptions.length),
+        value: formatCount(foundingLiveSubscriptions.length),
         detail:
-          `${foundingSubscriptions.length} fundador(es) preservados e ${pastDueSubscriptions.length} sinal(is) de risco no lifecycle recorrente.`,
-        tone: liveSubscriptions.length > 0 ? "success" : pastDueSubscriptions.length > 0 ? "warning" : "muted"
+          `${foundingSubscriptions.length} fundador(es) beta preservados, ${pendingAuthorizations.length} autorizacao(oes) pendente(s) e ${pastDueSubscriptions.length} sinal(is) de risco no lifecycle recorrente.`,
+        tone:
+          foundingLiveSubscriptions.length > 0
+            ? "success"
+            : pendingAuthorizations.length > 0 || pastDueSubscriptions.length > 0
+              ? "warning"
+              : "muted"
+      },
+      {
+        label: "Founding live habilitado",
+        value: formatCount(foundingLiveGrants.length),
+        detail:
+          `${activeMemberships.length} membership(s) ativa(s) e grants sincronizados para a experiencia fundadora real.`,
+        tone: foundingLiveGrants.length > 0 ? "success" : "warning"
       }
     ],
     contentSummary: [
@@ -682,6 +703,22 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
           (telemetryCounts.get("plan_viewed") || 0) > 0
             ? "success"
             : "muted"
+      },
+      {
+        label: "Ativacoes fundadoras",
+        value: formatCount(
+          (telemetryCounts.get("subscription_authorized") || 0) +
+            (telemetryCounts.get("founding_live_activated") || 0) +
+            (telemetryCounts.get("onboarding_completed") || 0)
+        ),
+        detail:
+          "A operacao fundadora agora le autorizacao, ativacao live e onboarding como uma unica jornada recorrente controlada.",
+        tone:
+          (telemetryCounts.get("subscription_authorized") || 0) > 0 ||
+          (telemetryCounts.get("founding_live_activated") || 0) > 0 ||
+          (telemetryCounts.get("onboarding_completed") || 0) > 0
+            ? "success"
+            : "warning"
       },
       {
         label: "Sinais de risco",
