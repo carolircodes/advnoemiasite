@@ -1,0 +1,133 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { conversationInboxService } from "@/lib/services/conversation-inbox";
+
+export async function GET(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const filters = {
+      search: searchParams.get("search") || undefined,
+      status: (searchParams.get("status") as
+        | "all"
+        | "new"
+        | "unread"
+        | "waiting_human"
+        | "waiting_client"
+        | "ai_active"
+        | "handoff"
+        | "closed"
+        | "archived"
+        | null) || undefined,
+      channel: (searchParams.get("channel") as
+        | "all"
+        | "instagram"
+        | "whatsapp"
+        | "site"
+        | "portal"
+        | null) || undefined,
+      priority: (searchParams.get("priority") as "all" | "low" | "medium" | "high" | null) || undefined,
+      waitingFor: (searchParams.get("waitingFor") as
+        | "all"
+        | "human"
+        | "client"
+        | "ai"
+        | "none"
+        | null) || undefined,
+      inboxMode: (searchParams.get("inboxMode") as
+        | "all"
+        | "needs_human"
+        | "customer_turn"
+        | "ai_control"
+        | "hot"
+        | null) || undefined,
+      includeArchived: searchParams.get("includeArchived") === "true"
+    };
+
+    const selectedThreadId = searchParams.get("selectedThreadId");
+    const list = await conversationInboxService.listThreads(filters);
+    const selectedThread = selectedThreadId
+      ? await conversationInboxService.getThreadDetail(selectedThreadId)
+      : null;
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        ...list,
+        selectedThread
+      }
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Nao foi possivel carregar a central de conversas."
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const access = await requireInternalApiProfile();
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  try {
+    const payload = await request.json();
+    const action = payload?.action;
+
+    if (action === "sendHumanReply") {
+      const result = await conversationInboxService.sendHumanReply({
+        threadId: payload.threadId,
+        content: payload.content,
+        authorId: access.profile.id,
+        authorName: access.profile.full_name
+      });
+
+      return NextResponse.json({ ok: true, data: result });
+    }
+
+    if (action === "updateThreadState") {
+      const result = await conversationInboxService.updateThreadState({
+        threadId: payload.threadId,
+        actorId: access.profile.id,
+        actorName: access.profile.full_name,
+        threadStatus: payload.threadStatus,
+        waitingFor: payload.waitingFor,
+        priority: payload.priority,
+        ownerMode: payload.ownerMode,
+        handoffState: payload.handoffState,
+        handoffReason: payload.handoffReason,
+        aiEnabled: payload.aiEnabled,
+        markRead: payload.markRead,
+        internalNotes: payload.internalNotes
+      });
+
+      return NextResponse.json({ ok: true, data: result });
+    }
+
+    return NextResponse.json(
+      {
+        error: "Acao invalida. Use sendHumanReply ou updateThreadState."
+      },
+      { status: 400 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Nao foi possivel operar a thread selecionada."
+      },
+      { status: 400 }
+    );
+  }
+}

@@ -33,6 +33,35 @@ export interface ConversationMessage {
   created_at: string;
 }
 
+export interface ConversationSession {
+  thread_status?:
+    | 'new'
+    | 'unread'
+    | 'waiting_human'
+    | 'waiting_client'
+    | 'ai_active'
+    | 'handoff'
+    | 'closed'
+    | 'archived';
+  waiting_for?: 'human' | 'client' | 'ai' | 'none';
+  owner_mode?: 'ai' | 'human' | 'hybrid';
+  owner_user_id?: string;
+  priority?: 'low' | 'medium' | 'high';
+  unread_count?: number;
+  handoff_state?: 'none' | 'requested' | 'active' | 'resolved';
+  handoff_reason?: string;
+  ai_enabled?: boolean;
+  last_message_at?: string;
+  last_message_preview?: string;
+  last_message_direction?: 'inbound' | 'outbound';
+  last_human_reply_at?: string;
+  last_ai_reply_at?: string;
+  closed_at?: string;
+  archived_at?: string;
+  internal_notes?: string;
+  tags?: unknown[];
+}
+
 export interface ProcessedWebhookEvent {
   id: string;
   channel: 'instagram' | 'whatsapp';

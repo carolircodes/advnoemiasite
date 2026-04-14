@@ -2729,6 +2729,44 @@ export async function processChannelConversationEvent(
       last_inbound_at: new Date().toISOString(),
       last_outbound_at: new Date().toISOString(),
       last_summary: sessionSummary,
+      thread_status:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed
+          ? "handoff"
+          : conversationPolicy.aiActiveOnChannel
+            ? "waiting_client"
+            : "waiting_human",
+      waiting_for:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed
+          ? "human"
+          : conversationPolicy.aiActiveOnChannel
+            ? "client"
+            : "human",
+      owner_mode:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed
+          ? conversationPolicy.aiActiveOnChannel
+            ? "hybrid"
+            : "human"
+          : "ai",
+      priority:
+        conversationPolicy.operationalHandoffRecorded ||
+        conversationPolicy.handoffAllowed ||
+        conversationPolicy.humanFollowUpPending
+          ? "high"
+          : conversationPolicy.followUpReady
+            ? "medium"
+            : "low",
+      handoff_state:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed
+          ? "active"
+          : "none",
+      handoff_reason: conversationPolicy.handoffReason || undefined,
+      ai_enabled: conversationPolicy.aiActiveOnChannel,
+      unread_count:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed ? 1 : 0,
+      last_message_at: new Date().toISOString(),
+      last_message_preview: finalReplyText.slice(0, 240),
+      last_message_direction: "outbound",
+      last_ai_reply_at: new Date().toISOString(),
       metadata: mergedMetadata
     });
 
