@@ -47,6 +47,12 @@ type WhatsAppOutboundContext = {
   reason?: string | null;
 };
 
+type WhatsAppSendResult = {
+  ok: boolean;
+  messageId?: string | null;
+  error?: string | null;
+};
+
 type WhatsAppStatusWebhook = {
   id?: string;
   status?: "sent" | "delivered" | "read" | "failed";
@@ -210,7 +216,7 @@ async function sendWhatsAppResponse(
   to: string,
   message: string,
   context?: WhatsAppOutboundContext
-) {
+): Promise<WhatsAppSendResult> {
   logEvent("WHATSAPP_OUTBOUND_SEND_START", {
     channel: context?.channel || "whatsapp",
     externalUserId: context?.externalUserId || to,
@@ -239,7 +245,11 @@ async function sendWhatsAppResponse(
       accessTokenSource: ACCESS_TOKEN_SOURCE,
       phoneNumberIdSource: PHONE_NUMBER_ID_SOURCE
     }, "error");
-    return false;
+    return {
+      ok: false,
+      messageId: null,
+      error: "missing_config"
+    };
   }
 
   try {
@@ -284,10 +294,22 @@ async function sendWhatsAppResponse(
         errorSubcode: errorBody?.error?.error_subcode || null,
         errorText: errorText.slice(0, 500)
       }, "error");
-      return false;
+      return {
+        ok: false,
+        messageId: null,
+        error:
+          typeof errorBody?.error?.message === "string"
+            ? errorBody.error.message
+            : `api_error_${response.status}`
+      };
     }
 
     const responseBody = await response.json().catch(() => null);
+    const outboundMessageId =
+      Array.isArray((responseBody as any)?.messages) &&
+      typeof (responseBody as any).messages[0]?.id === "string"
+        ? (responseBody as any).messages[0].id
+        : null;
 
     logEvent("WHATSAPP_OUTBOUND_SEND_SUCCESS", {
       channel: context?.channel || "whatsapp",
@@ -298,16 +320,16 @@ async function sendWhatsAppResponse(
       messageType: context?.messageType || "text",
       responseType: context?.responseType || "text",
       responseLength: context?.responseLength ?? message.length,
-      outboundMessageId:
-        Array.isArray((responseBody as any)?.messages) &&
-        typeof (responseBody as any).messages[0]?.id === "string"
-          ? (responseBody as any).messages[0].id
-          : null,
+      outboundMessageId,
       reason: context?.reason || null,
       status: response.status
     });
 
-    return true;
+    return {
+      ok: true,
+      messageId: outboundMessageId,
+      error: null
+    };
   } catch (error) {
     logEvent("WHATSAPP_OUTBOUND_SEND_ERROR", {
       channel: context?.channel || "whatsapp",
@@ -323,7 +345,11 @@ async function sendWhatsAppResponse(
       errorCode: null,
       error: error instanceof Error ? error.message : String(error)
     }, "error");
-    return false;
+    return {
+      ok: false,
+      messageId: null,
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 

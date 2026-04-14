@@ -88,7 +88,7 @@ type RouterTransport = {
       responseLength?: number | null;
       reason?: string | null;
     }
-  ) => Promise<boolean>;
+  ) => Promise<boolean | RouterSendResult>;
   markAsRead?: (messageId: string) => Promise<boolean>;
   sendTypingIndicator?: (recipientId: string) => Promise<boolean>;
   sendPublicCommentReply?: (
@@ -120,6 +120,30 @@ type RouterTransport = {
     }
   ) => Promise<boolean>;
 };
+
+type RouterSendResult = {
+  ok: boolean;
+  messageId?: string | null;
+  error?: string | null;
+};
+
+function normalizeRouterSendResult(
+  result: boolean | RouterSendResult
+): RouterSendResult {
+  if (typeof result === "boolean") {
+    return {
+      ok: result,
+      messageId: null,
+      error: result ? null : "transport_send_failed"
+    };
+  }
+
+  return {
+    ok: result.ok,
+    messageId: result.messageId ?? null,
+    error: result.error ?? null
+  };
+}
 
 type RouterDecision = {
   direction: MessageDirection;
@@ -1869,17 +1893,20 @@ export async function processChannelConversationEvent(
         "warn"
       );
 
-      const sent = await transport.sendText(event.externalUserId, unsupportedReply, {
-        channel: event.channel,
-        eventId,
-        externalUserId: event.externalUserId,
-        sessionId: null,
-        pipelineId: null,
-        messageType,
-        responseType: "text",
-        responseLength: unsupportedReply.length,
-        reason: "unsupported_message"
-      });
+      const sendResult = normalizeRouterSendResult(
+        await transport.sendText(event.externalUserId, unsupportedReply, {
+          channel: event.channel,
+          eventId,
+          externalUserId: event.externalUserId,
+          sessionId: null,
+          pipelineId: null,
+          messageType,
+          responseType: "text",
+          responseLength: unsupportedReply.length,
+          reason: "unsupported_message"
+        })
+      );
+      const sent = sendResult.ok;
 
       if (sent) {
         await antiSpamGuard.markEventProcessed({
@@ -2633,17 +2660,20 @@ export async function processChannelConversationEvent(
     })
   );
 
-  let sent = await transport.sendText(event.externalUserId, finalReplyText, {
-    channel: event.channel,
-    eventId,
-    externalUserId: event.externalUserId,
-    sessionId: session.id,
-    pipelineId,
-    messageType,
-    responseType: "text",
-    responseLength: finalReplyText.length,
-    reason: direction
-  });
+  let sendResult = normalizeRouterSendResult(
+    await transport.sendText(event.externalUserId, finalReplyText, {
+      channel: event.channel,
+      eventId,
+      externalUserId: event.externalUserId,
+      sessionId: session.id,
+      pipelineId,
+      messageType,
+      responseType: "text",
+      responseLength: finalReplyText.length,
+      reason: direction
+    })
+  );
+  let sent = sendResult.ok;
   let finalUsedFallback = coreResponse.usedFallback;
   let finalDirection = direction;
 
@@ -2665,32 +2695,37 @@ export async function processChannelConversationEvent(
       "warn"
     );
 
-    const fallbackSent = await transport.sendText(event.externalUserId, safeFallback, {
-      channel: event.channel,
-      eventId,
-      externalUserId: event.externalUserId,
-      sessionId: session.id,
-      pipelineId,
-      messageType,
-      responseType: "text",
-      responseLength: safeFallback.length,
-      reason: "emergency_fallback"
-    });
+    const fallbackSendResult = normalizeRouterSendResult(
+      await transport.sendText(event.externalUserId, safeFallback, {
+        channel: event.channel,
+        eventId,
+        externalUserId: event.externalUserId,
+        sessionId: session.id,
+        pipelineId,
+        messageType,
+        responseType: "text",
+        responseLength: safeFallback.length,
+        reason: "emergency_fallback"
+      })
+    );
+    const fallbackSent = fallbackSendResult.ok;
 
     if (fallbackSent) {
       finalReplyText = safeFallback;
       finalUsedFallback = true;
       finalDirection = "fallback";
+      sendResult = fallbackSendResult;
       sent = true;
     }
   }
 
   if (sent) {
-    await safeSaveMessage(session.id, undefined, "assistant", finalReplyText, "outbound", {
+    await safeSaveMessage(session.id, sendResult.messageId || undefined, "assistant", finalReplyText, "outbound", {
       channel: event.channel,
       source: finalUsedFallback ? "fallback" : coreResponse.source,
       route: "channel_conversation_router",
       eventId,
+      outboundMessageId: sendResult.messageId || null,
       usedFallback: finalUsedFallback,
       handoffTriggered: handoffDecision.shouldHandoff,
       handoffReason: handoffDecision.reason || null,
