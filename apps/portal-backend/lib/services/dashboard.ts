@@ -231,7 +231,8 @@ export async function getStaffOverview() {
     intakeRequestsResult,
     appointmentsResult,
     appointmentHistoryResult,
-    outboxResult
+    outboxResult,
+    conversationSessionsResult
   ] =
     await Promise.all([
     supabase
@@ -292,7 +293,12 @@ export async function getStaffOverview() {
       .from("notifications_outbox")
       .select("id,status,template_key,created_at")
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(100),
+    supabase
+      .from("conversation_sessions")
+      .select("id,thread_status,waiting_for,priority,owner_mode,follow_up_status,channel,last_message_at")
+      .order("updated_at", { ascending: false })
+      .limit(300)
     ]);
 
   if (clientsResult.error) {
@@ -339,6 +345,12 @@ export async function getStaffOverview() {
     );
   }
 
+  if (conversationSessionsResult.error) {
+    throw new Error(
+      `Nao foi possivel carregar a operacao conversacional: ${conversationSessionsResult.error.message}`
+    );
+  }
+
   const cases = casesResult.data || [];
   const clients = clientsResult.data || [];
   const events = eventsResult.data || [];
@@ -347,6 +359,7 @@ export async function getStaffOverview() {
   const intakeRequests = intakeRequestsResult.data || [];
   const appointments = appointmentsResult.data || [];
   const appointmentHistory = appointmentHistoryResult.data || [];
+  const conversationSessions = conversationSessionsResult.data || [];
   const caseClientIds = [...new Set(cases.map((item) => item.client_id))];
 
   const { data: relatedClients, error: relatedClientsError } = caseClientIds.length
@@ -1054,6 +1067,20 @@ export async function getStaffOverview() {
       item.urgency_level === "urgente" &&
       (item.status === "new" || item.status === "in_review")
   ).length;
+  const conversationInboxSummary = {
+    waitingHumanCount: conversationSessions.filter((item) => item.waiting_for === "human").length,
+    handoffCount: conversationSessions.filter(
+      (item) => item.thread_status === "handoff" || item.owner_mode === "hybrid"
+    ).length,
+    followUpPendingCount: conversationSessions.filter((item) =>
+      ["pending", "due", "overdue"].includes(item.follow_up_status || "none")
+    ).length,
+    followUpOverdueCount: conversationSessions.filter(
+      (item) => item.follow_up_status === "overdue"
+    ).length,
+    hotCount: conversationSessions.filter((item) => item.priority === "high").length,
+    whatsappActiveCount: conversationSessions.filter((item) => item.channel === "whatsapp").length
+  };
 
   return {
     latestClients,
@@ -1081,6 +1108,7 @@ export async function getStaffOverview() {
       },
       queues: sortedOperationalQueues
     },
+    conversationInboxSummary,
     upcomingAppointmentsCount: upcomingAppointments.length,
     openDocumentRequestsCount: openDocumentRequests.length,
     pendingIntakeRequestsCount: pendingIntakeRequests.length,

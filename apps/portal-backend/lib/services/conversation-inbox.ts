@@ -24,7 +24,14 @@ export type ConversationInboxFilters = {
   channel?: ConversationChannel | "all";
   priority?: Priority | "all";
   waitingFor?: WaitingFor | "all";
-  inboxMode?: "all" | "needs_human" | "customer_turn" | "ai_control" | "hot";
+  inboxMode?:
+    | "all"
+    | "needs_human"
+    | "customer_turn"
+    | "ai_control"
+    | "hot"
+    | "follow_up_due"
+    | "follow_up_overdue";
   founderScope?: "all" | "founder" | "waitlist";
   paymentState?: "all" | "pending" | "approved";
   includeArchived?: boolean;
@@ -65,6 +72,13 @@ type SessionRow = {
   archived_at: string | null;
   internal_notes: string | null;
   tags: unknown;
+  next_action_hint: string | null;
+  priority_source: "manual" | "inferred" | "hybrid";
+  sensitivity_level: "low" | "normal" | "high";
+  follow_up_status: "none" | "pending" | "due" | "overdue" | "resolved" | "converted";
+  follow_up_due_at: string | null;
+  follow_up_resolved_at: string | null;
+  last_status_event_at: string | null;
 };
 
 type MessageRow = {
@@ -213,6 +227,10 @@ export type ConversationThreadListItem = {
   hasPaymentPending: boolean;
   paymentApproved: boolean;
   nextAction: string;
+  prioritySource: "manual" | "inferred" | "hybrid";
+  followUpStatus: string;
+  followUpDueAt: string | null;
+  idleMinutes: number | null;
 };
 
 export type ConversationThreadDetail = {
@@ -276,6 +294,8 @@ export type ConversationThreadDetail = {
       nextSuggestedAction: string | null;
       nextSuggestedActionDetail: string | null;
       humanFollowUpPending: boolean;
+      followUpStatus: string;
+      followUpDueAt: string | null;
     };
   };
   events: Array<{
@@ -308,9 +328,13 @@ export type ConversationInboxMetrics = {
   aiControlledThreads: number;
   humanControlledThreads: number;
   followUpPendingCount: number;
+  followUpOverdueCount: number;
   whatsappVolume: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
+  failedMessagesCount: number;
+  deliveredMessagesCount: number;
+  readMessagesCount: number;
 };
 
 function asString(value: unknown) {
@@ -426,6 +450,19 @@ function average(values: Array<number | null>) {
   }
 
   return Number((valid.reduce((sum, value) => sum + value, 0) / valid.length).toFixed(1));
+}
+
+function minutesSince(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const diff = Date.now() - new Date(value).getTime();
+  if (Number.isNaN(diff) || diff < 0) {
+    return null;
+  }
+
+  return Math.round(diff / 60000);
 }
 
 class ConversationInboxService {
@@ -719,7 +756,11 @@ class ConversationInboxService {
       hasWaitlistContext,
       hasPaymentPending,
       paymentApproved,
-      nextAction: formatNextAction(session, triage)
+      nextAction: session.next_action_hint || formatNextAction(session, triage),
+      prioritySource: session.priority_source,
+      followUpStatus: session.follow_up_status,
+      followUpDueAt: session.follow_up_due_at,
+      idleMinutes: minutesSince(session.last_message_at || session.updated_at)
     };
   }
 
@@ -756,6 +797,14 @@ class ConversationInboxService {
     }
 
     if (filters.inboxMode === "hot" && !item.hot) {
+      return false;
+    }
+
+    if (filters.inboxMode === "follow_up_due" && item.followUpStatus !== "due") {
+      return false;
+    }
+
+    if (filters.inboxMode === "follow_up_overdue" && item.followUpStatus !== "overdue") {
       return false;
     }
 
@@ -810,6 +859,13 @@ class ConversationInboxService {
 
     const allItems = sessions.map((session) => this.buildThreadItem(session, bundle));
     const items = allItems.filter((item) => this.applyThreadFilters(item, filters)).slice(0, limit);
+    const sessionIds = sessions.map((session) => session.id);
+    const { data: messageStatusRows } = sessionIds.length
+      ? await this.supabase
+          .from("conversation_messages")
+          .select("send_status, delivery_status")
+          .in("session_id", sessionIds)
+      : { data: [] as Array<{ send_status: string; delivery_status: string | null }> };
 
     const firstResponseTimes = sessions.map((session) =>
       toMinutes(session.last_inbound_at, session.last_outbound_at)
@@ -830,7 +886,8 @@ class ConversationInboxService {
         accumulator.paymentPendingThreads += item.hasPaymentPending ? 1 : 0;
         accumulator.aiControlledThreads += item.ownerMode === "ai" ? 1 : 0;
         accumulator.humanControlledThreads += item.ownerMode === "human" ? 1 : 0;
-        accumulator.followUpPendingCount += item.waitingFor === "human" || item.waitingFor === "client" ? 1 : 0;
+        accumulator.followUpPendingCount += ["pending", "due", "overdue"].includes(item.followUpStatus) ? 1 : 0;
+        accumulator.followUpOverdueCount += item.followUpStatus === "overdue" ? 1 : 0;
         accumulator.whatsappVolume += item.channel === "whatsapp" ? 1 : 0;
         return accumulator;
       },
@@ -846,9 +903,17 @@ class ConversationInboxService {
         aiControlledThreads: 0,
         humanControlledThreads: 0,
         followUpPendingCount: 0,
+        followUpOverdueCount: 0,
         whatsappVolume: 0,
         firstResponseTimeMinutes: average(firstResponseTimes),
-        humanResponseTimeMinutes: average(humanResponseTimes)
+        humanResponseTimeMinutes: average(humanResponseTimes),
+        failedMessagesCount: (messageStatusRows || []).filter((row) => row.send_status === "failed").length,
+        deliveredMessagesCount: (messageStatusRows || []).filter(
+          (row) => row.send_status === "delivered" || row.delivery_status === "delivered"
+        ).length,
+        readMessagesCount: (messageStatusRows || []).filter(
+          (row) => row.send_status === "read" || row.delivery_status === "read"
+        ).length
       }
     );
 
@@ -1001,7 +1066,9 @@ class ConversationInboxService {
             asString(triage?.report_data?.nextBestActionDetail) ||
             asString(triage?.report_data?.next_action_detail) ||
             null,
-          humanFollowUpPending: Boolean(triage?.human_followup_pending)
+          humanFollowUpPending: Boolean(triage?.human_followup_pending),
+          followUpStatus: (session as SessionRow).follow_up_status,
+          followUpDueAt: (session as SessionRow).follow_up_due_at
         }
       },
       events: ((eventsData || []) as EventRow[]).map((event) => ({
@@ -1151,6 +1218,196 @@ class ConversationInboxService {
     return { ok: true, messageId: sendResult.messageId || null };
   }
 
+  async sendInboxFollowUp(input: {
+    clientId: string;
+    pipelineId?: string | null;
+    channel: "whatsapp";
+    content: string;
+    authorId: string;
+    authorName: string;
+    followUpMessageId?: string;
+    messageType?: string;
+  }) {
+    const { data: channelRow, error } = await this.supabase
+      .from("client_channels")
+      .select("client_id, channel, external_user_id")
+      .eq("client_id", input.clientId)
+      .eq("channel", input.channel)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error || !channelRow) {
+      throw new Error("Nao foi possivel localizar o canal ativo para consolidar o follow-up.");
+    }
+
+    const { data: session } = await this.supabase
+      .from("conversation_sessions")
+      .select("id")
+      .eq("channel", input.channel)
+      .eq("external_user_id", channelRow.external_user_id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!session?.id) {
+      throw new Error("A thread operacional ainda nao existe para este contato.");
+    }
+
+    const result = await this.sendHumanReply({
+      threadId: session.id,
+      content: input.content,
+      authorId: input.authorId,
+      authorName: input.authorName
+    });
+
+    const now = new Date().toISOString();
+
+    await this.supabase
+      .from("conversation_sessions")
+      .update({
+        follow_up_status: "resolved",
+        follow_up_resolved_at: now,
+        next_action_hint: "Aguardar retorno do cliente ao follow-up humano enviado pelo painel.",
+        updated_at: now
+      })
+      .eq("id", session.id);
+
+    const followUpPayload = {
+      client_id: input.clientId,
+      pipeline_id: input.pipelineId || null,
+      channel: input.channel,
+      message_type: input.messageType || "inbox_follow_up",
+      status: "sent",
+      content: input.content,
+      sent_at: now,
+      external_message_id: result.messageId || null,
+      approved_by: input.authorName,
+      metadata: {
+        source: "conversation_inbox",
+        sessionId: session.id,
+        authorId: input.authorId
+      }
+    };
+
+    if (input.followUpMessageId) {
+      await this.supabase
+        .from("follow_up_messages")
+        .update(followUpPayload)
+        .eq("id", input.followUpMessageId);
+    } else {
+      await this.supabase.from("follow_up_messages").insert(followUpPayload);
+    }
+
+    await this.createEvent({
+      sessionId: session.id,
+      eventType: "follow_up_unified_in_inbox",
+      actorType: "human",
+      actorId: input.authorId,
+      actorLabel: input.authorName,
+      eventData: {
+        summary: "Follow-up consolidado e operado pela inbox.",
+        pipelineId: input.pipelineId || null
+      }
+    });
+
+    return result;
+  }
+
+  async reconcileWhatsAppMessageStatus(input: {
+    externalMessageId: string;
+    status: "sent" | "delivered" | "read" | "failed";
+    timestamp?: string | number | null;
+    errorCode?: number | string | null;
+    errorTitle?: string | null;
+  }) {
+    const eventTime =
+      typeof input.timestamp === "number"
+        ? new Date(input.timestamp * 1000).toISOString()
+        : typeof input.timestamp === "string" && /^\d+$/.test(input.timestamp)
+          ? new Date(Number(input.timestamp) * 1000).toISOString()
+          : new Date().toISOString();
+
+    const baseUpdates: Record<string, unknown> = {
+      send_status: input.status,
+      delivery_status: input.status,
+      error_message: input.status === "failed" ? input.errorTitle || "WhatsApp delivery failure" : null
+    };
+
+    if (input.status === "delivered") {
+      baseUpdates.read_at = null;
+    }
+
+    if (input.status === "read") {
+      baseUpdates.is_read = true;
+      baseUpdates.read_at = eventTime;
+    }
+
+    if (input.status === "failed") {
+      baseUpdates.failed_at = eventTime;
+    }
+
+    const { data: message, error } = await this.supabase
+      .from("conversation_messages")
+      .update(baseUpdates)
+      .eq("external_message_id", input.externalMessageId)
+      .select("id, session_id")
+      .maybeSingle();
+
+    if (error || !message) {
+      return { ok: false };
+    }
+
+    await this.supabase
+      .from("follow_up_messages")
+      .update({
+        status:
+          input.status === "read"
+            ? "replied"
+            : input.status === "failed"
+              ? "cancelled"
+              : "sent",
+        delivered_at: input.status === "delivered" || input.status === "read" ? eventTime : undefined,
+        read_at: input.status === "read" ? eventTime : undefined,
+        error_message: input.status === "failed" ? input.errorTitle || "WhatsApp delivery failure" : undefined,
+        updated_at: eventTime
+      })
+      .eq("external_message_id", input.externalMessageId);
+
+    const sessionUpdates: Record<string, unknown> = {
+      last_status_event_at: eventTime,
+      updated_at: eventTime
+    };
+
+    if (input.status === "read") {
+      sessionUpdates.waiting_for = "client";
+    }
+
+    if (input.status === "failed") {
+      sessionUpdates.thread_status = "waiting_human";
+      sessionUpdates.waiting_for = "human";
+      sessionUpdates.next_action_hint =
+        "Mensagem falhou no WhatsApp. Revisar o envio, validar numero e decidir retry humano.";
+      sessionUpdates.follow_up_status = "due";
+    }
+
+    await this.supabase.from("conversation_sessions").update(sessionUpdates).eq("id", message.session_id);
+
+    await this.createEvent({
+      sessionId: message.session_id,
+      eventType: "whatsapp_status_reconciled",
+      actorType: "system",
+      eventData: {
+        summary: `Status do WhatsApp reconciliado como ${input.status}.`,
+        status: input.status,
+        externalMessageId: input.externalMessageId,
+        errorCode: input.errorCode || null,
+        errorTitle: input.errorTitle || null
+      }
+    });
+
+    return { ok: true, sessionId: message.session_id };
+  }
+
   async addThreadNote(input: {
     threadId: string;
     body: string;
@@ -1219,6 +1476,11 @@ class ConversationInboxService {
     aiEnabled?: boolean;
     markRead?: boolean;
     internalNotes?: string | null;
+    nextActionHint?: string | null;
+    followUpStatus?: "none" | "pending" | "due" | "overdue" | "resolved" | "converted";
+    followUpDueAt?: string | null;
+    prioritySource?: "manual" | "inferred" | "hybrid";
+    sensitivityLevel?: "low" | "normal" | "high";
   }) {
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString()
@@ -1257,6 +1519,29 @@ class ConversationInboxService {
     if (input.internalNotes !== undefined) {
       updates.internal_notes = input.internalNotes;
       eventData.internalNotesUpdated = true;
+    }
+    if (input.nextActionHint !== undefined) {
+      updates.next_action_hint = input.nextActionHint;
+      eventData.nextActionHint = input.nextActionHint;
+    }
+    if (input.followUpStatus) {
+      updates.follow_up_status = input.followUpStatus;
+      eventData.followUpStatus = input.followUpStatus;
+      if (input.followUpStatus === "resolved" || input.followUpStatus === "converted") {
+        updates.follow_up_resolved_at = new Date().toISOString();
+      }
+    }
+    if (input.followUpDueAt !== undefined) {
+      updates.follow_up_due_at = input.followUpDueAt;
+      eventData.followUpDueAt = input.followUpDueAt;
+    }
+    if (input.prioritySource) {
+      updates.priority_source = input.prioritySource;
+      eventData.prioritySource = input.prioritySource;
+    }
+    if (input.sensitivityLevel) {
+      updates.sensitivity_level = input.sensitivityLevel;
+      eventData.sensitivityLevel = input.sensitivityLevel;
     }
     if (input.markRead) {
       updates.unread_count = 0;

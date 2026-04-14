@@ -25,9 +25,13 @@ type Metrics = {
   aiControlledThreads: number;
   humanControlledThreads: number;
   followUpPendingCount: number;
+  followUpOverdueCount: number;
   whatsappVolume: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
+  failedMessagesCount: number;
+  deliveredMessagesCount: number;
+  readMessagesCount: number;
 };
 
 type ThreadItem = {
@@ -53,6 +57,10 @@ type ThreadItem = {
   hasPaymentPending: boolean;
   paymentApproved: boolean;
   nextAction: string;
+  prioritySource: "manual" | "inferred" | "hybrid";
+  followUpStatus: string;
+  followUpDueAt: string | null;
+  idleMinutes: number | null;
 };
 
 type ThreadDetail = {
@@ -116,6 +124,8 @@ type ThreadDetail = {
       nextSuggestedAction: string | null;
       nextSuggestedActionDetail: string | null;
       humanFollowUpPending: boolean;
+      followUpStatus: string;
+      followUpDueAt: string | null;
     };
   };
   events: Array<{
@@ -199,6 +209,22 @@ function toneForOwner(mode: string) {
   }
 
   return "border-[#cde0f4] bg-[#eef6ff] text-[#22588e]";
+}
+
+function toneForFollowUp(status: string) {
+  if (status === "overdue") {
+    return "border-[#f3c4b6] bg-[#fff3ee] text-[#8a3e1f]";
+  }
+
+  if (status === "due" || status === "pending") {
+    return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
+  }
+
+  if (status === "resolved" || status === "converted") {
+    return "border-[#d9e2db] bg-[#f5f8f4] text-[#446054]";
+  }
+
+  return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
 }
 
 function MetricCard({
@@ -366,7 +392,7 @@ export function ConversationInboxDashboard() {
     }
   }
 
-  async function sendHumanReply() {
+async function sendHumanReply() {
     if (!selectedThreadId || !composer.trim()) {
       return;
     }
@@ -398,6 +424,29 @@ export function ConversationInboxDashboard() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function scheduleFollowUp(status: "due" | "overdue" | "resolved") {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    const dueAt =
+      status === "resolved"
+        ? null
+        : new Date(Date.now() + (status === "overdue" ? -2 : 24) * 60 * 60 * 1000).toISOString();
+
+    await updateThreadState({
+      followUpStatus: status,
+      followUpDueAt: dueAt,
+      waitingFor: status === "resolved" ? "client" : "human",
+      nextActionHint:
+        status === "resolved"
+          ? "Follow-up tratado. Agora a thread aguarda retorno do cliente."
+          : status === "overdue"
+            ? "Follow-up vencido. Priorizar contato humano ainda hoje."
+            : "Follow-up marcado para a fila do dia."
+    });
   }
 
   async function addThreadNote() {
@@ -567,6 +616,8 @@ export function ConversationInboxDashboard() {
             <option value="customer_turn">Esperando cliente</option>
             <option value="ai_control">IA no comando</option>
             <option value="hot">Somente quentes</option>
+            <option value="follow_up_due">Follow-up do dia</option>
+            <option value="follow_up_overdue">Follow-up vencido</option>
           </select>
           <select
             value={filters.founderScope}
@@ -634,12 +685,17 @@ export function ConversationInboxDashboard() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Chip className={toneForPriority(thread.priority)}>{thread.priority}</Chip>
                     <Chip className={toneForOwner(thread.ownerMode)}>{thread.ownerMode}</Chip>
+                    {thread.followUpStatus !== "none" ? (
+                      <Chip className={toneForFollowUp(thread.followUpStatus)}>
+                        follow-up {thread.followUpStatus}
+                      </Chip>
+                    ) : null}
                     {thread.hot ? <Chip className="border-[#f3c4b6] bg-[#fff2ec] text-[#8a3e1f]">quente</Chip> : null}
                     {thread.hasFounderContext ? <Chip className="border-[#d7cbee] bg-[#f7f3ff] text-[#5b4c99]">founder</Chip> : null}
                     {thread.hasPaymentPending ? <Chip className="border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]">pagamento</Chip> : null}
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs text-[#76857d]">
-                    <span>{thread.nextAction}</span>
+                    <span>{thread.idleMinutes ? `${thread.idleMinutes} min parada • ` : ""}{thread.nextAction}</span>
                     <span>{formatDateTime(thread.lastMessageAt)}</span>
                   </div>
                 </button>
@@ -729,6 +785,38 @@ export function ConversationInboxDashboard() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => void scheduleFollowUp("due")}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Marcar follow-up
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void scheduleFollowUp("overdue")}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Venceu hoje
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void updateThreadState({ threadStatus: "closed", waitingFor: "none", followUpStatus: "resolved" })}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void updateThreadState({ threadStatus: "waiting_human", waitingFor: "human" })}
+                    disabled={sending}
+                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                  >
+                    Reabrir
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void updateThreadState({ threadStatus: "archived", waitingFor: "none" })}
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
@@ -795,6 +883,12 @@ export function ConversationInboxDashboard() {
                   <p>Pagamentos pendentes: {selectedThread.context.payment.pendingCount}</p>
                   <p>Status mais recente: {selectedThread.context.payment.latestStatus || "sem pagamento"}</p>
                   <p>Proximo compromisso: {formatDateTime(selectedThread.context.agenda.nextAppointmentAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Follow-up e risco</p>
+                  <p>Estado: {selectedThread.context.operational.followUpStatus || "none"}</p>
+                  <p>Prazo: {formatDateTime(selectedThread.context.operational.followUpDueAt)}</p>
+                  <p>Thread parada: {selectedThread.thread.idleMinutes ? `${selectedThread.thread.idleMinutes} min` : "sem leitura"}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Proxima acao</p>
@@ -919,6 +1013,14 @@ export function ConversationInboxDashboard() {
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume WhatsApp</span>
                 <strong>{payload?.metrics.whatsappVolume || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Mensagens falhadas</span>
+                <strong>{payload?.metrics.failedMessagesCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Entregues / lidas</span>
+                <strong>{`${payload?.metrics.deliveredMessagesCount || 0} / ${payload?.metrics.readMessagesCount || 0}`}</strong>
               </div>
             </div>
           </div>

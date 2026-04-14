@@ -398,6 +398,14 @@ function buildActionItemFromOperationalItem(item: any): PremiumActionItem {
 
 export function buildExecutiveCockpitProjection(overview: any, intelligence: any): ExecutiveCockpitProjection {
   const operationalSummary = overview.operationalCenter.summary;
+  const inboxSummary = overview.conversationInboxSummary || {
+    waitingHumanCount: 0,
+    handoffCount: 0,
+    followUpPendingCount: 0,
+    followUpOverdueCount: 0,
+    hotCount: 0,
+    whatsappActiveCount: 0
+  };
   const todayQueue = overview.operationalCenter.queues.today || [];
   const waitingClientQueue = overview.operationalCenter.queues.awaitingClient || [];
   const waitingTeamQueue = overview.operationalCenter.queues.awaitingTeam || [];
@@ -441,6 +449,15 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
       tone: operationalSummary.waitingTeamCount > 0 ? "warning" : "success"
     },
     {
+      label: "Inbox pedindo acao",
+      value: String(inboxSummary.waitingHumanCount),
+      detail:
+        inboxSummary.handoffCount > 0
+          ? `${inboxSummary.handoffCount} handoff(s) ativos e ${inboxSummary.followUpPendingCount} follow-up(s) em jogo.`
+          : "WhatsApp-first visivel no cockpit com fila humana e follow-up consolidados.",
+      tone: inboxSummary.waitingHumanCount > 0 ? "warning" : "success"
+    },
+    {
       label: "Agenda central",
       value: String(upcomingAppointments.length),
       detail:
@@ -476,6 +493,24 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
       value: String(operationalSummary.inviteStalledCount),
       detail: "Clientes cadastrados que ainda nao entraram no portal e enfraquecem continuidade.",
       tone: operationalSummary.inviteStalledCount > 0 ? "warning" : "success"
+    },
+    {
+      label: "Follow-up da inbox",
+      value: String(inboxSummary.followUpPendingCount),
+      detail:
+        inboxSummary.followUpOverdueCount > 0
+          ? `${inboxSummary.followUpOverdueCount} follow-up(s) ja venceram e puxam a fila do dia.`
+          : "A operacao conversacional agora explicita o que ainda depende de retorno ou cobranca.",
+      tone: inboxSummary.followUpOverdueCount > 0 ? "critical" : inboxSummary.followUpPendingCount > 0 ? "warning" : "success"
+    },
+    {
+      label: "WhatsApp ativo",
+      value: String(inboxSummary.whatsappActiveCount),
+      detail:
+        inboxSummary.hotCount > 0
+          ? `${inboxSummary.hotCount} thread(s) quentes sob leitura do cockpit.`
+          : "Canal principal sincronizado com a operacao premium.",
+      tone: inboxSummary.hotCount > 0 ? "warning" : "muted"
     }
   ];
 
@@ -530,6 +565,8 @@ export function buildExecutiveCockpitProjection(overview: any, intelligence: any
   const focusHeadline =
     operationalSummary.criticalCount > 0
       ? `${operationalSummary.criticalCount} ponto(s) ja exigem conducao imediata antes do restante da fila do imperio.`
+      : inboxSummary.followUpOverdueCount > 0
+        ? `${inboxSummary.followUpOverdueCount} follow-up(s) da inbox ja estao vencidos e merecem a primeira leitura do dia.`
       : operationalSummary.todayCount > 0
         ? `${operationalSummary.todayCount} movimento(s) estruturam o dia com clareza entre agenda, consulta, documentos e operacao.`
         : "A operacao esta limpa agora. O command center segue pronto para destacar o proximo gargalo assim que ele surgir.";

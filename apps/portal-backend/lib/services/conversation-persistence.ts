@@ -60,6 +60,13 @@ export interface ConversationSession {
   archived_at?: string;
   internal_notes?: string;
   tags?: unknown[];
+  next_action_hint?: string;
+  priority_source?: 'manual' | 'inferred' | 'hybrid';
+  sensitivity_level?: 'low' | 'normal' | 'high';
+  follow_up_status?: 'none' | 'pending' | 'due' | 'overdue' | 'resolved' | 'converted';
+  follow_up_due_at?: string;
+  follow_up_resolved_at?: string;
+  last_status_event_at?: string;
 }
 
 export interface ProcessedWebhookEvent {

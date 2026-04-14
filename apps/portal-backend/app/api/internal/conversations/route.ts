@@ -46,6 +46,8 @@ export async function GET(request: NextRequest) {
         | "customer_turn"
         | "ai_control"
         | "hot"
+        | "follow_up_due"
+        | "follow_up_overdue"
         | null) || undefined,
       founderScope: (searchParams.get("founderScope") as
         | "all"
@@ -106,6 +108,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, data: result });
     }
 
+    if (action === "sendInboxFollowUp") {
+      const result = await conversationInboxService.sendInboxFollowUp({
+        clientId: payload.clientId,
+        pipelineId: payload.pipelineId,
+        channel: payload.channel || "whatsapp",
+        content: payload.content,
+        followUpMessageId: payload.followUpMessageId,
+        messageType: payload.messageType,
+        authorId: access.profile.id,
+        authorName: access.profile.full_name
+      });
+
+      return NextResponse.json({ ok: true, data: result });
+    }
+
     if (action === "updateThreadState") {
       const result = await conversationInboxService.updateThreadState({
         threadId: payload.threadId,
@@ -119,7 +136,12 @@ export async function POST(request: NextRequest) {
         handoffReason: payload.handoffReason,
         aiEnabled: payload.aiEnabled,
         markRead: payload.markRead,
-        internalNotes: payload.internalNotes
+        internalNotes: payload.internalNotes,
+        nextActionHint: payload.nextActionHint,
+        followUpStatus: payload.followUpStatus,
+        followUpDueAt: payload.followUpDueAt,
+        prioritySource: payload.prioritySource,
+        sensitivityLevel: payload.sensitivityLevel
       });
 
       return NextResponse.json({ ok: true, data: result });
@@ -140,7 +162,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        error: "Acao invalida. Use sendHumanReply, updateThreadState ou addThreadNote."
+        error: "Acao invalida. Use sendHumanReply, sendInboxFollowUp, updateThreadState ou addThreadNote."
       },
       { status: 400 }
     );

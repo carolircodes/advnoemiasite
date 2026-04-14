@@ -2767,6 +2767,23 @@ export async function processChannelConversationEvent(
       last_message_preview: finalReplyText.slice(0, 240),
       last_message_direction: "outbound",
       last_ai_reply_at: new Date().toISOString(),
+      next_action_hint:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed
+          ? "Assumir o handoff e conduzir a thread humana com contexto preservado."
+          : conversationPolicy.aiActiveOnChannel
+            ? "Monitorar resposta do cliente e intervir apenas se o canal sinalizar excecao."
+            : "Revisar manualmente a thread e decidir a proxima acao.",
+      priority_source: "inferred",
+      sensitivity_level:
+        conversationPolicy.operationalHandoffRecorded || conversationPolicy.handoffAllowed
+          ? "high"
+          : "normal",
+      follow_up_status: conversationPolicy.humanFollowUpPending
+        ? "pending"
+        : conversationPolicy.followUpReady
+          ? "due"
+          : "none",
+      last_status_event_at: new Date().toISOString(),
       metadata: mergedMetadata
     });
 

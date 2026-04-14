@@ -8,6 +8,7 @@ import {
 } from "@/lib/http/webhook-security";
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
+import { conversationInboxService } from "@/lib/services/conversation-inbox";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
@@ -44,6 +45,17 @@ type WhatsAppOutboundContext = {
   responseType?: string | null;
   responseLength?: number | null;
   reason?: string | null;
+};
+
+type WhatsAppStatusWebhook = {
+  id?: string;
+  status?: "sent" | "delivered" | "read" | "failed";
+  timestamp?: string | number;
+  recipient_id?: string;
+  errors?: Array<{
+    code?: number | string;
+    title?: string;
+  }>;
 };
 
 function logEvent(
@@ -99,6 +111,31 @@ function extractMessageInfo(message: Record<string, any>) {
     type,
     content: `[${type}]`
   };
+}
+
+async function reconcileStatusUpdate(rawStatus: WhatsAppStatusWebhook) {
+  if (!rawStatus.id || !rawStatus.status) {
+    return;
+  }
+
+  const firstError = Array.isArray(rawStatus.errors) ? rawStatus.errors[0] : null;
+  const result = await conversationInboxService.reconcileWhatsAppMessageStatus({
+    externalMessageId: rawStatus.id,
+    status: rawStatus.status,
+    timestamp: rawStatus.timestamp,
+    errorCode: firstError?.code || null,
+    errorTitle: firstError?.title || null
+  });
+
+  logEvent("WHATSAPP_STATUS_RECONCILED", {
+    eventId: rawStatus.id,
+    externalUserId: rawStatus.recipient_id || null,
+    sendResult: rawStatus.status,
+    sessionId: result.ok ? result.sessionId || null : null,
+    reason: result.ok ? "status_reconciled" : "status_not_mapped",
+    errorCode: firstError?.code || null,
+    errorTitle: firstError?.title || null
+  });
 }
 
 async function markAsRead(messageId: string) {
@@ -406,6 +443,10 @@ export async function POST(request: NextRequest) {
       for (const change of entry.changes || []) {
         if (change.field !== "messages") {
           continue;
+        }
+
+        for (const rawStatus of change.value?.statuses || []) {
+          await reconcileStatusUpdate(rawStatus as WhatsAppStatusWebhook);
         }
 
         for (const rawMessage of change.value?.messages || []) {

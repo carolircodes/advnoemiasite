@@ -5,6 +5,7 @@
 
 import { createWebhookSupabaseClient } from '../supabase/webhook';
 import { sendWhatsAppMessage } from '../meta/whatsapp-service';
+import { conversationInboxService } from './conversation-inbox';
 
 interface SendAssistedFollowUpParams {
   clientId: string;
@@ -153,35 +154,58 @@ class AssistedFollowUpService {
       }
 
       // 5. Enviar mensagem pelo canal correto
-      const sendResult = await this.sendFollowUpMessage({
-        channel: params.channel,
-        externalUserId: channelValidation.externalUserId!,
-        content: params.content
-      });
+      const sendResult =
+        params.channel === 'whatsapp'
+          ? await conversationInboxService.sendInboxFollowUp({
+              clientId: params.clientId,
+              pipelineId: params.pipelineId,
+              channel: 'whatsapp',
+              content: params.content,
+              followUpMessageId: params.followUpMessageId,
+              messageType: params.messageType,
+              authorId: params.approvedBy,
+              authorName: params.approvedBy
+            })
+              .then((result) => ({ success: true, messageId: result.messageId || undefined }))
+              .catch((error) => ({
+                success: false,
+                error: error instanceof Error ? error.message : 'Erro ao unificar follow-up na inbox'
+              }))
+          : await this.sendFollowUpMessage({
+              channel: params.channel,
+              externalUserId: channelValidation.externalUserId!,
+              content: params.content
+            });
+
+      const sendError = 'error' in sendResult ? sendResult.error : undefined;
+      const sendMessageId = 'messageId' in sendResult ? sendResult.messageId : undefined;
 
       if (!sendResult.success) {
         console.log('ASSISTED_SEND_ERROR', {
           clientId: params.clientId,
           channel: params.channel,
-          error: sendResult.error
+          error: sendError
         });
         return {
           success: false,
-          error: sendResult.error || 'Falha ao enviar mensagem'
+          error: sendError || 'Falha ao enviar mensagem'
         };
       }
 
       // 6. Registrar status do envio
-      const recordResult = await this.recordFollowUpSend({
-        clientId: params.clientId,
-        pipelineId: params.pipelineId,
-        followUpMessageId: params.followUpMessageId,
-        channel: params.channel,
-        content: params.content,
-        messageId: sendResult.messageId,
-        approvedBy: params.approvedBy,
-        messageType: params.messageType
-      });
+      const recordResult =
+        params.channel === 'whatsapp'
+          ? { success: true }
+          : await this.recordFollowUpSend({
+              clientId: params.clientId,
+              pipelineId: params.pipelineId,
+              followUpMessageId: params.followUpMessageId,
+              channel: params.channel,
+              content: params.content,
+              messageId: sendMessageId,
+              approvedBy: params.approvedBy,
+              messageType: params.messageType
+            });
 
       if (!recordResult.success) {
         console.log('ASSISTED_SEND_RECORD_ERROR', {
@@ -209,13 +233,13 @@ class AssistedFollowUpService {
       console.log('ASSISTED_SEND_SUCCESS', {
         clientId: params.clientId,
         channel: params.channel,
-        messageId: sendResult.messageId,
+        messageId: sendMessageId,
         approvedBy: params.approvedBy
       });
 
       return {
         success: true,
-        messageId: sendResult.messageId,
+        messageId: sendMessageId,
         channelUsed: params.channel,
         contentSent: params.content
       };
