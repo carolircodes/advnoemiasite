@@ -71,7 +71,7 @@ function extractLeadIdFromExternalReference(externalReference: string | null) {
     return null;
   }
 
-  const match = externalReference.match(/^(.+?)_(.+)_\d+$/);
+  const match = externalReference.match(/^(.*)_([0-9a-fA-F-]{36})_(\d+)$/);
   return match?.[2] || null;
 }
 

@@ -182,7 +182,7 @@ function parseExternalReference(externalReference: unknown): ParsedExternalRefer
     return null;
   }
 
-  const match = externalReference.match(/^(.+?)_(.+)_\d+$/);
+  const match = externalReference.match(/^(.*)_([0-9a-fA-F-]{36})_(\d+)$/);
 
   if (!match) {
     return null;
@@ -403,19 +403,37 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
 
     await sendPaymentConfirmationMessage(supabase, lead);
 
-    await supabase.from("follow_up_events").insert({
-      lead_id: leadId,
-      event_type: "payment_confirmed",
-      trigger: "automatic",
-      message: "Pagamento confirmado automaticamente via webhook",
-      metadata: {
-        payment_id: payment.id,
-        mercado_pago_payment_id: paymentInfo.id,
-        amount: paymentInfo.transaction_amount,
-        payment_method: paymentInfo.payment_method_id
-      },
-      sent_at: new Date().toISOString()
-    });
+    try {
+      const { error: followUpError } = await supabase.from("follow_up_events").insert({
+        lead_id: leadId,
+        event_type: "payment_confirmed",
+        trigger: "automatic",
+        message: "Pagamento confirmado automaticamente via webhook",
+        metadata: {
+          payment_id: payment.id,
+          mercado_pago_payment_id: paymentInfo.id,
+          amount: paymentInfo.transaction_amount,
+          payment_method: paymentInfo.payment_method_id
+        },
+        sent_at: new Date().toISOString()
+      });
+
+      if (followUpError) {
+        console.error("[payment.webhook] Failed to persist follow-up event", {
+          followUpError,
+          leadId,
+          paymentId: payment.id,
+          mercadoPagoPaymentId: paymentInfo.id
+        });
+      }
+    } catch (followUpInsertError) {
+      console.error("[payment.webhook] Follow-up event insert crashed", {
+        followUpInsertError,
+        leadId,
+        paymentId: payment.id,
+        mercadoPagoPaymentId: paymentInfo.id
+      });
+    }
 
     try {
       await recordRevenueTelemetry({
