@@ -89,6 +89,26 @@ export default async function ClientEcosystemHubPage() {
           }}
         />
       ) : null}
+      {journey.entry.stage === "reserved_interest" ? (
+        <EcosystemTelemetryBeacon
+          eventKey="reserved_priority_signal"
+          payload={{
+            surface: "client_ecosystem_hub",
+            page: "/cliente/ecossistema",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
+      {!journey.access.hasAccess ? (
+        <EcosystemTelemetryBeacon
+          eventKey="paid_interest_signal"
+          payload={{
+            surface: "client_ecosystem_hub",
+            page: "/cliente/ecossistema",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
       <EcosystemTelemetryBeacon
         eventKey="premium_interest_signal"
         payload={{
@@ -262,6 +282,59 @@ export default async function ClientEcosystemHubPage() {
         </div>
       </ClientSafeCard>
 
+      <ClientSafeCard title="Escada De Reserva E Interesse">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Posicao atual</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.reserve.ladderPosition}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.reserve.microcopy}</p>
+            <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{journey.reserve.curatorReason}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Avanco curatorial</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.reserve.statusLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.reserve.advancementTiming}</p>
+            <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{journey.reserve.invitationLogic}</p>
+          </article>
+        </div>
+        <div className="mt-5 rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Sinais de prioridade</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {journey.reserve.prioritySignals.map((signal) => (
+              <span
+                key={signal}
+                className="inline-flex rounded-full bg-[#f5ead6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#7b5c31]"
+              >
+                {signal}
+              </span>
+            ))}
+          </div>
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Paid Interest E Continuidade Futura">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Leitura atual</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.paidInterest.statusLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.paidInterest.headline}</p>
+            <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{journey.paidInterest.detail}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Proximo movimento</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">Continuidade sem pressa</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.paidInterest.nextMove}</p>
+          </article>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {journey.paidInterest.signals.map((signal) => (
+            <article key={signal} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-sm leading-6 text-[#5f6f68]">{signal}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
+
       <ClientSafeCard title="Entrada Curada E Lista Privada">
         <div className="grid gap-4 md:grid-cols-2">
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
@@ -312,6 +385,26 @@ export default async function ClientEcosystemHubPage() {
         </div>
       </ClientSafeCard>
 
+      <ClientSafeCard title="Prova Social E Densidade Comunitaria">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Tese social</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.socialProof.headline}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.socialProof.detail}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Marcadores visiveis</p>
+            <div className="mt-4 space-y-3">
+              {journey.socialProof.markers.map((marker) => (
+                <p key={marker} className="text-sm leading-6 text-[#5f6f68]">
+                  {marker}
+                </p>
+              ))}
+            </div>
+          </article>
+        </div>
+      </ClientSafeCard>
+
       <ClientSafeCard title="Retorno E Maturidade Da Jornada">
         <div className="grid gap-4 md:grid-cols-3">
           {operations.retentionRoutines.map((routine) => (
@@ -345,6 +438,19 @@ export default async function ClientEcosystemHubPage() {
                 <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{channel.curationRule}</p>
               </article>
             ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Estados De Portal E Desejo">
+        <div className="grid gap-4 md:grid-cols-2">
+          {operations.portalExperience.map((item) => (
+            <article key={item.audience} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">{item.label}</p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{item.headline}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{item.detail}</p>
+              <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{item.framing}</p>
+            </article>
+          ))}
         </div>
       </ClientSafeCard>
 

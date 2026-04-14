@@ -9,6 +9,7 @@ import {
   subscriptionStatusLabels
 } from "../domain/ecosystem";
 import { createServerSupabaseClient } from "../supabase/server";
+import { getCommunityOperationsBlueprint } from "./ecosystem-community-operations";
 
 export const PREMIUM_JOURNEY_ANCHOR = {
   catalogSlug: "biblioteca-estrategica-premium",
@@ -109,6 +110,27 @@ export type ClientPremiumJourneySnapshot = {
     priorityLabel: string;
     ctaLabel: string;
   };
+  reserve: {
+    statusLabel: string;
+    ladderPosition: string;
+    microcopy: string;
+    curatorReason: string;
+    advancementTiming: string;
+    invitationLogic: string;
+    prioritySignals: string[];
+  };
+  paidInterest: {
+    headline: string;
+    statusLabel: string;
+    detail: string;
+    nextMove: string;
+    signals: string[];
+  };
+  socialProof: {
+    headline: string;
+    detail: string;
+    markers: string[];
+  };
 };
 
 export type InternalPremiumJourneySnapshot = {
@@ -137,6 +159,15 @@ export type InternalPremiumJourneySnapshot = {
   articlesOriginCount: number;
   reservedPrioritySignals: number;
   monetizationReadinessSignals: number;
+  waitlistQualifiedCount: number;
+  editorialOriginCount: number;
+  socialDensityScore: number;
+  thresholdDistanceSummary: Array<{
+    label: string;
+    current: number;
+    target: number;
+    gap: number;
+  }>;
   sourceSummary: Array<{
     label: string;
     count: number;
@@ -254,6 +285,7 @@ export async function getClientPremiumJourney(
   profile: PortalProfile
 ): Promise<ClientPremiumJourneySnapshot> {
   const supabase = await createServerSupabaseClient();
+  const operations = getCommunityOperationsBlueprint();
 
   const [
     catalogResult,
@@ -481,6 +513,34 @@ export async function getClientPremiumJourney(
     deferred: "Manter interesse qualificado",
     open_interest: "Pedir observacao curada"
   };
+  const reserveStageMap: Record<EntryStage, string> = {
+    active_founder: "Founder ativa",
+    invited: "Convite reservado",
+    waitlist: "Waitlist qualificada",
+    reserved_interest: "Reserva prioritaria",
+    deferred: "Observacao adiada",
+    open_interest: "Interesse inicial"
+  };
+  const reserveDescriptor =
+    operations.reservePolicy.curationStates.find((state) => {
+      if (founderStage === "active_founder") {
+        return state.key === "active_founder";
+      }
+
+      if (founderStage === "invited") {
+        return state.key === "invited";
+      }
+
+      if (founderStage === "reserved_interest") {
+        return state.key === "reserved_priority";
+      }
+
+      if (founderStage === "waitlist") {
+        return state.key === "qualified_waitlist";
+      }
+
+      return state.key === "interested";
+    }) || operations.reservePolicy.curationStates[0];
 
   const firstModule = track?.ecosystem_content_modules?.[0];
   const firstUnit = firstModule?.ecosystem_content_units?.[0];
@@ -613,12 +673,52 @@ export async function getClientPremiumJourney(
       nextStepLabel: nextStepMap[founderStage],
       priorityLabel: prettifyOrigin(founderPriority),
       ctaLabel: ctaMap[founderStage]
+    },
+    reserve: {
+      statusLabel: reserveStageMap[founderStage],
+      ladderPosition: reserveDescriptor.label,
+      microcopy: reserveDescriptor.microcopy,
+      curatorReason: reserveDescriptor.curatorReason,
+      advancementTiming: reserveDescriptor.promotionTiming,
+      invitationLogic: operations.reservePolicy.invitationLogic,
+      prioritySignals: operations.waitlistPolicy.prioritySignals
+    },
+    paidInterest: {
+      headline: operations.paidInterestPolicy.headline,
+      statusLabel:
+        founderStage === "reserved_interest"
+          ? "Interesse futuro pago materializado"
+          : founderStage === "active_founder"
+            ? "Continuidade futura em prova"
+            : "Interesse futuro pago em leitura",
+      detail:
+        founderStage === "reserved_interest"
+          ? "Seu interesse ja foi reconhecido como prioridade para a proxima chamada fundadora, sem ativar cobranca agora."
+          : founderStage === "active_founder"
+            ? "Seu uso e retorno ajudam a provar que a futura cobranca pode nascer com valor e desejo reais."
+            : "O portal separa curiosidade de vontade concreta de permanecer quando o plano fundador futuro abrir.",
+      nextMove:
+        founderStage === "reserved_interest"
+          ? "Seguir presente e alinhada para converter prioridade reservada em convite curado no lote certo."
+          : founderStage === "active_founder"
+            ? "Continuar voltando, consumindo e reforcando a prova social viva da comunidade."
+            : "Fortalecer origem, afinidade e sinais de permanencia antes de qualquer convite.",
+      signals: operations.paidInterestPolicy.explicitSignals.map((signal) => signal.label)
+    },
+    socialProof: {
+      headline: "A prova do Circulo cresce pela vida da comunidade, nao por barulho comercial.",
+      detail:
+        founderStage === "active_founder"
+          ? "Seu progresso, sua presenca e seu retorno semanal viram parte da densidade social que sustenta a futura monetizacao."
+          : "A reserva existe para proteger uma comunidade viva e desejada, nao para encenar escassez vazia.",
+      markers: operations.socialDensityLevers.map((lever) => lever.visibleProof)
     }
   };
 }
 
 export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremiumJourneySnapshot> {
   const supabase = await createServerSupabaseClient();
+  const operations = getCommunityOperationsBlueprint();
 
   const [
     catalogResult,
@@ -767,6 +867,34 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
   const articlesOriginCount =
     (sourceCounts.get("articles_private_interest") || 0) +
     (sourceCounts.get("articles_editorial_bridge") || 0);
+  const waitlistQualifiedCount = waitlistCount + reservedInterestCount;
+  const editorialOriginCount = siteOriginCount + articlesOriginCount;
+  const socialDensityScore =
+    activeFoundersCount * 4 +
+    engagedFoundersCount * 5 +
+    completedContentCount * 3 +
+    reservedInterestCount * 2 +
+    founderEngagementEvents +
+    retentionSignalCount;
+  const readinessCurrent: Record<string, number> = {
+    active_founders: activeFoundersCount,
+    engaged_founders: engagedFoundersCount,
+    average_progress_percent: averageProgressPercent,
+    completed_content_count: completedContentCount,
+    qualified_waitlist: waitlistQualifiedCount,
+    editorial_origin_signals: editorialOriginCount,
+    paid_interest_signals: paidInterestCount,
+    cooling_risk_count: coolingRiskCount
+  };
+  const thresholdDistanceSummary = operations.readinessThresholds.map((threshold) => {
+    const current = readinessCurrent[threshold.key] ?? 0;
+    return {
+      label: threshold.label,
+      current,
+      target: threshold.target,
+      gap: Math.max(threshold.target - current, 0)
+    };
+  });
 
   return {
     anchorTitle: catalogResult.data?.title || "Circulo Essencial",
@@ -799,6 +927,10 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
     coolingRiskCount,
     siteOriginCount,
     articlesOriginCount,
+    waitlistQualifiedCount,
+    editorialOriginCount,
+    socialDensityScore,
+    thresholdDistanceSummary,
     sourceSummary: Array.from(sourceCounts.entries())
       .map(([label, count]) => ({
         label: prettifyOrigin(label),
@@ -807,6 +939,6 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       .sort((left, right) => right.count - left.count)
       .slice(0, 5),
     summary:
-      "O Circulo Essencial agora enxerga founder ativo, convites, waitlist, reserva prioritaria, onboarding, valor consumido, retencao, desejo e prontidao futura para monetizacao como uma unica jornada executiva."
+      "O Circulo Essencial agora enxerga founder ativo, convites, waitlist, reserva prioritaria, paid interest, densidade social, onboarding, valor consumido, retencao, desejo e prontidao futura para monetizacao como uma unica jornada executiva."
   };
 }

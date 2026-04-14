@@ -119,13 +119,34 @@ async function ensureProfile(item) {
     return existing[0];
   }
 
+  const { data: authUserData, error: authUserError } = await supabase.auth.admin.createUser({
+    email: item.email,
+    email_confirm: true,
+    user_metadata: {
+      role: "cliente",
+      full_name: item.full_name,
+      seeded_by: "phase12_9_reserve_interest"
+    }
+  });
+
+  if (authUserError || !authUserData?.user) {
+    throw new Error(`profiles auth: ${authUserError?.message || "nao foi possivel criar auth user"}`);
+  }
+
   const { data, error } = await supabase
     .from("profiles")
-    .insert({
-      email: item.email,
-      full_name: item.full_name,
-      role: "cliente"
-    })
+    .upsert(
+      {
+        id: authUserData.user.id,
+        email: item.email,
+        full_name: item.full_name,
+        role: "cliente",
+        is_active: true
+      },
+      {
+        onConflict: "id"
+      }
+    )
     .select("id,email,full_name,role")
     .single();
 

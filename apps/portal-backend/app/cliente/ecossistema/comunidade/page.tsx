@@ -147,6 +147,42 @@ export default async function ClientEcosystemCommunityPage() {
           ))}
         </div>
       </ClientSafeCard>
+
+      <ClientSafeCard title="Densidade Social Do Circulo">
+        <div className="grid gap-4 md:grid-cols-2">
+          {operations.socialDensityLevers.map((lever) => (
+            <article
+              key={lever.label}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {lever.cadence}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{lever.label}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{lever.objective}</p>
+              <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{lever.visibleProof}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Estados Visiveis Da Comunidade">
+        <div className="grid gap-4 md:grid-cols-2">
+          {operations.portalExperience.map((item) => (
+            <article
+              key={item.audience}
+              className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+                {item.label}
+              </p>
+              <p className="mt-3 text-lg font-semibold text-[#10261d]">{item.headline}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{item.detail}</p>
+              <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{item.framing}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
     </ClientShell>
   );
 }

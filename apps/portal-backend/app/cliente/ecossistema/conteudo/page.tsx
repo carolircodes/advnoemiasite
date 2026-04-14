@@ -89,6 +89,14 @@ export default async function ClientEcosystemContentPage() {
               journey: "circulo_essencial"
             }}
           />
+          <EcosystemTelemetryBeacon
+            eventKey="paid_interest_signal"
+            payload={{
+              surface: "client_ecosystem_content_locked",
+              page: "/cliente/ecossistema/conteudo",
+              journey: "circulo_essencial"
+            }}
+          />
         </>
       )}
 
@@ -163,6 +171,21 @@ export default async function ClientEcosystemContentPage() {
               <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{item.detail}</p>
             </article>
           ))}
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Conteudo Como Prova De Reserva">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Reserva e desejo</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.reserve.ladderPosition}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.reserve.microcopy}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Paid interest</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.paidInterest.statusLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.paidInterest.nextMove}</p>
+          </article>
         </div>
       </ClientSafeCard>
     </ClientShell>

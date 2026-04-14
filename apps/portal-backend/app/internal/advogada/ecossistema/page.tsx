@@ -71,6 +71,8 @@ export default async function EcosystemPage() {
         { label: "Aceites", value: String(premiumJourney.acceptedInvitesCount) },
         { label: "Waitlist", value: String(premiumJourney.waitlistCount) },
         { label: "Reserva", value: String(premiumJourney.reservedInterestCount) },
+        { label: "Fila qualificada", value: String(premiumJourney.waitlistQualifiedCount) },
+        { label: "Paid interest", value: String(premiumJourney.paidInterestCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
@@ -130,7 +132,7 @@ export default async function EcosystemPage() {
           <div className="summary-card">
             <span>Waitlist qualificada</span>
             <strong>{premiumJourney.waitlistCount}</strong>
-            <p>Perfis em observacao para entrada futura, sem abrir aquisicao massiva.</p>
+            <p>Perfis em observacao curada para entrada futura, sem abrir aquisicao massiva.</p>
             <span className="pill muted">espera elegante</span>
           </div>
           <div className="summary-card">
@@ -138,6 +140,12 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.reservedInterestCount}</strong>
             <p>Interessadas que ja sairam da espera generica e entraram na fila premium de prioridade.</p>
             <span className="pill success">reserva</span>
+          </div>
+          <div className="summary-card">
+            <span>Fila premium total</span>
+            <strong>{premiumJourney.waitlistQualifiedCount}</strong>
+            <p>Waitlist qualificada somada a reserva prioritaria para medir prontidao real.</p>
+            <span className="pill success">densidade</span>
           </div>
           <div className="summary-card">
             <span>Convites aceitos</span>
@@ -156,6 +164,12 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.paidInterestCount}</strong>
             <p>Sinais de interesse numa futura camada paga, sem ativar cobranca agora.</p>
             <span className="pill warning">monetizacao depois</span>
+          </div>
+          <div className="summary-card">
+            <span>Sinais editoriais</span>
+            <strong>{premiumJourney.editorialOriginCount}</strong>
+            <p>Site e artigos provando motor proprio de desejo, fila e paid interest.</p>
+            <span className="pill success">editorial</span>
           </div>
           <div className="summary-card">
             <span>Assinaturas preservadas</span>
@@ -223,6 +237,12 @@ export default async function EcosystemPage() {
             <p>Founders ativos sem sinais equivalentes de retorno no ciclo recente.</p>
             <span className="pill warning">atencao</span>
           </div>
+          <div className="summary-card">
+            <span>Densidade social</span>
+            <strong>{premiumJourney.socialDensityScore}</strong>
+            <p>Score composto de retorno, conclusoes, reserva e atividade comunitaria.</p>
+            <span className="pill success">peso social</span>
+          </div>
         </div>
         <p className="empty-state" style={{ marginTop: "20px" }}>
           {premiumJourney.summary}
@@ -230,6 +250,45 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <div className="grid two">
+        <SectionCard
+          title="Reserva Elegante E Paid Interest"
+          description="A Fase 12.9 formaliza a camada intermediaria entre interesse, waitlist, reserva prioritaria e convite sem monetizar agora."
+        >
+          <div className="summary-grid compact">
+            <div className="summary-card">
+              <span>Fila premium total</span>
+              <strong>{premiumJourney.waitlistQualifiedCount}</strong>
+              <p>Waitlist qualificada somada a reserva prioritaria para medir prontidao sem abrir geral.</p>
+            </div>
+            <div className="summary-card">
+              <span>Paid interest</span>
+              <strong>{premiumJourney.paidInterestCount}</strong>
+              <p>{operations.paidInterestPolicy.distinctionRule}</p>
+            </div>
+            <div className="summary-card">
+              <span>Janela de avancos</span>
+              <strong>{operations.reservePolicy.advancementWindow}</strong>
+              <p>{operations.reservePolicy.invitationLogic}</p>
+            </div>
+          </div>
+          <ul className="update-feed" style={{ marginTop: "20px" }}>
+            {operations.paidInterestPolicy.explicitSignals.map((signal) => (
+              <li key={signal.label} className="update-card">
+                <div className="update-head">
+                  <div>
+                    <strong>{signal.label}</strong>
+                    <span className="item-meta">{signal.telemetryFocus}</span>
+                  </div>
+                  <span className="tag soft">Interesse</span>
+                </div>
+                <p className="update-body">
+                  {signal.signal}. {signal.interpretation}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+
         <SectionCard
           title="Operacao Curada De Entrada"
           description="A curadoria deixa de ser ideia solta e passa a ter lote, estados, capacidade e regras de aprovacao."
@@ -327,6 +386,22 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.articlesOriginCount}</strong>
             <p>Registros curatoriais e sinais editoriais ligados a artigos e pontes de profundidade.</p>
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Densidade Social E Prova Comunitaria"
+        description="A futura cobranca precisa nascer sobre uma comunidade com peso social visivel, retorno recorrente e pequenos marcos de prova."
+      >
+        <div className="summary-grid compact">
+          {operations.socialDensityLevers.map((lever) => (
+            <div key={lever.label} className="summary-card">
+              <span>{lever.label}</span>
+              <strong>{lever.cadence}</strong>
+              <p>{lever.objective}</p>
+              <span className="pill success">{lever.telemetryFocus}</span>
+            </div>
+          ))}
         </div>
       </SectionCard>
 
@@ -460,6 +535,47 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
+        title="Distancia Real Ate A Monetizacao"
+        description="A leitura executiva mostra quanto falta objetivamente para a futura cobranca nascer forte, natural e desejada."
+      >
+        <div className="summary-grid compact">
+          {premiumJourney.thresholdDistanceSummary.map((threshold) => (
+            <div key={threshold.label} className="summary-card">
+              <span>{threshold.label}</span>
+              <strong>
+                {threshold.current} / {threshold.target}
+              </strong>
+              <p>
+                {threshold.gap === 0
+                  ? "Threshold atingido ou superado."
+                  : `Faltam ${threshold.gap} unidade(s) para o alvo desta etapa.`}
+              </p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Revisao Executiva Dos Thresholds"
+        description="A Fase 12.9 mantem os thresholds da 12.8 e explicita como eles devem ser lidos com honestidade operacional."
+      >
+        <ul className="update-feed">
+          {operations.executiveThresholdReview.map((item) => (
+            <li key={item.label} className="update-card">
+              <div className="update-head">
+                <div>
+                  <strong>{item.label}</strong>
+                  <span className="item-meta">{item.maintainedThreshold}</span>
+                </div>
+                <span className="tag soft">Threshold</span>
+              </div>
+              <p className="update-body">{item.operatingRule}</p>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+
+      <SectionCard
         title="Cenarios De Evolucao"
         description="A decisao de monetizacao nao e binaria por impulso: ela precisa respeitar risco, marca e densidade comunitaria."
       >
@@ -519,7 +635,7 @@ export default async function EcosystemPage() {
           description="A Fase 12 foi desenhada para expandir receita e experiencia sem reabrir problemas da Fase 11 nem baguncar o cockpit juridico."
         >
           <ul className="update-feed">
-            {overview.coreProtectionSummary.map((item) => (
+            {[...overview.coreProtectionSummary, ...operations.coreProtectionRules].map((item) => (
               <li key={item} className="update-card">
                 <div className="update-head">
                   <div>

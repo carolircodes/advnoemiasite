@@ -742,12 +742,17 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         label: "Prontidao para monetizacao",
         value: formatCount(
           (telemetryCounts.get("paid_interest_signal") || 0) +
-            (telemetryCounts.get("subscription_interest") || 0)
+            (telemetryCounts.get("subscription_interest") || 0) +
+            (telemetryCounts.get("reserved_priority_signal") || 0) +
+            (telemetryCounts.get("monetization_readiness_signal") || 0)
         ),
-        detail: "Sinais de interesse futuro pago ajudam a definir quando a cobranca pode nascer forte, natural e elegante.",
+        detail:
+          "Sinais de interesse futuro pago, prioridade reservada e readiness ajudam a definir quando a cobranca pode nascer forte, natural e elegante.",
         tone:
           (telemetryCounts.get("paid_interest_signal") || 0) > 0 ||
-          (telemetryCounts.get("subscription_interest") || 0) > 0
+          (telemetryCounts.get("subscription_interest") || 0) > 0 ||
+          (telemetryCounts.get("reserved_priority_signal") || 0) > 0 ||
+          (telemetryCounts.get("monetization_readiness_signal") || 0) > 0
             ? "success"
             : "muted"
       },

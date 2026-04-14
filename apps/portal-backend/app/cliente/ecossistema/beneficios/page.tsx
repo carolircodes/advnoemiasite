@@ -101,6 +101,26 @@ export default async function ClientEcosystemBenefitsPage({
           }}
         />
       ) : null}
+      {journey.entry.stage === "reserved_interest" ? (
+        <EcosystemTelemetryBeacon
+          eventKey="reserved_priority_signal"
+          payload={{
+            surface: "client_ecosystem_benefits",
+            page: "/cliente/ecossistema/beneficios",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
+      {!journey.access.hasAccess ? (
+        <EcosystemTelemetryBeacon
+          eventKey="paid_interest_signal"
+          payload={{
+            surface: "client_ecosystem_benefits",
+            page: "/cliente/ecossistema/beneficios",
+            journey: "circulo_essencial"
+          }}
+        />
+      ) : null}
       {!journey.access.hasAccess ? (
         <EcosystemTelemetryBeacon
           eventKey="waitlist_interest"
@@ -192,28 +212,55 @@ export default async function ClientEcosystemBenefitsPage({
           </div>
         </ClientSafeCard>
 
-        <ClientSafeCard title="Waitlist Elegante E Prioridade Futura">
-          <ul className="space-y-4">
-            {operations.waitlistPolicy.prioritySignals.map((signal) => (
-              <li key={signal} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-                {signal}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.experienceRule}</p>
-        </ClientSafeCard>
+      <ClientSafeCard title="Waitlist Elegante E Prioridade Futura">
+        <ul className="space-y-4">
+          {operations.waitlistPolicy.prioritySignals.map((signal) => (
+            <li key={signal} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              {signal}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.experienceRule}</p>
+        <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.waitlistPolicy.upgradeRule}</p>
+      </ClientSafeCard>
 
-        <ClientSafeCard title="Reserva Prioritaria E Interesse Futuro">
-          <ul className="space-y-4">
-            {operations.reservePolicy.reserveStates.map((state) => (
-              <li key={state} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
-                {state}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.reserveSignalRule}</p>
-          <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.promotionRule}</p>
-        </ClientSafeCard>
+      <ClientSafeCard title="Reserva Prioritaria E Interesse Futuro">
+        <ul className="space-y-4">
+          {operations.reservePolicy.curationStates.map((state) => (
+            <li key={state.key} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-base font-semibold text-[#10261d]">{state.label}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{state.microcopy}</p>
+              <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{state.curatorReason}</p>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.reserveSignalRule}</p>
+        <p className="mt-3 text-sm leading-7 text-[#5f6f68]">{operations.reservePolicy.promotionRule}</p>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Paid Interest Materializado">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Leitura atual</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.paidInterest.statusLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.paidInterest.detail}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Regra premium</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{operations.paidInterestPolicy.headline}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{operations.paidInterestPolicy.permanenceRule}</p>
+          </article>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {operations.paidInterestPolicy.explicitSignals.map((signal) => (
+            <article key={signal.label} className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+              <p className="text-base font-semibold text-[#10261d]">{signal.label}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{signal.signal}</p>
+              <p className="mt-3 text-sm leading-6 text-[#5f6f68]">{signal.interpretation}</p>
+            </article>
+          ))}
+        </div>
+      </ClientSafeCard>
 
         <ClientSafeCard title="Onboarding premium do primeiro ciclo">
           <ul className="space-y-4">

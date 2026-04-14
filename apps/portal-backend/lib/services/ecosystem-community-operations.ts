@@ -70,6 +70,43 @@ export type MonetizationReadinessThreshold = {
   reason: string;
 };
 
+export type ReserveStateDescriptor = {
+  key: "curious" | "interested" | "qualified_waitlist" | "reserved_priority" | "invited" | "active_founder";
+  label: string;
+  microcopy: string;
+  curatorReason: string;
+  promotionTiming: string;
+};
+
+export type PaidInterestSignal = {
+  label: string;
+  signal: string;
+  interpretation: string;
+  telemetryFocus: string;
+};
+
+export type SocialDensityLever = {
+  label: string;
+  cadence: string;
+  objective: string;
+  visibleProof: string;
+  telemetryFocus: string;
+};
+
+export type PortalExperienceMarker = {
+  audience: "founder" | "invited" | "waitlist" | "reserved_interest";
+  label: string;
+  headline: string;
+  detail: string;
+  framing: string;
+};
+
+export type ExecutiveThresholdReview = {
+  label: string;
+  maintainedThreshold: string;
+  operatingRule: string;
+};
+
 export type CommunityOperationsBlueprint = {
   positioning: {
     currentMode: string;
@@ -91,16 +128,31 @@ export type CommunityOperationsBlueprint = {
   };
   reservePolicy: {
     reserveStates: Array<"interested" | "waitlist" | "reserved_priority" | "founder_active">;
+    curationStates: ReserveStateDescriptor[];
     reserveSignalRule: string;
     promotionRule: string;
+    priorityReasons: string[];
+    advancementWindow: string;
+    invitationLogic: string;
+  };
+  paidInterestPolicy: {
+    headline: string;
+    explicitSignals: PaidInterestSignal[];
+    distinctionRule: string;
+    permanenceRule: string;
+    founderPlanRule: string;
   };
   onboarding: CommunityOnboardingStep[];
   valueLoops: CommunityValueLoop[];
   retentionRoutines: RetentionRoutine[];
   contentCheckpoints: ContentCheckpoint[];
+  socialDensityLevers: SocialDensityLever[];
+  portalExperience: PortalExperienceMarker[];
   channelBridges: CommunityChannelBridge[];
   monetizationCriteria: MonetizationCriterion[];
   readinessThresholds: MonetizationReadinessThreshold[];
+  executiveThresholdReview: ExecutiveThresholdReview[];
+  coreProtectionRules: string[];
   monetizationScenarios: MonetizationScenario[];
 };
 
@@ -159,10 +211,99 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
     },
     reservePolicy: {
       reserveStates: ["interested", "waitlist", "reserved_priority", "founder_active"],
+      curationStates: [
+        {
+          key: "curious",
+          label: "Curiosa em leitura",
+          microcopy: "Interesse inicial lido com delicadeza, sem promessa de entrada.",
+          curatorReason: "Existe afinidade embrionaria, mas ainda sem densidade para fila premium.",
+          promotionTiming: "Avanca quando houver origem clara e retorno espontaneo."
+        },
+        {
+          key: "interested",
+          label: "Interesse declarado",
+          microcopy: "Desejo percebido e registrado como sinal nobre de aproximacao.",
+          curatorReason: "A pessoa demonstrou vontade ativa de acompanhar o Circulo com mais proximidade.",
+          promotionTiming: "Sobe para waitlist qualificada quando o interesse ganha contexto e origem."
+        },
+        {
+          key: "qualified_waitlist",
+          label: "Waitlist qualificada",
+          microcopy: "Fila elegante com observacao curada, nao formulario frio.",
+          curatorReason: "Ja existe aderencia editorial ou relacional suficiente para manter aquecimento.",
+          promotionTiming: "Pode subir para reserva prioritaria na janela seguinte de revisao."
+        },
+        {
+          key: "reserved_priority",
+          label: "Reserva prioritaria",
+          microcopy: "Prioridade preservada para a proxima chamada fundadora, sem cobranca agora.",
+          curatorReason: "Desejo futuro pago, permanencia e afinidade alta ja aparecem de forma objetiva.",
+          promotionTiming: "Vira convite quando houver lote, densidade social e capacidade de onboarding."
+        },
+        {
+          key: "invited",
+          label: "Convite reservado",
+          microcopy: "Janela pequena e curada de entrada, com motivo e contexto claros.",
+          curatorReason: "A pessoa ja cabe no lote atual sem diluir a experiencia fundadora.",
+          promotionTiming: "Aceite acontece no lote ativo, sem pressa comercial e sem abertura geral."
+        },
+        {
+          key: "active_founder",
+          label: "Founder ativa",
+          microcopy: "Pertencimento materializado em acesso, trilha, comunidade e retorno.",
+          curatorReason: "A entrada deixou de ser hipotese e virou prova social viva do Circulo.",
+          promotionTiming: "Mantem-se pela continuidade, nao por urgencia de venda."
+        }
+      ],
       reserveSignalRule:
         "Reserved priority so aparece quando houver desejo futuro pago declarado, origem qualificada e nota curatorial favoravel.",
       promotionRule:
-        "Promover waitlist para reserved_priority antes do convite quando a pessoa ja demonstrar continuidade, afinidade editorial e apetite explicito por plano fundador futuro."
+        "Promover waitlist para reserved_priority antes do convite quando a pessoa ja demonstrar continuidade, afinidade editorial e apetite explicito por plano fundador futuro.",
+      priorityReasons: [
+        "origem rastreavel por site, artigo, WhatsApp curado ou indicacao qualificada",
+        "sinal explicito de continuidade e desejo de permanecer quando a camada paga abrir",
+        "aderencia editorial percebida na linguagem, no problema e na forma de entrar",
+        "capacidade de reforcar a densidade social sem transformar o grupo em volume"
+      ],
+      advancementWindow:
+        "A revisao de avancos acontece em janelas curatoriais curtas, orientadas por lote e capacidade operacional, nunca por pressa de captura.",
+      invitationLogic:
+        "Convite so sai da reserva quando a proxima entrada fortalece pertencimento, prova social e ritmo da comunidade ao mesmo tempo."
+    },
+    paidInterestPolicy: {
+      headline: "Paid interest aqui significa desejo de continuar pagando depois, nao curiosidade sobre preco.",
+      explicitSignals: [
+        {
+          label: "Manifestacao futura",
+          signal: "declarar interesse em continuar quando o plano fundador pago abrir",
+          interpretation: "Separa admiracao passiva de vontade concreta de permanecer.",
+          telemetryFocus: "paid_interest_signal"
+        },
+        {
+          label: "Prioridade reservada",
+          signal: "pedir prioridade para a proxima chamada sem exigir entrada imediata",
+          interpretation: "Mostra apetite real por lugar, nao so por mais informacao.",
+          telemetryFocus: "reserved_priority_signal"
+        },
+        {
+          label: "Continuidade assumida",
+          signal: "sinalizar que quer seguir depois do ciclo gratuito fundador",
+          interpretation: "Materializa intencao de permanencia e reduz risco de curiosidade vazia.",
+          telemetryFocus: "monetization_readiness_signal"
+        },
+        {
+          label: "Afinidade editorial",
+          signal: "chegar por artigo, site ou ponte de profundidade e ainda assim pedir entrada futura",
+          interpretation: "Eleva o valor do paid interest porque nasce de entendimento, nao de impulso.",
+          telemetryFocus: "premium_interest_signal"
+        }
+      ],
+      distinctionRule:
+        "Curiosidade pergunta o que e; paid interest pergunta como garantir continuidade quando a camada paga amadurecer.",
+      permanenceRule:
+        "Registrar paid interest apenas quando houver linguagem de permanencia, nao apenas elogio ou afinidade superficial.",
+      founderPlanRule:
+        "O futuro plano fundador deve ser mencionado como continuidade elegante do que ja esta sendo vivido, nunca como pitch de fechamento."
     },
     onboarding: [
       {
@@ -247,6 +388,66 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         milestone: "content_completed",
         detail: "a primeira conclusao vira prova de valor, nao so liberacao de conteudo",
         telemetryFocus: "content_completed"
+      }
+    ],
+    socialDensityLevers: [
+      {
+        label: "Lotes curatoriais visiveis",
+        cadence: "a cada nova janela",
+        objective: "fazer novas entradas parecerem continuidade de uma sala viva, nao fluxo aleatorio",
+        visibleProof: "novas founders aparecem como parte de um lote pequeno e intencional",
+        telemetryFocus: "member_joined"
+      },
+      {
+        label: "Marcos pequenos de prova",
+        cadence: "semanal",
+        objective: "transformar progresso, retorno e conclusao em prova comunitaria delicada",
+        visibleProof: "conteudo iniciado, concluido e retorno semanal reforcam vida social",
+        telemetryFocus: "content_completed"
+      },
+      {
+        label: "Pertencimento narrado",
+        cadence: "continuo",
+        objective: "dar nome, contexto e elegancia ao status de cada pessoa dentro do Circulo",
+        visibleProof: "founder, convite, waitlist e reserva aparecem com semantica premium no portal",
+        telemetryFocus: "founder_engagement_score"
+      },
+      {
+        label: "Pulso de comunidade",
+        cadence: "por ciclo fundador",
+        objective: "manter sensacao de grupo vivo sem depender de volume ou ruido",
+        visibleProof: "community_viewed, member_active e retention_signal sobem em conjunto",
+        telemetryFocus: "community_viewed"
+      }
+    ],
+    portalExperience: [
+      {
+        audience: "founder",
+        label: "Founder ativo",
+        headline: "Voce ja esta dentro do Circulo em sua camada fundadora.",
+        detail: "O portal deve reforcar pertencimento, progresso e retorno como experiencia viva.",
+        framing: "mostrar continuidade e prova, nao exclusividade vazia"
+      },
+      {
+        audience: "invited",
+        label: "Convite reservado",
+        headline: "Sua entrada esta aberta dentro de uma chamada pequena e cuidadosa.",
+        detail: "A experiencia deve transmitir contexto, motivo da chamada e elegancia de lote.",
+        framing: "convite como honra operacional, nao urgencia barata"
+      },
+      {
+        audience: "waitlist",
+        label: "Waitlist qualificada",
+        headline: "Seu nome esta em observacao curada para os proximos lotes do Circulo.",
+        detail: "O portal sustenta desejo com clareza de valor e sem prometer imediatismo.",
+        framing: "espera nobre com sinal de leitura real"
+      },
+      {
+        audience: "reserved_interest",
+        label: "Reserva prioritaria",
+        headline: "Sua prioridade ja foi reconhecida para a proxima chamada fundadora.",
+        detail: "Aqui o portal deve materializar desejo futuro pago, fila premium e prontidao crescente.",
+        framing: "prioridade como prova de maturidade, nao de escassez teatral"
       }
     ],
     channelBridges: [
@@ -388,6 +589,39 @@ export function getCommunityOperationsBlueprint(): CommunityOperationsBlueprint 
         unit: "riscos",
         reason: "Cobrar com esfriamento alto cria pressao prematura."
       }
+    ],
+    executiveThresholdReview: [
+      {
+        label: "Founders ativos e engajados",
+        maintainedThreshold: "12 ativos e 8 engajados",
+        operatingRule: "crescer por lotes pequenos enquanto a experiencia continuar parecendo intima e viva"
+      },
+      {
+        label: "Progresso e conclusoes",
+        maintainedThreshold: "70% de progresso medio e 4 conclusoes reais",
+        operatingRule: "tratar conclusao como prova publica de valor, nao apenas consumo interno"
+      },
+      {
+        label: "Waitlist e reserva",
+        maintainedThreshold: "20 nomes qualificados entre waitlist e reserva prioritaria",
+        operatingRule: "medir densidade, origem e desejo pago futuro antes de qualquer abertura"
+      },
+      {
+        label: "Motor editorial e paid interest",
+        maintainedThreshold: "6 sinais editoriais e 10 sinais de paid interest",
+        operatingRule: "site e artigos precisam alimentar desejo premium sem contaminar a marca"
+      },
+      {
+        label: "Risco de esfriamento",
+        maintainedThreshold: "0 founders esfriando sem contrapeso",
+        operatingRule: "nao monetizar enquanto a comunidade precisar de reanimacao basica"
+      }
+    ],
+    coreProtectionRules: [
+      "o core juridico continua intacto como command center principal do imperio",
+      "pagamentos juridicos seguem separados da camada premium e da reserva fundadora",
+      "portal premium, comunidade e assinatura nao contaminam a operacao legal",
+      "toda telemetria do Circulo continua em camada propria, fora da leitura do atendimento juridico"
     ],
     monetizationScenarios: [
       {
