@@ -20,20 +20,60 @@ export const metadata: Metadata = {
   }
 };
 
-export default async function ClientEcosystemBenefitsPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function pickFirst(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : "";
+  }
+
+  return typeof value === "string" ? value : "";
+}
+
+export default async function ClientEcosystemBenefitsPage({
+  searchParams
+}: {
+  searchParams: SearchParams;
+}) {
   const profile = await requireProfile(["cliente"]);
 
   if (!profile.first_login_completed_at) {
     redirect("/auth/primeiro-acesso");
   }
 
+  const params = await searchParams;
+  const success = pickFirst(params.success);
+  const error = pickFirst(params.error);
   const [profileSummary, journey] = await Promise.all([
     getClientProfileSummary(profile),
     getClientPremiumJourney(profile)
   ]);
 
   return (
-    <ClientShell profile={profileSummary.data}>
+    <ClientShell
+      profile={profileSummary.data}
+      notices={[
+        success
+          ? {
+              tone: "success",
+              title: "Assinatura atualizada",
+              description:
+                "A camada recorrente foi sincronizada com sucesso e o entitlement premium ja refletiu o novo estado da assinatura."
+            }
+          : error
+            ? {
+                tone: "error",
+                title: "Leitura da assinatura",
+                description: error
+              }
+            : {
+                tone: "warning",
+                title: "Continuidade premium",
+                description:
+                  "Esta area organiza billing, beneficios e acesso do Circulo Essencial sem misturar a assinatura com o fluxo juridico principal."
+              }
+      ]}
+    >
       <EcosystemTelemetryBeacon
         eventKey="plan_viewed"
         payload={{
@@ -64,7 +104,7 @@ export default async function ClientEcosystemBenefitsPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Cadencia modelada</p>
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.plan.cadenceLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
-              A recorrencia esta semanticamente pronta, mas a cobranca operacional continua fora de escopo nesta fase.
+              A recorrencia agora roda em camada propria, com billing recorrente separado do checkout juridico.
             </p>
           </article>
           <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
@@ -72,6 +112,83 @@ export default async function ClientEcosystemBenefitsPage() {
             <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.plan.statusLabel}</p>
             <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.plan.detail}</p>
           </article>
+        </div>
+      </ClientSafeCard>
+
+      <ClientSafeCard title="Gestao elegante da assinatura">
+        <div className="grid gap-4 md:grid-cols-3">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Lifecycle</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.lifecycleLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.detail}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Billing</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.billingLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.nextBillingLabel}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">Politica fundadora</p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              A migracao do beta preserva beneficios fundadores e rastreabilidade do entitlement.
+            </p>
+          </article>
+        </div>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          {journey.subscription.canStartLive ? (
+            <TrackedLink
+              href={journey.subscription.startHref}
+              eventKey="subscription_started"
+              eventGroup="ecosystem"
+              trackingPayload={{ surface: "client_ecosystem_benefits", target: "start_live" }}
+              className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
+            >
+              Ativar assinatura live
+            </TrackedLink>
+          ) : null}
+          {journey.subscription.canPause ? (
+            <TrackedLink
+              href={journey.subscription.pauseHref}
+              eventKey="subscription_paused"
+              eventGroup="ecosystem"
+              trackingPayload={{ surface: "client_ecosystem_benefits", target: "pause" }}
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
+            >
+              Pausar
+            </TrackedLink>
+          ) : null}
+          {journey.subscription.canResume ? (
+            <TrackedLink
+              href={journey.subscription.resumeHref}
+              eventKey="access_restored"
+              eventGroup="ecosystem"
+              trackingPayload={{ surface: "client_ecosystem_benefits", target: "resume" }}
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
+            >
+              Retomar
+            </TrackedLink>
+          ) : null}
+          {journey.subscription.canCancel ? (
+            <TrackedLink
+              href={journey.subscription.cancelHref}
+              eventKey="subscription_canceled"
+              eventGroup="ecosystem"
+              trackingPayload={{ surface: "client_ecosystem_benefits", target: "cancel" }}
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
+            >
+              Cancelar
+            </TrackedLink>
+          ) : null}
+          <TrackedLink
+            href={journey.subscription.syncHref}
+            eventKey="retention_signal"
+            eventGroup="ecosystem"
+            trackingPayload={{ surface: "client_ecosystem_benefits", target: "sync" }}
+            className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
+          >
+            Sincronizar status
+          </TrackedLink>
         </div>
       </ClientSafeCard>
 

@@ -405,7 +405,7 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
     supabase
       .from("ecosystem_subscriptions")
       .select(
-        "id,status,cadence,current_period_ends_at,profile_id,plan_tier_id,created_at,ecosystem_plan_tiers(name)"
+        "id,status,cadence,current_period_ends_at,profile_id,plan_tier_id,created_at,source_of_activation,payment_provider,billing_status,ecosystem_plan_tiers(name)"
       )
       .order("created_at", { ascending: false })
       .limit(200),
@@ -510,6 +510,15 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
   );
   const activeSubscriptions = subscriptions.filter((item) => item.status === "active");
   const pausedSubscriptions = subscriptions.filter((item) => item.status === "paused");
+  const liveSubscriptions = subscriptions.filter(
+    (item) => item.payment_provider === "mercado_pago_preapproval"
+  );
+  const foundingSubscriptions = subscriptions.filter(
+    (item) => item.source_of_activation === "founding_beta"
+  );
+  const pastDueSubscriptions = subscriptions.filter(
+    (item) => item.status === "past_due" || item.billing_status === "past_due"
+  );
   const activeGrants = accessGrants.filter((item) => item.grant_status === "active");
   const completedProgress = progressItems.filter((item) => item.status === "completed");
   const activeMemberships = memberships.filter((item) => item.status === "active");
@@ -593,7 +602,7 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         label: "Assinaturas mapeadas",
         value: formatCount(subscriptions.length),
         detail:
-          `${activeSubscriptions.length} ativa(s), ${pausedSubscriptions.length} pausada(s) e sem misturar recorrencia com pagamento transacional do core.`,
+          `${activeSubscriptions.length} ativa(s), ${pausedSubscriptions.length} pausada(s), ${liveSubscriptions.length} live e sem misturar recorrencia com pagamento transacional do core.`,
         tone: subscriptions.length > 0 ? "success" : "warning"
       },
       {
@@ -602,6 +611,13 @@ export async function getEcosystemExecutiveOverview(days = 45): Promise<Ecosyste
         detail:
           `${activeGrants.length} grant(s) ativo(s) por plano, compra ou curadoria com trilha propria de expiracao.`,
         tone: accessGrants.length > 0 ? "success" : "warning"
+      },
+      {
+        label: "Transicao beta -> live",
+        value: formatCount(liveSubscriptions.length),
+        detail:
+          `${foundingSubscriptions.length} fundador(es) preservados e ${pastDueSubscriptions.length} sinal(is) de risco no lifecycle recorrente.`,
+        tone: liveSubscriptions.length > 0 ? "success" : pastDueSubscriptions.length > 0 ? "warning" : "muted"
       }
     ],
     contentSummary: [

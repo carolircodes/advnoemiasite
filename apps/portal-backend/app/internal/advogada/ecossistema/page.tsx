@@ -54,6 +54,7 @@ export default async function EcosystemPage() {
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
         { label: "Oferta ancora", value: premiumJourney.anchorTitle },
         { label: "Beta ativo", value: String(premiumJourney.betaAudienceCount) },
+        { label: "Live", value: String(premiumJourney.liveSubscribersCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
@@ -105,6 +106,12 @@ export default async function EcosystemPage() {
             <span className="pill success">grant ativo</span>
           </div>
           <div className="summary-card">
+            <span>Assinantes live</span>
+            <strong>{premiumJourney.liveSubscribersCount}</strong>
+            <p>Perfis que ja iniciaram ou ativaram a assinatura recorrente operacional.</p>
+            <span className="pill success">billing live</span>
+          </div>
+          <div className="summary-card">
             <span>Assinaturas beta</span>
             <strong>{premiumJourney.activeSubscriptions}</strong>
             <p>Assinaturas em modo manual_beta, sem cobranca recorrente operacional.</p>
@@ -121,6 +128,14 @@ export default async function EcosystemPage() {
             <strong>{premiumJourney.activeMemberships}</strong>
             <p>Membros ativos na extensao comunitaria da jornada ancora.</p>
             <span className="pill success">membership ativo</span>
+          </div>
+          <div className="summary-card">
+            <span>Risco de churn</span>
+            <strong>{premiumJourney.churnRiskCount}</strong>
+            <p>Assinaturas em pausa, past_due ou sinais equivalentes dentro do lifecycle recorrente.</p>
+            <span className={premiumJourney.churnRiskCount > 0 ? "pill warning" : "pill muted"}>
+              risco
+            </span>
           </div>
         </div>
         <p className="empty-state" style={{ marginTop: "20px" }}>

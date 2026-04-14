@@ -22,6 +22,7 @@ export const PortalTable = {
   ecosystemPlanTiers: "ecosystem_plan_tiers",
   ecosystemPlanBenefits: "ecosystem_plan_benefits",
   ecosystemSubscriptions: "ecosystem_subscriptions",
+  ecosystemBillingEvents: "ecosystem_billing_events",
   ecosystemAccessGrants: "ecosystem_access_grants",
   ecosystemContentTracks: "ecosystem_content_tracks",
   ecosystemContentModules: "ecosystem_content_modules",
@@ -134,6 +135,11 @@ export type EcosystemPlanTierRow = {
   portal_workspace: string;
   price_amount: number | null;
   currency_code: string;
+  billing_provider: string | null;
+  billing_plan_reference: string | null;
+  billing_status: string;
+  billing_metadata: Record<string, unknown>;
+  billing_activated_at: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -147,6 +153,19 @@ export type EcosystemSubscriptionRow = {
   status: string;
   cadence: string;
   renewal_mode: string;
+  payment_provider: string | null;
+  external_reference: string | null;
+  billing_status: string;
+  billing_provider_reference: string | null;
+  billing_provider_plan_reference: string | null;
+  source_of_activation: string;
+  renewal_cycle: number;
+  renewal_due_at: string | null;
+  next_billing_at: string | null;
+  past_due_at: string | null;
+  grace_period_ends_at: string | null;
+  last_billing_event_at: string | null;
+  billing_metadata: Record<string, unknown>;
   current_period_started_at: string | null;
   current_period_ends_at: string | null;
   trial_ends_at: string | null;
@@ -156,4 +175,22 @@ export type EcosystemSubscriptionRow = {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+};
+
+export type EcosystemBillingEventRow = {
+  id: string;
+  subscription_id: string | null;
+  profile_id: string | null;
+  plan_tier_id: string | null;
+  provider: string;
+  provider_event_type: string;
+  provider_status: string | null;
+  billing_status: string | null;
+  amount: number | null;
+  currency_code: string;
+  provider_reference: string | null;
+  external_reference: string | null;
+  occurred_at: string;
+  payload: Record<string, unknown>;
+  created_at: string;
 };

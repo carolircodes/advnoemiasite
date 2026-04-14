@@ -20,6 +20,25 @@ export const PREMIUM_JOURNEY_ANCHOR = {
 
 type JourneyTone = "success" | "warning" | "muted" | "critical";
 
+type PremiumSubscriptionSnapshot = {
+  hasLiveProvider: boolean;
+  lifecycleLabel: string;
+  billingLabel: string;
+  foundingLabel: string;
+  detail: string;
+  nextBillingLabel: string;
+  canStartLive: boolean;
+  canPause: boolean;
+  canResume: boolean;
+  canCancel: boolean;
+  providerLabel: string;
+  startHref: string;
+  pauseHref: string;
+  resumeHref: string;
+  cancelHref: string;
+  syncHref: string;
+};
+
 export type ClientPremiumJourneySnapshot = {
   anchor: {
     title: string;
@@ -44,6 +63,7 @@ export type ClientPremiumJourneySnapshot = {
     statusLabel: string;
     detail: string;
   };
+  subscription: PremiumSubscriptionSnapshot;
   content: {
     title: string;
     unitTitle: string;
@@ -75,6 +95,9 @@ export type InternalPremiumJourneySnapshot = {
   anchorSubtitle: string;
   statusLabel: string;
   betaAudienceCount: number;
+  liveSubscribersCount: number;
+  pausedSubscribersCount: number;
+  churnRiskCount: number;
   activeMemberships: number;
   activeSubscriptions: number;
   contentUnlocks: number;
@@ -93,6 +116,101 @@ function getTone(active: boolean, preview: boolean): JourneyTone {
   return "muted";
 }
 
+function formatDate(value: string | null | undefined) {
+  if (!value) {
+    return "Sem data definida";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "medium"
+  }).format(date);
+}
+
+function getBillingLabel(status: string | null | undefined) {
+  switch ((status || "").toLowerCase()) {
+    case "authorized":
+      return "Billing autorizado";
+    case "pending_authorization":
+      return "Autorizacao pendente";
+    case "paused":
+      return "Billing pausado";
+    case "canceled":
+      return "Billing cancelado";
+    case "beta_manual":
+      return "Curadoria fundadora";
+    case "live_ready":
+      return "Billing live pronto";
+    default:
+      return status ? status.replaceAll("_", " ") : "Billing em preparacao";
+  }
+}
+
+function buildSubscriptionSnapshot(args: {
+  betaSubscription: any | null;
+  liveSubscription: any | null;
+  effectiveSubscription: any | null;
+}) {
+  const { betaSubscription, liveSubscription, effectiveSubscription } = args;
+  const liveStatus = liveSubscription?.status || null;
+  const liveBillingStatus = liveSubscription?.billing_status || null;
+  const betaFounding = betaSubscription?.source_of_activation === "founding_beta";
+  const hasLiveProvider = liveSubscription?.payment_provider === "mercado_pago_preapproval";
+  const canPause = liveStatus === "active";
+  const canResume = liveStatus === "paused" || liveStatus === "past_due";
+  const canCancel = ["active", "paused", "past_due", "trialing"].includes(liveStatus || "");
+  const canStartLive = !hasLiveProvider || liveStatus === "incomplete";
+  const lifecycleLabel = effectiveSubscription
+    ? subscriptionStatusLabels[
+        effectiveSubscription.status as keyof typeof subscriptionStatusLabels
+      ] || "Assinatura estruturada"
+    : "Sem assinatura live";
+
+  return {
+    hasLiveProvider,
+    lifecycleLabel,
+    billingLabel: getBillingLabel(liveBillingStatus || betaSubscription?.billing_status || null),
+    foundingLabel: betaFounding
+      ? hasLiveProvider && liveStatus === "active"
+        ? "Fundadora migrada para live"
+        : "Beneficio fundador preservado"
+      : hasLiveProvider
+        ? "Assinante live"
+        : "Sem status fundador",
+    detail: hasLiveProvider
+      ? liveStatus === "active"
+        ? "A assinatura recorrente do Circulo Essencial agora roda em lifecycle operacional proprio, com billing separado do core juridico."
+        : liveStatus === "paused"
+          ? "A assinatura live esta pausada. O entitlement premium segue congelado sem contaminar a camada juridica."
+          : liveStatus === "canceled"
+            ? "A assinatura live foi cancelada e a continuidade premium passa a obedecer o fim do ciclo configurado."
+            : "A transicao para billing live ja foi iniciada e aguarda autorizacao final da assinatura."
+      : betaFounding
+        ? "A jornada fundadora continua protegida enquanto a migracao elegante para live acontece."
+        : "A camada de assinatura real ainda nao foi iniciada para este perfil.",
+    nextBillingLabel: effectiveSubscription?.next_billing_at
+      ? `Proxima leitura de ciclo: ${formatDate(effectiveSubscription.next_billing_at)}`
+      : effectiveSubscription?.renewal_due_at
+        ? `Renovacao prevista: ${formatDate(effectiveSubscription.renewal_due_at)}`
+        : "Sem proxima cobranca registrada",
+    canStartLive,
+    canPause,
+    canResume,
+    canCancel,
+    providerLabel: hasLiveProvider ? "Mercado Pago Recorrente" : "Transicao curada",
+    startHref: "/api/ecosystem/subscription/start",
+    pauseHref: "/api/ecosystem/subscription/manage?action=pause",
+    resumeHref: "/api/ecosystem/subscription/manage?action=resume",
+    cancelHref: "/api/ecosystem/subscription/manage?action=cancel",
+    syncHref: "/api/ecosystem/subscription/manage?action=sync"
+  };
+}
+
 export async function getClientPremiumJourney(
   profile: PortalProfile
 ): Promise<ClientPremiumJourneySnapshot> {
@@ -101,7 +219,7 @@ export async function getClientPremiumJourney(
   const [
     catalogResult,
     planResult,
-    subscriptionResult,
+    subscriptionsResult,
     grantResult,
     trackResult,
     progressResult,
@@ -115,16 +233,19 @@ export async function getClientPremiumJourney(
       .maybeSingle(),
     supabase
       .from("ecosystem_plan_tiers")
-      .select("id,name,headline,description,cadence,status,metadata")
+      .select(
+        "id,name,headline,description,cadence,status,metadata,billing_provider,billing_status,billing_plan_reference"
+      )
       .eq("code", PREMIUM_JOURNEY_ANCHOR.planCode)
       .maybeSingle(),
     supabase
       .from("ecosystem_subscriptions")
-      .select("id,status,cadence,current_period_ends_at,renewal_mode,metadata")
+      .select(
+        "id,status,cadence,current_period_ends_at,renewal_mode,metadata,payment_provider,billing_status,billing_provider_reference,source_of_activation,renewal_due_at,next_billing_at,billing_metadata"
+      )
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(10),
     supabase
       .from("ecosystem_access_grants")
       .select("id,grant_status,access_scope,starts_at,ends_at,metadata")
@@ -168,12 +289,12 @@ export async function getClientPremiumJourney(
     throw new Error(`Nao foi possivel carregar o plano premium: ${planResult.error.message}`);
   }
 
-  if (subscriptionResult.error) {
-    throw new Error(`Nao foi possivel carregar a assinatura beta: ${subscriptionResult.error.message}`);
+  if (subscriptionsResult.error) {
+    throw new Error(`Nao foi possivel carregar a assinatura premium: ${subscriptionsResult.error.message}`);
   }
 
   if (grantResult.error) {
-    throw new Error(`Nao foi possivel carregar o grant beta: ${grantResult.error.message}`);
+    throw new Error(`Nao foi possivel carregar o grant premium: ${grantResult.error.message}`);
   }
 
   if (trackResult.error) {
@@ -194,7 +315,7 @@ export async function getClientPremiumJourney(
 
   const catalog = catalogResult.data;
   const plan = planResult.data;
-  const subscription = subscriptionResult.data;
+  const subscriptions = subscriptionsResult.data || [];
   const grant = grantResult.data;
   const track = trackResult.data as
     | {
@@ -214,14 +335,30 @@ export async function getClientPremiumJourney(
   const progress = progressResult.data;
   const community = communityResult.data;
   const membership = membershipResult.data;
+  const betaSubscription =
+    subscriptions.find((item) => item.source_of_activation === "founding_beta") || null;
+  const liveSubscription =
+    subscriptions.find((item) => item.payment_provider === "mercado_pago_preapproval") || null;
+  const effectiveSubscription =
+    liveSubscription ||
+    subscriptions.find((item) => ["active", "trialing", "paused", "past_due"].includes(item.status)) ||
+    betaSubscription ||
+    subscriptions[0] ||
+    null;
 
   const hasActiveGrant = grant?.grant_status === "active";
-  const hasActiveSubscription = subscription?.status === "active";
+  const hasActiveSubscription =
+    effectiveSubscription?.status === "active" || effectiveSubscription?.status === "trialing";
   const hasJoinedCommunity = membership?.status === "active";
 
   const firstModule = track?.ecosystem_content_modules?.[0];
   const firstUnit = firstModule?.ecosystem_content_units?.[0];
   const firstAsset = firstUnit?.ecosystem_content_assets?.[0];
+  const subscription = buildSubscriptionSnapshot({
+    betaSubscription,
+    liveSubscription,
+    effectiveSubscription
+  });
 
   return {
     anchor: {
@@ -234,8 +371,16 @@ export async function getClientPremiumJourney(
       description:
         catalog?.description ||
         "A primeira jornada premium organiza catalogo, plano, acesso, conteudo e comunidade em uma experiencia privada, nobre e controlada.",
-      ctaLabel: hasActiveGrant ? "Entrar na experiencia premium" : "Solicitar acesso beta",
-      statusLabel: hasActiveGrant ? "Acesso beta liberado" : "Beta privado controlado",
+      ctaLabel: subscription.canStartLive
+        ? "Ativar assinatura fundadora"
+        : hasActiveGrant
+          ? "Entrar na experiencia premium"
+          : "Solicitar acesso beta",
+      statusLabel: hasActiveGrant
+        ? subscription.hasLiveProvider
+          ? "Assinatura premium ativa"
+          : "Acesso fundador preservado"
+        : "Beta privado controlado",
       statusTone: getTone(hasActiveGrant, true),
       workspaceLabel: "Hub premium do ecossistema"
     },
@@ -245,8 +390,10 @@ export async function getClientPremiumJourney(
         ? accessGrantStatusLabels[grant.grant_status as keyof typeof accessGrantStatusLabels]
         : "Sem grant ativo",
       detail: hasActiveGrant
-        ? "Seu acesso foi concedido manualmente para a primeira jornada premium, sem misturar essa liberacao com o core juridico."
-        : "Esta experiencia premium esta em beta privado. O portal distingue com clareza entre arquitetura pronta e acesso ainda nao liberado.",
+        ? subscription.hasLiveProvider
+          ? "O acesso premium agora e sustentado por assinatura recorrente e entitlement proprio, sem tocar no core juridico."
+          : "Seu acesso fundador continua ativo enquanto a transicao para billing live e conduzida com elegancia."
+        : "Esta experiencia premium continua protegida por gating semantico entre beta, assinatura live e ausencia de acesso.",
       tone: getTone(hasActiveGrant, true)
     },
     plan: {
@@ -260,12 +407,13 @@ export async function getClientPremiumJourney(
       statusLabel: plan
         ? ecosystemAvailabilityStatusLabels[
             plan.status as keyof typeof ecosystemAvailabilityStatusLabels
-          ] || "Beta privado"
-        : "Beta privado",
+          ] || "Publicado"
+        : "Publicado",
       detail: hasActiveSubscription
-        ? `Estado da jornada: ${subscriptionStatusLabels[subscription.status as keyof typeof subscriptionStatusLabels]}.`
-        : "Nesta fase, o plano organiza acesso, beneficio e framing de valor sem ativar cobranca recorrente operacional."
+        ? `Estado da jornada: ${subscription.lifecycleLabel}. ${subscription.nextBillingLabel}.`
+        : "O plano agora sustenta billing, entitlement, pausas, cancelamento e continuidade premium dentro da propria camada do ecossistema."
     },
+    subscription,
     content: {
       title: track?.title || "Trilha de Clareza Estrategica",
       unitTitle: firstUnit?.title || "Boas-vindas Curadas",
@@ -279,8 +427,8 @@ export async function getClientPremiumJourney(
             : "Conteudo liberado"
         : "Conteudo reservado",
       detail: hasActiveGrant
-        ? "A trilha premium foi conectada ao grant beta e pode ser consumida com clareza, progresso e linguagem de ecossistema."
-        : "A trilha existe e sustenta a jornada ancora, mas continua reservada enquanto o acesso beta nao for concedido."
+        ? "A trilha premium agora conversa com a assinatura, com grants e continuidade de consumo preservados."
+        : "A trilha existe como parte da assinatura ancora, mas continua reservada enquanto o entitlement nao estiver ativo."
     },
     community: {
       title: community?.title || "Circulo Reservado",
@@ -290,7 +438,7 @@ export async function getClientPremiumJourney(
           ] || "Reserva"
         : "Convite reservado",
       detail: hasJoinedCommunity
-        ? "A comunidade funciona como extensao natural da jornada premium, conectando permanencia, pertencimento e continuidade."
+        ? "A comunidade acompanha a assinatura como camada de permanencia e pertencimento, sem virar puxadinho."
         : community?.onboarding_copy ||
           "A comunidade nasce como sala reservada da jornada ancora, com entrada controlada e sem ruir a sobriedade da marca.",
       joined: hasJoinedCommunity
@@ -302,9 +450,8 @@ export async function getClientPremiumJourney(
       community: "/cliente/ecossistema/comunidade"
     },
     beta: {
-      label: "Beta privado elegante",
-      detail:
-        "A primeira jornada premium esta ativa com controle de acesso manual, framing nobre e escopo contido para validar valor percebido antes de qualquer abertura maior."
+      label: subscription.foundingLabel,
+      detail: subscription.detail
     }
   };
 }
@@ -317,7 +464,8 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
     grantsResult,
     membershipsResult,
     subscriptionsResult,
-    progressResult
+    progressResult,
+    billingEventsResult
   ] = await Promise.all([
     supabase
       .from("ecosystem_catalog_items")
@@ -326,27 +474,39 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       .maybeSingle(),
     supabase
       .from("ecosystem_access_grants")
-      .select("id,grant_status")
+      .select("id,grant_status,access_scope")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("ecosystem_community_memberships")
-      .select("id,status")
+      .select("id,status,access_level")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("ecosystem_subscriptions")
-      .select("id,status")
+      .select("id,status,source_of_activation,payment_provider,billing_status")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("ecosystem_content_progress")
       .select("id,status")
       .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("ecosystem_billing_events")
+      .select("id,billing_status")
+      .order("created_at", { ascending: false })
       .limit(200)
   ]);
 
-  if (catalogResult.error || grantsResult.error || membershipsResult.error || subscriptionsResult.error || progressResult.error) {
+  if (
+    catalogResult.error ||
+    grantsResult.error ||
+    membershipsResult.error ||
+    subscriptionsResult.error ||
+    progressResult.error ||
+    billingEventsResult.error
+  ) {
     throw new Error("Nao foi possivel consolidar a leitura interna da jornada premium.");
   }
 
@@ -354,6 +514,19 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
   const memberships = membershipsResult.data || [];
   const subscriptions = subscriptionsResult.data || [];
   const progressItems = progressResult.data || [];
+  const billingEvents = billingEventsResult.data || [];
+  const betaAudienceCount = subscriptions.filter(
+    (item) => item.source_of_activation === "founding_beta"
+  ).length;
+  const liveSubscribersCount = subscriptions.filter(
+    (item) =>
+      item.payment_provider === "mercado_pago_preapproval" &&
+      ["active", "trialing", "incomplete", "paused", "past_due"].includes(item.status)
+  ).length;
+  const pausedSubscribersCount = subscriptions.filter((item) => item.status === "paused").length;
+  const churnRiskCount =
+    subscriptions.filter((item) => item.status === "past_due" || item.billing_status === "past_due").length +
+    billingEvents.filter((item) => item.billing_status === "past_due").length;
 
   return {
     anchorTitle: catalogResult.data?.title || "Circulo Essencial",
@@ -364,11 +537,14 @@ export async function getInternalPremiumJourneySnapshot(): Promise<InternalPremi
       ecosystemAvailabilityStatusLabels[
         (catalogResult.data?.availability_status || "private_beta") as keyof typeof ecosystemAvailabilityStatusLabels
       ] || "Beta privado",
-    betaAudienceCount: grants.filter((item) => item.grant_status === "active").length,
+    betaAudienceCount,
+    liveSubscribersCount,
+    pausedSubscribersCount,
+    churnRiskCount,
     activeMemberships: memberships.filter((item) => item.status === "active").length,
     activeSubscriptions: subscriptions.filter((item) => item.status === "active").length,
     contentUnlocks: progressItems.length,
     summary:
-      "A ancora premium agora tem framing, grant controlado, plano-base, trilha e comunidade conectados para um beta privado elegante."
+      "O Circulo Essencial agora enxerga beta fundador, transicao live, billing events e entitlement como uma unica jornada executiva."
   };
 }

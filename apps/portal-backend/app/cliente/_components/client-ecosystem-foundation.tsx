@@ -143,6 +143,34 @@ export function ClientEcosystemFoundation({
         </ClientSafeCard>
       ) : null}
 
+      <ClientSafeCard title="Recorrencia premium em transicao elegante">
+        <div className="grid gap-4 md:grid-cols-3">
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+              Assinatura
+            </p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.lifecycleLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.detail}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+              Billing
+            </p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.billingLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">{journey.subscription.nextBillingLabel}</p>
+          </article>
+          <article className="rounded-[24px] border border-[#ece5d9] bg-[#fcfaf6] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+              Fundacao
+            </p>
+            <p className="mt-3 text-lg font-semibold text-[#10261d]">{journey.subscription.foundingLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-[#5f6f68]">
+              A camada premium preserva quem entrou cedo enquanto organiza billing e entitlement em lifecycle proprio.
+            </p>
+          </article>
+        </div>
+      </ClientSafeCard>
+
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <ClientSafeCard title="Experiencias multicamada">
           <div className="space-y-4">

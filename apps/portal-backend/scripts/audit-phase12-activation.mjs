@@ -28,6 +28,7 @@ const tables = [
   "ecosystem_plan_benefits",
   "ecosystem_access_grants",
   "ecosystem_subscriptions",
+  "ecosystem_billing_events",
   "ecosystem_content_tracks",
   "ecosystem_content_modules",
   "ecosystem_content_units",
@@ -71,12 +72,23 @@ async function main() {
     counts[table] = await countRows(table);
   }
 
-  const [catalogItems, plans, tracks, communities, productEvents] = await Promise.all([
+  const [catalogItems, plans, subscriptions, billingEvents, tracks, communities, productEvents] = await Promise.all([
     latestRows(
       "ecosystem_catalog_items",
       "slug,title,availability_status,portal_workspace,legal_boundary"
     ),
-    latestRows("ecosystem_plan_tiers", "code,name,status,cadence,portal_workspace"),
+    latestRows(
+      "ecosystem_plan_tiers",
+      "code,name,status,cadence,portal_workspace,billing_provider,billing_plan_reference,billing_status"
+    ),
+    latestRows(
+      "ecosystem_subscriptions",
+      "status,source_of_activation,payment_provider,billing_status,billing_provider_reference,next_billing_at,current_period_ends_at"
+    ),
+    latestRows(
+      "ecosystem_billing_events",
+      "provider,provider_event_type,billing_status,provider_reference,occurred_at"
+    ),
     latestRows("ecosystem_content_tracks", "slug,title,status,portal_workspace"),
     latestRows("ecosystem_communities", "slug,title,status,portal_workspace"),
     supabase
@@ -102,6 +114,8 @@ async function main() {
         samples: {
           catalogItems,
           plans,
+          subscriptions,
+          billingEvents,
           tracks,
           communities,
           productEvents
