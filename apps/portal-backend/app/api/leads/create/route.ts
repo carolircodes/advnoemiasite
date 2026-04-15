@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
         phone: phone.replace(/\D/g, ''),
         message: message || '',
         status: 'new',
-        lead_status: 'new',
-        funnel_stage: 'top',
-        urgency: 'medium',
+        lead_status: 'curioso',
+        funnel_stage: 'contato_inicial',
+        urgency: 'media',
 
         source: acquisitionContext.source,
         campaign: acquisitionContext.campaign,

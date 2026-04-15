@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Activity,
   Bot,
@@ -437,6 +438,7 @@ function Chip({
 }
 
 export function ConversationInboxDashboard() {
+  const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [payload, setPayload] = useState<ApiPayload | null>(null);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -453,6 +455,77 @@ export function ConversationInboxDashboard() {
   const [telegramCtaUrl, setTelegramCtaUrl] = useState("");
   const [telegramSignalType, setTelegramSignalType] = useState("editorial_bridge");
   const [error, setError] = useState<string | null>(null);
+
+  const routeFilters = useMemo<Filters>(() => {
+    const nextFilters = { ...initialFilters };
+    const allowedChannels = new Set(["all", "instagram", "whatsapp", "site", "portal", "telegram"]);
+    const allowedStatus = new Set(["all", "open", "waiting_human", "waiting_client", "closed"]);
+    const allowedWaitingFor = new Set(["all", "human", "client", "system"]);
+    const allowedPriority = new Set(["all", "high", "medium", "low"]);
+    const allowedInboxMode = new Set(["all", "needs_human", "hot", "handoff", "follow_up"]);
+    const allowedFounderScope = new Set(["all", "founder", "waitlist"]);
+    const allowedPaymentState = new Set(["all", "pending", "approved"]);
+
+    const search = searchParams.get("search");
+    if (search) {
+      nextFilters.search = search;
+    }
+
+    const status = searchParams.get("status");
+    if (status && allowedStatus.has(status)) {
+      nextFilters.status = status;
+    }
+
+    const channel = searchParams.get("channel");
+    if (channel && allowedChannels.has(channel)) {
+      nextFilters.channel = channel;
+    }
+
+    const waitingFor = searchParams.get("waitingFor");
+    if (waitingFor && allowedWaitingFor.has(waitingFor)) {
+      nextFilters.waitingFor = waitingFor;
+    }
+
+    const priority = searchParams.get("priority");
+    if (priority && allowedPriority.has(priority)) {
+      nextFilters.priority = priority;
+    }
+
+    const inboxMode = searchParams.get("inboxMode");
+    if (inboxMode && allowedInboxMode.has(inboxMode)) {
+      nextFilters.inboxMode = inboxMode;
+    }
+
+    const founderScope = searchParams.get("founderScope");
+    if (founderScope && allowedFounderScope.has(founderScope)) {
+      nextFilters.founderScope = founderScope;
+    }
+
+    const paymentState = searchParams.get("paymentState");
+    if (paymentState && allowedPaymentState.has(paymentState)) {
+      nextFilters.paymentState = paymentState;
+    }
+
+    return nextFilters;
+  }, [searchParams]);
+
+  const routeSelectedThreadId = searchParams.get("selectedThreadId");
+
+  useEffect(() => {
+    setFilters((current) => {
+      const hasChanged = (Object.keys(routeFilters) as Array<keyof Filters>).some(
+        (key) => current[key] !== routeFilters[key]
+      );
+
+      return hasChanged ? routeFilters : current;
+    });
+  }, [routeFilters]);
+
+  useEffect(() => {
+    if (routeSelectedThreadId) {
+      setSelectedThreadId(routeSelectedThreadId);
+    }
+  }, [routeSelectedThreadId]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();

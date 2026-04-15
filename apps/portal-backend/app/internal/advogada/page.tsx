@@ -613,6 +613,7 @@ export default async function InternalLawyerPage({
       }
       navigation={[
         { href: "/internal/advogada", label: "Painel", active: true },
+        { href: "/internal/advogada/atendimento", label: "Atendimento" },
         { href: "/internal/advogada/leads", label: "Leads" },
         { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
         { href: "/documentos", label: "Documentos" },

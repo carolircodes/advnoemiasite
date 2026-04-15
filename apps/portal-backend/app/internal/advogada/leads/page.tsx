@@ -78,6 +78,149 @@ const funnelStageConfig: Record<string, VisualConfig> = {
   cliente: { label: "Cliente", color: "#059669", bgColor: "#D1FAE5" }
 };
 
+const fallbackAreaConfig: AreaConfig = {
+  label: "Nao classificado",
+  color: "#6B7280",
+  bgColor: "#F3F4F6",
+  icon: "?"
+};
+
+const fallbackVisualConfig: VisualConfig = {
+  label: "Nao classificado",
+  color: "#6B7280",
+  bgColor: "#F3F4F6"
+};
+
+const legalAreaAliases: Record<string, Lead["legal_area"]> = {
+  previdenciario: "previdenciario",
+  bancario: "bancario",
+  familia: "familia",
+  geral: "geral",
+  civil: "geral"
+};
+
+const leadStatusAliases: Record<string, Lead["lead_status"]> = {
+  frio: "frio",
+  curioso: "curioso",
+  interessado: "interessado",
+  quente: "quente",
+  pronto_para_agendar: "pronto_para_agendar",
+  cliente_ativo: "cliente_ativo",
+  sem_aderencia: "sem_aderencia",
+  new: "curioso"
+};
+
+const funnelStageAliases: Record<string, Lead["funnel_stage"]> = {
+  contato_inicial: "contato_inicial",
+  qualificacao: "qualificacao",
+  triagem: "triagem",
+  interesse: "interesse",
+  agendamento: "agendamento",
+  cliente: "cliente",
+  top: "contato_inicial",
+  middle: "qualificacao",
+  bottom: "agendamento"
+};
+
+const urgencyAliases: Record<string, Lead["urgency"]> = {
+  baixa: "baixa",
+  media: "media",
+  alta: "alta",
+  low: "baixa",
+  medium: "media",
+  high: "alta"
+};
+
+const operationalStatusAliases: Record<string, Lead["operational_status"]> = {
+  new: "new",
+  viewed: "viewed",
+  in_progress: "in_progress",
+  scheduled: "scheduled",
+  converted: "converted",
+  closed: "closed"
+};
+
+function normalizeAliasValue<T extends string>(
+  value: unknown,
+  aliases: Record<string, T>,
+  fallback: T
+) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  return aliases[value] || fallback;
+}
+
+function normalizeLeadRecord(raw: Partial<Lead> & Record<string, unknown>): Lead {
+  const now = new Date().toISOString();
+
+  return {
+    id:
+      typeof raw.id === "string" && raw.id.trim()
+        ? raw.id
+        : `lead-${Math.random().toString(36).slice(2)}`,
+    platform_user_id:
+      typeof raw.platform_user_id === "string" && raw.platform_user_id.trim()
+        ? raw.platform_user_id
+        : "sem-identificador",
+    username: typeof raw.username === "string" && raw.username.trim() ? raw.username : null,
+    legal_area: normalizeAliasValue(raw.legal_area, legalAreaAliases, "geral"),
+    lead_status: normalizeAliasValue(raw.lead_status, leadStatusAliases, "curioso"),
+    funnel_stage: normalizeAliasValue(raw.funnel_stage, funnelStageAliases, "contato_inicial"),
+    urgency: normalizeAliasValue(raw.urgency, urgencyAliases, "media"),
+    last_message:
+      typeof raw.last_message === "string" && raw.last_message.trim()
+        ? raw.last_message
+        : "Sem ultima mensagem registrada.",
+    last_response:
+      typeof raw.last_response === "string" && raw.last_response.trim()
+        ? raw.last_response
+        : "Sem resposta registrada.",
+    wants_human: raw.wants_human === true,
+    should_schedule: raw.should_schedule === true,
+    summary:
+      typeof raw.summary === "string" && raw.summary.trim()
+        ? raw.summary
+        : "Resumo indisponivel para este lead.",
+    suggested_action:
+      typeof raw.suggested_action === "string" && raw.suggested_action.trim()
+        ? raw.suggested_action
+        : "Revisar lead manualmente e definir o proximo passo.",
+    first_contact_at:
+      typeof raw.first_contact_at === "string" && raw.first_contact_at.trim()
+        ? raw.first_contact_at
+        : now,
+    last_contact_at:
+      typeof raw.last_contact_at === "string" && raw.last_contact_at.trim()
+        ? raw.last_contact_at
+        : now,
+    conversation_count:
+      typeof raw.conversation_count === "number" && Number.isFinite(raw.conversation_count)
+        ? raw.conversation_count
+        : 0,
+    operational_status: normalizeAliasValue(
+      raw.operational_status,
+      operationalStatusAliases,
+      "new"
+    ),
+    created_at:
+      typeof raw.created_at === "string" && raw.created_at.trim() ? raw.created_at : now,
+    updated_at:
+      typeof raw.updated_at === "string" && raw.updated_at.trim() ? raw.updated_at : now,
+    metadata:
+      raw.metadata && typeof raw.metadata === "object" ? (raw.metadata as Record<string, any>) : {}
+  };
+}
+
+function getAreaConfig(value: string) {
+  return legalAreaConfig[value] || fallbackAreaConfig;
+}
+
+function getVisualConfig(source: Record<string, VisualConfig>, value: string) {
+  return source[value] || fallbackVisualConfig;
+}
+
 // Componentes de UI Premium
 function MetricCard({ title, value, subtitle, color, icon, trend }: MetricCardProps) {
   return (
@@ -114,11 +257,11 @@ function StatusBadge({ config }: StatusBadgeProps) {
 }
 
 function LeadTableRow({ lead, onSelect }: LeadTableRowProps) {
-  const areaConfig = legalAreaConfig[lead.legal_area];
-  const statusConfig = leadStatusConfig[lead.lead_status];
-  const urgencyStyle = urgencyConfig[lead.urgency];
-  const funnelConfig = funnelStageConfig[lead.funnel_stage];
-  const operationalConfig = operationalStatusConfig[lead.operational_status];
+  const areaConfig = getAreaConfig(lead.legal_area);
+  const statusConfig = getVisualConfig(leadStatusConfig, lead.lead_status);
+  const urgencyStyle = getVisualConfig(urgencyConfig, lead.urgency);
+  const funnelConfig = getVisualConfig(funnelStageConfig, lead.funnel_stage);
+  const operationalConfig = getVisualConfig(operationalStatusConfig, lead.operational_status);
 
   return (
     <tr 
@@ -271,7 +414,7 @@ export default function LeadsDashboard() {
         const leadsResponse = await fetch('/api/internal/leads');
         if (leadsResponse.ok) {
           const leadsData = await leadsResponse.json();
-          setLeads(leadsData);
+          setLeads(Array.isArray(leadsData) ? leadsData.map(normalizeLeadRecord) : []);
         }
 
         // Carregar conversas se houver lead selecionado
@@ -588,19 +731,19 @@ export default function LeadsDashboard() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Área Jurídica:</span>
-                        <StatusBadge config={legalAreaConfig[selectedLead.legal_area]} />
+                        <StatusBadge config={getAreaConfig(selectedLead.legal_area)} />
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Status:</span>
-                        <StatusBadge config={leadStatusConfig[selectedLead.lead_status]} />
+                        <StatusBadge config={getVisualConfig(leadStatusConfig, selectedLead.lead_status)} />
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Funil:</span>
-                        <StatusBadge config={funnelStageConfig[selectedLead.funnel_stage]} />
+                        <StatusBadge config={getVisualConfig(funnelStageConfig, selectedLead.funnel_stage)} />
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Urgência:</span>
-                        <StatusBadge config={urgencyConfig[selectedLead.urgency]} />
+                        <StatusBadge config={getVisualConfig(urgencyConfig, selectedLead.urgency)} />
                       </div>
                     </div>
                   </div>

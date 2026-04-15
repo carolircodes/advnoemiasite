@@ -1,18 +1,23 @@
 'use client';
 
-import { 
-  LayoutDashboard, 
-  Users, 
-  MessageSquare, 
-  FolderOpen, 
-  Calendar, 
-  FileText, 
-  Bot, 
-  Smartphone, 
-  Brain, 
+import {
+  Bot,
+  Brain,
+  Calendar,
+  FileText,
+  FolderOpen,
+  LayoutDashboard,
+  MessageSquare,
   Settings,
+  Smartphone,
+  Users,
   X
 } from 'lucide-react';
+
+import {
+  internalWorkspaceMenuItems,
+  isInternalWorkspacePathActive
+} from '@/lib/internal-workspace-nav';
 
 interface SidebarProps {
   currentPath: string;
@@ -20,27 +25,20 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const menuItems = [
-  { id: 'dashboard', label: 'Painel Operacional', icon: LayoutDashboard, href: '/internal/advogada/operacional' },
-  { id: 'leads', label: 'Leads', icon: Users, href: '/internal/advogada/leads' },
-  { id: 'atendimento', label: 'Atendimento', icon: MessageSquare, href: '/internal/advogada/atendimento' },
-  { id: 'casos', label: 'Casos', icon: FolderOpen, href: '/internal/advogada/casos' },
-  { id: 'agenda', label: 'Agenda', icon: Calendar, href: '/internal/advogada/agenda' },
-  { id: 'documentos', label: 'Documentos', icon: FileText, href: '/internal/advogada/documentos' },
-  { id: 'automacoes', label: 'Automações', icon: Bot, href: '/internal/advogada/automacoes' },
-  { id: 'canais', label: 'Canais', icon: Smartphone, href: '/internal/advogada/canais' },
-  { id: 'inteligencia', label: 'Inteligência', icon: Brain, href: '/internal/advogada/inteligencia' },
-  { id: 'configuracoes', label: 'Configurações', icon: Settings, href: '/internal/advogada/configuracoes' },
-];
+const iconById = {
+  dashboard: LayoutDashboard,
+  leads: Users,
+  atendimento: MessageSquare,
+  canais: Smartphone,
+  casos: FolderOpen,
+  agenda: Calendar,
+  documentos: FileText,
+  inteligencia: Brain,
+  ecossistema: Bot
+} as const;
 
 export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps) {
-  const isActive = (href: string) => {
-    if (currentPath === href) return true;
-    // Para páginas dinâmicas, verificar se começa com o caminho base
-    if (href === '/internal/advogada/leads' && currentPath.startsWith('/internal/advogada/leads')) return true;
-    if (href === '/internal/advogada/casos' && currentPath.startsWith('/internal/advogada/casos')) return true;
-    return false;
-  };
+  const isActive = (href: string) => isInternalWorkspacePathActive(currentPath, href);
 
   const sidebarClasses = isMobile
     ? `fixed left-0 top-0 h-full w-64 bg-[#0f172a] text-white z-50 transform transition-transform duration-300 ${
@@ -51,7 +49,6 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
   return (
     <div className={sidebarClasses}>
       <div className="flex flex-col h-full">
-        {/* Logo */}
         <div className="p-6 border-b border-[#1e293b]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -63,29 +60,28 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
                 <p className="text-xs text-[#94a3b8]">Painel Operacional</p>
               </div>
             </div>
-            {isMobile && onClose && (
+            {isMobile && onClose ? (
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg hover:bg-[#1e293b] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {/* Menu */}
         <nav className="flex-1 p-4">
           <ul className="space-y-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
+            {internalWorkspaceMenuItems.map((item) => {
+              const Icon = iconById[item.id as keyof typeof iconById] || Settings;
               const active = isActive(item.href);
-              
+
               return (
                 <li key={item.id}>
                   <a
                     href={item.href}
-                    onClick={() => isMobile && onClose && onClose()}
+                    onClick={() => (isMobile && onClose ? onClose() : undefined)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                       active
                         ? 'bg-[#8e6a3b] text-white border-l-4 border-[#f5efe2]'
@@ -101,11 +97,8 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
           </ul>
         </nav>
 
-        {/* Footer */}
         <div className="p-4 border-t border-[#1e293b]">
-          <div className="text-xs text-[#64748b]">
-            © 2026 NoemIA
-          </div>
+          <div className="text-xs text-[#64748b]">© 2026 NoemIA</div>
         </div>
       </div>
     </div>

@@ -3,6 +3,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth/guards";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
+const leadStatusAliases: Record<string, string> = {
+  new: "curioso"
+};
+
+const funnelStageAliases: Record<string, string> = {
+  top: "contato_inicial",
+  middle: "qualificacao",
+  bottom: "agendamento"
+};
+
+const urgencyAliases: Record<string, string> = {
+  low: "baixa",
+  medium: "media",
+  high: "alta"
+};
+
+function normalizeWorkspaceLead(record: Record<string, unknown>) {
+  return {
+    ...record,
+    lead_status:
+      typeof record.lead_status === "string"
+        ? leadStatusAliases[record.lead_status] || record.lead_status
+        : "curioso",
+    funnel_stage:
+      typeof record.funnel_stage === "string"
+        ? funnelStageAliases[record.funnel_stage] || record.funnel_stage
+        : "contato_inicial",
+    urgency:
+      typeof record.urgency === "string"
+        ? urgencyAliases[record.urgency] || record.urgency
+        : "media"
+  };
+}
+
 export async function GET() {
   try {
     await requireProfile(["admin", "advogada"]);
@@ -18,7 +52,7 @@ export async function GET() {
       return NextResponse.json({ error: "Erro ao buscar leads" }, { status: 500 });
     }
 
-    return NextResponse.json(data || []);
+    return NextResponse.json(Array.isArray(data) ? data.map(normalizeWorkspaceLead) : []);
   } catch (error) {
     console.error("Erro na rota de leads:", error);
 

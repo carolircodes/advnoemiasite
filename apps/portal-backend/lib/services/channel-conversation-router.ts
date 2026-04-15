@@ -840,9 +840,9 @@ async function ensureChannelRevenueLead(args: {
       phone: normalizedPhone,
       message: args.event.messageText,
       status: "new",
-      lead_status: "new",
-      funnel_stage: "middle",
-      urgency: "medium",
+      lead_status: "curioso",
+      funnel_stage: "qualificacao",
+      urgency: "media",
       source: "whatsapp",
       topic: args.detectedTheme,
       metadata: {

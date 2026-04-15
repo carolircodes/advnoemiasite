@@ -4,38 +4,15 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar, Topbar, PageContainer } from '@/components/layout';
+import {
+  internalWorkspaceMenuItems,
+  internalWorkspaceSubtitles,
+  isInternalWorkspacePathActive
+} from '@/lib/internal-workspace-nav';
 
 interface LayoutProps {
   children: ReactNode;
 }
-
-const menuItems = [
-  { id: 'dashboard', label: 'Painel Operacional', href: '/internal/advogada/operacional' },
-  { id: 'leads', label: 'Leads', href: '/internal/advogada/leads' },
-  { id: 'atendimento', label: 'Atendimento', href: '/internal/advogada/atendimento' },
-  { id: 'casos', label: 'Casos', href: '/internal/advogada/casos' },
-  { id: 'agenda', label: 'Agenda', href: '/internal/advogada/agenda' },
-  { id: 'documentos', label: 'Documentos', href: '/internal/advogada/documentos' },
-  { id: 'automacoes', label: 'Automacoes', href: '/internal/advogada/automacoes' },
-  { id: 'canais', label: 'Canais', href: '/internal/advogada/canais' },
-  { id: 'inteligencia', label: 'Inteligencia', href: '/internal/advogada/inteligencia' },
-  { id: 'ecossistema', label: 'Ecossistema', href: '/internal/advogada/ecossistema' },
-  { id: 'configuracoes', label: 'Configuracoes', href: '/internal/advogada/configuracoes' }
-];
-
-const subtitles: Record<string, string> = {
-  'Painel Operacional': 'Gestao de leads e operacoes',
-  Leads: 'Captura e qualificacao de leads',
-  Atendimento: 'Gestao de atendimento ao cliente',
-  Casos: 'Acompanhamento de processos',
-  Agenda: 'Compromissos e consultas',
-  Documentos: 'Gestao documental',
-  Automacoes: 'Fluxos automatizados',
-  Canais: 'WhatsApp e Instagram',
-  Inteligencia: 'Analises e insights',
-  Ecossistema: 'Catalogo, recorrencia e expansao premium',
-  Configuracoes: 'Configuracoes do sistema'
-};
 
 export default function InternalLayout({ children }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,28 +20,20 @@ export default function InternalLayout({ children }: LayoutProps) {
   const currentPath = pathname || '/internal/advogada/operacional';
 
   const currentPage = useMemo(() => {
-    const currentItem = menuItems.find((item) => {
-      return (
-        item.href === currentPath ||
-        (item.href === '/internal/advogada/leads' &&
-          currentPath.startsWith('/internal/advogada/leads')) ||
-        (item.href === '/internal/advogada/casos' &&
-          currentPath.startsWith('/internal/advogada/casos')) ||
-        (item.href === '/internal/advogada/ecossistema' &&
-          currentPath.startsWith('/internal/advogada/ecossistema'))
-      );
-    });
+    const currentItem = internalWorkspaceMenuItems.find((item) =>
+      isInternalWorkspacePathActive(currentPath, item.href)
+    );
 
     if (!currentItem) {
       return {
         title: 'Painel Operacional',
-        subtitle: subtitles['Painel Operacional']
+        subtitle: internalWorkspaceSubtitles['Painel Operacional']
       };
     }
 
     return {
       title: currentItem.label,
-      subtitle: subtitles[currentItem.label] || ''
+      subtitle: internalWorkspaceSubtitles[currentItem.label] || ''
     };
   }, [currentPath]);
 
