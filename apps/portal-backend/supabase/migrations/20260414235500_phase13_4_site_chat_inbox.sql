@@ -7,4 +7,4 @@ create index if not exists conversation_messages_site_chat_idx
   where message_type = 'site_chat';
 
 create index if not exists product_events_site_session_idx
-  on product_events (session_id, page_path, created_at desc);
+  on product_events (session_id, page_path, occurred_at desc);

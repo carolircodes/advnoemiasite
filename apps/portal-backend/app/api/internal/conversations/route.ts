@@ -1,14 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { getSchemaCompatibilityReportForSurface } from "@/lib/schema/compatibility";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
-import { telegramDistributionService } from "@/lib/services/telegram-distribution";
+import { traceOperationalEvent } from "@/lib/observability/operational-trace";
+
+async function ensureConversationInboxSchema() {
+  const report = await getSchemaCompatibilityReportForSurface("internal_conversations");
+
+  if (report.ok) {
+    return null;
+  }
+
+  const missing = report.missing.map((entry) => ({
+    table: entry.table,
+    columns: entry.columns
+  }));
+
+  traceOperationalEvent("error", "INBOX_SCHEMA_INCOMPATIBLE", {
+    service: "internal_conversations",
+    action: "schema_guard"
+  }, {
+    surface: "internal_conversations",
+    schemaVersion: report.schemaVersion,
+    missing
+  });
+
+  return NextResponse.json(
+    {
+      error:
+        "A inbox multicanal ainda nao pode operar neste ambiente porque o schema phase 13 esta incompleto.",
+      code: "schema_incompatible",
+      surface: "internal_conversations",
+      schemaVersion: report.schemaVersion,
+      missing
+    },
+    { status: 503 }
+  );
+}
 
 export async function GET(request: NextRequest) {
   const access = await requireInternalApiProfile();
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const schemaResponse = await ensureConversationInboxSchema();
+  if (schemaResponse) {
+    return schemaResponse;
   }
 
   try {
@@ -69,14 +109,12 @@ export async function GET(request: NextRequest) {
     const selectedThread = selectedThreadId
       ? await conversationInboxService.getThreadDetail(selectedThreadId)
       : null;
-    const telegram = await telegramDistributionService.getOverview();
 
     return NextResponse.json({
       ok: true,
       data: {
         ...list,
-        selectedThread,
-        telegram
+        selectedThread
       }
     });
   } catch (error) {
@@ -95,6 +133,11 @@ export async function POST(request: NextRequest) {
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const schemaResponse = await ensureConversationInboxSchema();
+  if (schemaResponse) {
+    return schemaResponse;
   }
 
   try {
@@ -164,19 +207,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, data: result });
     }
 
-    if (action === "publishTelegramChannelPost") {
-      const result = await telegramDistributionService.publishPost(payload, {
-        id: access.profile.id,
-        name: access.profile.full_name
-      });
-
-      return NextResponse.json({ ok: true, data: result });
-    }
-
     return NextResponse.json(
       {
         error:
-          "Acao invalida. Use sendHumanReply, sendInboxFollowUp, updateThreadState, addThreadNote ou publishTelegramChannelPost."
+          "Acao invalida. Use sendHumanReply, sendInboxFollowUp, updateThreadState ou addThreadNote."
       },
       { status: 400 }
     );

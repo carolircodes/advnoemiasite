@@ -1,6 +1,6 @@
 {
   "sourceOfTruth": "supabase/migrations",
-  "schemaVersion": "phase-12-2026-04-14",
+  "schemaVersion": "phase-13-2026-04-15",
   "requiredTables": {
     "conversation_sessions": [
       "id",
@@ -10,7 +10,66 @@
       "current_intent",
       "last_summary",
       "handoff_to_human",
-      "metadata"
+      "metadata",
+      "thread_status",
+      "waiting_for",
+      "owner_mode",
+      "priority",
+      "unread_count",
+      "handoff_state",
+      "ai_enabled",
+      "last_message_at",
+      "last_message_preview",
+      "last_message_direction",
+      "internal_notes",
+      "tags",
+      "next_action_hint",
+      "priority_source",
+      "sensitivity_level",
+      "follow_up_status",
+      "follow_up_due_at",
+      "follow_up_resolved_at",
+      "last_status_event_at"
+    ],
+    "conversation_messages": [
+      "id",
+      "session_id",
+      "role",
+      "content",
+      "direction",
+      "metadata_json",
+      "created_at",
+      "message_type",
+      "sender_type",
+      "send_status",
+      "delivery_status",
+      "is_read",
+      "read_at",
+      "error_message",
+      "attachments",
+      "received_at",
+      "failed_at"
+    ],
+    "conversation_events": [
+      "id",
+      "session_id",
+      "event_type",
+      "actor_type",
+      "actor_id",
+      "actor_label",
+      "event_data",
+      "created_at"
+    ],
+    "conversation_notes": [
+      "id",
+      "session_id",
+      "author_id",
+      "author_name",
+      "note_body",
+      "note_kind",
+      "is_sensitive",
+      "metadata",
+      "created_at"
     ],
     "processed_webhook_events": [
       "id",
@@ -55,6 +114,18 @@
       "page_path",
       "session_id",
       "payload"
+    ],
+    "telegram_channel_publications": [
+      "id",
+      "channel_key",
+      "channel_username",
+      "publication_type",
+      "body",
+      "status",
+      "provider_status",
+      "posted_at",
+      "metadata",
+      "created_at"
     ],
     "ecosystem_catalog_items": [
       "id",

@@ -67,6 +67,24 @@ export default async function InternalLawyerChannelsPage() {
           </Link>
         </div>
       </SectionCard>
+
+      <SectionCard
+        title="Separacao estrutural desta fase"
+        description="A inbox conversacional deixou de carregar a distribuicao editorial do Telegram como parte obrigatoria da leitura."
+      >
+        <div className="grid two">
+          <article className="route-card">
+            <span className="shortcut-kicker">Inbox conversacional</span>
+            <strong>/internal/advogada/atendimento</strong>
+            <span>Agora fica restrita ao contrato de threads, mensagens, contexto, handoff e notas internas.</span>
+          </article>
+          <article className="route-card">
+            <span className="shortcut-kicker">Telegram distribution</span>
+            <strong>/api/internal/telegram/distribution</strong>
+            <span>A camada editorial e broadcast continua existindo, mas fora do contrato central da inbox multicanal.</span>
+          </article>
+        </div>
+      </SectionCard>
     </AppFrame>
   );
 }

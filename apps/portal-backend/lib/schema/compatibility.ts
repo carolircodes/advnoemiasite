@@ -9,7 +9,9 @@ type OperationalSurface =
   | "whatsapp_webhook"
   | "channel_router"
   | "public_intake"
-  | "internal_panel";
+  | "internal_panel"
+  | "internal_conversations"
+  | "internal_telegram_distribution";
 
 type CompatibilityReport = {
   ok: boolean;
@@ -45,7 +47,15 @@ const REQUIRED_TABLES_BY_SURFACE: Record<OperationalSurface, string[]> = {
     "noemia_triage_summaries",
     "follow_up_messages",
     "product_events"
-  ]
+  ],
+  internal_conversations: [
+    "conversation_sessions",
+    "conversation_messages",
+    "conversation_events",
+    "conversation_notes",
+    "noemia_triage_summaries"
+  ],
+  internal_telegram_distribution: ["telegram_channel_publications"]
 };
 
 export function getOfficialSchemaVersion() {
@@ -135,11 +145,16 @@ export async function getOperationalSchemaCompatibilityReport() {
   return compatibilityCheckPromise;
 }
 
+export async function getSchemaCompatibilityReportForSurface(surface: OperationalSurface) {
+  if (surface === "internal_panel") {
+    return getOperationalSchemaCompatibilityReport();
+  }
+
+  return fetchCompatibilityReportForSurface(surface);
+}
+
 export async function assertOperationalSchemaCompatibility(surface: OperationalSurface) {
-  const report =
-    surface === "internal_panel"
-      ? await getOperationalSchemaCompatibilityReport()
-      : await fetchCompatibilityReportForSurface(surface);
+  const report = await getSchemaCompatibilityReportForSurface(surface);
 
   if (report.ok) {
     return report;
