@@ -1581,9 +1581,47 @@
       box-shadow: 0 12px 24px rgba(46, 34, 17, 0.10);
     }
 
+    .suggestions-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
     .assistant-home-form {
       display: grid;
       gap: 14px;
+    }
+
+    .guided-progress-note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(248, 244, 236, 0.92);
+      border: 1px solid rgba(16, 38, 29, 0.08);
+      color: #4e6058;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .guided-progress-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(181, 141, 73, 0.10);
+      color: #7f612d;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .error-notice,
@@ -1649,6 +1687,10 @@
       padding: 24px;
       display: grid;
       gap: 18px;
+    }
+
+    .embedded-triage.is-collapsed .triage-progressive-panel {
+      display: none;
     }
 
     .embedded-triage-head {
@@ -1770,6 +1812,49 @@
       color: rgba(247, 241, 228, 0.84);
     }
 
+    .consultation-dock {
+      display: grid;
+      gap: 14px;
+      padding: 18px 18px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(255,253,248,0.96) 0%, rgba(245,237,224,0.96) 100%);
+      border: 1px solid rgba(16, 38, 29, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    .consultation-dock strong,
+    .triage-progressive-head strong {
+      color: #142d24;
+      font-size: 1.02rem;
+    }
+
+    .consultation-dock p,
+    .triage-progressive-head p {
+      margin: 0;
+      color: #51645c;
+      line-height: 1.7;
+    }
+
+    .consultation-dock-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .triage-progressive-panel {
+      display: grid;
+      gap: 18px;
+    }
+
+    .triage-progressive-panel[hidden] {
+      display: none !important;
+    }
+
+    .triage-progressive-head {
+      display: grid;
+      gap: 8px;
+    }
+
     @media (max-width: 1080px) {
       .home-attendance-grid {
         grid-template-columns: 1fr;
@@ -1801,6 +1886,12 @@
       .assistant-home-actions .btn-noemia {
         width: 100%;
         justify-content: center;
+      }
+
+      .guided-progress-note,
+      .consultation-dock-actions {
+        flex-direction: column;
+        align-items: stretch;
       }
     }
   </style>
@@ -1953,6 +2044,11 @@
                 Descreva sua situacao com tranquilidade. O atendente virtual do escritorio acolhe o caso, organiza informacoes importantes, orienta documentos e mostra o caminho mais adequado para voce seguir.
               </p>
 
+              <div class="guided-progress-note">
+                <span>Voce pode tocar nas opcoes abaixo e deixar o atendimento guiar a conversa sem precisar escrever logo de inicio.</span>
+                <span class="guided-progress-pill" id="guidedProgressPill">Etapa inicial</span>
+              </div>
+
               <div class="conversation-feed" aria-live="polite">
                 <article class="chat-bubble assistant">
                   <span>Atendente virtual do escritorio</span>
@@ -1961,10 +2057,14 @@
               </div>
 
               <div class="prompt-chip-grid" aria-label="Sugestoes de inicio">
-                <button class="prompt-chip" type="button">Quero entender meu caso</button>
-                <button class="prompt-chip" type="button">Quais documentos ajudam agora?</button>
-                <button class="prompt-chip" type="button">Ja faz sentido marcar consulta?</button>
-                <button class="prompt-chip" type="button">Meu caso parece urgente</button>
+                <button class="prompt-chip" type="button" data-guided-option="understand_case">Quero entender meu caso</button>
+                <button class="prompt-chip" type="button" data-guided-option="documents">Quais documentos ajudam agora?</button>
+                <button class="prompt-chip" type="button" data-guided-option="consultation">Ja faz sentido marcar consulta?</button>
+                <button class="prompt-chip" type="button" data-guided-option="urgent">Meu caso parece urgente</button>
+                <button class="prompt-chip" type="button" data-guided-option="banking">Tenho problema com banco</button>
+                <button class="prompt-chip" type="button" data-guided-option="social_security">E questao previdenciaria</button>
+                <button class="prompt-chip" type="button" data-guided-option="family">E questao de familia</button>
+                <button class="prompt-chip" type="button" data-guided-option="other">Quero falar sobre outro assunto</button>
               </div>
 
               <form class="assistant-home-form">
@@ -1982,95 +2082,111 @@
               </form>
 
               <p class="assistant-home-note">
-                O atendimento virtual orienta seus primeiros passos, organiza o caso e ajuda a definir quando a consulta juridica e o melhor movimento.
+                Se preferir escrever livremente, o atendimento continua aberto. Se quiser menos friccao, toque nas opcoes e deixe o funil conduzir voce.
               </p>
             </div>
 
-            <div class="embedded-triage" id="triagem-home">
+            <div class="embedded-triage is-collapsed" id="triagem-home">
               <div class="embedded-triage-head">
-                <span class="eyebrow">Triagem integrada</span>
-                <h3>Se ja quiser avancar, deixe sua triagem aqui mesmo.</h3>
-                <p>Sem mudar de pagina, sem perder contexto e sem transformar o primeiro contato em uma experiencia fragmentada.</p>
+                <span class="eyebrow">Continuidade do atendimento</span>
+                <h3>A consulta e a triagem entram quando o proprio atendimento pedir mais detalhe.</h3>
+                <p>A camada estruturada continua existindo, mas agora aparece como etapa progressiva, e nao como formulario pesado dominando a home.</p>
               </div>
 
               <div class="support-strip">
-                <strong>O que esta triagem resolve agora</strong>
-                <p>Ela organiza seu caso, reduz ida e volta desnecessaria e prepara o atendimento humano com muito mais precisao.</p>
+                <strong>Menos formulario na frente. Mais conducao e mais clareza no primeiro contato.</strong>
+                <p>Quando fizer sentido avancar para consulta ou detalhar o caso, o proprio atendente vai abrir a etapa certa para voce.</p>
               </div>
 
-              <form class="triage-form" id="triageForm" data-triage-form novalidate>
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label for="leadNameHome">Nome completo</label>
-                    <input class="form-input" id="leadNameHome" name="name" type="text" placeholder="Seu nome completo" autocomplete="name" required />
-                    <span class="field-error"></span>
-                  </div>
+              <div class="consultation-dock">
+                <strong>Quando voce quiser avançar, o fluxo abre a etapa certa.</strong>
+                <p>Consulta, envio de contexto e triagem estruturada continuam disponiveis, mas so aparecem em destaque quando o atendimento indicar que ja faz sentido seguir.</p>
+                <div class="consultation-dock-actions">
+                  <button class="btn btn-primary" type="button" id="openProgressiveTriage">Avancar para consulta</button>
+                  <a class="btn btn-secondary" href="https://portal.advnoemia.com.br/portal/login">Ja sou cliente</a>
+                </div>
+              </div>
 
-                  <div class="form-group">
-                    <label for="leadPhoneHome">WhatsApp</label>
-                    <input class="form-input" id="leadPhoneHome" name="phone" type="tel" placeholder="(84) 99999-9999" autocomplete="tel" inputmode="numeric" required />
-                    <span class="field-error"></span>
-                  </div>
+              <div class="triage-progressive-panel" id="triageProgressivePanel" hidden>
+                <div class="triage-progressive-head">
+                  <strong>Detalhes finais para preparar seu encaminhamento</strong>
+                  <p>Esta etapa continua tecnica e funcional, mas agora entra apenas quando voce decide aprofundar o atendimento.</p>
                 </div>
 
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label for="leadCityHome">Cidade</label>
-                    <input class="form-input" id="leadCityHome" name="city" type="text" placeholder="Sua cidade" autocomplete="address-level2" required />
+                <form class="triage-form" id="triageForm" data-triage-form novalidate>
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="leadNameHome">Nome completo</label>
+                      <input class="form-input" id="leadNameHome" name="name" type="text" placeholder="Seu nome completo" autocomplete="name" required />
+                      <span class="field-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="leadPhoneHome">WhatsApp</label>
+                      <input class="form-input" id="leadPhoneHome" name="phone" type="tel" placeholder="(84) 99999-9999" autocomplete="tel" inputmode="numeric" required />
+                      <span class="field-error"></span>
+                    </div>
+                  </div>
+
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="leadCityHome">Cidade</label>
+                      <input class="form-input" id="leadCityHome" name="city" type="text" placeholder="Sua cidade" autocomplete="address-level2" required />
+                      <span class="field-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="leadProblemTypeHome">Area principal</label>
+                      <select class="form-select" id="leadProblemTypeHome" name="problem_type" required>
+                        <option value="">Selecione a area juridica</option>
+                        <option value="previdenciario">Direito Previdenciario</option>
+                        <option value="consumidor-bancario">Consumidor e Bancario</option>
+                        <option value="consumidor">Direito do Consumidor</option>
+                        <option value="bancario">Direito Bancario</option>
+                        <option value="familia">Direito de Familia</option>
+                        <option value="civil">Direito Civil</option>
+                        <option value="outro">Outra questao juridica</option>
+                      </select>
+                      <span class="field-error"></span>
+                    </div>
+                  </div>
+
+                  <div class="form-group full">
+                    <label for="leadDescriptionHome">Descreva seu caso</label>
+                    <textarea class="form-textarea" id="leadDescriptionHome" name="description" rows="5" placeholder="Conte o que aconteceu, quando isso comecou, o que mais preocupa voce agora e qual orientacao espera receber." required></textarea>
                     <span class="field-error"></span>
                   </div>
 
-                  <div class="form-group">
-                    <label for="leadProblemTypeHome">Area principal</label>
-                    <select class="form-select" id="leadProblemTypeHome" name="problem_type" required>
-                      <option value="">Selecione a area juridica</option>
-                      <option value="previdenciario">Direito Previdenciario</option>
-                      <option value="consumidor-bancario">Consumidor e Bancario</option>
-                      <option value="consumidor">Direito do Consumidor</option>
-                      <option value="bancario">Direito Bancario</option>
-                      <option value="familia">Direito de Familia</option>
-                      <option value="civil">Direito Civil</option>
-                      <option value="outro">Outra questao juridica</option>
+                  <div class="form-group full">
+                    <label for="leadUrgencyHome">Urgencia</label>
+                    <select class="form-select" id="leadUrgencyHome" name="urgency" required>
+                      <option value="">Selecione o nivel de urgencia</option>
+                      <option value="alta">Alta - existe prazo, bloqueio ou risco imediato</option>
+                      <option value="media">Media - preciso de orientacao em breve</option>
+                      <option value="baixa">Baixa - quero entender o melhor caminho</option>
                     </select>
                     <span class="field-error"></span>
                   </div>
-                </div>
 
-                <div class="form-group full">
-                  <label for="leadDescriptionHome">Descreva seu caso</label>
-                  <textarea class="form-textarea" id="leadDescriptionHome" name="description" rows="5" placeholder="Conte o que aconteceu, quando isso comecou, o que mais preocupa voce agora e qual orientacao espera receber." required></textarea>
-                  <span class="field-error"></span>
-                </div>
+                  <input type="hidden" name="area" value="geral" data-triage-area-input />
+                  <input type="hidden" name="source" value="site" data-triage-source-input />
+                  <input type="hidden" name="page" value="index.html" data-triage-page-input />
+                  <input type="hidden" name="campaign" value="" data-triage-campaign-input />
+                  <input type="hidden" name="video" value="" data-triage-video-input />
 
-                <div class="form-group full">
-                  <label for="leadUrgencyHome">Urgencia</label>
-                  <select class="form-select" id="leadUrgencyHome" name="urgency" required>
-                    <option value="">Selecione o nivel de urgencia</option>
-                    <option value="alta">Alta - existe prazo, bloqueio ou risco imediato</option>
-                    <option value="media">Media - preciso de orientacao em breve</option>
-                    <option value="baixa">Baixa - quero entender o melhor caminho</option>
-                  </select>
-                  <span class="field-error"></span>
-                </div>
+                  <button class="btn btn-primary btn-full" type="submit" id="submitButton">
+                    Quero seguir para o WhatsApp com minha triagem pronta
+                  </button>
 
-                <input type="hidden" name="area" value="geral" data-triage-area-input />
-                <input type="hidden" name="source" value="site" data-triage-source-input />
-                <input type="hidden" name="page" value="index.html" data-triage-page-input />
-                <input type="hidden" name="campaign" value="" data-triage-campaign-input />
-                <input type="hidden" name="video" value="" data-triage-video-input />
+                  <div class="form-status" data-triage-status role="status" aria-live="polite">
+                    Preencha os dados acima para continuar seu atendimento com mais contexto.
+                  </div>
+                </form>
 
-                <button class="btn btn-primary btn-full" type="submit" id="submitButton">
-                  Quero seguir para o WhatsApp com minha triagem pronta
-                </button>
-
-                <div class="form-status" data-triage-status role="status" aria-live="polite">
-                  Preencha os dados acima para continuar seu atendimento com mais contexto.
-                </div>
-              </form>
-
-              <p class="mini-note">
-                A triagem organiza o primeiro atendimento e acelera o encaminhamento da consulta. A analise juridica aprofundada acontece com avaliacao individual da advogada.
-              </p>
+                <p class="mini-note">
+                  A triagem organiza o primeiro atendimento e acelera o encaminhamento da consulta. A analise juridica aprofundada acontece com avaliacao individual da advogada.
+                </p>
+              </div>
             </div>
           </div>
         </div>

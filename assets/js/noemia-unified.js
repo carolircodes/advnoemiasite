@@ -4,6 +4,7 @@ class NoemiaUnified {
     this.environment = this.detectEnvironment();
     this.apiEndpoint = this.getApiEndpoint();
     this.fallbackMode = false;
+    this.currentGuidedStage = 'initial';
     this.init();
   }
 
@@ -29,8 +30,67 @@ class NoemiaUnified {
   }
 
   init() {
+    this.setupGuidedFlows();
     this.setupEventListeners();
     this.detectFallbackMode();
+    this.renderGuidedOptions(this.currentGuidedStage);
+  }
+
+  setupGuidedFlows() {
+    this.guidedFlows = {
+      initial: {
+        pill: 'Etapa inicial',
+        options: [
+          { id: 'understand_case', label: 'Quero entender meu caso' },
+          { id: 'documents', label: 'Quais documentos ajudam agora?' },
+          { id: 'consultation', label: 'Ja faz sentido marcar consulta?' },
+          { id: 'urgent', label: 'Meu caso parece urgente' },
+          { id: 'banking', label: 'Tenho problema com banco' },
+          { id: 'social_security', label: 'E questao previdenciaria' },
+          { id: 'family', label: 'E questao de familia' },
+          { id: 'other', label: 'Quero falar sobre outro assunto' }
+        ]
+      },
+      clarify: {
+        pill: 'Entendimento inicial',
+        options: [
+          { id: 'explain_more', label: 'Me explique melhor' },
+          { id: 'documents', label: 'Quais documentos separar' },
+          { id: 'describe_case', label: 'Quero descrever o que aconteceu' },
+          { id: 'consultation', label: 'Quero avancar para consulta' },
+          { id: 'back_initial', label: 'Mudar assunto' }
+        ]
+      },
+      documents: {
+        pill: 'Documentos e contexto',
+        options: [
+          { id: 'area_previdenciario', label: 'Caso previdenciario' },
+          { id: 'area_bancario', label: 'Problema bancario' },
+          { id: 'area_familia', label: 'Questao de familia' },
+          { id: 'describe_case', label: 'Quero explicar meu caso' },
+          { id: 'consultation', label: 'Ja quero seguir' }
+        ]
+      },
+      urgency: {
+        pill: 'Prioridade do caso',
+        options: [
+          { id: 'urgent_now', label: 'Existe prazo ou bloqueio agora' },
+          { id: 'urgent_soon', label: 'Preciso de orientacao em breve' },
+          { id: 'consultation', label: 'Quero avancar para consulta' },
+          { id: 'describe_case', label: 'Vou explicar melhor' },
+          { id: 'back_initial', label: 'Voltar' }
+        ]
+      },
+      consultation: {
+        pill: 'Avanco para consulta',
+        options: [
+          { id: 'open_triage', label: 'Abrir etapa final para consulta' },
+          { id: 'describe_case', label: 'Antes vou explicar melhor' },
+          { id: 'documents', label: 'Quais dados ajudam agora?' },
+          { id: 'back_initial', label: 'Voltar' }
+        ]
+      }
+    };
   }
 
   detectFallbackMode() {
@@ -232,6 +292,14 @@ class NoemiaUnified {
         this.handleSuggestionClick(button, e);
       }
     });
+
+    document.addEventListener('click', (e) => {
+      const button = e.target.closest('#openProgressiveTriage');
+      if (button) {
+        e.preventDefault();
+        this.openProgressiveTriage();
+      }
+    });
   }
 
   async handleFormSubmit(form, event) {
@@ -277,6 +345,12 @@ class NoemiaUnified {
   handleSuggestionClick(button, event) {
     event.preventDefault();
     
+    const guidedOption = button.dataset.guidedOption;
+    if (guidedOption) {
+      this.handleGuidedOption(guidedOption, button.textContent?.trim() || '');
+      return;
+    }
+
     const suggestion = button.textContent?.trim() || button.dataset.suggestion;
     if (!suggestion) return;
 
@@ -291,6 +365,174 @@ class NoemiaUnified {
       // Enviar automaticamente
       const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
       form.dispatchEvent(submitEvent);
+    }
+  }
+
+  handleGuidedOption(optionId, label) {
+    const journeys = {
+      understand_case: {
+        answer: 'Posso te ajudar a entender o ponto principal do seu caso e mostrar o proximo passo mais sensato. Se voce me contar a area ou a situacao central, eu organizo isso com mais clareza.',
+        nextStage: 'clarify'
+      },
+      explain_more: {
+        answer: 'O melhor primeiro passo costuma ser entender tres pontos: qual area juridica envolve seu caso, se existe urgencia real e quais documentos ou fatos ja estao disponiveis. Com isso, o atendimento fica muito mais preciso.',
+        nextStage: 'clarify'
+      },
+      documents: {
+        answer: 'Os documentos ideais mudam conforme a area, mas normalmente ja ajudam nome completo, cidade, registros do que aconteceu, comprovantes, mensagens, extratos, contratos ou laudos. Posso te guiar por area para ficar mais objetivo.',
+        nextStage: 'documents'
+      },
+      consultation: {
+        answer: 'Se voce ja sente que precisa de orientacao mais profunda, faz sentido preparar a consulta. Antes disso, posso abrir a etapa final para voce deixar o contexto essencial do caso de forma organizada.',
+        nextStage: 'consultation'
+      },
+      urgent: {
+        answer: 'Quando ha prazo, bloqueio, corte de beneficio, negativacao, desconto indevido ativo ou conflito familiar sensivel, vale tratar como prioridade. Posso te ajudar a separar o que e urgente e o que deve ser reunido agora.',
+        nextStage: 'urgency'
+      },
+      urgent_now: {
+        answer: 'Se existe risco imediato, a melhor decisao e avancar para a etapa final de consulta e deixar o contexto essencial pronto agora. Assim o escritorio recebe seu caso mais bem organizado.',
+        nextStage: 'consultation',
+        action: 'open_triage'
+      },
+      urgent_soon: {
+        answer: 'Se a urgencia e alta, mas nao imediata, ja vale reunir o contexto principal, documentos e objetivo do atendimento. Posso te conduzir por isso sem pressa desnecessaria.',
+        nextStage: 'clarify'
+      },
+      banking: {
+        answer: 'Em problema bancario, geralmente importa entender se houve desconto indevido, fraude, emprestimo nao reconhecido, negativacao, cobranca abusiva ou contrato mal executado. Se quiser, posso te conduzir para a etapa final ou ajudar a entender os documentos certos.',
+        nextStage: 'clarify',
+        area: 'bancario'
+      },
+      social_security: {
+        answer: 'Em questao previdenciaria, normalmente ajuda saber se voce busca aposentadoria, revisao, beneficio negado, corte, BPC ou incapacidade. Com esse eixo definido, o escritorio recebe seu caso muito melhor organizado.',
+        nextStage: 'clarify',
+        area: 'previdenciario'
+      },
+      family: {
+        answer: 'Em direito de familia, os pontos mais delicados costumam envolver guarda, pensao, convivencia, divorcio e urgencia emocional ou patrimonial. Posso te orientar sobre o que faz sentido reunir e quando a consulta entra como melhor proximo passo.',
+        nextStage: 'clarify',
+        area: 'familia'
+      },
+      other: {
+        answer: 'Sem problema. O importante e comecar com clareza. Se quiser, descreva o que aconteceu com suas palavras ou me diga qual tipo de duvida quer resolver primeiro.',
+        nextStage: 'clarify'
+      },
+      area_previdenciario: {
+        answer: 'Para caso previdenciario, ja ajudam numero do beneficio se existir, carta do INSS, CNIS, laudos, carteira de trabalho e um resumo do que voce espera resolver.',
+        nextStage: 'consultation',
+        area: 'previdenciario'
+      },
+      area_bancario: {
+        answer: 'Para caso bancario, extratos, contratos, comprovantes, prints, notificacoes e datas dos descontos ou cobrancas costumam acelerar bastante a analise inicial.',
+        nextStage: 'consultation',
+        area: 'bancario'
+      },
+      area_familia: {
+        answer: 'Para questao de familia, normalmente ajudam documentos pessoais, registro da relacao familiar, historico objetivo da situacao e, quando houver, conversas ou comprovantes ligados ao conflito.',
+        nextStage: 'consultation',
+        area: 'familia'
+      },
+      describe_case: {
+        answer: 'Perfeito. Escreva com suas palavras o que aconteceu, o que mais te preocupa agora e, se souber, qual area juridica envolve seu caso. Eu sigo a partir disso.',
+        nextStage: 'clarify',
+        action: 'focus_textarea'
+      },
+      open_triage: {
+        answer: 'Abri a etapa final para consulta logo abaixo. Ela pede apenas o contexto essencial para que o atendimento humano receba seu caso com mais precisao.',
+        nextStage: 'consultation',
+        action: 'open_triage'
+      },
+      back_initial: {
+        answer: 'Sem problema. Vou voltar para as opcoes iniciais para voce escolher outro caminho com tranquilidade.',
+        nextStage: 'initial'
+      }
+    };
+
+    const step = journeys[optionId];
+    if (!step) {
+      return;
+    }
+
+    const feed = document.querySelector('.conversation-feed');
+    if (feed) {
+      this.addMessageToContainer(feed, 'user', label || 'Quero seguir por este caminho');
+      this.addMessageToContainer(feed, 'assistant', step.answer);
+    }
+
+    if (step.area) {
+      this.applyGuidedArea(step.area);
+    }
+
+    if (step.action === 'focus_textarea') {
+      this.focusTextarea();
+    }
+
+    if (step.action === 'open_triage') {
+      this.openProgressiveTriage();
+    }
+
+    this.renderGuidedOptions(step.nextStage || 'initial');
+  }
+
+  renderGuidedOptions(stageId) {
+    const stage = this.guidedFlows[stageId] || this.guidedFlows.initial;
+    const container = document.querySelector('.prompt-chip-grid');
+    const pill = document.getElementById('guidedProgressPill');
+
+    this.currentGuidedStage = stageId;
+
+    if (pill) {
+      pill.textContent = stage.pill || 'Etapa inicial';
+    }
+
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = '';
+    stage.options.forEach((option) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'prompt-chip';
+      button.dataset.guidedOption = option.id;
+      button.textContent = option.label;
+      container.appendChild(button);
+    });
+  }
+
+  applyGuidedArea(area) {
+    const problemField = document.getElementById('leadProblemTypeHome');
+    const areaField = document.querySelector('[data-triage-area-input]');
+
+    if (problemField) {
+      problemField.value = area;
+    }
+
+    if (areaField) {
+      areaField.value = area;
+    }
+  }
+
+  focusTextarea() {
+    const textarea = document.getElementById('homeAssistantMessage');
+    if (textarea) {
+      textarea.focus();
+      textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  openProgressiveTriage() {
+    const triageShell = document.getElementById('triagem-home');
+    const triagePanel = document.getElementById('triageProgressivePanel');
+
+    if (triageShell) {
+      triageShell.classList.remove('is-collapsed');
+    }
+
+    if (triagePanel) {
+      triagePanel.hidden = false;
+      triagePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
