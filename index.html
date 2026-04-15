@@ -3,28 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Noemia Paixao Advocacia | Atendimento inicial inteligente e consulta juridica estrategica</title>
+  <title>Noemia Paixao Advocacia | Atendimento juridico premium com clareza desde o primeiro contato</title>
   <meta
     name="description"
-    content="Atendimento inicial inteligente, disponivel 24h, para organizar seu caso e conduzir sua consulta juridica com mais clareza, contexto e seguranca."
+    content="Atendimento juridico premium, disponivel 24h, para acolher seu caso, orientar seus primeiros passos e preparar a consulta com clareza e criterio."
   />
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta name="theme-color" content="#f6f1e8" />
   <link rel="canonical" href="https://advnoemia.com.br/" />
   <meta property="og:locale" content="pt_BR" />
-  <meta property="og:title" content="Noemia Paixao Advocacia | Atendimento inicial inteligente e consulta juridica estrategica" />
+  <meta property="og:title" content="Noemia Paixao Advocacia | Atendimento juridico premium com clareza desde o primeiro contato" />
   <meta
     property="og:description"
-    content="Atendimento inicial inteligente, disponivel 24h, para acolher seu caso, orientar os proximos passos e preparar sua consulta com mais clareza."
+    content="Atendimento juridico premium, disponivel 24h, para acolher seu caso, orientar os primeiros passos e preparar sua consulta com clareza."
   />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://advnoemia.com.br/mae.jpeg" />
   <meta property="og:url" content="https://advnoemia.com.br/" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Noemia Paixao Advocacia | Atendimento inicial inteligente e consulta juridica estrategica" />
+  <meta name="twitter:title" content="Noemia Paixao Advocacia | Atendimento juridico premium com clareza desde o primeiro contato" />
   <meta
     name="twitter:description"
-    content="Atendimento inicial inteligente, disponivel 24h, para acolher seu caso, orientar os proximos passos e preparar sua consulta com mais clareza."
+    content="Atendimento juridico premium, disponivel 24h, para acolher seu caso, orientar os primeiros passos e preparar sua consulta com clareza."
   />
   <meta name="twitter:image" content="https://advnoemia.com.br/mae.jpeg" />
   <link rel="icon" href="logo.png" type="image/png" />
@@ -528,6 +528,36 @@
       line-height:1.55;
     }
 
+    .hero-signature{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:12px;
+      margin-top:1.35rem;
+    }
+
+    .hero-signature-item{
+      padding:16px 18px;
+      border-radius:20px;
+      background:rgba(255,252,245,.82);
+      border:1px solid rgba(163,132,68,.16);
+      box-shadow:0 14px 32px rgba(57,41,18,.06);
+    }
+
+    .hero-signature-item strong{
+      display:block;
+      margin-bottom:6px;
+      color:var(--ink) !important;
+      font-size:1rem;
+      line-height:1.2;
+    }
+
+    .hero-signature-item span{
+      display:block;
+      color:var(--ink-soft) !important;
+      font-size:.92rem;
+      line-height:1.55;
+    }
+
     .dashboard-actions--split{
       display:flex;
       flex-wrap:wrap;
@@ -599,7 +629,7 @@
       overflow:hidden;
       position:relative;
       box-shadow:0 30px 80px rgba(54,36,13,.12) !important;
-      background:transparent !important;
+      background:linear-gradient(180deg, rgba(255,253,248,.9), rgba(244,236,223,.92)) !important;
       border:1px solid rgba(163,132,68,.18) !important;
     }
 
@@ -608,9 +638,8 @@
       position:absolute;
       inset:0;
       background:
-        linear-gradient(180deg, rgba(255,252,247,.04), rgba(255,252,247,.32)),
-        url("mae.jpeg") no-repeat 78% center / cover;
-      transform:scale(1.02);
+        radial-gradient(circle at top right, rgba(199,164,93,.16), transparent 24%),
+        linear-gradient(180deg, rgba(255,252,247,.96), rgba(247,239,228,.86));
     }
 
     .panel-visual,
@@ -624,7 +653,111 @@
       content:"";
       position:absolute;
       inset:0;
-      background:linear-gradient(180deg, rgba(255,251,244,0) 20%, rgba(255,250,242,.18) 60%, rgba(255,250,242,.56) 100%);
+      background:
+        radial-gradient(circle at bottom left, rgba(16,38,29,.06), transparent 28%),
+        linear-gradient(180deg, rgba(255,251,244,0) 12%, rgba(255,250,242,.12) 54%, rgba(255,250,242,.3) 100%);
+    }
+
+    .hero-panel-card{
+      position:absolute;
+      left:32px;
+      right:32px;
+      bottom:32px;
+      display:grid;
+      gap:18px;
+      padding:28px;
+      border-radius:28px;
+      background:rgba(16,38,29,.92);
+      color:#f8f2e8;
+      box-shadow:0 26px 56px rgba(16,38,29,.24);
+    }
+
+    .hero-panel-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+    }
+
+    .hero-panel-copy span{
+      display:block;
+      margin-bottom:8px;
+      color:rgba(247,233,205,.72);
+      font-size:.76rem;
+      font-weight:700;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+
+    .hero-panel-copy strong{
+      display:block;
+      max-width:12ch;
+      font-size:clamp(1.8rem, 2.6vw, 2.5rem);
+      line-height:1;
+      color:#fffaf0;
+    }
+
+    .hero-panel-copy p{
+      margin:0;
+      max-width:44ch;
+      color:rgba(248,242,232,.78) !important;
+      line-height:1.7;
+    }
+
+    .hero-availability{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:38px;
+      padding:0 14px;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12);
+      color:#f3e4bf;
+      font-size:.76rem;
+      font-weight:700;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    .hero-availability::before{
+      content:"";
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:#4cc38b;
+      box-shadow:0 0 0 6px rgba(76,195,139,.14);
+    }
+
+    .hero-journey{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:12px;
+      margin:0;
+      padding:0;
+      list-style:none;
+    }
+
+    .hero-journey li{
+      padding:14px 14px 12px;
+      border-radius:20px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.1);
+    }
+
+    .hero-journey strong{
+      display:block;
+      margin-bottom:4px;
+      color:#fff8eb;
+      font-size:.95rem;
+    }
+
+    .hero-journey span{
+      display:block;
+      color:rgba(248,242,232,.72);
+      font-size:.88rem;
+      line-height:1.5;
     }
 
     .pathway-shell,
@@ -764,6 +897,78 @@
       border-color:rgba(163,132,68,.28) !important;
     }
 
+    .home-discreet-flow{
+      padding-top:4.8rem;
+    }
+
+    .discreet-flow-shell{
+      display:grid;
+      gap:20px;
+      padding:1.8rem;
+      border-radius:30px;
+      border:1px solid rgba(163,132,68,.18);
+      background:linear-gradient(135deg, rgba(255,252,246,.92), rgba(246,239,228,.9));
+      box-shadow:0 24px 60px rgba(57,41,18,.08);
+    }
+
+    .discreet-flow-head{
+      display:flex;
+      align-items:end;
+      justify-content:space-between;
+      gap:20px;
+    }
+
+    .discreet-flow-head h2{
+      max-width:11ch;
+      color:var(--ink) !important;
+      font-size:clamp(2.2rem, 4vw, 4rem);
+      line-height:.96;
+      letter-spacing:-.04em;
+    }
+
+    .discreet-flow-head p{
+      max-width:34ch;
+      margin:0;
+      color:var(--ink-soft) !important;
+      line-height:1.7;
+    }
+
+    .discreet-flow-grid{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:14px;
+    }
+
+    .discreet-flow-card{
+      padding:1.45rem;
+      border-radius:24px;
+      background:rgba(255,255,255,.7);
+      border:1px solid rgba(163,132,68,.16);
+    }
+
+    .discreet-flow-card .eyebrow{
+      margin-bottom:14px;
+    }
+
+    .discreet-flow-card h3{
+      margin:0 0 10px;
+      color:var(--ink) !important;
+      font-size:1.28rem;
+      line-height:1.12;
+    }
+
+    .discreet-flow-card p{
+      margin:0;
+      color:var(--ink-soft) !important;
+      line-height:1.7;
+    }
+
+    .discreet-flow-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+    }
+
     .footer{
       background:linear-gradient(180deg, #f1eadf 0%, #eadfce 100%) !important;
       border-top:1px solid rgba(163,132,68,.16) !important;
@@ -819,6 +1024,12 @@
       background:linear-gradient(180deg, rgba(246,239,228,.65) 0%, rgba(255,255,255,.04) 100%) !important;
     }
 
+    .pathway-section,
+    .home-identity,
+    .home-experience-light{
+      display:none !important;
+    }
+
     @media (max-width: 1100px){
       .hero-grid{
         grid-template-columns:1fr;
@@ -836,6 +1047,12 @@
 
       .hero-copy h1{
         max-width:12ch;
+      }
+
+      .hero-signature,
+      .hero-journey,
+      .discreet-flow-grid{
+        grid-template-columns:1fr;
       }
     }
 
@@ -857,6 +1074,11 @@
       .hero-copy h1{
         font-size:clamp(2.6rem, 11vw, 4.4rem) !important;
         max-width:11ch;
+      }
+
+      .discreet-flow-head{
+        flex-direction:column;
+        align-items:flex-start;
       }
 
       .pathway-shell,
@@ -912,6 +1134,19 @@
         min-height:360px;
       }
 
+      .hero-panel-card{
+        left:18px;
+        right:18px;
+        bottom:18px;
+        padding:20px;
+        border-radius:24px;
+      }
+
+      .hero-panel-top{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+
       .metric-card,
       .feature-card,
       .pathway-card,
@@ -927,6 +1162,11 @@
 
       .experience-copy h2{
         max-width:11ch;
+      }
+
+      .discreet-flow-shell{
+        padding:1.2rem;
+        border-radius:24px;
       }
 
       .footer-bar{
@@ -1954,74 +2194,92 @@
       <section class="hero">
         <div class="container hero-grid">
           <div class="hero-copy">
-            <span class="eyebrow">Atendimento juridico estrategico com clareza desde o primeiro contato</span>
-            <h1>
-              Atendimento premium para quem precisa de direcao, seguranca e proximo passo.
-            </h1>
-            <p>
-              Atuacao em Direito Previdenciario, Consumidor e Bancario, Familia e Civil. O atendimento inicial inteligente do escritorio acolhe seu caso, organiza as informacoes mais importantes e prepara a consulta com muito mais contexto.
-            </p>
+            <span class="eyebrow">Atendimento juridico premium com clareza desde o primeiro contato</span>
+            <h1>Seu caso entra com mais criterio, mais respiro e o proximo passo certo.</h1>
+            <p>O escritorio oferece atendimento inicial disponivel 24h para acolher sua situacao, organizar o essencial e preparar a consulta juridica com leitura mais precisa.</p>
 
             <div class="hero-actions">
-              <a class="btn btn-primary" href="#atendimento">
-                Falar com o atendente virtual
-              </a>
+              <a class="btn btn-primary" href="#atendimento">Iniciar atendimento</a>
               <a class="btn btn-secondary" href="https://portal.advnoemia.com.br/portal/login">Area do cliente</a>
             </div>
-            <p class="hero-trust-note">
-              Atendente virtual do escritorio, disponivel 24h, para orientar seus primeiros passos com elegancia e criterio.
-            </p>
+            <p class="hero-trust-note">Atendimento virtual do escritorio para orientar com clareza, discricao e postura tecnica desde o inicio.</p>
 
-            <div class="hero-points">
-              <div class="glass-card hero-point">
-                <strong>Primeiro atendimento com criterio</strong>
-                <p>Seu caso entra com mais clareza, menos ruido e melhor leitura do que realmente precisa avancar.</p>
-              </div>
-
-              <div class="glass-card hero-point">
+            <div class="hero-signature" aria-label="Diferenciais do atendimento">
+              <div class="hero-signature-item">
                 <strong>Disponivel 24h</strong>
-                <p>Duvidas iniciais, documentos e proximo passo ja podem ser organizados sem esperar o horario comercial.</p>
+                <span>Primeiro contato aberto sempre que voce precisar comecar.</span>
+              </div>
+              <div class="hero-signature-item">
+                <strong>Conducao elegante</strong>
+                <span>Pouco ruido, boa direcao e linguagem objetiva.</span>
+              </div>
+              <div class="hero-signature-item">
+                <strong>Consulta melhor preparada</strong>
+                <span>O contexto chega mais claro quando o caso pede aprofundamento.</span>
               </div>
             </div>
           </div>
 
           <div class="hero-panel glass-card">
             <div class="panel-visual">
-              <div class="hero-preview" role="region" aria-label="Por que confiar neste atendimento">              
+              <div class="hero-preview" role="region" aria-label="Resumo do atendimento premium">
+                <div class="hero-panel-card">
+                  <div class="hero-panel-top">
+                    <div class="hero-panel-copy">
+                      <span>Atendimento virtual do escritorio</span>
+                      <strong>Primeiro acolhimento com direcao.</strong>
+                    </div>
+                    <div class="hero-availability">Disponivel 24h</div>
+                  </div>
+                  <p>Uma entrada guiada para compreender a situacao, indicar documentos e abrir a consulta no momento certo, sem excesso de etapas na tela.</p>
+                  <ul class="hero-journey">
+                    <li>
+                      <strong>Escuta inicial</strong>
+                      <span>Entende o ponto central do caso.</span>
+                    </li>
+                    <li>
+                      <strong>Leitura objetiva</strong>
+                      <span>Organiza urgencia, area e documentos.</span>
+                    </li>
+                    <li>
+                      <strong>Continuidade discreta</strong>
+                      <span>Abre consulta ou portal quando fizer sentido.</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
+        </div>
       </section>
       <section class="noemia-section" id="atendimento">
         <div id="noemia" aria-hidden="true"></div>
         <div class="noemia-shell home-attendance-shell">
           <div class="noemia-copy">
-            <span class="noemia-eyebrow">Atendimento inicial inteligente</span>
+            <span class="noemia-eyebrow">Atendimento virtual do escritorio</span>
 
             <h2 class="noemia-title">
-              O <span>atendente virtual do escritorio</span> acolhe seu caso com clareza e esta disponivel 24h.
+              Clareza inicial, acolhimento tecnico e <span>direcao para o proximo passo.</span>
             </h2>
 
             <p class="noemia-text">
-              Aqui mesmo voce pode iniciar seu atendimento, entender os primeiros pontos importantes, organizar documentos, reduzir inseguranca e chegar a consulta com muito mais contexto.
+              Aqui voce inicia o atendimento com elegancia e objetividade. O atendente virtual organiza o essencial do caso e conduz a conversa sem transformar a home em formulario.
             </p>
-
-            <p class="noemia-highlight">Primeiro atendimento com direcao elegante, sem sair da home.</p>
 
             <div class="noemia-points">
               <div class="noemia-point">
-                <strong>Acolhimento com estrategia</strong>
-                <p>As duvidas iniciais entram em um fluxo mais humano, mais claro e mais premium.</p>
+                <strong>Entrada guiada</strong>
+                <p>Poucas escolhas, boa hierarquia e uma conversa conduzida com naturalidade.</p>
               </div>
 
               <div class="noemia-point">
-                <strong>Organizacao do caso</strong>
-                <p>O atendimento virtual ajuda a separar documentos, urgencia, area juridica e melhor proximo passo.</p>
+                <strong>Leitura do contexto</strong>
+                <p>Documentos, urgencia e area juridica aparecem no momento adequado.</p>
               </div>
 
               <div class="noemia-point">
-                <strong>Consulta melhor preparada</strong>
-                <p>Quando o caso pede aprofundamento, a consulta avanca com muito mais contexto e seguranca.</p>
+                <strong>Encaminhamento seguro</strong>
+                <p>Quando for hora de aprofundar, a consulta entra com mais criterio.</p>
               </div>
             </div>
           </div>
@@ -2033,7 +2291,7 @@
                   <div class="assistant-lounge-avatar">24h</div>
                   <div>
                     <span>Atendimento virtual do escritorio</span>
-                    <strong>Primeiro atendimento com clareza e direcao</strong>
+                    <strong>Comece por aqui</strong>
                   </div>
                 </div>
 
@@ -2041,30 +2299,26 @@
               </div>
 
               <p class="assistant-lounge-intro">
-                Descreva sua situacao com tranquilidade. O atendente virtual do escritorio acolhe o caso, organiza informacoes importantes, orienta documentos e mostra o caminho mais adequado para voce seguir.
+                Toque em uma opcao ou descreva sua situacao. O atendimento conduz a conversa com clareza e abre a continuidade apenas quando ela fizer sentido.
               </p>
 
               <div class="guided-progress-note">
-                <span>Voce pode tocar nas opcoes abaixo e deixar o atendimento guiar a conversa sem precisar escrever logo de inicio.</span>
+                <span>Uma entrada simples para orientar seu primeiro movimento.</span>
                 <span class="guided-progress-pill" id="guidedProgressPill">Etapa inicial</span>
               </div>
 
               <div class="conversation-feed" aria-live="polite">
                 <article class="chat-bubble assistant">
                   <span>Atendente virtual do escritorio</span>
-                  <p>Ola. Estou disponivel 24h para acolher seu primeiro contato, entender sua situacao e orientar seus proximos passos com mais clareza.</p>
+                  <p>Ola. Posso acolher seu primeiro contato, entender o ponto principal do seu caso e indicar o melhor caminho para seguir.</p>
                 </article>
               </div>
 
               <div class="prompt-chip-grid" aria-label="Sugestoes de inicio">
-                <button class="prompt-chip" type="button" data-guided-option="understand_case">Quero entender meu caso</button>
-                <button class="prompt-chip" type="button" data-guided-option="documents">Quais documentos ajudam agora?</button>
-                <button class="prompt-chip" type="button" data-guided-option="consultation">Ja faz sentido marcar consulta?</button>
-                <button class="prompt-chip" type="button" data-guided-option="urgent">Meu caso parece urgente</button>
-                <button class="prompt-chip" type="button" data-guided-option="banking">Tenho problema com banco</button>
-                <button class="prompt-chip" type="button" data-guided-option="social_security">E questao previdenciaria</button>
-                <button class="prompt-chip" type="button" data-guided-option="family">E questao de familia</button>
-                <button class="prompt-chip" type="button" data-guided-option="other">Quero falar sobre outro assunto</button>
+                <button class="prompt-chip" type="button" data-guided-option="understand_case">Entender meu caso</button>
+                <button class="prompt-chip" type="button" data-guided-option="documents">Separar documentos</button>
+                <button class="prompt-chip" type="button" data-guided-option="consultation">Avancar para consulta</button>
+                <button class="prompt-chip" type="button" data-guided-option="urgent">Tratar uma urgencia</button>
               </div>
 
               <form class="assistant-home-form">
@@ -2072,45 +2326,40 @@
                 <textarea
                   id="homeAssistantMessage"
                   name="message"
-                  placeholder="Ex.: tive um desconto indevido, preciso entender meus direitos e saber qual documento ja vale separar agora."
+                  placeholder="Ex.: recebi um desconto indevido e quero entender meus direitos e quais documentos valem separar agora."
                 ></textarea>
 
                 <div class="assistant-home-actions">
                   <button class="btn-noemia btn-noemia-primary" type="submit">Receber orientacao inicial</button>
-                  <a class="btn-noemia btn-noemia-secondary" href="noemia.html">Abrir tela dedicada, se preferir</a>
+                  <a class="btn-noemia btn-noemia-secondary" href="noemia.html">Abrir atendimento em tela dedicada</a>
                 </div>
               </form>
 
               <p class="assistant-home-note">
-                Se preferir escrever livremente, o atendimento continua aberto. Se quiser menos friccao, toque nas opcoes e deixe o funil conduzir voce.
+                Se preferir, escreva livremente. Se quiser um caminho mais guiado, use as opcoes acima.
               </p>
             </div>
 
             <div class="embedded-triage is-collapsed" id="triagem-home">
               <div class="embedded-triage-head">
-                <span class="eyebrow">Continuidade do atendimento</span>
-                <h3>A consulta e a triagem entram quando o proprio atendimento pedir mais detalhe.</h3>
-                <p>A camada estruturada continua existindo, mas agora aparece como etapa progressiva, e nao como formulario pesado dominando a home.</p>
-              </div>
-
-              <div class="support-strip">
-                <strong>Menos formulario na frente. Mais conducao e mais clareza no primeiro contato.</strong>
-                <p>Quando fizer sentido avancar para consulta ou detalhar o caso, o proprio atendente vai abrir a etapa certa para voce.</p>
+                <span class="eyebrow">Continuidade</span>
+                <h3>Consulta, portal e detalhes finais entram com discricao.</h3>
+                <p>O primeiro contato permanece leve. A etapa estruturada segue disponivel quando voce decidir aprofundar.</p>
               </div>
 
               <div class="consultation-dock">
                 <strong>Quando voce quiser avançar, o fluxo abre a etapa certa.</strong>
-                <p>Consulta, envio de contexto e triagem estruturada continuam disponiveis, mas so aparecem em destaque quando o atendimento indicar que ja faz sentido seguir.</p>
+                <p>Abra a etapa final da consulta ou siga para a area do cliente sem competir visualmente com o atendimento principal.</p>
                 <div class="consultation-dock-actions">
-                  <button class="btn btn-primary" type="button" id="openProgressiveTriage">Avancar para consulta</button>
-                  <a class="btn btn-secondary" href="https://portal.advnoemia.com.br/portal/login">Ja sou cliente</a>
+                  <button class="btn btn-primary" type="button" id="openProgressiveTriage">Preparar consulta</button>
+                  <a class="btn btn-secondary" href="https://portal.advnoemia.com.br/portal/login">Entrar na area do cliente</a>
                 </div>
               </div>
 
               <div class="triage-progressive-panel" id="triageProgressivePanel" hidden>
                 <div class="triage-progressive-head">
-                  <strong>Detalhes finais para preparar seu encaminhamento</strong>
-                  <p>Esta etapa continua tecnica e funcional, mas agora entra apenas quando voce decide aprofundar o atendimento.</p>
+                  <strong>Contexto essencial para seu encaminhamento</strong>
+                  <p>Preencha apenas o necessario para seguir com sua triagem pronta para o WhatsApp.</p>
                 </div>
 
                 <form class="triage-form" id="triageForm" data-triage-form novalidate>
@@ -2153,7 +2402,7 @@
 
                   <div class="form-group full">
                     <label for="leadDescriptionHome">Descreva seu caso</label>
-                    <textarea class="form-textarea" id="leadDescriptionHome" name="description" rows="5" placeholder="Conte o que aconteceu, quando isso comecou, o que mais preocupa voce agora e qual orientacao espera receber." required></textarea>
+                    <textarea class="form-textarea" id="leadDescriptionHome" name="description" rows="5" placeholder="Conte o que aconteceu, o que mais preocupa voce agora e qual orientacao deseja receber." required></textarea>
                     <span class="field-error"></span>
                   </div>
 
@@ -2175,16 +2424,16 @@
                   <input type="hidden" name="video" value="" data-triage-video-input />
 
                   <button class="btn btn-primary btn-full" type="submit" id="submitButton">
-                    Quero seguir para o WhatsApp com minha triagem pronta
+                    Seguir para o WhatsApp com minha triagem pronta
                   </button>
 
                   <div class="form-status" data-triage-status role="status" aria-live="polite">
-                    Preencha os dados acima para continuar seu atendimento com mais contexto.
+                    Preencha os dados acima para seguir com seu atendimento.
                   </div>
                 </form>
 
                 <p class="mini-note">
-                  A triagem organiza o primeiro atendimento e acelera o encaminhamento da consulta. A analise juridica aprofundada acontece com avaliacao individual da advogada.
+                  A analise juridica aprofundada acontece com avaliacao individual da advogada.
                 </p>
               </div>
             </div>
@@ -2443,19 +2692,19 @@
             <div class="cta-grid">
               <div class="cta-copy">
                 <span class="eyebrow">Contato</span>
-                <h2>Pronto para iniciar seu atendimento? O atendente virtual do escritorio organiza tudo antes da consulta.</h2>
+                <h2>Quando voce decidir avancar, o escritorio ja recebe seu caso com mais clareza.</h2>
                 <p>
-                  Converse aqui mesmo com o atendimento inicial inteligente do escritorio. Ele acolhe seu caso, organiza o contexto principal e direciona voce para a consulta especializada com muito mais clareza.
+                  Inicie a conversa pela home, siga para a triagem quando desejar aprofundar e mantenha a continuidade no portal exclusivo.
                 </p>
               </div>
 
               <div class="showcase-side">
                 <div class="stack-card">
-                  <strong>Falar com a especialista</strong>
+                  <strong>Iniciar agora</strong>
                   <p>Envie o contexto do problema, a cidade e a urgência para receber um encaminhamento inicial mais objetivo.</p>
                   <div class="dashboard-actions">
                     <a class="btn btn-primary" href="#atendimento">
-                      Iniciar atendimento agora
+                      Falar com o atendente virtual
                     </a>
                   </div>
                 </div>

@@ -41,24 +41,20 @@ class NoemiaUnified {
       initial: {
         pill: 'Etapa inicial',
         options: [
-          { id: 'understand_case', label: 'Quero entender meu caso' },
-          { id: 'documents', label: 'Quais documentos ajudam agora?' },
-          { id: 'consultation', label: 'Ja faz sentido marcar consulta?' },
-          { id: 'urgent', label: 'Meu caso parece urgente' },
-          { id: 'banking', label: 'Tenho problema com banco' },
-          { id: 'social_security', label: 'E questao previdenciaria' },
-          { id: 'family', label: 'E questao de familia' },
-          { id: 'other', label: 'Quero falar sobre outro assunto' }
+          { id: 'understand_case', label: 'Entender meu caso' },
+          { id: 'documents', label: 'Separar documentos' },
+          { id: 'consultation', label: 'Avancar para consulta' },
+          { id: 'urgent', label: 'Tratar uma urgencia' }
         ]
       },
       clarify: {
         pill: 'Entendimento inicial',
         options: [
-          { id: 'explain_more', label: 'Me explique melhor' },
-          { id: 'documents', label: 'Quais documentos separar' },
-          { id: 'describe_case', label: 'Quero descrever o que aconteceu' },
-          { id: 'consultation', label: 'Quero avancar para consulta' },
-          { id: 'back_initial', label: 'Mudar assunto' }
+          { id: 'explain_more', label: 'Explicar melhor' },
+          { id: 'documents', label: 'Separar documentos' },
+          { id: 'describe_case', label: 'Descrever o caso' },
+          { id: 'consultation', label: 'Avancar para consulta' },
+          { id: 'back_initial', label: 'Voltar ao inicio' }
         ]
       },
       documents: {
@@ -67,8 +63,8 @@ class NoemiaUnified {
           { id: 'area_previdenciario', label: 'Caso previdenciario' },
           { id: 'area_bancario', label: 'Problema bancario' },
           { id: 'area_familia', label: 'Questao de familia' },
-          { id: 'describe_case', label: 'Quero explicar meu caso' },
-          { id: 'consultation', label: 'Ja quero seguir' }
+          { id: 'describe_case', label: 'Explicar meu caso' },
+          { id: 'consultation', label: 'Seguir para consulta' }
         ]
       },
       urgency: {
@@ -84,9 +80,9 @@ class NoemiaUnified {
       consultation: {
         pill: 'Avanco para consulta',
         options: [
-          { id: 'open_triage', label: 'Abrir etapa final para consulta' },
-          { id: 'describe_case', label: 'Antes vou explicar melhor' },
-          { id: 'documents', label: 'Quais dados ajudam agora?' },
+          { id: 'open_triage', label: 'Preparar consulta' },
+          { id: 'describe_case', label: 'Explicar melhor antes' },
+          { id: 'documents', label: 'Separar documentos' },
           { id: 'back_initial', label: 'Voltar' }
         ]
       }
@@ -226,7 +222,7 @@ class NoemiaUnified {
         'beneficio': 'Para análise de benefícios previdenciários, é importante entender alguns pontos: qual tipo de benefício você busca (aposentadoria por idade, tempo de contribuição, auxílio-doença, etc)? Já possui algum benefício negado pelo INSS? Com base na sua situação, posso te orientar sobre os documentos essenciais e os próximos passos para uma análise mais completa.',
         'documento': 'Os documentos variam conforme a área do direito. Para casos previdenciários, geralmente precisamos de: RG, CPF, comprovantes de residência, carteira de trabalho com todas as páginas, laudos médicos (se aplicável), e decisões anteriores do INSS. Para consumeristas: contratos, faturas, comprovantes de pagamento e registros de ocorrência. Posso te ajudar a montar uma lista específica para o seu caso.',
         'desconto': 'Descontos indevidos exigem atenção rápida. Preciso entender melhor: o desconto ocorreu em conta bancária, folha de pagamento ou cartão de crédito? É um empréstimo que você não reconhece, uma tarifa abusiva ou outro tipo? Com essas informações, te orientarei sobre como proceder, quais provas reunir e se há necessidade de medida urgente.',
-        'default': 'Entendi sua situação. Para te dar uma orientação mais precisa e personalizada, sugiro iniciar nossa triagem especializada. Lá você poderá detalhar melhor seu caso e eu conseguirei te direcionar para o melhor caminho jurídico, seja ele uma consulta, uma ação específica ou outro procedimento adequado ao seu perfil.'
+        'default': 'Entendi. Posso orientar seus primeiros passos, indicar o que vale reunir agora e, quando fizer sentido, direcionar voce para a consulta.'
       },
       'client': {
         'default': 'Posso ajudar você a entender melhor o que aparece no seu portal. Para analisar seu caso específico, preciso acessar seus dados. No momento, estou operando em modo limitado. Sugiro usar os recursos do portal ou falar diretamente com a equipe para obter informações personalizadas sobre seu caso.'
@@ -254,7 +250,7 @@ class NoemiaUnified {
     let fullResponse = response;
     
     if (apiError) {
-      fullResponse += '\n\n*Nota: Estou operando em modo de backup devido a instabilidades técnicas. Para atendimento completo, sugiro contatar a equipe diretamente.*';
+      fullResponse += '\n\nPosso seguir com uma orientacao inicial por aqui e, se necessario, direcionar voce para a continuidade do atendimento.';
     }
 
     return {
@@ -268,7 +264,7 @@ class NoemiaUnified {
 
   getDefaultSuggestions(audience) {
     const suggestions = {
-      'visitor': ['Iniciar triagem especializada', 'Ver áreas de atuação', 'Falar com a equipe'],
+      'visitor': ['Entender meu caso', 'Separar documentos', 'Avancar para consulta'],
       'client': ['Ver meu painel', 'Enviar documentos', 'Agendar consulta'],
       'staff': ['Ver painel operacional', 'Analisar triagens', 'Ver casos recentes']
     };
@@ -371,7 +367,7 @@ class NoemiaUnified {
   handleGuidedOption(optionId, label) {
     const journeys = {
       understand_case: {
-        answer: 'Posso te ajudar a entender o ponto principal do seu caso e mostrar o proximo passo mais sensato. Se voce me contar a area ou a situacao central, eu organizo isso com mais clareza.',
+        answer: 'Posso te ajudar a entender o ponto principal do seu caso e mostrar o proximo passo mais sensato. Se voce me contar a area ou a situacao central, eu organizo isso com clareza.',
         nextStage: 'clarify'
       },
       explain_more: {
@@ -383,7 +379,7 @@ class NoemiaUnified {
         nextStage: 'documents'
       },
       consultation: {
-        answer: 'Se voce ja sente que precisa de orientacao mais profunda, faz sentido preparar a consulta. Antes disso, posso abrir a etapa final para voce deixar o contexto essencial do caso de forma organizada.',
+        answer: 'Se voce ja sente que precisa de orientacao mais profunda, faz sentido preparar a consulta. Posso abrir a etapa final para deixar o contexto essencial do caso organizado.',
         nextStage: 'consultation'
       },
       urgent: {
@@ -391,7 +387,7 @@ class NoemiaUnified {
         nextStage: 'urgency'
       },
       urgent_now: {
-        answer: 'Se existe risco imediato, a melhor decisao e avancar para a etapa final de consulta e deixar o contexto essencial pronto agora. Assim o escritorio recebe seu caso mais bem organizado.',
+        answer: 'Se existe risco imediato, o melhor caminho e avancar para a etapa final de consulta e deixar o contexto essencial pronto agora.',
         nextStage: 'consultation',
         action: 'open_triage'
       },
@@ -439,7 +435,7 @@ class NoemiaUnified {
         action: 'focus_textarea'
       },
       open_triage: {
-        answer: 'Abri a etapa final para consulta logo abaixo. Ela pede apenas o contexto essencial para que o atendimento humano receba seu caso com mais precisao.',
+        answer: 'Abri a etapa final logo abaixo. Ela pede apenas o contexto essencial para preparar sua consulta.',
         nextStage: 'consultation',
         action: 'open_triage'
       },
