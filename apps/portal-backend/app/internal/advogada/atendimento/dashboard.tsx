@@ -71,6 +71,9 @@ type ThreadItem = {
   threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
+  identityStatus: "resolved" | "provisional" | "pending";
+  identityStatusLabel: string;
+  identitySourceLabel: string;
   preview: string;
   lastMessageAt: string | null;
   threadStatus: string;
@@ -127,6 +130,9 @@ type ThreadDetail = {
   context: {
     person: {
       name: string;
+      identityStatus: "resolved" | "provisional" | "pending";
+      identityStatusLabel: string;
+      identitySourceLabel: string;
       phone: string | null;
       email: string | null;
       role: string | null;
@@ -364,6 +370,18 @@ function toneForFollowUp(status: string) {
   }
 
   return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
+}
+
+function toneForIdentity(status: string) {
+  if (status === "pending") {
+    return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
+  }
+
+  if (status === "provisional") {
+    return "border-[#d7d1ef] bg-[#f5f2ff] text-[#5a4aa0]";
+  }
+
+  return "border-[#d9e2db] bg-[#f5f8f4] text-[#446054]";
 }
 
 function MetricCard({
@@ -988,8 +1006,18 @@ async function sendHumanReply() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-[#10261d]">{thread.displayName}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-[#10261d]">{thread.displayName}</p>
+                        {thread.identityStatus !== "resolved" ? (
+                          <Chip className={toneForIdentity(thread.identityStatus)}>
+                            {thread.identityStatusLabel}
+                          </Chip>
+                        ) : null}
+                      </div>
                       <p className="mt-1 text-xs text-[#6c7b73]">{thread.contactLabel}</p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[#8a6a3d]">
+                        {thread.identitySourceLabel}
+                      </p>
                     </div>
                     {thread.unreadCount > 0 ? (
                       <span className="rounded-full bg-[#10261d] px-2.5 py-1 text-xs font-semibold text-white">
@@ -1071,6 +1099,15 @@ async function sendHumanReply() {
                 </>
               ) : null}
             </div>
+            {selectedThread ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[#4e6057]">
+                <span className="font-semibold text-[#10261d]">{selectedThread.context.person.name}</span>
+                <Chip className={toneForIdentity(selectedThread.context.person.identityStatus)}>
+                  {selectedThread.context.person.identityStatusLabel}
+                </Chip>
+                <span>{selectedThread.thread.contactLabel}</span>
+              </div>
+            ) : null}
           </div>
 
           {selectedThread ? (
@@ -1222,6 +1259,14 @@ async function sendHumanReply() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Pessoa</p>
                   <p className="mt-2 font-medium text-[#10261d]">{selectedThread.context.person.name}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Chip className={toneForIdentity(selectedThread.context.person.identityStatus)}>
+                      {selectedThread.context.person.identityStatusLabel}
+                    </Chip>
+                    <Chip className="border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]">
+                      {selectedThread.context.person.identitySourceLabel}
+                    </Chip>
+                  </div>
                   <p>{selectedThread.context.person.phone || "Telefone nao identificado"}</p>
                   <p>{selectedThread.context.person.email || "Email nao identificado"}</p>
                 </div>

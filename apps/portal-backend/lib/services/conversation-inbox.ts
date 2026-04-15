@@ -8,6 +8,11 @@ import {
   sendTelegramGroupMessage,
   sendTelegramPrivateMessage
 } from "../telegram/telegram-service";
+import {
+  buildOperationalContactLabel,
+  resolveLeadIdentity,
+  type LeadIdentityStatus
+} from "./lead-identity";
 
 type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal" | "telegram";
 type ThreadStatus =
@@ -225,6 +230,9 @@ export type ConversationThreadListItem = {
   threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
+  identityStatus: LeadIdentityStatus;
+  identityStatusLabel: string;
+  identitySourceLabel: string;
   preview: string;
   lastMessageAt: string | null;
   threadStatus: ThreadStatus;
@@ -281,6 +289,9 @@ export type ConversationThreadDetail = {
   context: {
     person: {
       name: string;
+      identityStatus: LeadIdentityStatus;
+      identityStatusLabel: string;
+      identitySourceLabel: string;
       phone: string | null;
       email: string | null;
       role: string | null;
@@ -867,6 +878,95 @@ class ConversationInboxService {
     };
   }
 
+  private getSessionUsername(session: SessionRow) {
+    return (
+      asString(session.metadata?.username) ||
+      asString(session.metadata?.instagram_username) ||
+      asString(session.metadata?.telegram_username) ||
+      null
+    );
+  }
+
+  private resolveSessionIdentity(
+    session: SessionRow,
+    client: ClientRow | null,
+    profile: ProfileRow | null
+  ) {
+    const username = this.getSessionUsername(session);
+    const identity = resolveLeadIdentity({
+      channel: session.channel,
+      externalUserId: session.external_user_id,
+      profileFullName: profile?.full_name,
+      clientFullName: client?.full_name,
+      clientName: client?.name,
+      sessionLeadName: session.lead_name,
+      metadataDisplayName: asString(session.metadata?.displayName),
+      metadataUsername: username
+    });
+
+    const contactLabel =
+      profile?.email ||
+      client?.phone ||
+      buildOperationalContactLabel(session.channel, session.external_user_id, username);
+
+    return {
+      identity,
+      username,
+      contactLabel
+    };
+  }
+
+  private async synchronizeSessionIdentity(
+    session: SessionRow,
+    resolved: ReturnType<ConversationInboxService["resolveSessionIdentity"]>
+  ) {
+    const nextLeadName = resolved.identity.canonicalName || session.lead_name || null;
+    const previousIdentityStatus = asString(session.metadata?.identity_status);
+    const previousIdentitySource = asString(session.metadata?.identity_source);
+    const displayNameChanged =
+      (resolved.identity.status !== "pending"
+        ? resolved.identity.displayName
+        : asString(session.metadata?.displayName) || null) !==
+      (asString(session.metadata?.displayName) || null);
+    const sourceChanged = previousIdentitySource !== resolved.identity.source;
+    const statusChanged = previousIdentityStatus !== resolved.identity.status;
+    const usernameChanged = (resolved.username || null) !== (this.getSessionUsername(session) || null);
+    const nextMetadata = {
+      ...(session.metadata || {}),
+      identity_status: resolved.identity.status,
+      identity_source: resolved.identity.source,
+      identity_updated_at:
+        sourceChanged || statusChanged || displayNameChanged || usernameChanged
+          ? new Date().toISOString()
+          : asString(session.metadata?.identity_updated_at) || undefined,
+      ...(resolved.identity.status !== "pending"
+        ? { displayName: resolved.identity.displayName }
+        : {}),
+      ...(resolved.username ? { username: resolved.username } : {})
+    };
+
+    const metadataChanged = JSON.stringify(nextMetadata) !== JSON.stringify(session.metadata || {});
+    const leadNameChanged = (nextLeadName || null) !== (session.lead_name || null);
+
+    if (!metadataChanged && !leadNameChanged) {
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from("conversation_sessions")
+      .update({
+        lead_name: nextLeadName || undefined,
+        metadata: nextMetadata,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", session.id);
+
+    if (!error) {
+      session.lead_name = nextLeadName;
+      session.metadata = nextMetadata;
+    }
+  }
+
   private buildThreadItem(
     session: SessionRow,
     bundle: Awaited<ReturnType<ConversationInboxService["loadContextBundle"]>>
@@ -896,14 +996,7 @@ class ConversationInboxService {
       ["pending", "in_process", "requires_action"].includes(payment.status)
     );
     const paymentApproved = payments.some((payment) => payment.status === "approved");
-
-    const displayName =
-      profile?.full_name ||
-      client?.full_name ||
-      client?.name ||
-      session.lead_name ||
-      asString(session.metadata?.displayName) ||
-      "Contato sem nome";
+    const sessionIdentity = this.resolveSessionIdentity(session, client, profile);
     const origin = inferThreadOrigin(session);
 
     return {
@@ -912,8 +1005,11 @@ class ConversationInboxService {
       channelLabel: getChannelLabel(session.channel),
       threadOriginType: origin.type,
       threadOriginLabel: origin.label,
-      displayName,
-      contactLabel: profile?.email || client?.phone || session.external_user_id,
+      displayName: sessionIdentity.identity.displayName,
+      contactLabel: sessionIdentity.contactLabel,
+      identityStatus: sessionIdentity.identity.status,
+      identityStatusLabel: sessionIdentity.identity.statusLabel,
+      identitySourceLabel: sessionIdentity.identity.sourceLabel,
       preview: buildPreview(session),
       lastMessageAt: session.last_message_at || session.updated_at,
       threadStatus: session.thread_status,
@@ -1031,6 +1127,14 @@ class ConversationInboxService {
       (session) => filters.includeArchived || session.thread_status !== "archived"
     );
     const bundle = await this.loadContextBundle(sessions);
+    await Promise.all(
+      sessions.map((session) => {
+        const resolvedClientId = bundle.resolvedClientIds.get(session.id) || session.client_id;
+        const client = resolvedClientId ? bundle.clientsById.get(resolvedClientId) || null : null;
+        const profile = client?.profile_id ? bundle.profilesById.get(client.profile_id) || null : null;
+        return this.synchronizeSessionIdentity(session, this.resolveSessionIdentity(session, client, profile));
+      })
+    );
 
     const allItems = sessions.map((session) => this.buildThreadItem(session, bundle));
     const items = allItems.filter((item) => this.applyThreadFilters(item, filters)).slice(0, limit);
@@ -1182,12 +1286,14 @@ class ConversationInboxService {
     }
 
     const bundle = await this.loadContextBundle([session as SessionRow]);
-    const thread = this.buildThreadItem(session as SessionRow, bundle);
     const resolvedClientId =
       bundle.resolvedClientIds.get(threadId) || (session as SessionRow).client_id;
     const client = resolvedClientId ? bundle.clientsById.get(resolvedClientId) || null : null;
     const pipeline = resolvedClientId ? bundle.pipelinesByClientId.get(resolvedClientId) || null : null;
     const profile = client?.profile_id ? bundle.profilesById.get(client.profile_id) || null : null;
+    const sessionIdentity = this.resolveSessionIdentity(session as SessionRow, client, profile);
+    await this.synchronizeSessionIdentity(session as SessionRow, sessionIdentity);
+    const thread = this.buildThreadItem(session as SessionRow, bundle);
     const triage = bundle.triageBySession.get(threadId) || null;
     const socialAcquisition = safeObject((session as SessionRow).metadata?.social_acquisition);
     const siteOrigin = safeObject((session as SessionRow).metadata?.site_origin);
@@ -1281,13 +1387,11 @@ class ConversationInboxService {
       })),
       context: {
         person: {
-          name:
-            profile?.full_name ||
-            client?.full_name ||
-            client?.name ||
-            (session as SessionRow).lead_name ||
-            "Contato sem nome",
-          phone: profile?.phone || client?.phone || (session as SessionRow).external_user_id,
+          name: sessionIdentity.identity.displayName,
+          identityStatus: sessionIdentity.identity.status,
+          identityStatusLabel: sessionIdentity.identity.statusLabel,
+          identitySourceLabel: sessionIdentity.identity.sourceLabel,
+          phone: profile?.phone || client?.phone || sessionIdentity.contactLabel,
           email: profile?.email || null,
           role: profile?.role || null
         },

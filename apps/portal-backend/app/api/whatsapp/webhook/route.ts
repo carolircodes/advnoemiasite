@@ -119,6 +119,22 @@ function extractMessageInfo(message: Record<string, any>) {
   };
 }
 
+function buildWhatsAppContactNameMap(contacts: Array<Record<string, any>> | undefined) {
+  const contactMap = new Map<string, string>();
+
+  for (const contact of contacts || []) {
+    const waId = typeof contact?.wa_id === "string" ? contact.wa_id : "";
+    const profileName =
+      typeof contact?.profile?.name === "string" ? contact.profile.name.trim() : "";
+
+    if (waId && profileName) {
+      contactMap.set(waId, profileName);
+    }
+  }
+
+  return contactMap;
+}
+
 async function reconcileStatusUpdate(rawStatus: WhatsAppStatusWebhook) {
   if (!rawStatus.id || !rawStatus.status) {
     return;
@@ -471,6 +487,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        const contactNameMap = buildWhatsAppContactNameMap(change.value?.contacts);
+
         for (const rawStatus of change.value?.statuses || []) {
           await reconcileStatusUpdate(rawStatus as WhatsAppStatusWebhook);
         }
@@ -503,7 +521,8 @@ export async function POST(request: NextRequest) {
               externalEventId: message.messageId || undefined,
               messageText: message.content,
               messageType: message.type,
-              timestamp: message.timestamp
+              timestamp: message.timestamp,
+              displayName: contactNameMap.get(message.from)
             },
             {
               sendText: sendWhatsAppResponse,

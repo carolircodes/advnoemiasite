@@ -49,6 +49,10 @@ import {
   getRevenueOfferByIntent
 } from "./revenue-architecture";
 import { recordRevenueTelemetry } from "./revenue-telemetry";
+import {
+  buildLeadIdentityUpdate,
+  buildLeadNamePrompt
+} from "./lead-identity";
 
 type SupportedChannel = "instagram" | "whatsapp";
 type ConversationSource = "instagram_comment" | "instagram_dm" | "whatsapp_inbound";
@@ -66,6 +70,8 @@ export type ChannelConversationEvent = {
   messageType?: string;
   isEcho?: boolean;
   timestamp?: string | number;
+  displayName?: string;
+  username?: string;
   commentContext?: {
     commentId: string;
     mediaId: string;
@@ -2335,6 +2341,45 @@ export async function processChannelConversationEvent(
       role: message.role as "user" | "assistant",
       content: message.content
     }));
+  const identityUpdate = buildLeadIdentityUpdate({
+    channel: event.channel,
+    externalUserId: event.externalUserId,
+    currentLeadName: session.lead_name,
+    metadata: session.metadata,
+    platformDisplayName: event.displayName,
+    platformUsername: event.username || event.commentContext?.username,
+    messageText: event.messageText,
+    historyCount: history.length
+  });
+  const identityStateChanged =
+    (identityUpdate.leadName || null) !== (session.lead_name || null) ||
+    JSON.stringify(identityUpdate.metadata || {}) !== JSON.stringify(session.metadata || {});
+
+  if (identityStateChanged) {
+    await safeUpdateSession(session.id, {
+      lead_name: identityUpdate.leadName || session.lead_name || undefined,
+      metadata: identityUpdate.metadata
+    });
+  }
+
+  session = {
+    ...session,
+    lead_name: identityUpdate.leadName || session.lead_name,
+    metadata: identityUpdate.metadata
+  };
+
+  if (identityUpdate.nameWasUpgraded) {
+    await safeCreateConversationEvent({
+      sessionId: session.id,
+      eventType: "lead_identity_resolved",
+      actorType: "system",
+      eventData: {
+        source: identityUpdate.resolvedIdentity.source,
+        displayName: identityUpdate.resolvedIdentity.displayName,
+        extractedFromMessage: Boolean(identityUpdate.extractedName)
+      }
+    });
+  }
 
   const conversationSummary = await conversationPersistence.generateConversationSummary(
     session.id,
@@ -2385,6 +2430,7 @@ export async function processChannelConversationEvent(
         }
       : null,
     currentMessage: event.messageText,
+    userName: identityUpdate.resolvedIdentity.canonicalName || undefined,
     historySummary: conversationSummary,
     funnelStage: session.lead_stage || "initial",
     triageStatus: session.current_intent || "unknown",
@@ -2731,8 +2777,33 @@ export async function processChannelConversationEvent(
     direction = "fallback";
   }
 
-  const mergedMetadata = {
+  let finalReplyText = replyText;
+  const shouldAppendLeadNamePrompt =
+    identityUpdate.shouldAskForName &&
+    !identityUpdate.extractedName &&
+    !/como posso te chamar|qual(?:\s+é|\s+e)?\s+o seu nome|seu nome|como prefere ser identificado/i.test(
+      replyText
+    );
+
+  if (shouldAppendLeadNamePrompt) {
+    finalReplyText = `${replyText.trim()}\n\n${buildLeadNamePrompt()}`;
+  }
+
+  const mergedIdentityMetadata = {
     ...(session.metadata || {}),
+    ...(shouldAppendLeadNamePrompt
+      ? {
+          identity_name_requested_at: new Date().toISOString(),
+          identity_name_request_count:
+            typeof session.metadata?.identity_name_request_count === "number"
+              ? Number(session.metadata.identity_name_request_count) + 1
+              : 1
+        }
+      : {})
+  };
+
+  const mergedMetadata = {
+    ...mergedIdentityMetadata,
     social_acquisition: acquisitionSnapshot,
     router_last_event_id: eventId,
     router_last_source: event.source,
@@ -2786,8 +2857,6 @@ export async function processChannelConversationEvent(
     handoffTriggered: handoffDecision.shouldHandoff,
     handoffReason: handoffDecision.reason
   });
-
-  let finalReplyText = replyText;
 
   logRouterEvent(
     "CHANNEL_ROUTER_PRE_OUTBOUND_SEND",
@@ -2905,6 +2974,7 @@ export async function processChannelConversationEvent(
     });
 
     await safeUpdateSession(session.id, {
+      lead_name: identityUpdate.leadName || session.lead_name || undefined,
       lead_stage: leadStage,
       case_area: detectedTheme || session.case_area,
       current_intent:

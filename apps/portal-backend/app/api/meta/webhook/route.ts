@@ -172,6 +172,10 @@ export async function POST(request: NextRequest) {
       for (const messaging of entry.messaging || []) {
         const senderId =
           typeof messaging.sender?.id === "string" ? messaging.sender.id : "";
+        const senderUsername =
+          typeof messaging.sender?.username === "string" ? messaging.sender.username : undefined;
+        const senderDisplayName =
+          typeof messaging.sender?.name === "string" ? messaging.sender.name : undefined;
         const message = messaging.message || {};
         const messageText = extractInstagramDmMessageText(message);
         const messageId = typeof message.mid === "string" ? message.mid : "";
@@ -190,7 +194,9 @@ export async function POST(request: NextRequest) {
             messageText,
             messageType: typeof message.type === "string" ? message.type : "text",
             isEcho: message.is_echo === true,
-            timestamp: messaging.timestamp
+            timestamp: messaging.timestamp,
+            displayName: senderDisplayName,
+            username: senderUsername
           },
           {
             sendText: async (recipientId, messageText, context) => {
@@ -299,6 +305,10 @@ export async function POST(request: NextRequest) {
 
         for (const message of change.value?.messages || []) {
           const senderId = typeof message.from?.id === "string" ? message.from.id : "";
+          const senderUsername =
+            typeof message.from?.username === "string" ? message.from.username : undefined;
+          const senderDisplayName =
+            typeof message.from?.name === "string" ? message.from.name : undefined;
           const messageId = typeof message.mid === "string" ? message.mid : "";
           const messageText = extractInstagramDmMessageText(message);
 
@@ -316,7 +326,9 @@ export async function POST(request: NextRequest) {
               messageText,
               messageType: typeof message.type === "string" ? message.type : "text",
               isEcho: message.is_echo === true,
-            timestamp: message.timestamp
+            timestamp: message.timestamp,
+            displayName: senderDisplayName,
+            username: senderUsername
           },
           {
             sendText: async (recipientId, messageText, context) => {
