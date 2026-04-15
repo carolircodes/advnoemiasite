@@ -767,6 +767,32 @@ export default function OperationalPanel() {
         </ActionButton>
       </div>
 
+      <PanelSection
+        title="CRM comercial do escritorio"
+        description="Esta superficie existe para follow-up, consulta, prioridade comercial e travas de conversao. Conversas em tempo real ficam na Inbox; leitura executiva ampla fica no Painel."
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Papel oficial</p>
+            <p className="mt-2 text-sm text-[#4f6158]">
+              Organizar fila comercial, follow-up, consulta e proximo passo de conversao.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Nao e inbox</p>
+            <p className="mt-2 text-sm text-[#4f6158]">
+              Threads, resposta humana e handoff operacional agora pertencem a Atendimento.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Uso ideal</p>
+            <p className="mt-2 text-sm text-[#4f6158]">
+              Entrar aqui para decidir quem converter, quem cobrar retorno e quem esta travado.
+            </p>
+          </div>
+        </div>
+      </PanelSection>
+
       {metrics ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Total de leads" value={metrics.totalLeads} icon={<Users className="h-6 w-6" />} />

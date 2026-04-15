@@ -600,8 +600,8 @@ export default async function InternalLawyerPage({
   return (
     <AppFrame
       eyebrow="Painel da advogada"
-      title={`Command center premium para ${profile.full_name}.`}
-      description="O cockpit-mae agora unifica agenda, entradas, comercial, receita, operacao e proximo passo em uma leitura central de comando, sem depender de paines paralelos."
+      title={`Cockpit executivo do escritorio para ${profile.full_name}.`}
+      description="Esta e a leitura central de comando do workspace. Aqui entram prioridades do dia, triagens, agenda, receita, gargalos e proximo passo sem competir com inbox, CRM ou inteligencia."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -613,8 +613,8 @@ export default async function InternalLawyerPage({
       }
       navigation={[
         { href: "/internal/advogada", label: "Painel", active: true },
-        { href: "/internal/advogada/atendimento", label: "Atendimento" },
-        { href: "/internal/advogada/leads", label: "Leads" },
+        { href: "/internal/advogada/atendimento", label: "Inbox" },
+        { href: "/internal/advogada/operacional", label: "CRM" },
         { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
         { href: "/documentos", label: "Documentos" },
         { href: "/agenda", label: "Agenda" }

@@ -36,8 +36,8 @@ export default async function IntelligencePage({
   return (
     <AppFrame
       eyebrow="Inteligencia do produto"
-      title="Leitura simples do funil, das automacoes e do uso real do portal."
-      description="Esta visao junta conversao, operacao e uso do portal para mostrar onde o fluxo avanca, onde trava e o que ja esta sendo tratado automaticamente."
+      title="Leitura executiva de funil, receita e growth."
+      description="Esta visao junta conversao, operacao, receita e uso real do portal para mostrar onde o fluxo avanca, onde trava e o que merece decisao executiva."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -50,8 +50,8 @@ export default async function IntelligencePage({
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
         { href: "/internal/advogada/inteligencia", label: "Inteligencia", active: true },
-        { href: "/documentos", label: "Documentos" },
-        { href: "/agenda", label: "Agenda" }
+        { href: "/internal/advogada/ecossistema", label: "Ecossistema" },
+        { href: "/internal/advogada/operacional", label: "CRM" }
       ]}
       highlights={[
         { label: "Periodo", value: `${intelligence.days} dias` },

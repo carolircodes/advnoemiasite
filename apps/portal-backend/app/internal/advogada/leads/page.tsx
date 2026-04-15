@@ -438,9 +438,9 @@ export default function LeadsDashboard() {
   if (loading) {
     return (
       <AppFrame
-        eyebrow="Dashboard"
-        title="Leads da NoemIA"
-        description="Gerencie os leads capturados pelo assistente virtual"
+        eyebrow="Historico comercial"
+        title="Historico de leads da NoemIA"
+        description="Leitura de apoio para leads antigos, classificacao e consulta de contexto comercial."
       >
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -451,9 +451,9 @@ export default function LeadsDashboard() {
 
   return (
     <AppFrame
-      eyebrow="Leads e triagem"
-      title="Acompanhamento legado com ponte para a operacao oficial."
-      description="Esta area continua disponivel para leitura e apoio, mas o fluxo premium de triagem, follow-up e evolucao para cliente agora se concentra no painel operacional e no painel principal."
+      eyebrow="Historico comercial"
+      title="Leads e triagem em modo legado."
+      description="Esta rota continua acessivel para apoio e leitura historica, mas o fluxo principal do escritorio agora vive no Painel, na Inbox e no CRM comercial."
     >
       <PortalSessionBanner
         role="advogada"
@@ -464,7 +464,7 @@ export default function LeadsDashboard() {
       <div className="space-y-8">
         <SectionCard
           title="Hub oficial da operacao"
-          description="Use esta rota como apoio historico. A conducao principal dos leads e da triagem agora acontece nas superficies integradas do escritorio."
+          description="Use esta rota como apoio historico. A conducao principal dos leads e da triagem agora acontece nas superficies oficiais do workspace."
         >
           <div className="grid two">
             <Link className="route-card" href="/internal/advogada/operacional">

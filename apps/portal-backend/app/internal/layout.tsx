@@ -5,9 +5,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar, Topbar, PageContainer } from '@/components/layout';
 import {
-  internalWorkspaceMenuItems,
-  internalWorkspaceSubtitles,
-  isInternalWorkspacePathActive
+  getInternalWorkspaceCurrentPage
 } from '@/lib/internal-workspace-nav';
 
 interface LayoutProps {
@@ -17,23 +15,14 @@ interface LayoutProps {
 export default function InternalLayout({ children }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const currentPath = pathname || '/internal/advogada/operacional';
+  const currentPath = pathname || '/internal/advogada';
 
   const currentPage = useMemo(() => {
-    const currentItem = internalWorkspaceMenuItems.find((item) =>
-      isInternalWorkspacePathActive(currentPath, item.href)
-    );
-
-    if (!currentItem) {
-      return {
-        title: 'Painel Operacional',
-        subtitle: internalWorkspaceSubtitles['Painel Operacional']
-      };
-    }
+    const currentItem = getInternalWorkspaceCurrentPage(currentPath);
 
     return {
       title: currentItem.label,
-      subtitle: internalWorkspaceSubtitles[currentItem.label] || ''
+      subtitle: currentItem.subtitle
     };
   }, [currentPath]);
 

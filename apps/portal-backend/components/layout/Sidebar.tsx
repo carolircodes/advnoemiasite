@@ -8,6 +8,7 @@ import {
   FolderOpen,
   LayoutDashboard,
   MessageSquare,
+  Radio,
   Settings,
   Smartphone,
   Users,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 
 import {
-  internalWorkspaceMenuItems,
+  internalWorkspaceMenuSections,
   isInternalWorkspacePathActive
 } from '@/lib/internal-workspace-nav';
 
@@ -26,7 +27,7 @@ interface SidebarProps {
 }
 
 const iconById = {
-  dashboard: LayoutDashboard,
+  painel: LayoutDashboard,
   leads: Users,
   atendimento: MessageSquare,
   canais: Smartphone,
@@ -34,7 +35,8 @@ const iconById = {
   agenda: Calendar,
   documentos: FileText,
   inteligencia: Brain,
-  ecossistema: Bot
+  ecossistema: Bot,
+  operacional: Radio
 } as const;
 
 export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps) {
@@ -57,7 +59,7 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
               </div>
               <div>
                 <h1 className="font-bold text-lg">NoemIA</h1>
-                <p className="text-xs text-[#94a3b8]">Painel Operacional</p>
+                <p className="text-xs text-[#94a3b8]">Workspace interno</p>
               </div>
             </div>
             {isMobile && onClose ? (
@@ -72,29 +74,38 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
         </div>
 
         <nav className="flex-1 p-4">
-          <ul className="space-y-1">
-            {internalWorkspaceMenuItems.map((item) => {
-              const Icon = iconById[item.id as keyof typeof iconById] || Settings;
-              const active = isActive(item.href);
+          <div className="space-y-6">
+            {internalWorkspaceMenuSections.map((section) => (
+              <div key={section.id}>
+                <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                  {section.label}
+                </p>
+                <ul className="space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = iconById[item.id as keyof typeof iconById] || Settings;
+                    const active = isActive(item.href);
 
-              return (
-                <li key={item.id}>
-                  <a
-                    href={item.href}
-                    onClick={() => (isMobile && onClose ? onClose() : undefined)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                      active
-                        ? 'bg-[#8e6a3b] text-white border-l-4 border-[#f5efe2]'
-                        : 'text-[#94a3b8] hover:bg-[#1e293b] hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="font-medium">{item.label}</span>
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
+                    return (
+                      <li key={item.id}>
+                        <a
+                          href={item.href}
+                          onClick={() => (isMobile && onClose ? onClose() : undefined)}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                            active
+                              ? 'bg-[#8e6a3b] text-white border-l-4 border-[#f5efe2]'
+                              : 'text-[#94a3b8] hover:bg-[#1e293b] hover:text-white'
+                          }`}
+                        >
+                          <Icon className="w-5 h-5" />
+                          <span className="font-medium">{item.label}</span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </nav>
 
         <div className="p-4 border-t border-[#1e293b]">

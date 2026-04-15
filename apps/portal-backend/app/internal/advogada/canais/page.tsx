@@ -10,14 +10,13 @@ export default async function InternalLawyerChannelsPage() {
 
   return (
     <AppFrame
-      eyebrow="Canais"
-      title="Atendimento multicanal com atalhos operacionais claros."
-      description="Use esta camada como hub rapido para abrir a inbox oficial, filtrar WhatsApp, filtrar Instagram e voltar para o command center."
+      eyebrow="Distribuicao e canais"
+      title="Launcher por canal e separacao entre inbox e distribuicao."
+      description="Esta camada existe como apoio operacional para abrir a Inbox oficial no recorte certo e deixar claro que distribuicao editorial nao e a mesma coisa que conversas 1:1."
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
-        { href: "/internal/advogada/operacional", label: "Operacional" },
-        { href: "/internal/advogada/atendimento", label: "Atendimento" },
-        { href: "/internal/advogada/canais", label: "Canais", active: true }
+        { href: "/internal/advogada/atendimento", label: "Inbox" },
+        { href: "/internal/advogada/canais", label: "Distribuicao", active: true }
       ]}
       utilityContent={
         <PortalSessionBanner
@@ -29,7 +28,7 @@ export default async function InternalLawyerChannelsPage() {
     >
       <SectionCard
         title="Inbox oficial"
-        description="A operacao real de threads, handoff, notas internas e resposta humana vive na inbox oficial."
+        description="A operacao real de threads, handoff, notas internas e resposta humana vive em Atendimento. Esta pagina nao e uma inbox paralela."
       >
         <div className="grid two">
           <Link className="route-card" href="/internal/advogada/atendimento">
@@ -38,9 +37,9 @@ export default async function InternalLawyerChannelsPage() {
             <span>Visao geral com fila, contexto, mensagens, follow-up e memoria operacional.</span>
           </Link>
           <Link className="route-card" href="/internal/advogada/operacional">
-            <span className="shortcut-kicker">Command Center</span>
-            <strong>Voltar para o operacional</strong>
-            <span>Retome prioridades, triagens, casos quentes e sinais executivos do escritorio.</span>
+            <span className="shortcut-kicker">CRM</span>
+            <strong>Abrir CRM comercial</strong>
+            <span>Retome follow-up, conversao, consulta em vista e travas comerciais fora da inbox.</span>
           </Link>
         </div>
       </SectionCard>

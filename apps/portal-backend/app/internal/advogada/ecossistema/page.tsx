@@ -45,8 +45,8 @@ export default async function EcosystemPage() {
   return (
     <AppFrame
       eyebrow="Ecossistema"
-      title="Base executiva da expansao premium do imperio."
-      description="Esta area existe para separar o que e juridico do que pertence ao ecossistema premium. Aqui entram catalogo, recorrencia, acesso, conteudo, comunidade e leitura de retencao sem contaminar o cockpit principal."
+      title="Expansao premium, recorrencia e comunidade."
+      description="Esta area existe para separar o juridico do que pertence ao ecossistema premium. Aqui entram catalogo, recorrencia, acesso, conteudo, comunidade e retencao sem contaminar o cockpit principal."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -58,8 +58,8 @@ export default async function EcosystemPage() {
       }
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
-        { href: "/internal/advogada/operacional", label: "Operacional" },
         { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
+        { href: "/internal/advogada/operacional", label: "CRM" },
         { href: buildInternalEcosystemHref(), label: "Ecossistema", active: true }
       ]}
       highlights={[
