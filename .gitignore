@@ -45,47 +45,29 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Apps specific
+# App-specific dependencies and build outputs
 apps/portal-backend/node_modules/
 apps/portal-backend/.next/
-apps/portal-backend/.env.local
-apps/portal-backend/.env
 
-*.mp4
-*.js
-*.svg
-*.png
-*.css
-*.html
-*.pb
-*.db
-/apps/portal-backend/.codex-chrome-gui
-*.store
-/apps/portal-backend/.codex-chrome-profile/Default
-*.4_13420725444557343
-*.4_13420755105965447
-*.4_13420733319399613
-*.32_13420725444557526
-*.32_13420725444528496
-*.tflite
-*.gz
-*.4_13420730846107378
-*.4_13420755105963110
-*.4_13420733319395515
-*.4_13420755105958229
-*.model
-*.32_13420725444555548
-*.4_13420733319390684
-*.binarypb
-*.4_13420755105960299
-*.txt
-*.json
-/apps/portal-backend/.codex-chrome-profile/CertificateRevocation/10465
-*.pma
-/apps/portal-backend/.codex-chrome-profile/component_crx_cache
-/apps/portal-backend/.codex-chrome-profile/component_crx_cache
-/apps/portal-backend/.codex-chrome-profile/Crowd Deny/2026.4.13.61
-/apps/portal-backend/.codex-chrome-profile
-/apps/portal-backend/.codex-chrome-profile/GraphiteDawnCache
-/apps/portal-backend
-/apps/portal-backend/app/internal/advogada/atendimento
+# App-specific environment files
+apps/portal-backend/.env*
+!apps/portal-backend/.env.example
+!apps/portal-backend/.env.local.example
+!apps/portal-backend/.env.meta.example
+!apps/portal-backend/.env.production.example
+
+# Codex / browser automation runtime artifacts
+.codex*.log
+.codex*.out.log
+.codex*.err.log
+.codex-chrome-profile/
+.codex-chrome-gui/
+apps/portal-backend/.codex*
+apps/portal-backend/.codex-tmp/
+apps/portal-backend/.codex-phase*-shots/
+apps/portal-backend/.codex-chrome-profile/
+apps/portal-backend/.codex-chrome-gui/
+
+# Supabase local state
+apps/portal-backend/supabase/.temp/
+apps/portal-backend/supabase/.branches/
