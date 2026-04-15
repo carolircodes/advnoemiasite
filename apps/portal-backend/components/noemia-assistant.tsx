@@ -21,15 +21,15 @@ type NoemiaAssistantProps = {
 const audienceCopy = {
   visitor: {
     welcome:
-      "Olá. Sou a NoemIA. Posso te orientar com clareza sobre triagem, consulta, funcionamento do escritório e o próximo passo mais adequado.",
-    modeLabel: "Orientação inicial premium",
+      "Olá. Sou a NoemIA. Posso te ajudar a organizar seu caso, esclarecer as dúvidas iniciais e indicar o próximo passo mais adequado com a equipe.",
+    modeLabel: "Concierge jurídica inicial",
     usageHint:
-      "Pergunte sobre triagem, áreas atendidas, consulta, portal e próximos passos.",
+      "Pergunte sobre triagem, consulta, documentos iniciais, funcionamento do escritório ou diga que quer iniciar seu atendimento.",
     placeholder:
-      "Ex.: Meu caso parece urgente. Como funciona a análise inicial e qual é o próximo passo?",
+      "Ex.: Quero entender meu melhor próximo passo e se já faz sentido marcar uma consulta.",
     pendingText:
-      "Estou organizando sua resposta com base no fluxo público e institucional do escritório...",
-    successText: "Resposta pronta com o melhor próximo passo disponível agora.",
+      "Estou organizando sua resposta com base no fluxo público do escritório para te indicar o melhor caminho agora...",
+    successText: "Resposta pronta com orientação inicial e próximo passo sugerido.",
     errorText:
       "Não consegui responder com segurança neste instante. Tente novamente em alguns segundos."
   },

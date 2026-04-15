@@ -97,15 +97,16 @@ function validateStep(state: TriageFormState, stepIndex: number) {
 
 type TriageFormProps = {
   entryContext?: EntryContext;
+  sourcePath?: string;
 };
 
-export function TriageForm({ entryContext }: TriageFormProps) {
+export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
   const initialCaseArea = resolveEntryCaseArea(entryContext) || initialState.caseArea;
   const baseState = {
     ...initialState,
     caseArea: initialCaseArea
   };
-  const entryPath = appendEntryContextToPath("/triagem", entryContext);
+  const entryPath = sourcePath || appendEntryContextToPath("/triagem", entryContext);
   const entryContextPayload = getEntryContextPayload(entryContext);
   const homeHref = appendEntryContextToPath("/", entryContext);
   const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);

@@ -23,8 +23,8 @@ type PublicLegalPageProps = {
 
 const baseNavigation = [
   { href: "/", label: "Inicio" },
-  { href: "/triagem", label: "Triagem" },
-  { href: "/noemia", label: "Noemia" },
+  { href: "/#atendimento", label: "Atendimento" },
+  { href: "/#como-funciona", label: "Como funciona" },
   { href: CLIENT_LOGIN_PATH, label: "Area do cliente" }
 ];
 
@@ -53,7 +53,7 @@ export function PublicLegalPage({
       highlights={highlights}
       actions={[
         {
-          href: "/triagem",
+          href: "/#atendimento",
           label: "Iniciar atendimento",
           tone: "primary"
         },

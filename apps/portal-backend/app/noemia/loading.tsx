@@ -4,13 +4,13 @@ import { CLIENT_LOGIN_PATH } from "../../lib/auth/access-control";
 export default function Loading() {
   return (
     <PortalLoadingPage
-      eyebrow="Noemia"
-      title="Carregando a assistente do portal."
-      description="Estamos preparando o contexto correto para orientar a jornada do atendimento."
+      eyebrow="Atendimento"
+      title="Preparando o atendimento inteligente do escritorio."
+      description="Estamos direcionando voce para a entrada oficial de atendimento na home."
       navigation={[
         { href: "/", label: "Inicio" },
-        { href: "/triagem", label: "Triagem" },
-        { href: "/noemia", label: "Noemia", active: true },
+        { href: "/#atendimento", label: "Atendimento", active: true },
+        { href: "/#como-funciona", label: "Como funciona" },
         { href: CLIENT_LOGIN_PATH, label: "Area do cliente" }
       ]}
     />

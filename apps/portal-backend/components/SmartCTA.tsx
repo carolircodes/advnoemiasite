@@ -206,7 +206,7 @@ export function WhatsAppCTA({
     });
 
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message || '')}`;
-    const trackingUrl = `/noemia?${trackingParams.toString()}`;
+    const trackingUrl = `/?${trackingParams.toString()}#atendimento`;
 
     console.log('WHATSAPP_CTA_CLICKED: Redirecionando para WhatsApp com tracking:', {
       message,

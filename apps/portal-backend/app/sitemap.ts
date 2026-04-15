@@ -4,8 +4,6 @@ import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
 
 const publicRoutes = [
   "",
-  "/triagem",
-  "/noemia",
   "/politica-de-privacidade",
   "/exclusao-de-dados",
   "/termos-de-uso"

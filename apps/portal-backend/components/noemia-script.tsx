@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const PUBLIC_NOEMIA_PATHS = ["/", "/triagem", "/noemia"];
+const PUBLIC_NOEMIA_PATHS = ["/", "/noemia"];
 
 function shouldLoadNoemiaScript(pathname: string) {
   return PUBLIC_NOEMIA_PATHS.some((basePath) => {

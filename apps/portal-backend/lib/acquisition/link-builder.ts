@@ -21,7 +21,7 @@ export interface LinkGenerationOptions {
 // Configuração padrão
 const DEFAULT_CONFIG = {
   baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://advnoemia.com.br',
-  path: '/noemia'
+  path: '/#atendimento'
 };
 
 function shouldLogTrackingLinks() {
