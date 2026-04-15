@@ -37,6 +37,24 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://advnoemia.com.br/politica-de-privacidade</loc>
+    <lastmod>2026-04-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://advnoemia.com.br/termos-de-uso</loc>
+    <lastmod>2026-04-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://advnoemia.com.br/exclusao-de-dados</loc>
+    <lastmod>2026-04-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://advnoemia.com.br/artigos/aposentadoria-negada-inss.html</loc>
     <lastmod>2026-04-03</lastmod>
     <changefreq>monthly</changefreq>
