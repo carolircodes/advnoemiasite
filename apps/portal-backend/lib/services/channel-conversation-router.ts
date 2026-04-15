@@ -1,4 +1,5 @@
 import type { ConversationSession } from "./conversation-persistence";
+import type { ConversationMessageWriteOptions } from "./conversation-persistence";
 
 import { processNoemiaCore } from "../ai/noemia-core";
 import {
@@ -1353,7 +1354,8 @@ async function safeSaveMessage(
   role: "user" | "assistant" | "system",
   content: string,
   direction: "inbound" | "outbound",
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  options?: ConversationMessageWriteOptions
 ) {
   try {
     await conversationPersistence.saveMessage(
@@ -1362,7 +1364,8 @@ async function safeSaveMessage(
       role,
       content,
       direction,
-      metadata
+      metadata,
+      options
     );
     return true;
   } catch (error) {
@@ -1397,6 +1400,32 @@ async function safeUpdateSession(
       "warn"
     );
     return false;
+  }
+}
+
+async function safeCreateConversationEvent(input: {
+  sessionId: string;
+  eventType: string;
+  actorType: "system" | "ai" | "human";
+  eventData?: Record<string, unknown>;
+}) {
+  try {
+    await conversationPersistence.supabaseClient.from("conversation_events").insert({
+      session_id: input.sessionId,
+      event_type: input.eventType,
+      actor_type: input.actorType,
+      event_data: input.eventData || {}
+    });
+  } catch (error) {
+    logRouterEvent(
+      "CHANNEL_ROUTER_CREATE_EVENT_ERROR",
+      {
+        sessionId: input.sessionId,
+        eventType: input.eventType,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      "warn"
+    );
   }
 }
 
@@ -1623,6 +1652,23 @@ async function handleInstagramCommentEntry(args: {
     messageType: args.messageType,
     responseSurface: "public_comment",
     socialAcquisition: buildSocialAcquisitionPayload(args.acquisitionSnapshot)
+  }, {
+    messageType: "social_comment",
+    senderType: "contact",
+    sendStatus: "received",
+    isRead: false,
+    receivedAt: now
+  });
+
+  await safeCreateConversationEvent({
+    sessionId: args.session.id,
+    eventType: "instagram_comment_signal_captured",
+    actorType: "system",
+    eventData: {
+      summary: "Comentario do Instagram capturado como sinal operacional.",
+      commentId: commentContext.commentId,
+      decision: commentPolicy.decision
+    }
   });
 
   let publicReplySent = false;
@@ -1654,6 +1700,11 @@ async function handleInstagramCommentEntry(args: {
       eventId: args.eventId,
       responseSurface: "public_comment",
       commentPolicy
+    }, {
+      messageType: "public_comment_reply",
+      senderType: "ai",
+      sendStatus: "sent",
+      deliveryStatus: "public_reply"
     });
 
     await trackSocialAcquisitionEvent({
@@ -1702,6 +1753,29 @@ async function handleInstagramCommentEntry(args: {
     );
 
     if (dmStarted) {
+      await safeSaveMessage(args.session.id, undefined, "assistant", commentPolicy.publicReply, "outbound", {
+        channel: args.event.channel,
+        source: "instagram_comment_auto_dm",
+        eventId: args.eventId,
+        responseSurface: "direct_message",
+        commentPolicy
+      }, {
+        messageType: "social_dm",
+        senderType: "ai",
+        sendStatus: "sent",
+        deliveryStatus: "accepted"
+      });
+
+      await safeCreateConversationEvent({
+        sessionId: args.session.id,
+        eventType: "instagram_comment_dm_started",
+        actorType: "ai",
+        eventData: {
+          summary: "Comentario relevante ganhou continuidade privada no direct.",
+          commentId: commentContext.commentId
+        }
+      });
+
       await trackSocialAcquisitionEvent({
         eventName: "dm_started_from_comment",
         eventGroup: "social_conversion",
@@ -1743,13 +1817,26 @@ async function handleInstagramCommentEntry(args: {
     last_router_at: now
   };
 
+  if (commentPolicy.humanReviewRequired) {
+    await safeCreateConversationEvent({
+      sessionId: args.session.id,
+      eventType: "instagram_comment_handoff_requested",
+      actorType: "ai",
+      eventData: {
+        summary: "Comentario relevante pede revisao humana no Instagram.",
+        decision: commentPolicy.decision,
+        safetyDecision: commentPolicy.safetyDecision
+      }
+    });
+  }
+
   await safeUpdateSession(args.session.id, {
     lead_stage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
     case_area: args.acquisitionSnapshot.topic,
     current_intent: `comment_${commentPolicy.decision}`,
     handoff_to_human: commentPolicy.humanReviewRequired,
     last_inbound_at: now,
-    last_outbound_at: publicReplySent ? now : undefined,
+    last_outbound_at: publicReplySent || dmStarted ? now : undefined,
     last_summary: buildSessionSummaryPayload({
       acquisitionSummary: buildAcquisitionSummary(finalSnapshot),
       detectedTheme: finalSnapshot.topic,
@@ -1768,6 +1855,57 @@ async function handleInstagramCommentEntry(args: {
       handoffTriggered: commentPolicy.humanReviewRequired,
       handoffReason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined
     }),
+    thread_status:
+      commentPolicy.decision === "no_auto_reply"
+        ? "archived"
+        : commentPolicy.humanReviewRequired
+          ? "handoff"
+          : commentPolicy.inviteToDm || dmStarted
+            ? "waiting_client"
+            : "closed",
+    waiting_for:
+      commentPolicy.decision === "no_auto_reply"
+        ? "none"
+        : commentPolicy.humanReviewRequired
+          ? "human"
+          : commentPolicy.inviteToDm || dmStarted
+            ? "client"
+            : "none",
+    owner_mode: commentPolicy.humanReviewRequired ? "hybrid" : "ai",
+    priority:
+      commentPolicy.humanReviewRequired
+        ? "high"
+        : commentPolicy.inviteToDm || dmStarted
+          ? "medium"
+          : "low",
+    handoff_state: commentPolicy.humanReviewRequired ? "active" : "none",
+    handoff_reason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined,
+    ai_enabled: true,
+    unread_count: commentPolicy.humanReviewRequired ? 1 : 0,
+    last_message_at: now,
+    last_message_preview: args.event.messageText.slice(0, 240),
+    last_message_direction: "inbound",
+    next_action_hint:
+      commentPolicy.decision === "no_auto_reply"
+        ? "Comentario irrelevante mantido apenas como sinal editorial, fora da fila operacional."
+        : commentPolicy.humanReviewRequired
+          ? "Comentario sensivel. Assumir no Instagram com continuidade premium."
+          : commentPolicy.inviteToDm || dmStarted
+            ? "Aguardar continuidade no direct e preservar contexto do comentario."
+            : "Comentario acolhido em publico sem necessidade de fila ativa.",
+    priority_source: "inferred",
+    sensitivity_level: commentPolicy.humanReviewRequired ? "high" : "normal",
+    follow_up_status:
+      commentPolicy.humanReviewRequired
+        ? "pending"
+        : commentPolicy.inviteToDm || dmStarted
+          ? "due"
+          : "none",
+    follow_up_due_at:
+      commentPolicy.inviteToDm || dmStarted
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        : undefined,
+    last_status_event_at: now,
     metadata: mergedMetadata
   });
 
@@ -2139,6 +2277,11 @@ export async function processChannelConversationEvent(
       externalMessageId: event.externalMessageId,
       messageType,
       socialAcquisition: buildSocialAcquisitionPayload(acquisitionSnapshot)
+    }, {
+      messageType: event.source === "instagram_dm" ? "social_dm" : "text",
+      senderType: "contact",
+      sendStatus: "received",
+      isRead: false
     });
   }
 
@@ -2752,6 +2895,13 @@ export async function processChannelConversationEvent(
       paymentOfferCode: paymentResult?.offerCode || null,
       responseTime: coreResponse.metadata.responseTime,
       classification: coreResponse.metadata.classification
+    }, {
+      messageType: event.channel === "instagram" ? "social_dm" : "text",
+      senderType: "ai",
+      sendStatus: sendResult.ok ? "sent" : "failed",
+      deliveryStatus: sendResult.ok ? "accepted" : "failed",
+      errorMessage: sendResult.error || null,
+      failedAt: sendResult.ok ? null : new Date().toISOString()
     });
 
     await safeUpdateSession(session.id, {

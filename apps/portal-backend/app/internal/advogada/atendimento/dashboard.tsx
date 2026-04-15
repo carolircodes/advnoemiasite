@@ -27,6 +27,14 @@ type Metrics = {
   followUpPendingCount: number;
   followUpOverdueCount: number;
   whatsappVolume: number;
+  instagramVolume: number;
+  instagramDmVolume: number;
+  instagramCommentSignals: number;
+  instagramWaitingHumanCount: number;
+  instagramHandoffCount: number;
+  instagramFollowUpPendingCount: number;
+  instagramHotThreads: number;
+  founderOrWaitlistInstagramThreads: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
   failedMessagesCount: number;
@@ -37,6 +45,9 @@ type Metrics = {
 type ThreadItem = {
   id: string;
   channel: "instagram" | "whatsapp" | "site" | "portal";
+  channelLabel: string;
+  threadOriginType: "dm" | "comment" | "comment_to_dm" | "unknown";
+  threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
   preview: string;
@@ -80,6 +91,8 @@ type ThreadDetail = {
     senderType: "contact" | "ai" | "human" | "system";
     sendStatus: string;
     messageType: string;
+    surface: "direct_message" | "public_comment" | "system";
+    socialOrigin: string | null;
     createdAt: string;
     isRead: boolean;
     errorMessage: string | null;
@@ -127,6 +140,22 @@ type ThreadDetail = {
       followUpStatus: string;
       followUpDueAt: string | null;
     };
+    social: {
+      sourceLabel: string | null;
+      entryType: string | null;
+      directTransitionStatus: string | null;
+      topicLabel: string | null;
+      campaignLabel: string | null;
+      contentLabel: string | null;
+      contentType: string | null;
+      contentPlatformId: string | null;
+      commentId: string | null;
+      commentText: string | null;
+      publicCommentDecision: string | null;
+      publicCommentSafety: string | null;
+      operatorAction: string | null;
+      rationale: string | null;
+    };
   };
   events: Array<{
     id: string;
@@ -155,6 +184,7 @@ type ApiPayload = {
 type Filters = {
   search: string;
   status: string;
+  channel: string;
   waitingFor: string;
   priority: string;
   inboxMode: string;
@@ -165,6 +195,7 @@ type Filters = {
 const initialFilters: Filters = {
   search: "",
   status: "all",
+  channel: "all",
   waitingFor: "all",
   priority: "all",
   inboxMode: "all",
@@ -209,6 +240,30 @@ function toneForOwner(mode: string) {
   }
 
   return "border-[#cde0f4] bg-[#eef6ff] text-[#22588e]";
+}
+
+function toneForChannel(channel: string) {
+  if (channel === "instagram") {
+    return "border-[#f0c7db] bg-[#fff2f7] text-[#8d3f66]";
+  }
+
+  if (channel === "whatsapp") {
+    return "border-[#cfe5d3] bg-[#effaf1] text-[#2f6c45]";
+  }
+
+  return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
+}
+
+function toneForSurface(surface: string) {
+  if (surface === "public_comment") {
+    return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
+  }
+
+  if (surface === "direct_message") {
+    return "border-[#d5deef] bg-[#f1f6ff] text-[#36598a]";
+  }
+
+  return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
 }
 
 function toneForFollowUp(status: string) {
@@ -497,8 +552,8 @@ async function sendHumanReply() {
               Central premium de conversas da NoemIA
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#5e6e65]">
-              WhatsApp saiu do estado de canal cego e passou a operar como thread real, com
-              contexto, ownership, handoff e resposta humana dentro do painel.
+              WhatsApp e Instagram agora entram como canais operacionais reais, com thread unica,
+              sinais sociais legiveis, handoff premium e leitura executiva sem bagunca.
             </p>
           </div>
           <button
@@ -519,7 +574,7 @@ async function sendHumanReply() {
         <MetricCard label="Threads quentes" value={payload?.metrics.hotThreads || 0} icon={<Flame className="h-5 w-5" />} />
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <button
           type="button"
           onClick={() => setFilters((current) => ({ ...current, inboxMode: "needs_human", waitingFor: "human" }))}
@@ -549,6 +604,15 @@ async function sendHumanReply() {
         </button>
         <button
           type="button"
+          onClick={() => setFilters((current) => ({ ...current, channel: "instagram" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Instagram</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">DMs e sinais sociais</p>
+          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.instagramVolume || 0} threads Instagram na central.</p>
+        </button>
+        <button
+          type="button"
           onClick={() => setFilters((current) => ({ ...current, founderScope: "founder" }))}
           className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
         >
@@ -568,7 +632,7 @@ async function sendHumanReply() {
       </section>
 
       <section className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
           <input
             value={filters.search}
             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
@@ -585,6 +649,15 @@ async function sendHumanReply() {
             <option value="waiting_client">Aguardando cliente</option>
             <option value="handoff">Em handoff</option>
             <option value="ai_active">IA ativa</option>
+          </select>
+          <select
+            value={filters.channel}
+            onChange={(event) => setFilters((current) => ({ ...current, channel: event.target.value }))}
+            className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+          >
+            <option value="all">Todos os canais</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="instagram">Instagram</option>
           </select>
           <select
             value={filters.waitingFor}
@@ -683,6 +756,10 @@ async function sendHumanReply() {
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#4b5d55]">{thread.preview}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <Chip className={toneForChannel(thread.channel)}>{thread.channelLabel}</Chip>
+                    <Chip className={toneForSurface(thread.threadOriginType === "comment" ? "public_comment" : "direct_message")}>
+                      {thread.threadOriginLabel}
+                    </Chip>
                     <Chip className={toneForPriority(thread.priority)}>{thread.priority}</Chip>
                     <Chip className={toneForOwner(thread.ownerMode)}>{thread.ownerMode}</Chip>
                     {thread.followUpStatus !== "none" ? (
@@ -717,6 +794,12 @@ async function sendHumanReply() {
                   <Chip className={toneForPriority(selectedThread.thread.priority)}>
                     prioridade {selectedThread.thread.priority}
                   </Chip>
+                  <Chip className={toneForChannel(selectedThread.thread.channel)}>
+                    {selectedThread.thread.channelLabel}
+                  </Chip>
+                  <Chip className={toneForSurface(selectedThread.thread.threadOriginType === "comment" ? "public_comment" : "direct_message")}>
+                    {selectedThread.thread.threadOriginLabel}
+                  </Chip>
                   <Chip className={toneForOwner(selectedThread.thread.ownerMode)}>
                     ownership {selectedThread.thread.ownerMode}
                   </Chip>
@@ -746,10 +829,16 @@ async function sendHumanReply() {
                   >
                     <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] opacity-75">
                       <span>{message.senderType}</span>
+                      <span>{message.surface === "public_comment" ? "comentario" : message.surface === "direct_message" ? "dm" : "sistema"}</span>
                       <span>{message.sendStatus}</span>
                       <span>{formatDateTime(message.createdAt)}</span>
                     </div>
                     <p className="whitespace-pre-wrap">{message.content}</p>
+                    {message.socialOrigin ? (
+                      <p className="mt-2 text-[11px] uppercase tracking-[0.16em] opacity-70">
+                        origem {message.socialOrigin}
+                      </p>
+                    ) : null}
                     {message.errorMessage ? (
                       <p className="mt-2 text-xs text-[#ffd1c2]">{message.errorMessage}</p>
                     ) : null}
@@ -827,13 +916,13 @@ async function sendHumanReply() {
                 <textarea
                   value={composer}
                   onChange={(event) => setComposer(event.target.value)}
-                  placeholder="Responder manualmente pelo painel com continuidade nobre."
+                  placeholder="Responder manualmente pelo painel com continuidade premium no canal certo."
                   rows={5}
                   className="w-full rounded-[1.6rem] border border-[#d8cfbf] bg-white px-4 py-4 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
                 />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-xs text-[#718179]">
-                    WhatsApp e o primeiro canal oficial desta central. O historico interno e o handoff ficam preservados.
+                    WhatsApp e Instagram operam com historico interno, ownership e handoff preservados nesta central.
                   </p>
                   <button
                     type="button"
@@ -873,6 +962,14 @@ async function sendHumanReply() {
                   <p>Intento atual: {selectedThread.context.lead.currentIntent || "Sem leitura"}</p>
                 </div>
                 <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Origem social</p>
+                  <p>Entrada: {selectedThread.context.social.sourceLabel || "sem leitura social"}</p>
+                  <p>Tipo: {selectedThread.context.social.entryType || "nao classificado"}</p>
+                  <p>Topico: {selectedThread.context.social.topicLabel || "geral"}</p>
+                  <p>Conteudo: {selectedThread.context.social.contentLabel || "nao identificado"}</p>
+                  <p>Campanha: {selectedThread.context.social.campaignLabel || "organico"}</p>
+                </div>
+                <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Founder e comunidade</p>
                   <p>Founder: {selectedThread.context.founder.isFounder ? "sim" : "nao"}</p>
                   <p>Waitlist: {selectedThread.context.founder.isWaitlist ? "sim" : "nao"}</p>
@@ -897,10 +994,20 @@ async function sendHumanReply() {
                   </p>
                   <p>{selectedThread.context.operational.nextSuggestedActionDetail || selectedThread.thread.nextAction}</p>
                 </div>
+                {selectedThread.context.social.commentText ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Comentario de origem</p>
+                    <p className="font-medium text-[#10261d]">{selectedThread.context.social.commentText}</p>
+                    <p>
+                      Decisao: {selectedThread.context.social.publicCommentDecision || "sem politica"} •
+                      transicao {selectedThread.context.social.directTransitionStatus || "n/a"}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="mt-4 text-sm text-[#6b7b72]">
-                A lateral da thread mostra lead, pagamento, founder, agenda e proxima acao.
+                A lateral da thread mostra lead, origem social, pagamento, founder, agenda e proxima acao.
               </p>
             )}
           </div>
@@ -1013,6 +1120,26 @@ async function sendHumanReply() {
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume WhatsApp</span>
                 <strong>{payload?.metrics.whatsappVolume || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume Instagram</span>
+                <strong>{payload?.metrics.instagramVolume || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> DMs / comentarios</span>
+                <strong>{`${payload?.metrics.instagramDmVolume || 0} / ${payload?.metrics.instagramCommentSignals || 0}`}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human IG</span>
+                <strong>{payload?.metrics.instagramWaitingHumanCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Handoff IG</span>
+                <strong>{payload?.metrics.instagramHandoffCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up social</span>
+                <strong>{payload?.metrics.instagramFollowUpPendingCount || 0}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Mensagens falhadas</span>

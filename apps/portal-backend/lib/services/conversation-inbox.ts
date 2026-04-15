@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "../supabase/admin";
+import { sendInstagramDirectMessage } from "../meta/instagram-service";
 import { sendWhatsAppMessage } from "../meta/whatsapp-service";
 
 type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal";
@@ -207,6 +208,9 @@ type NoteRow = {
 export type ConversationThreadListItem = {
   id: string;
   channel: ConversationChannel;
+  channelLabel: string;
+  threadOriginType: "dm" | "comment" | "comment_to_dm" | "unknown";
+  threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
   preview: string;
@@ -250,6 +254,8 @@ export type ConversationThreadDetail = {
     senderType: "contact" | "ai" | "human" | "system";
     sendStatus: string;
     messageType: string;
+    surface: "direct_message" | "public_comment" | "system";
+    socialOrigin: string | null;
     createdAt: string;
     isRead: boolean;
     errorMessage: string | null;
@@ -297,6 +303,22 @@ export type ConversationThreadDetail = {
       followUpStatus: string;
       followUpDueAt: string | null;
     };
+    social: {
+      sourceLabel: string | null;
+      entryType: string | null;
+      directTransitionStatus: string | null;
+      topicLabel: string | null;
+      campaignLabel: string | null;
+      contentLabel: string | null;
+      contentType: string | null;
+      contentPlatformId: string | null;
+      commentId: string | null;
+      commentText: string | null;
+      publicCommentDecision: string | null;
+      publicCommentSafety: string | null;
+      operatorAction: string | null;
+      rationale: string | null;
+    };
   };
   events: Array<{
     id: string;
@@ -330,6 +352,14 @@ export type ConversationInboxMetrics = {
   followUpPendingCount: number;
   followUpOverdueCount: number;
   whatsappVolume: number;
+  instagramVolume: number;
+  instagramDmVolume: number;
+  instagramCommentSignals: number;
+  instagramWaitingHumanCount: number;
+  instagramHandoffCount: number;
+  instagramFollowUpPendingCount: number;
+  instagramHotThreads: number;
+  founderOrWaitlistInstagramThreads: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
   failedMessagesCount: number;
@@ -380,6 +410,41 @@ function buildPreview(session: SessionRow) {
   );
 }
 
+function getChannelLabel(channel: ConversationChannel) {
+  switch (channel) {
+    case "instagram":
+      return "Instagram";
+    case "whatsapp":
+      return "WhatsApp";
+    case "portal":
+      return "Portal";
+    default:
+      return "Site";
+  }
+}
+
+function inferThreadOrigin(session: SessionRow) {
+  const socialAcquisition = safeObject(session.metadata?.social_acquisition);
+  const entryType = asString(socialAcquisition.entryType);
+
+  if (entryType === "instagram_comment") {
+    return { type: "comment" as const, label: "Comentario relevante" };
+  }
+
+  if (entryType === "instagram_comment_to_dm") {
+    return { type: "comment_to_dm" as const, label: "Comentario convertido em DM" };
+  }
+
+  if (entryType === "instagram_dm") {
+    return { type: "dm" as const, label: "DM oficial" };
+  }
+
+  return {
+    type: session.channel === "instagram" ? ("dm" as const) : ("unknown" as const),
+    label: session.channel === "instagram" ? "DM oficial" : "Thread operacional"
+  };
+}
+
 function formatNextAction(session: SessionRow, triage?: TriageSummaryRow | null) {
   const report = safeObject(triage?.report_data);
   const nextAction = asString(report.nextBestAction) || asString(report.next_action);
@@ -425,6 +490,12 @@ function buildEventSummary(event: EventRow) {
       return `Ownership movido para ${asString(data.ownerMode) || "novo modo"}.`;
     case "thread_note_added":
       return "Nota interna adicionada a memoria operacional.";
+    case "instagram_comment_signal_captured":
+      return "Comentario relevante capturado como sinal operacional.";
+    case "instagram_comment_handoff_requested":
+      return "Comentario do Instagram encaminhado para revisao humana.";
+    case "instagram_comment_dm_started":
+      return "Comentario publico ganhou continuidade privada no direct.";
     default:
       return asString(data.summary) || "Evento operacional registrado.";
   }
@@ -733,10 +804,14 @@ class ConversationInboxService {
       session.lead_name ||
       asString(session.metadata?.displayName) ||
       "Contato sem nome";
+    const origin = inferThreadOrigin(session);
 
     return {
       id: session.id,
       channel: session.channel,
+      channelLabel: getChannelLabel(session.channel),
+      threadOriginType: origin.type,
+      threadOriginLabel: origin.label,
       displayName,
       contactLabel: profile?.email || client?.phone || session.external_user_id,
       preview: buildPreview(session),
@@ -889,6 +964,24 @@ class ConversationInboxService {
         accumulator.followUpPendingCount += ["pending", "due", "overdue"].includes(item.followUpStatus) ? 1 : 0;
         accumulator.followUpOverdueCount += item.followUpStatus === "overdue" ? 1 : 0;
         accumulator.whatsappVolume += item.channel === "whatsapp" ? 1 : 0;
+        accumulator.instagramVolume += item.channel === "instagram" ? 1 : 0;
+        accumulator.instagramDmVolume +=
+          item.channel === "instagram" && item.threadOriginType !== "comment" ? 1 : 0;
+        accumulator.instagramCommentSignals +=
+          item.channel === "instagram" && item.threadOriginType !== "dm" ? 1 : 0;
+        accumulator.instagramWaitingHumanCount +=
+          item.channel === "instagram" && item.waitingFor === "human" ? 1 : 0;
+        accumulator.instagramHandoffCount +=
+          item.channel === "instagram" && (item.handoffState === "active" || item.threadStatus === "handoff")
+            ? 1
+            : 0;
+        accumulator.instagramFollowUpPendingCount +=
+          item.channel === "instagram" && ["pending", "due", "overdue"].includes(item.followUpStatus)
+            ? 1
+            : 0;
+        accumulator.instagramHotThreads += item.channel === "instagram" && item.hot ? 1 : 0;
+        accumulator.founderOrWaitlistInstagramThreads +=
+          item.channel === "instagram" && (item.hasFounderContext || item.hasWaitlistContext) ? 1 : 0;
         return accumulator;
       },
       {
@@ -905,6 +998,14 @@ class ConversationInboxService {
         followUpPendingCount: 0,
         followUpOverdueCount: 0,
         whatsappVolume: 0,
+        instagramVolume: 0,
+        instagramDmVolume: 0,
+        instagramCommentSignals: 0,
+        instagramWaitingHumanCount: 0,
+        instagramHandoffCount: 0,
+        instagramFollowUpPendingCount: 0,
+        instagramHotThreads: 0,
+        founderOrWaitlistInstagramThreads: 0,
         firstResponseTimeMinutes: average(firstResponseTimes),
         humanResponseTimeMinutes: average(humanResponseTimes),
         failedMessagesCount: (messageStatusRows || []).filter((row) => row.send_status === "failed").length,
@@ -943,6 +1044,8 @@ class ConversationInboxService {
     const pipeline = resolvedClientId ? bundle.pipelinesByClientId.get(resolvedClientId) || null : null;
     const profile = client?.profile_id ? bundle.profilesById.get(client.profile_id) || null : null;
     const triage = bundle.triageBySession.get(threadId) || null;
+    const socialAcquisition = safeObject((session as SessionRow).metadata?.social_acquisition);
+    const publicCommentPolicy = safeObject((session as SessionRow).metadata?.public_comment_policy);
     const appointments = resolvedClientId
       ? bundle.appointmentsByClientId.get(resolvedClientId) || []
       : [];
@@ -1009,6 +1112,13 @@ class ConversationInboxService {
         senderType: message.sender_type,
         sendStatus: message.send_status,
         messageType: message.message_type,
+        surface:
+          asString(message.metadata_json?.responseSurface) === "public_comment"
+            ? "public_comment"
+            : message.message_type === "system_event"
+              ? "system"
+              : "direct_message",
+        socialOrigin: asString(message.metadata_json?.source),
         createdAt: message.created_at,
         isRead: message.is_read,
         errorMessage: message.error_message
@@ -1069,6 +1179,25 @@ class ConversationInboxService {
           humanFollowUpPending: Boolean(triage?.human_followup_pending),
           followUpStatus: (session as SessionRow).follow_up_status,
           followUpDueAt: (session as SessionRow).follow_up_due_at
+        },
+        social: {
+          sourceLabel: asString(socialAcquisition.sourceLabel),
+          entryType: asString(socialAcquisition.entryType),
+          directTransitionStatus: asString(socialAcquisition.directTransitionStatus),
+          topicLabel: asString(socialAcquisition.topicLabel),
+          campaignLabel: asString(socialAcquisition.campaignLabel),
+          contentLabel: asString(socialAcquisition.contentLabel),
+          contentType: asString(socialAcquisition.contentType),
+          contentPlatformId: asString(socialAcquisition.contentPlatformId),
+          commentId: asString(socialAcquisition.commentId),
+          commentText:
+            asString((session as SessionRow).metadata?.comment_text) ||
+            asString((session as SessionRow).metadata?.commentContextText) ||
+            null,
+          publicCommentDecision: asString(publicCommentPolicy.decision),
+          publicCommentSafety: asString(publicCommentPolicy.safetyDecision),
+          operatorAction: asString(publicCommentPolicy.operatorAction),
+          rationale: asString(publicCommentPolicy.rationale)
         }
       },
       events: ((eventsData || []) as EventRow[]).map((event) => ({
@@ -1126,14 +1255,23 @@ class ConversationInboxService {
       throw new Error("Thread nao encontrada.");
     }
 
-    if (detail.thread.channel !== "whatsapp") {
-      throw new Error("A resposta manual pelo painel esta habilitada apenas para WhatsApp nesta fase.");
-    }
+    const sendResult =
+      detail.thread.channel === "whatsapp"
+        ? await sendWhatsAppMessage(detail.context.person.phone || detail.thread.contactLabel, content)
+        : detail.thread.channel === "instagram"
+          ? await sendInstagramDirectMessage(detail.context.person.phone || detail.thread.contactLabel, content, {
+              sessionId: input.threadId,
+              externalUserId: detail.context.person.phone || detail.thread.contactLabel,
+              responseType: "human_reply",
+              reason: "internal_inbox_manual_reply"
+            })
+          : null;
 
-    const sendResult = await sendWhatsAppMessage(
-      detail.context.person.phone || detail.thread.contactLabel,
-      content
-    );
+    if (!sendResult) {
+      throw new Error("A resposta manual pelo painel esta disponivel apenas para WhatsApp e Instagram.");
+    }
+    const sendSucceeded = "success" in sendResult ? sendResult.success : sendResult.ok;
+    const outboundMessageId = "messageId" in sendResult ? sendResult.messageId || null : null;
 
     const now = new Date().toISOString();
 
@@ -1146,20 +1284,21 @@ class ConversationInboxService {
       metadata_json: {
         source: "internal_inbox",
         authored_by: input.authorId,
-        authored_name: input.authorName
+        authored_name: input.authorName,
+        channel: detail.thread.channel
       },
-      message_type: "text",
+      message_type: detail.thread.channel === "instagram" ? "social_dm" : "text",
       sender_type: "human",
-      send_status: sendResult.success ? "sent" : "failed",
-      delivery_status: sendResult.success ? "accepted" : "failed",
+      send_status: sendSucceeded ? "sent" : "failed",
+      delivery_status: sendSucceeded ? "accepted" : "failed",
       error_message: sendResult.error || null,
       is_read: true,
       read_at: now,
       received_at: now,
-      failed_at: sendResult.success ? null : now
+      failed_at: sendSucceeded ? null : now
     });
 
-    if (!sendResult.success) {
+    if (!sendSucceeded) {
       await this.createEvent({
         sessionId: input.threadId,
         eventType: "human_reply_failed",
@@ -1172,7 +1311,12 @@ class ConversationInboxService {
         }
       });
 
-      throw new Error(sendResult.error || "Falha ao enviar resposta humana pelo WhatsApp.");
+      throw new Error(
+        sendResult.error ||
+          (detail.thread.channel === "instagram"
+            ? "Falha ao enviar resposta humana pelo Instagram."
+            : "Falha ao enviar resposta humana pelo WhatsApp.")
+      );
     }
 
     await this.supabase
@@ -1215,7 +1359,7 @@ class ConversationInboxService {
       }
     });
 
-    return { ok: true, messageId: sendResult.messageId || null };
+    return { ok: true, messageId: outboundMessageId };
   }
 
   async sendInboxFollowUp(input: {

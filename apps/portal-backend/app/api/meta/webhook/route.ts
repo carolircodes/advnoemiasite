@@ -6,6 +6,10 @@ import {
   shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
+import {
+  sendInstagramCommentReply,
+  sendInstagramDirectMessage
+} from "@/lib/meta/instagram-service";
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
@@ -13,8 +17,6 @@ import { processChannelConversationEvent } from "../../../../lib/services/channe
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN?.trim();
 const APP_SECRET =
   process.env.INSTAGRAM_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
 
 function logEvent(
   event: string,
@@ -47,124 +49,6 @@ function verifySignature(rawBuffer: Buffer, signature: string) {
   const expectedSignature = `sha256=${computeHmacSha256Hex(APP_SECRET, rawBuffer)}`;
 
   return timingSafeEqualText(signature, expectedSignature);
-}
-
-async function sendInstagramMessage(recipientId: string, messageText: string) {
-  try {
-    if (!INSTAGRAM_ACCESS_TOKEN || !FACEBOOK_PAGE_ID) {
-      logEvent(
-        "INSTAGRAM_SEND_SKIPPED_MISSING_CONFIG",
-        {
-          recipientId,
-          hasAccessToken: !!INSTAGRAM_ACCESS_TOKEN,
-          hasPageId: !!FACEBOOK_PAGE_ID
-        },
-        "error"
-      );
-      return false;
-    }
-
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${INSTAGRAM_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          recipient: {
-            id: recipientId
-          },
-          message: {
-            text: messageText
-          }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logEvent(
-        "INSTAGRAM_SEND_ERROR",
-        {
-          recipientId,
-          status: response.status,
-          errorText: errorText.slice(0, 500)
-        },
-        "error"
-      );
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    logEvent(
-      "INSTAGRAM_SEND_EXCEPTION",
-      {
-        recipientId,
-        error: error instanceof Error ? error.message : String(error)
-      },
-      "error"
-    );
-    return false;
-  }
-}
-
-async function sendInstagramCommentReply(commentId: string, messageText: string) {
-  try {
-    if (!INSTAGRAM_ACCESS_TOKEN) {
-      logEvent(
-        "INSTAGRAM_COMMENT_REPLY_SKIPPED_MISSING_CONFIG",
-        {
-          commentId,
-          hasAccessToken: !!INSTAGRAM_ACCESS_TOKEN
-        },
-        "error"
-      );
-      return false;
-    }
-
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${commentId}/comments`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${INSTAGRAM_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: messageText
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logEvent(
-        "INSTAGRAM_COMMENT_REPLY_ERROR",
-        {
-          commentId,
-          status: response.status,
-          errorText: errorText.slice(0, 500)
-        },
-        "error"
-      );
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    logEvent(
-      "INSTAGRAM_COMMENT_REPLY_EXCEPTION",
-      {
-        commentId,
-        error: error instanceof Error ? error.message : String(error)
-      },
-      "error"
-    );
-    return false;
-  }
 }
 
 function extractInstagramDmMessageText(message: Record<string, unknown>) {
@@ -309,7 +193,19 @@ export async function POST(request: NextRequest) {
             timestamp: messaging.timestamp
           },
           {
-            sendText: sendInstagramMessage
+            sendText: async (recipientId, messageText, context) => {
+              const result = await sendInstagramDirectMessage(recipientId, messageText, context);
+
+              logEvent(result.ok ? "INSTAGRAM_SEND_SUCCESS" : "INSTAGRAM_SEND_ERROR", {
+                recipientId,
+                ...result.metadata,
+                messageId: result.messageId,
+                rawStatus: result.rawStatus,
+                error: result.error
+              }, result.ok ? "info" : "error");
+
+              return result;
+            }
           }
         );
       }
@@ -346,9 +242,53 @@ export async function POST(request: NextRequest) {
               }
             },
             {
-              sendText: sendInstagramMessage,
-              sendPublicCommentReply: sendInstagramCommentReply,
-              sendDirectFromComment: sendInstagramMessage
+              sendText: async (recipientId, messageText, context) => {
+                const result = await sendInstagramDirectMessage(recipientId, messageText, context);
+
+                logEvent(result.ok ? "INSTAGRAM_SEND_SUCCESS" : "INSTAGRAM_SEND_ERROR", {
+                  recipientId,
+                  ...result.metadata,
+                  messageId: result.messageId,
+                  rawStatus: result.rawStatus,
+                  error: result.error
+                }, result.ok ? "info" : "error");
+
+                return result;
+              },
+              sendPublicCommentReply: async (targetCommentId, messageText, context) => {
+                const result = await sendInstagramCommentReply(targetCommentId, messageText, context);
+
+                logEvent(
+                  result.ok ? "INSTAGRAM_COMMENT_REPLY_SUCCESS" : "INSTAGRAM_COMMENT_REPLY_ERROR",
+                  {
+                    commentId: targetCommentId,
+                    ...result.metadata,
+                    messageId: result.messageId,
+                    rawStatus: result.rawStatus,
+                    error: result.error
+                  },
+                  result.ok ? "info" : "error"
+                );
+
+                return result.ok;
+              },
+              sendDirectFromComment: async (recipientId, messageText, context) => {
+                const result = await sendInstagramDirectMessage(recipientId, messageText, context);
+
+                logEvent(
+                  result.ok ? "INSTAGRAM_COMMENT_AUTO_DM_SUCCESS" : "INSTAGRAM_COMMENT_AUTO_DM_ERROR",
+                  {
+                    recipientId,
+                    ...result.metadata,
+                    messageId: result.messageId,
+                    rawStatus: result.rawStatus,
+                    error: result.error
+                  },
+                  result.ok ? "info" : "error"
+                );
+
+                return result.ok;
+              }
             }
           );
         }
@@ -376,13 +316,25 @@ export async function POST(request: NextRequest) {
               messageText,
               messageType: typeof message.type === "string" ? message.type : "text",
               isEcho: message.is_echo === true,
-              timestamp: message.timestamp
-            },
-            {
-              sendText: sendInstagramMessage
+            timestamp: message.timestamp
+          },
+          {
+            sendText: async (recipientId, messageText, context) => {
+              const result = await sendInstagramDirectMessage(recipientId, messageText, context);
+
+              logEvent(result.ok ? "INSTAGRAM_SEND_SUCCESS" : "INSTAGRAM_SEND_ERROR", {
+                recipientId,
+                ...result.metadata,
+                messageId: result.messageId,
+                rawStatus: result.rawStatus,
+                error: result.error
+              }, result.ok ? "info" : "error");
+
+              return result;
             }
-          );
-        }
+          }
+        );
+      }
       }
     }
 

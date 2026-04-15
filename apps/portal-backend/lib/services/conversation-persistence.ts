@@ -33,6 +33,19 @@ export interface ConversationMessage {
   created_at: string;
 }
 
+export type ConversationMessageWriteOptions = {
+  messageType?: string;
+  senderType?: 'contact' | 'ai' | 'human' | 'system';
+  sendStatus?: 'received' | 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  deliveryStatus?: string | null;
+  isRead?: boolean;
+  readAt?: string | null;
+  errorMessage?: string | null;
+  attachments?: unknown[];
+  receivedAt?: string | null;
+  failedAt?: string | null;
+};
+
 export interface ConversationSession {
   thread_status?:
     | 'new'
@@ -528,9 +541,11 @@ class ConversationPersistenceService {
     role: 'user' | 'assistant' | 'system',
     content: string,
     direction: 'inbound' | 'outbound',
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    options: ConversationMessageWriteOptions = {}
   ): Promise<void> {
     try {
+      const now = new Date().toISOString();
       const { error } = await this.supabase
         .from('conversation_messages')
         .insert({
@@ -539,7 +554,25 @@ class ConversationPersistenceService {
           role,
           content,
           direction,
-          metadata_json: metadata || {}
+          metadata_json: metadata || {},
+          message_type: options.messageType || 'text',
+          sender_type:
+            options.senderType ||
+            (role === 'user'
+              ? 'contact'
+              : role === 'system'
+                ? 'system'
+                : 'ai'),
+          send_status:
+            options.sendStatus ||
+            (direction === 'inbound' ? 'received' : externalMessageId ? 'sent' : 'pending'),
+          delivery_status: options.deliveryStatus || null,
+          is_read: options.isRead ?? direction === 'outbound',
+          read_at: options.readAt ?? (direction === 'outbound' ? now : null),
+          error_message: options.errorMessage || null,
+          attachments: options.attachments || [],
+          received_at: options.receivedAt ?? (direction === 'inbound' ? now : null),
+          failed_at: options.failedAt || null
         });
 
       if (error) {
