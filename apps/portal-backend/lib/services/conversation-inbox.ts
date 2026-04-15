@@ -13,6 +13,7 @@ import {
   resolveLeadIdentity,
   type LeadIdentityStatus
 } from "./lead-identity";
+import { commercialRelationshipService } from "./commercial-relationship";
 
 type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal" | "telegram";
 type ThreadStatus =
@@ -62,6 +63,7 @@ type SessionRow = {
   last_inbound_at: string | null;
   last_outbound_at: string | null;
   client_id: string | null;
+  client_channel_id: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -331,6 +333,25 @@ export type ConversationThreadDetail = {
       humanFollowUpPending: boolean;
       followUpStatus: string;
       followUpDueAt: string | null;
+    };
+    commercial: {
+      clientId: string | null;
+      clientChannelId: string | null;
+      pipelineId: string | null;
+      ownerProfileId: string | null;
+      ownerAssignedAt: string | null;
+      nextStep: string | null;
+      nextStepDueAt: string | null;
+      waitingOn: string | null;
+      followUpState: string | null;
+      followUpReason: string | null;
+      latestNoteBody: string | null;
+      latestNoteAt: string | null;
+      linkedChannels: Array<{
+        channel: string;
+        externalUserId: string;
+        displayName: string | null;
+      }>;
     };
     social: {
       sourceLabel: string | null;
@@ -1126,6 +1147,21 @@ class ConversationInboxService {
     const sessions = ((data || []) as SessionRow[]).filter(
       (session) => filters.includeArchived || session.thread_status !== "archived"
     );
+    await Promise.all(
+      sessions.map((session) =>
+        commercialRelationshipService.ensureSessionCommercialLink({
+          id: session.id,
+          channel: session.channel,
+          external_user_id: session.external_user_id,
+          external_thread_id: session.external_thread_id,
+          client_id: session.client_id,
+          client_channel_id: session.client_channel_id,
+          lead_name: session.lead_name,
+          metadata: session.metadata,
+          updated_at: session.updated_at
+        })
+      )
+    );
     const bundle = await this.loadContextBundle(sessions);
     await Promise.all(
       sessions.map((session) => {
@@ -1286,6 +1322,7 @@ class ConversationInboxService {
     }
 
     const bundle = await this.loadContextBundle([session as SessionRow]);
+    const commercialContext = await commercialRelationshipService.getThreadCommercialContext(threadId);
     const resolvedClientId =
       bundle.resolvedClientIds.get(threadId) || (session as SessionRow).client_id;
     const client = resolvedClientId ? bundle.clientsById.get(resolvedClientId) || null : null;
@@ -1344,6 +1381,15 @@ class ConversationInboxService {
     if (notesError) {
       throw new Error(`Nao foi possivel carregar as notas da thread: ${notesError.message}`);
     }
+
+    const { data: linkedChannelsData } = resolvedClientId
+      ? await this.supabase
+          .from("client_channels")
+          .select("channel, external_user_id, display_name")
+          .eq("client_id", resolvedClientId)
+          .eq("is_active", true)
+          .order("last_contact_at", { ascending: false })
+      : { data: [] as Array<{ channel: string; external_user_id: string; display_name: string | null }> };
 
     return {
       thread: {
@@ -1439,6 +1485,27 @@ class ConversationInboxService {
           humanFollowUpPending: Boolean(triage?.human_followup_pending),
           followUpStatus: (session as SessionRow).follow_up_status,
           followUpDueAt: (session as SessionRow).follow_up_due_at
+        },
+        commercial: {
+          clientId: commercialContext.clientId,
+          clientChannelId: commercialContext.clientChannelId,
+          pipelineId: commercialContext.pipelineId,
+          ownerProfileId: commercialContext.ownerProfileId,
+          ownerAssignedAt: commercialContext.ownerAssignedAt,
+          nextStep: commercialContext.nextStep,
+          nextStepDueAt: commercialContext.nextStepDueAt,
+          waitingOn: commercialContext.waitingOn,
+          followUpState: commercialContext.followUpState,
+          followUpReason: commercialContext.followUpReason,
+          latestNoteBody: commercialContext.latestCommercialNote?.body || null,
+          latestNoteAt:
+            commercialContext.latestCommercialNote?.createdAt ||
+            commercialContext.lastCommercialNoteAt,
+          linkedChannels: (linkedChannelsData || []).map((channel) => ({
+            channel: channel.channel,
+            externalUserId: channel.external_user_id,
+            displayName: channel.display_name || null
+          }))
         },
         social: {
           sourceLabel: asString(socialAcquisition.sourceLabel),
@@ -1904,39 +1971,13 @@ class ConversationInboxService {
     const kind = input.kind || "operational";
     const now = new Date().toISOString();
 
-    const { error } = await this.supabase.from("conversation_notes").insert({
-      session_id: input.threadId,
-      author_id: input.authorId,
-      author_name: input.authorName,
-      note_body: body,
-      note_kind: kind,
-      is_sensitive: Boolean(input.isSensitive),
-      metadata: {}
-    });
-
-    if (error) {
-      throw new Error(`Nao foi possivel registrar a nota: ${error.message}`);
-    }
-
-    await this.supabase
-      .from("conversation_sessions")
-      .update({
-        internal_notes: kind === "next_action" ? body : undefined,
-        updated_at: now
-      })
-      .eq("id", input.threadId);
-
-    await this.createEvent({
+    await commercialRelationshipService.addCommercialNote({
       sessionId: input.threadId,
-      eventType: "thread_note_added",
-      actorType: "human",
-      actorId: input.authorId,
-      actorLabel: input.authorName,
-      eventData: {
-        summary: "Nota interna adicionada a memoria operacional da thread.",
-        noteKind: kind,
-        sensitive: Boolean(input.isSensitive)
-      }
+      body,
+      authorId: input.authorId,
+      authorName: input.authorName,
+      kind,
+      isSensitive: input.isSensitive
     });
 
     return { ok: true };
@@ -2059,6 +2100,65 @@ class ConversationInboxService {
       actorLabel: input.actorName,
       eventData
     });
+
+    if (
+      input.ownerMode !== undefined ||
+      input.followUpStatus !== undefined ||
+      input.followUpDueAt !== undefined ||
+      input.nextActionHint !== undefined
+    ) {
+      if (input.ownerMode !== undefined) {
+        await commercialRelationshipService.assignCommercialOwner({
+          sessionId: input.threadId,
+          ownerProfileId:
+            input.ownerMode === "human" || input.ownerMode === "hybrid"
+              ? input.actorId
+              : null,
+          ownerName:
+            input.ownerMode === "human" || input.ownerMode === "hybrid"
+              ? input.actorName
+              : null,
+          actorProfileId: input.actorId,
+          actorName: input.actorName
+        });
+      }
+
+      if (
+        input.followUpStatus !== undefined ||
+        input.followUpDueAt !== undefined ||
+        input.nextActionHint !== undefined
+      ) {
+        const mappedState =
+          input.followUpStatus === "due"
+            ? "needs_return"
+            : input.followUpStatus === "overdue"
+              ? "overdue"
+              : input.followUpStatus === "resolved" || input.followUpStatus === "converted"
+                ? "completed"
+                : input.followUpStatus === "pending"
+                  ? input.waitingFor === "client"
+                    ? "waiting_client"
+                    : "waiting_team"
+                  : input.followUpDueAt
+                    ? "scheduled"
+                    : "none";
+
+        await commercialRelationshipService.updateCommercialFollowUp({
+          sessionId: input.threadId,
+          state: mappedState,
+          dueAt: input.followUpDueAt,
+          nextStep: input.nextActionHint,
+          waitingOn:
+            input.waitingFor === "client"
+              ? "client"
+              : input.waitingFor === "human"
+                ? "team"
+                : "none",
+          actorProfileId: input.actorId,
+          actorName: input.actorName
+        });
+      }
+    }
 
     return { ok: true };
   }

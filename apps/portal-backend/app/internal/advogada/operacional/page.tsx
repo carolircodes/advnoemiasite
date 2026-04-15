@@ -21,6 +21,8 @@ import {
 interface OperationalContact {
   clientId: string;
   pipelineId: string;
+  sessionId?: string;
+  clientChannelId?: string;
   fullName: string;
   phone?: string;
   isClient: boolean;
@@ -33,9 +35,22 @@ interface OperationalContact {
   lastContactAt: string;
   latestSessionSummary?: string;
   latestMessagePreview?: string;
+  latestCommercialNote?: string;
+  latestCommercialNoteAt?: string;
+  waitingOn?: string;
+  followUpState?: string;
+  followUpReason?: string;
+  nextStep?: string;
+  nextStepDueAt?: string;
+  threadStatus?: string;
+  threadWaitingFor?: string;
+  ownerProfileId?: string;
+  ownerName?: string;
+  ownerAssignedAt?: string;
   channels: Array<{
     channel: string;
     externalUserId: string;
+    displayName?: string | null;
     lastContactAt: string;
   }>;
   followUpCount: number;
@@ -326,10 +341,15 @@ export default function OperationalPanel() {
   const [selectedChannel, setSelectedChannel] = useState<'whatsapp' | 'instagram' | ''>('');
   const [messageContent, setMessageContent] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [staffOwners, setStaffOwners] = useState<StaffOwner[]>([]);
 
   useEffect(() => {
     void loadPanelData();
   }, [filters]);
+
+  useEffect(() => {
+    void loadStaffOwners();
+  }, []);
 
   const activeFilterCount = useMemo(
     () => Object.values(filters).filter((value) => value !== '').length,
@@ -627,6 +647,178 @@ export default function OperationalPanel() {
 
   function formatStageLabel(stage: string) {
     return stage.replaceAll('_', ' ');
+  }
+
+  async function loadStaffOwners() {
+    try {
+      const response = await fetch('/api/internal/operational?action=getStaffOwners');
+      const result = await response.json();
+
+      if (result?.success) {
+        setStaffOwners(Array.isArray(result.data) ? result.data : []);
+      }
+    } catch (error) {
+      console.error('Error loading staff owners:', error);
+    }
+  }
+
+  async function assignCommercialOwner(contact: OperationalContact) {
+    if (!contact.sessionId) {
+      alert('Esta oportunidade ainda nao tem thread comercial vinculada.');
+      return;
+    }
+
+    const ownerOptions = staffOwners
+      .map((owner, index) => `${index + 1}. ${owner.full_name} (${owner.role})`)
+      .join('\n');
+    const selectedRaw = window.prompt(
+      `Escolha o responsavel da thread:\n${ownerOptions}\n\nDigite o numero do responsavel desejado.`,
+      '1'
+    );
+
+    if (!selectedRaw) {
+      return;
+    }
+
+    const selectedIndex = Number(selectedRaw) - 1;
+    const selectedOwner = staffOwners[selectedIndex];
+
+    if (!selectedOwner) {
+      alert('Responsavel invalido.');
+      return;
+    }
+
+    setActionLoading(`${contact.clientId}:assignOwner`);
+
+    try {
+      const response = await fetch('/api/internal/operational', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'assignOwner',
+          sessionId: contact.sessionId,
+          ownerProfileId: selectedOwner.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'Falha ao atualizar ownership.');
+      }
+
+      await loadPanelData();
+    } catch (error) {
+      console.error('Error assigning owner:', error);
+      alert(error instanceof Error ? error.message : 'Falha ao atualizar ownership.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function saveCommercialNote(contact: OperationalContact) {
+    if (!contact.sessionId) {
+      alert('Esta oportunidade ainda nao tem thread comercial vinculada.');
+      return;
+    }
+
+    const noteBody = window.prompt('Registrar nota comercial para esta oportunidade:');
+
+    if (!noteBody?.trim()) {
+      return;
+    }
+
+    setActionLoading(`${contact.clientId}:saveCommercialNote`);
+
+    try {
+      const response = await fetch('/api/internal/operational', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'saveCommercialNote',
+          sessionId: contact.sessionId,
+          noteBody: noteBody.trim(),
+          noteKind: 'operational',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'Falha ao salvar nota comercial.');
+      }
+
+      await loadPanelData();
+    } catch (error) {
+      console.error('Error saving note:', error);
+      alert(error instanceof Error ? error.message : 'Falha ao salvar nota comercial.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function updateCommercialFollowUp(contact: OperationalContact) {
+    if (!contact.sessionId) {
+      alert('Esta oportunidade ainda nao tem thread comercial vinculada.');
+      return;
+    }
+
+    const state = window.prompt(
+      'Estado do follow-up comercial:\nnone | needs_return | waiting_client | waiting_team | scheduled | overdue | completed',
+      contact.followUpState || 'needs_return'
+    );
+
+    if (!state) {
+      return;
+    }
+
+    const followUpReason = window.prompt(
+      'Motivo do follow-up:',
+      contact.followUpReason || ''
+    );
+    const nextStep = window.prompt(
+      'Proximo passo comercial:',
+      contact.nextStep || contact.nextBestAction.detail
+    );
+    const dueAt = window.prompt(
+      'Data/hora do follow-up (ISO, opcional):',
+      contact.nextStepDueAt || contact.nextFollowUpAt || ''
+    );
+    const waitingOn = window.prompt(
+      'Aguardando quem? client | team | none',
+      contact.waitingOn || 'client'
+    );
+
+    setActionLoading(`${contact.clientId}:updateCommercialFollowUp`);
+
+    try {
+      const response = await fetch('/api/internal/operational', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateCommercialFollowUp',
+          sessionId: contact.sessionId,
+          followUpState: state,
+          followUpReason: followUpReason || null,
+          followUpDueAt: dueAt || null,
+          nextStep: nextStep || null,
+          waitingOn: waitingOn || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'Falha ao atualizar follow-up comercial.');
+      }
+
+      await loadPanelData();
+    } catch (error) {
+      console.error('Error updating follow-up:', error);
+      alert(error instanceof Error ? error.message : 'Falha ao atualizar follow-up comercial.');
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   function getAttentionTone(bucket: OperationalContact['attentionBucket']): 'red' | 'orange' | 'blue' | 'gray' {
@@ -1096,6 +1288,72 @@ export default function OperationalPanel() {
                   </div>
                 ) : null}
 
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Ownership comercial
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.ownerName || 'Sem responsavel'}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.threadStatus
+                        ? `Thread ${contact.threadStatus}`
+                        : 'Thread comercial ainda sem leitura consolidada.'}
+                    </p>
+                    {contact.ownerAssignedAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        Assumido em {formatDate(contact.ownerAssignedAt)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Follow-up real
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.followUpState || contact.followUpStatus || 'none'}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.followUpReason || 'Sem motivo de follow-up registrado.'}
+                    </p>
+                    {contact.nextStepDueAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        Janela: {formatDate(contact.nextStepDueAt)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Proximo passo oficial
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.nextStep || contact.nextBestAction.title}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.waitingOn
+                        ? `Aguardando ${contact.waitingOn}.`
+                        : 'Sem bloqueio explicito registrado.'}
+                    </p>
+                  </div>
+                </div>
+
+                {contact.latestCommercialNote ? (
+                  <div className="mt-3 rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Nota comercial mais recente
+                    </p>
+                    <p className="mt-2 text-sm text-[#20342b]">{contact.latestCommercialNote}</p>
+                    {contact.latestCommercialNoteAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        Registrada em {formatDate(contact.latestCommercialNoteAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {contact.conversationState ? (
                   <div className="mt-3 rounded-2xl border border-[#ece5d8] bg-[#f8f5ee] p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
@@ -1468,6 +1726,33 @@ export default function OperationalPanel() {
 
                   <ActionButton
                     variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:assignOwner`}
+                    onClick={() => void assignCommercialOwner(contact)}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    Definir owner
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:saveCommercialNote`}
+                    onClick={() => void saveCommercialNote(contact)}
+                  >
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Registrar nota
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:updateCommercialFollowUp`}
+                    onClick={() => void updateCommercialFollowUp(contact)}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Atualizar follow-up
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
                     disabled={actionLoading === `${contact.clientId}:mark_consultation_offered`}
                     onClick={() => void applyOperationalAction(contact, 'mark_consultation_offered')}
                   >
@@ -1698,3 +1983,9 @@ export default function OperationalPanel() {
     </div>
   );
 }
+
+type StaffOwner = {
+  id: string;
+  full_name: string;
+  role: string;
+};

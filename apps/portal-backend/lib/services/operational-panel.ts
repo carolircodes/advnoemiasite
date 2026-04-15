@@ -1,4 +1,5 @@
 import { createWebhookSupabaseClient } from "../supabase/webhook";
+import { createAdminSupabaseClient } from "../supabase/admin";
 import { getCommercialAutomationPlans, type CommercialAutomationPlan } from "./commercial-automation";
 import { followUpEngine } from "./follow-up-engine";
 import {
@@ -15,6 +16,8 @@ import { projectPanelConversationState } from "./panel-state-projection";
 export interface OperationalContact {
   clientId: string;
   pipelineId: string;
+  sessionId?: string;
+  clientChannelId?: string;
   fullName: string;
   phone?: string;
   isClient: boolean;
@@ -27,9 +30,22 @@ export interface OperationalContact {
   lastContactAt: string;
   latestSessionSummary?: string;
   latestMessagePreview?: string;
+  latestCommercialNote?: string;
+  latestCommercialNoteAt?: string;
+  waitingOn?: string;
+  followUpState?: string;
+  followUpReason?: string;
+  nextStep?: string;
+  nextStepDueAt?: string;
+  threadStatus?: string;
+  threadWaitingFor?: string;
+  ownerProfileId?: string;
+  ownerName?: string;
+  ownerAssignedAt?: string;
   channels: Array<{
     channel: string;
     externalUserId: string;
+    displayName?: string | null;
     lastContactAt: string;
   }>;
   followUpCount: number;
@@ -158,8 +174,19 @@ export interface OperationalAction {
   notes?: string;
 }
 
+function getSinglePipeline(
+  pipeline: Record<string, unknown> | Array<Record<string, unknown>> | null | undefined
+): Record<string, unknown> {
+  if (Array.isArray(pipeline)) {
+    return (pipeline[0] as Record<string, unknown> | undefined) || {};
+  }
+
+  return (pipeline as Record<string, unknown> | null) || {};
+}
+
 class OperationalPanel {
   private supabase = createWebhookSupabaseClient();
+  private adminSupabase = createAdminSupabaseClient();
 
   async getOperationalContacts(
     filters: OperationalPanelFilters = {},
@@ -188,24 +215,46 @@ class OperationalPanel {
             source_channel,
             area_interest,
             follow_up_status,
+            follow_up_state,
+            follow_up_reason,
             next_follow_up_at,
             last_contact_at,
             tags,
             notes,
-            summary
+            summary,
+            owner_profile_id,
+            owner_assigned_at,
+            next_step,
+            next_step_due_at,
+            waiting_on,
+            last_thread_session_id,
+            last_commercial_note_at
           ),
           client_channels (
             id,
             channel,
             external_user_id,
+            display_name,
             last_contact_at
           ),
           conversation_sessions (
             id,
+            client_channel_id,
+            channel,
+            external_user_id,
+            thread_status,
+            waiting_for,
+            owner_user_id,
             lead_stage,
             case_area,
             current_intent,
             last_summary,
+            last_message_at,
+            last_message_preview,
+            follow_up_status,
+            follow_up_due_at,
+            next_action_hint,
+            updated_at,
             created_at
           ),
           follow_up_messages (
@@ -280,6 +329,34 @@ class OperationalPanel {
           .map((session: { id?: string }) => session?.id)
           .filter((value: string | undefined): value is string => Boolean(value))
       );
+      const ownerIds = Array.from(
+        new Set(
+          data.flatMap((client) => {
+            const ids: string[] = [];
+            const pipeline = getSinglePipeline(client.client_pipeline);
+            if (typeof pipeline.owner_profile_id === "string") {
+              ids.push(pipeline.owner_profile_id);
+            }
+            for (const session of client.conversation_sessions || []) {
+              if (session?.owner_user_id) {
+                ids.push(session.owner_user_id);
+              }
+            }
+            return ids;
+          })
+        )
+      );
+      const ownerProfilesById = new Map<string, { full_name: string | null }>();
+      if (ownerIds.length) {
+        const { data: ownerProfiles } = await this.adminSupabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", ownerIds);
+
+        (ownerProfiles || []).forEach((profile) => {
+          ownerProfilesById.set(profile.id, { full_name: profile.full_name });
+        });
+      }
 
       const contacts: OperationalContact[] = [];
 
@@ -287,7 +364,8 @@ class OperationalPanel {
         const operationalContact = await this.processOperationalContact(
           client,
           growthContextByClient.get(client.id) || null,
-          triageSummaryBySessionId
+          triageSummaryBySessionId,
+          ownerProfilesById
         );
         contacts.push(operationalContact);
       }
@@ -348,11 +426,16 @@ class OperationalPanel {
   private async processOperationalContact(
     client: any,
     growthContext: GrowthContextByItem | null,
-    triageSummaryBySessionId: Map<string, any>
+    triageSummaryBySessionId: Map<string, any>,
+    ownerProfilesById: Map<string, { full_name: string | null }>
   ): Promise<OperationalContact> {
-    const pipeline = client.client_pipeline;
+    const pipeline = getSinglePipeline(client.client_pipeline) as any;
     const channels = client.client_channels || [];
-    const sessions = client.conversation_sessions || [];
+    const sessions = [...(client.conversation_sessions || [])].sort((left: any, right: any) => {
+      const leftTime = left?.last_message_at || left?.updated_at || left?.created_at || "";
+      const rightTime = right?.last_message_at || right?.updated_at || right?.created_at || "";
+      return String(rightTime).localeCompare(String(leftTime));
+    });
     const followUps = client.follow_up_messages || [];
 
     const now = new Date();
@@ -399,6 +482,8 @@ class OperationalPanel {
     return {
       clientId: client.id,
       pipelineId: pipeline.id,
+      sessionId: latestSession?.id,
+      clientChannelId: latestSession?.client_channel_id || undefined,
       fullName: client.full_name || "",
       phone: client.phone,
       isClient: client.is_client,
@@ -410,10 +495,28 @@ class OperationalPanel {
       nextFollowUpAt: pipeline.next_follow_up_at,
       lastContactAt: pipeline.last_contact_at,
       latestSessionSummary: latestSession?.last_summary,
-      latestMessagePreview,
+      latestMessagePreview: latestSession?.last_message_preview || latestMessagePreview,
+      latestCommercialNote: pipeline.notes || undefined,
+      latestCommercialNoteAt: pipeline.last_commercial_note_at || undefined,
+      waitingOn: pipeline.waiting_on || undefined,
+      followUpState: pipeline.follow_up_state || undefined,
+      followUpReason: pipeline.follow_up_reason || undefined,
+      nextStep: pipeline.next_step || latestSession?.next_action_hint || undefined,
+      nextStepDueAt: pipeline.next_step_due_at || pipeline.next_follow_up_at || undefined,
+      threadStatus: latestSession?.thread_status || undefined,
+      threadWaitingFor: latestSession?.waiting_for || undefined,
+      ownerProfileId: pipeline.owner_profile_id || latestSession?.owner_user_id || undefined,
+      ownerName:
+        (pipeline.owner_profile_id
+          ? ownerProfilesById.get(pipeline.owner_profile_id)?.full_name
+          : latestSession?.owner_user_id
+            ? ownerProfilesById.get(latestSession.owner_user_id)?.full_name
+            : null) || undefined,
+      ownerAssignedAt: pipeline.owner_assigned_at || undefined,
       channels: channels.map((channel: any) => ({
         channel: channel.channel,
         externalUserId: channel.external_user_id,
+        displayName: channel.display_name || null,
         lastContactAt: channel.last_contact_at
       })),
       followUpCount: followUps.length,

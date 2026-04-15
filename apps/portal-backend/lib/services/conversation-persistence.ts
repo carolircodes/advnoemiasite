@@ -2,6 +2,7 @@ import { createWebhookSupabaseClient } from "../supabase/webhook";
 import { clientService } from "./client-service";
 import { clientIdentityService } from "./client-identity";
 import { isLegacySchemaFallbackAllowed } from "../schema/compatibility";
+import { commercialRelationshipService } from "./commercial-relationship";
 
 export interface ConversationSession {
   id: string;
@@ -419,6 +420,17 @@ class ConversationPersistenceService {
           });
         }
         
+        try {
+          await commercialRelationshipService.ensureSessionCommercialLink(existingSession.id);
+        } catch (linkError) {
+          console.warn('COMMERCIAL_THREAD_LINK_ERROR', {
+            sessionId: existingSession.id,
+            channel,
+            externalUserId,
+            reason: linkError instanceof Error ? linkError.message : String(linkError)
+          });
+        }
+
         return existingSession;
       }
 
@@ -470,6 +482,17 @@ class ConversationPersistenceService {
         sessionId: newSession.id,
         clientId: newSession.client_id
       });
+
+      try {
+        await commercialRelationshipService.ensureSessionCommercialLink(newSession.id);
+      } catch (linkError) {
+        console.warn('COMMERCIAL_THREAD_LINK_ERROR', {
+          sessionId: newSession.id,
+          channel,
+          externalUserId,
+          reason: linkError instanceof Error ? linkError.message : String(linkError)
+        });
+      }
 
       return newSession;
     } catch (error) {

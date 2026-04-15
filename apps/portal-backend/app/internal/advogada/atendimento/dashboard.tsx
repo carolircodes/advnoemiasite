@@ -173,6 +173,25 @@ type ThreadDetail = {
       followUpStatus: string;
       followUpDueAt: string | null;
     };
+    commercial: {
+      clientId: string | null;
+      clientChannelId: string | null;
+      pipelineId: string | null;
+      ownerProfileId: string | null;
+      ownerAssignedAt: string | null;
+      nextStep: string | null;
+      nextStepDueAt: string | null;
+      waitingOn: string | null;
+      followUpState: string | null;
+      followUpReason: string | null;
+      latestNoteBody: string | null;
+      latestNoteAt: string | null;
+      linkedChannels: Array<{
+        channel: string;
+        externalUserId: string;
+        displayName: string | null;
+      }>;
+    };
     social: {
       sourceLabel: string | null;
       entryType: string | null;
@@ -1287,6 +1306,17 @@ async function sendHumanReply() {
                   <p>Intento atual: {selectedThread.context.lead.currentIntent || "Sem leitura"}</p>
                 </div>
                 <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">CRM comercial conectado</p>
+                  <p>Cliente: {selectedThread.context.commercial.clientId || "thread ainda sem cliente vinculado"}</p>
+                  <p>Pipeline: {selectedThread.context.commercial.pipelineId || "nao materializado"}</p>
+                  <p>Owner: {selectedThread.thread.assignedTo.name || "sem owner comercial"}</p>
+                  <p>Follow-up: {selectedThread.context.commercial.followUpState || "none"}</p>
+                  <p>Motivo: {selectedThread.context.commercial.followUpReason || "sem motivo registrado"}</p>
+                  <p>Proximo passo: {selectedThread.context.commercial.nextStep || "nao definido"}</p>
+                  <p>Aguardando: {selectedThread.context.commercial.waitingOn || "nenhum bloqueio explicito"}</p>
+                  <p>Canal vinculado: {selectedThread.context.commercial.clientChannelId || "sem client_channel materializado"}</p>
+                </div>
+                <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Origem e navegacao</p>
                   <p>Canal de entrada: {selectedThread.context.origin.sourceLabel || selectedThread.context.social.sourceLabel || "sem leitura"}</p>
                   <p>Pagina: {selectedThread.context.origin.pagePath || "nao identificada"}</p>
@@ -1325,6 +1355,7 @@ async function sendHumanReply() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Follow-up e risco</p>
                   <p>Estado: {selectedThread.context.operational.followUpStatus || "none"}</p>
                   <p>Prazo: {formatDateTime(selectedThread.context.operational.followUpDueAt)}</p>
+                  <p>Leitura comercial: {selectedThread.context.commercial.followUpState || "none"}</p>
                   <p>Thread parada: {selectedThread.thread.idleMinutes ? `${selectedThread.thread.idleMinutes} min` : "sem leitura"}</p>
                 </div>
                 <div>
@@ -1332,8 +1363,15 @@ async function sendHumanReply() {
                   <p className="font-medium text-[#10261d]">
                     {selectedThread.context.operational.nextSuggestedAction || "Revisar manualmente"}
                   </p>
-                  <p>{selectedThread.context.operational.nextSuggestedActionDetail || selectedThread.thread.nextAction}</p>
+                  <p>{selectedThread.context.commercial.nextStep || selectedThread.context.operational.nextSuggestedActionDetail || selectedThread.thread.nextAction}</p>
                 </div>
+                {selectedThread.context.commercial.latestNoteBody ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Ultima nota comercial</p>
+                    <p className="font-medium text-[#10261d]">{selectedThread.context.commercial.latestNoteBody}</p>
+                    <p>{formatDateTime(selectedThread.context.commercial.latestNoteAt)}</p>
+                  </div>
+                ) : null}
                 {selectedThread.context.social.commentText ? (
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Comentario de origem</p>

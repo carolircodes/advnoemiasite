@@ -263,8 +263,8 @@ class AssistedFollowUpService {
   private async validateClient(clientId: string): Promise<{ valid: boolean; error?: string }> {
     try {
       const { data, error } = await this.supabase
-        .from('noemia_leads')
-        .select('id, status, merged_into')
+        .from('clients')
+        .select('id, merge_status')
         .eq('id', clientId)
         .single();
 
@@ -273,12 +273,8 @@ class AssistedFollowUpService {
       }
 
       // Verificar se está merged ou inactive
-      if (data.merged_into) {
-        return { valid: false, error: 'Cliente foi merged para outro registro' };
-      }
-
-      if (data.status === 'inactive') {
-        return { valid: false, error: 'Cliente está inativo' };
+      if (data.merge_status && data.merge_status !== 'active') {
+        return { valid: false, error: 'Cliente nÃ£o estÃ¡ disponÃ­vel para follow-up' };
       }
 
       return { valid: true };
@@ -562,6 +558,11 @@ class AssistedFollowUpService {
         updated_at: new Date().toISOString()
       };
 
+      updateData.follow_up_status = 'pending';
+      updateData.follow_up_state = 'waiting_client';
+      updateData.waiting_on = 'client';
+      delete updateData.last_contact_channel;
+
       // Regra conservadora: se estava new_lead e houve follow-up, pode ir para engaged
       const { data: currentPipeline } = await this.supabase
         .from('client_pipeline')
@@ -591,7 +592,8 @@ class AssistedFollowUpService {
         pipelineId: params.pipelineId,
         clientId: params.clientId,
         channel: params.channel,
-        followUpStatus: 'sent'
+        followUpStatus: 'pending',
+        followUpState: 'waiting_client'
       });
 
       return { success: true };
