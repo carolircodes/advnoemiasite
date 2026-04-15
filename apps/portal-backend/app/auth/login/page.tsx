@@ -172,6 +172,16 @@ async function loginAction(formData: FormData) {
 
     profile = await ensureProfileForUser(data.user);
   } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      typeof error.digest === "string" &&
+      error.digest.startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+
     console.error("[auth.login] Failed to complete sign-in", {
       message: error instanceof Error ? error.message : String(error),
       authEnv: getAuthEnvDiagnostics()

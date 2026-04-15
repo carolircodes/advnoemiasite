@@ -473,12 +473,20 @@ function buildEmptyStateMessage(filters: Filters) {
   return "Nenhuma conversa encontrada para os filtros atuais.";
 }
 
-export function ConversationInboxDashboard() {
+export function ConversationInboxDashboard({
+  initialPayload = null,
+  initialSelectedThreadId = null
+}: {
+  initialPayload?: ApiPayload | null;
+  initialSelectedThreadId?: string | null;
+}) {
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filters>(initialFilters);
-  const [payload, setPayload] = useState<ApiPayload | null>(null);
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [payload, setPayload] = useState<ApiPayload | null>(initialPayload);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
+    initialSelectedThreadId || initialPayload?.selectedThread?.thread.id || null
+  );
+  const [loading, setLoading] = useState(initialPayload ? false : true);
   const [sending, setSending] = useState(false);
   const [composer, setComposer] = useState("");
   const [noteComposer, setNoteComposer] = useState("");
@@ -778,6 +786,7 @@ async function sendHumanReply() {
   }
 
   const selectedThread = payload?.selectedThread || null;
+  const hasThreadList = Boolean(payload?.threads.length);
 
   return (
     <div className="space-y-6">
@@ -989,7 +998,7 @@ async function sendHumanReply() {
             </p>
           </div>
           <div className="max-h-[760px] overflow-y-auto px-3 py-3">
-            {loading ? (
+            {loading && !hasThreadList ? (
               <div className="px-3 py-10 text-sm text-[#6b7b72]">Carregando threads...</div>
             ) : payload?.threads.length ? (
               payload.threads.map((thread) => (

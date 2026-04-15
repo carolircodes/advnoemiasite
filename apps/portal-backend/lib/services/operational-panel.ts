@@ -249,7 +249,10 @@ class OperationalPanel {
       }
 
       query = query
-        .order("client_pipeline.last_contact_at", { ascending: false })
+        .order("last_contact_at", {
+          ascending: false,
+          foreignTable: "client_pipeline"
+        })
         .range(offset, offset + limit - 1);
 
       const { data, error, count } = await query;
