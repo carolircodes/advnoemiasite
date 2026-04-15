@@ -43,15 +43,15 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
   const isActive = (href: string) => isInternalWorkspacePathActive(currentPath, href);
 
   const sidebarClasses = isMobile
-    ? `fixed left-0 top-0 h-full w-64 bg-[#0f172a] text-white z-50 transform transition-transform duration-300 ${
+    ? `fixed inset-y-0 left-0 w-72 max-w-[calc(100vw-1rem)] bg-[#0f172a] text-white z-50 transform transition-transform duration-300 shadow-2xl ${
         onClose ? 'translate-x-0' : '-translate-x-full'
       }`
     : 'fixed left-0 top-0 h-screen w-64 bg-[#0f172a] text-white z-50';
 
   return (
     <div className={sidebarClasses}>
-      <div className="flex flex-col h-full">
-        <div className="p-6 border-b border-[#1e293b]">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="shrink-0 border-b border-[#1e293b] p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-[#8e6a3b] to-[#6f512c] rounded-xl flex items-center justify-center font-bold text-lg">
@@ -73,7 +73,10 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
           </div>
         </div>
 
-        <nav className="flex-1 p-4">
+        <nav
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-10"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <div className="space-y-6">
             {internalWorkspaceMenuSections.map((section) => (
               <div key={section.id}>
@@ -108,7 +111,7 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
           </div>
         </nav>
 
-        <div className="p-4 border-t border-[#1e293b]">
+        <div className="shrink-0 border-t border-[#1e293b] p-4">
           <div className="text-xs text-[#64748b]">© 2026 NoemIA</div>
         </div>
       </div>

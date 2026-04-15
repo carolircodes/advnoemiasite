@@ -251,12 +251,12 @@ class NoemiaUnified {
     // Loading state
     if (submitButton) {
       submitButton.disabled = true;
-      submitButton.textContent = 'Consultando Noemia...';
+      submitButton.textContent = 'Consultando o atendente virtual...';
     }
 
     try {
       const response = await this.sendMessage(message);
-      this.displayResponse(response);
+      this.displayResponse(response, message);
       
       // Clear form
       if (textarea) {
@@ -294,7 +294,7 @@ class NoemiaUnified {
     }
   }
 
-  displayResponse(response) {
+  displayResponse(response, originalMessage) {
     // Encontrar o container de mensagens
     const messagesContainer = document.querySelector('.conversation-feed, .chat-messages, .messages-container');
     if (!messagesContainer) {
@@ -303,7 +303,7 @@ class NoemiaUnified {
     }
 
     // Adicionar mensagem do usuário
-    this.addMessageToContainer(messagesContainer, 'user', response.message || 'Pergunta enviada');
+    this.addMessageToContainer(messagesContainer, 'user', originalMessage || response.message || 'Pergunta enviada');
     
     // Adicionar resposta da NoemIA
     this.addMessageToContainer(messagesContainer, 'assistant', response.answer);
@@ -318,7 +318,7 @@ class NoemiaUnified {
     const messageElement = document.createElement('article');
     messageElement.className = `chat-bubble ${role}`;
     messageElement.innerHTML = `
-      <span>${role === 'assistant' ? 'Noemia' : 'Você'}</span>
+      <span>${role === 'assistant' ? 'Atendente virtual do escritorio' : 'Voce'}</span>
       <p>${content}</p>
     `;
     
