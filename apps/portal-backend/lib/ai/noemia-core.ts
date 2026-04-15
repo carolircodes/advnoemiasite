@@ -2,7 +2,7 @@
  * NOEMIA CORE - CÉREBRO CENTRALIZADO DA IA
  *
  * Única camada responsável por toda inteligência da NoemIA
- * Usado por: site, portal, WhatsApp, Instagram
+ * Usado por: site, portal, WhatsApp, Instagram, Telegram
  */
 
 import { OpenAI } from "openai";
@@ -1906,7 +1906,11 @@ export async function processNoemiaCore(
     let clientContext = null;
     let enrichedContext = input.context;
 
-    if (input.channel === 'whatsapp' || input.channel === 'instagram') {
+    if (
+      input.channel === 'whatsapp' ||
+      input.channel === 'instagram' ||
+      input.channel === 'telegram'
+    ) {
       try {
         // Tentar obter clientId do metadata ou context
         const clientId = (input.metadata?.clientId as string) || 
@@ -1983,7 +1987,12 @@ export async function processNoemiaCore(
       console.log(`NOEMIA_CORE_OPENAI_SUCCESS: ${input.channel}`);
 
       // Fase 4.5 - Atualizar pipeline automaticamente após interação
-      if (clientContext && (input.channel === 'whatsapp' || input.channel === 'instagram')) {
+      if (
+        clientContext &&
+        (input.channel === 'whatsapp' ||
+          input.channel === 'instagram' ||
+          input.channel === 'telegram')
+      ) {
         try {
           await clientContextService.updatePipelineFromInteraction(
             clientContext.client.id,

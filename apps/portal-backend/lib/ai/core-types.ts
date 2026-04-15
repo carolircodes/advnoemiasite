@@ -1,6 +1,6 @@
 import type { PortalProfile } from "../auth/guards";
 
-export type NoemiaChannel = "site" | "portal" | "whatsapp" | "instagram";
+export type NoemiaChannel = "site" | "portal" | "whatsapp" | "instagram" | "telegram";
 export type NoemiaUserType = "visitor" | "client" | "staff" | "unknown";
 
 export type LegalTheme =

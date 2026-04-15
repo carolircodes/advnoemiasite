@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireInternalApiProfile } from "@/lib/auth/guards";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
+import { telegramDistributionService } from "@/lib/services/telegram-distribution";
 
 export async function GET(request: NextRequest) {
   const access = await requireInternalApiProfile();
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
         | "whatsapp"
         | "site"
         | "portal"
+        | "telegram"
         | null) || undefined,
       priority: (searchParams.get("priority") as "all" | "low" | "medium" | "high" | null) || undefined,
       waitingFor: (searchParams.get("waitingFor") as
@@ -67,12 +69,14 @@ export async function GET(request: NextRequest) {
     const selectedThread = selectedThreadId
       ? await conversationInboxService.getThreadDetail(selectedThreadId)
       : null;
+    const telegram = await telegramDistributionService.getOverview();
 
     return NextResponse.json({
       ok: true,
       data: {
         ...list,
-        selectedThread
+        selectedThread,
+        telegram
       }
     });
   } catch (error) {
@@ -160,9 +164,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, data: result });
     }
 
+    if (action === "publishTelegramChannelPost") {
+      const result = await telegramDistributionService.publishPost(payload, {
+        id: access.profile.id,
+        name: access.profile.full_name
+      });
+
+      return NextResponse.json({ ok: true, data: result });
+    }
+
     return NextResponse.json(
       {
-        error: "Acao invalida. Use sendHumanReply, sendInboxFollowUp, updateThreadState ou addThreadNote."
+        error:
+          "Acao invalida. Use sendHumanReply, sendInboxFollowUp, updateThreadState, addThreadNote ou publishTelegramChannelPost."
       },
       { status: 400 }
     );

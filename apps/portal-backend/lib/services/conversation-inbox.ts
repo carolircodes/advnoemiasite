@@ -4,8 +4,12 @@ import { createAdminSupabaseClient } from "../supabase/admin";
 import { sendInstagramDirectMessage } from "../meta/instagram-service";
 import { sendWhatsAppMessage } from "../meta/whatsapp-service";
 import { sendSiteChatMessage } from "../site/site-chat-service";
+import {
+  sendTelegramGroupMessage,
+  sendTelegramPrivateMessage
+} from "../telegram/telegram-service";
 
-type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal";
+type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal" | "telegram";
 type ThreadStatus =
   | "new"
   | "unread"
@@ -210,7 +214,14 @@ export type ConversationThreadListItem = {
   id: string;
   channel: ConversationChannel;
   channelLabel: string;
-  threadOriginType: "dm" | "comment" | "comment_to_dm" | "site_chat" | "unknown";
+  threadOriginType:
+    | "dm"
+    | "comment"
+    | "comment_to_dm"
+    | "site_chat"
+    | "telegram_private"
+    | "telegram_group"
+    | "unknown";
   threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
@@ -255,7 +266,13 @@ export type ConversationThreadDetail = {
     senderType: "contact" | "ai" | "human" | "system";
     sendStatus: string;
     messageType: string;
-    surface: "direct_message" | "public_comment" | "site_chat" | "system";
+    surface:
+      | "direct_message"
+      | "public_comment"
+      | "site_chat"
+      | "telegram_private"
+      | "telegram_group"
+      | "system";
     socialOrigin: string | null;
     createdAt: string;
     isRead: boolean;
@@ -337,6 +354,15 @@ export type ConversationThreadDetail = {
       utmMedium: string | null;
       utmCampaign: string | null;
     };
+    telegram: {
+      surface: "private" | "group" | "channel" | "unknown";
+      chatId: string | null;
+      username: string | null;
+      groupTitle: string | null;
+      relevance: string | null;
+      shouldMoveToPrivate: boolean;
+      replyMessageId: string | null;
+    };
   };
   events: Array<{
     id: string;
@@ -384,6 +410,13 @@ export type ConversationInboxMetrics = {
   siteFollowUpPendingCount: number;
   siteHotThreads: number;
   siteQualifiedThreads: number;
+  telegramVolume: number;
+  telegramPrivateVolume: number;
+  telegramGroupSignals: number;
+  telegramWaitingHumanCount: number;
+  telegramHandoffCount: number;
+  telegramFollowUpPendingCount: number;
+  telegramHotThreads: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
   failedMessagesCount: number;
@@ -440,6 +473,8 @@ function getChannelLabel(channel: ConversationChannel) {
       return "Instagram";
     case "whatsapp":
       return "WhatsApp";
+    case "telegram":
+      return "Telegram";
     case "portal":
       return "Portal";
     default:
@@ -450,6 +485,7 @@ function getChannelLabel(channel: ConversationChannel) {
 function inferThreadOrigin(session: SessionRow) {
   const socialAcquisition = safeObject(session.metadata?.social_acquisition);
   const siteOrigin = safeObject(session.metadata?.site_origin);
+  const telegram = safeObject(session.metadata?.telegram);
   const entryType = asString(socialAcquisition.entryType);
 
   if (entryType === "instagram_comment") {
@@ -468,6 +504,22 @@ function inferThreadOrigin(session: SessionRow) {
     return {
       type: "site_chat" as const,
       label: asString(siteOrigin.ctaLabel) ? "Chat do site com CTA" : "Chat do site"
+    };
+  }
+
+  if (session.channel === "telegram") {
+    if (asString(telegram.surface) === "group") {
+      return {
+        type: "telegram_group" as const,
+        label: telegram.shouldMoveToPrivate === true
+          ? "Grupo curado puxando para privado"
+          : "Sinal relevante do grupo"
+      };
+    }
+
+    return {
+      type: "telegram_private" as const,
+      label: "Telegram privado"
     };
   }
 
@@ -532,6 +584,18 @@ function buildEventSummary(event: EventRow) {
       return "Origem, CTA e contexto de navegacao capturados no site.";
     case "site_handoff_requested":
       return "Thread do site sinalizada para handoff humano.";
+    case "telegram_private_inbound":
+      return "Mensagem privada do Telegram entrou na thread oficial.";
+    case "telegram_private_ai_replied":
+      return "IA respondeu no Telegram privado.";
+    case "telegram_private_ai_failed":
+      return "Envio da IA no Telegram privado falhou e pede revisao humana.";
+    case "telegram_group_signal_captured":
+      return "Sinal relevante do grupo curado entrou na operacao.";
+    case "telegram_group_redirected_private":
+      return "Grupo recebeu orientacao elegante para migrar ao privado.";
+    case "telegram_group_guardrail_sent":
+      return "Grupo recebeu resposta curta de moderacao operacional.";
     default:
       return asString(data.summary) || "Evento operacional registrado.";
   }
@@ -1034,6 +1098,22 @@ class ConversationInboxService {
           ["qualified", "triage", "engaged", "handoff"].includes(item.leadStage || "")
             ? 1
             : 0;
+        accumulator.telegramVolume += item.channel === "telegram" ? 1 : 0;
+        accumulator.telegramPrivateVolume +=
+          item.channel === "telegram" && item.threadOriginType === "telegram_private" ? 1 : 0;
+        accumulator.telegramGroupSignals +=
+          item.channel === "telegram" && item.threadOriginType === "telegram_group" ? 1 : 0;
+        accumulator.telegramWaitingHumanCount +=
+          item.channel === "telegram" && item.waitingFor === "human" ? 1 : 0;
+        accumulator.telegramHandoffCount +=
+          item.channel === "telegram" && (item.handoffState === "active" || item.threadStatus === "handoff")
+            ? 1
+            : 0;
+        accumulator.telegramFollowUpPendingCount +=
+          item.channel === "telegram" && ["pending", "due", "overdue"].includes(item.followUpStatus)
+            ? 1
+            : 0;
+        accumulator.telegramHotThreads += item.channel === "telegram" && item.hot ? 1 : 0;
         return accumulator;
       },
       {
@@ -1064,6 +1144,13 @@ class ConversationInboxService {
         siteFollowUpPendingCount: 0,
         siteHotThreads: 0,
         siteQualifiedThreads: 0,
+        telegramVolume: 0,
+        telegramPrivateVolume: 0,
+        telegramGroupSignals: 0,
+        telegramWaitingHumanCount: 0,
+        telegramHandoffCount: 0,
+        telegramFollowUpPendingCount: 0,
+        telegramHotThreads: 0,
         firstResponseTimeMinutes: average(firstResponseTimes),
         humanResponseTimeMinutes: average(humanResponseTimes),
         failedMessagesCount: (messageStatusRows || []).filter((row) => row.send_status === "failed").length,
@@ -1104,6 +1191,7 @@ class ConversationInboxService {
     const triage = bundle.triageBySession.get(threadId) || null;
     const socialAcquisition = safeObject((session as SessionRow).metadata?.social_acquisition);
     const siteOrigin = safeObject((session as SessionRow).metadata?.site_origin);
+    const telegramContext = safeObject((session as SessionRow).metadata?.telegram);
     const publicCommentPolicy = safeObject((session as SessionRow).metadata?.public_comment_policy);
     const appointments = resolvedClientId
       ? bundle.appointmentsByClientId.get(resolvedClientId) || []
@@ -1174,6 +1262,12 @@ class ConversationInboxService {
         surface:
           asString(message.metadata_json?.responseSurface) === "public_comment"
             ? "public_comment"
+            : asString(message.metadata_json?.responseSurface) === "telegram_group" ||
+                message.message_type === "telegram_group_signal"
+              ? "telegram_group"
+            : asString(message.metadata_json?.responseSurface) === "telegram_private" ||
+                message.message_type === "telegram_private"
+              ? "telegram_private"
             : asString(message.metadata_json?.responseSurface) === "site_chat" ||
                 message.message_type === "site_chat"
               ? "site_chat"
@@ -1277,6 +1371,20 @@ class ConversationInboxService {
           utmSource: asString(siteOrigin.utmSource),
           utmMedium: asString(siteOrigin.utmMedium),
           utmCampaign: asString(siteOrigin.utmCampaign)
+        },
+        telegram: {
+          surface:
+            asString(telegramContext.surface) === "private" ||
+            asString(telegramContext.surface) === "group" ||
+            asString(telegramContext.surface) === "channel"
+              ? (asString(telegramContext.surface) as "private" | "group" | "channel")
+              : "unknown",
+          chatId: asString(telegramContext.chatId),
+          username: asString(telegramContext.username),
+          groupTitle: asString(telegramContext.groupTitle),
+          relevance: asString(telegramContext.relevance),
+          shouldMoveToPrivate: Boolean(telegramContext.shouldMoveToPrivate),
+          replyMessageId: asString(telegramContext.lastInboundMessageId)
         }
       },
       events: ((eventsData || []) as EventRow[]).map((event) => ({
@@ -1362,10 +1470,23 @@ class ConversationInboxService {
                       : undefined
                 }
               })
+            : detail.thread.channel === "telegram"
+              ? detail.context.telegram.surface === "group"
+                ? await sendTelegramGroupMessage({
+                    chatId: detail.context.telegram.chatId || detail.thread.contactLabel,
+                    text: content,
+                    replyToMessageId: detail.context.telegram.replyMessageId
+                  })
+                : await sendTelegramPrivateMessage({
+                    chatId: detail.context.telegram.chatId || detail.thread.contactLabel,
+                    text: content
+                  })
             : null;
 
     if (!sendResult) {
-      throw new Error("A resposta manual pelo painel esta disponivel apenas para WhatsApp, Instagram e Site Chat.");
+      throw new Error(
+        "A resposta manual pelo painel esta disponivel apenas para WhatsApp, Instagram, Site Chat e Telegram."
+      );
     }
     const sendSucceeded = "success" in sendResult ? sendResult.success : sendResult.ok;
     const outboundMessageId = "messageId" in sendResult ? sendResult.messageId || null : null;
@@ -1387,6 +1508,10 @@ class ConversationInboxService {
       message_type:
         detail.thread.channel === "instagram"
           ? "social_dm"
+          : detail.thread.channel === "telegram"
+            ? detail.context.telegram.surface === "group"
+              ? "telegram_group_signal"
+              : "telegram_private"
           : detail.thread.channel === "site"
             ? "site_chat"
             : "text",
@@ -1417,6 +1542,8 @@ class ConversationInboxService {
         sendResult.error ||
           (detail.thread.channel === "instagram"
             ? "Falha ao enviar resposta humana pelo Instagram."
+            : detail.thread.channel === "telegram"
+              ? "Falha ao enviar resposta humana pelo Telegram."
             : detail.thread.channel === "site"
               ? "Falha ao registrar resposta humana no Site Chat."
               : "Falha ao enviar resposta humana pelo WhatsApp.")

@@ -5,7 +5,7 @@ import { isLegacySchemaFallbackAllowed } from "../schema/compatibility";
 
 export interface ConversationSession {
   id: string;
-  channel: 'instagram' | 'whatsapp' | 'site' | 'portal';
+  channel: 'instagram' | 'whatsapp' | 'site' | 'portal' | 'telegram';
   external_user_id: string;
   external_thread_id?: string;
   lead_name?: string;
@@ -84,7 +84,7 @@ export interface ConversationSession {
 
 export interface ProcessedWebhookEvent {
   id: string;
-  channel: 'instagram' | 'whatsapp';
+  channel: 'instagram' | 'whatsapp' | 'telegram';
   external_event_id: string;
   external_message_id?: string;
   external_user_id?: string;
@@ -161,7 +161,7 @@ class ConversationPersistenceService {
 
   // Verificar se evento já foi processado (idempotência)
   async isEventProcessed(
-    channel: 'instagram' | 'whatsapp',
+    channel: 'instagram' | 'whatsapp' | 'telegram',
     externalEventId: string
   ): Promise<boolean> {
     try {
@@ -186,7 +186,7 @@ class ConversationPersistenceService {
 
   // Marcar evento como processado
   async markEventProcessed(
-    channel: 'instagram' | 'whatsapp',
+    channel: 'instagram' | 'whatsapp' | 'telegram',
     externalEventId: string,
     externalMessageId?: string,
     externalUserId?: string,
@@ -335,7 +335,7 @@ class ConversationPersistenceService {
 
   // Obter ou criar sessão de conversação (Fase 2.3 - Integrado com clientIdentityService)
   async getOrCreateSession(
-    channel: 'instagram' | 'whatsapp' | 'site' | 'portal',
+    channel: 'instagram' | 'whatsapp' | 'site' | 'portal' | 'telegram',
     externalUserId: string,
     externalThreadId?: string
   ): Promise<ConversationSession> {
@@ -405,7 +405,12 @@ class ConversationPersistenceService {
             console.error('ERROR_LINKING_CLIENT_TO_EXISTING_SESSION', linkError);
             // Continuar sem client_id para não quebrar o fluxo
           }
-        } else if (channel === 'whatsapp' || channel === 'instagram' || channel === 'site') {
+        } else if (
+          channel === 'whatsapp' ||
+          channel === 'instagram' ||
+          channel === 'site' ||
+          channel === 'telegram'
+        ) {
           console.log('VISITOR_SESSION_MAINTAINED', {
             sessionId: existingSession.id,
             channel,
@@ -435,7 +440,12 @@ class ConversationPersistenceService {
           channel,
           externalUserId
         });
-      } else if (channel === 'whatsapp' || channel === 'instagram' || channel === 'site') {
+      } else if (
+        channel === 'whatsapp' ||
+        channel === 'instagram' ||
+        channel === 'site' ||
+        channel === 'telegram'
+      ) {
         console.log('VISITOR_SESSION_CREATED', {
           channel,
           externalUserId,

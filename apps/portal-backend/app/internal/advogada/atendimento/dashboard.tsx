@@ -41,6 +41,13 @@ type Metrics = {
   siteFollowUpPendingCount: number;
   siteHotThreads: number;
   siteQualifiedThreads: number;
+  telegramVolume: number;
+  telegramPrivateVolume: number;
+  telegramGroupSignals: number;
+  telegramWaitingHumanCount: number;
+  telegramHandoffCount: number;
+  telegramFollowUpPendingCount: number;
+  telegramHotThreads: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
   failedMessagesCount: number;
@@ -50,9 +57,16 @@ type Metrics = {
 
 type ThreadItem = {
   id: string;
-  channel: "instagram" | "whatsapp" | "site" | "portal";
+  channel: "instagram" | "whatsapp" | "site" | "portal" | "telegram";
   channelLabel: string;
-  threadOriginType: "dm" | "comment" | "comment_to_dm" | "site_chat" | "unknown";
+  threadOriginType:
+    | "dm"
+    | "comment"
+    | "comment_to_dm"
+    | "site_chat"
+    | "telegram_private"
+    | "telegram_group"
+    | "unknown";
   threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
@@ -97,7 +111,13 @@ type ThreadDetail = {
     senderType: "contact" | "ai" | "human" | "system";
     sendStatus: string;
     messageType: string;
-    surface: "direct_message" | "public_comment" | "site_chat" | "system";
+    surface:
+      | "direct_message"
+      | "public_comment"
+      | "site_chat"
+      | "telegram_private"
+      | "telegram_group"
+      | "system";
     socialOrigin: string | null;
     createdAt: string;
     isRead: boolean;
@@ -179,6 +199,15 @@ type ThreadDetail = {
       utmMedium: string | null;
       utmCampaign: string | null;
     };
+    telegram: {
+      surface: "private" | "group" | "channel" | "unknown";
+      chatId: string | null;
+      username: string | null;
+      groupTitle: string | null;
+      relevance: string | null;
+      shouldMoveToPrivate: boolean;
+      replyMessageId: string | null;
+    };
   };
   events: Array<{
     id: string;
@@ -202,6 +231,45 @@ type ApiPayload = {
   threads: ThreadItem[];
   metrics: Metrics;
   selectedThread: ThreadDetail | null;
+  telegram: {
+    channel: {
+      mode: "channel_broadcast";
+      username: string;
+      url: string;
+      botConfigured: boolean;
+      futureGroupReady: boolean;
+    };
+    metrics: {
+      totalPosts: number;
+      sentPosts: number;
+      failedPosts: number;
+      premiumSignals: number;
+      waitlistSignals: number;
+      founderSignals: number;
+      editorialBridges: number;
+      postsLast7Days: number;
+    };
+    recentPosts: Array<{
+      id: string;
+      title: string | null;
+      bodyPreview: string;
+      status: string;
+      signalType: string | null;
+      topic: string | null;
+      editorialSource: string | null;
+      ctaLabel: string | null;
+      ctaUrl: string | null;
+      postedAt: string | null;
+      createdAt: string;
+      createdByName: string | null;
+    }>;
+    discipline: {
+      officialRole: string;
+      whenToUse: string[];
+      whenNotToUse: string[];
+      futureGroupReadiness: string;
+    };
+  };
 };
 
 type Filters = {
@@ -274,6 +342,10 @@ function toneForChannel(channel: string) {
     return "border-[#cfe5d3] bg-[#effaf1] text-[#2f6c45]";
   }
 
+  if (channel === "telegram") {
+    return "border-[#cfe0ef] bg-[#eef6ff] text-[#2f5e85]";
+  }
+
   if (channel === "site") {
     return "border-[#d9d0be] bg-[#f8f3ea] text-[#6b5a3d]";
   }
@@ -284,6 +356,14 @@ function toneForChannel(channel: string) {
 function toneForSurface(surface: string) {
   if (surface === "public_comment") {
     return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
+  }
+
+  if (surface === "telegram_group") {
+    return "border-[#d4deee] bg-[#f2f7ff] text-[#31597d]";
+  }
+
+  if (surface === "telegram_private") {
+    return "border-[#cfe6ef] bg-[#edf9fb] text-[#22606f]";
   }
 
   if (surface === "site_chat") {
@@ -365,6 +445,13 @@ export function ConversationInboxDashboard() {
   const [composer, setComposer] = useState("");
   const [noteComposer, setNoteComposer] = useState("");
   const [noteKind, setNoteKind] = useState("operational");
+  const [telegramComposer, setTelegramComposer] = useState("");
+  const [telegramTitle, setTelegramTitle] = useState("");
+  const [telegramTopic, setTelegramTopic] = useState("");
+  const [telegramEditorialSource, setTelegramEditorialSource] = useState("");
+  const [telegramCtaLabel, setTelegramCtaLabel] = useState("");
+  const [telegramCtaUrl, setTelegramCtaUrl] = useState("");
+  const [telegramSignalType, setTelegramSignalType] = useState("editorial_bridge");
   const [error, setError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
@@ -569,6 +656,52 @@ async function sendHumanReply() {
     }
   }
 
+  async function publishTelegramPost() {
+    if (!telegramComposer.trim()) {
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/internal/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "publishTelegramChannelPost",
+          content: telegramComposer,
+          title: telegramTitle || undefined,
+          topic: telegramTopic || undefined,
+          editorialSource: telegramEditorialSource || undefined,
+          ctaLabel: telegramCtaLabel || undefined,
+          ctaUrl: telegramCtaUrl || undefined,
+          signalType: telegramSignalType || undefined
+        })
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "Falha ao publicar no Telegram.");
+      }
+
+      setTelegramComposer("");
+      setTelegramTitle("");
+      setTelegramTopic("");
+      setTelegramEditorialSource("");
+      setTelegramCtaLabel("");
+      setTelegramCtaUrl("");
+      setTelegramSignalType("editorial_bridge");
+      await loadInbox();
+    } catch (publishError) {
+      setError(
+        publishError instanceof Error ? publishError.message : "Falha ao publicar no Telegram."
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
   const selectedThread = payload?.selectedThread || null;
 
   return (
@@ -583,9 +716,9 @@ async function sendHumanReply() {
               Central premium de conversas da NoemIA
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#5e6e65]">
-              WhatsApp, Instagram e Site Chat agora entram como canais operacionais reais, com
-              thread unica, contexto de origem legivel, handoff premium e leitura executiva sem
-              bagunca.
+              WhatsApp, Instagram, Site Chat e Telegram agora entram como canais operacionais
+              reais, com thread unica, contexto de origem legivel, handoff premium e leitura
+              executiva sem bagunca.
             </p>
           </div>
           <button
@@ -654,6 +787,18 @@ async function sendHumanReply() {
         </button>
         <button
           type="button"
+          onClick={() => setFilters((current) => ({ ...current, channel: "telegram" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Telegram</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Privado, grupo e canal</p>
+          <p className="mt-1 text-sm text-[#67786f]">
+            {payload?.metrics.telegramVolume || 0} threads conversacionais e{" "}
+            {payload?.telegram.metrics.totalPosts || 0} publicacoes na camada broadcast.
+          </p>
+        </button>
+        <button
+          type="button"
           onClick={() => setFilters((current) => ({ ...current, founderScope: "founder" }))}
           className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
         >
@@ -700,6 +845,7 @@ async function sendHumanReply() {
             <option value="whatsapp">WhatsApp</option>
             <option value="instagram">Instagram</option>
             <option value="site">Site Chat</option>
+            <option value="telegram">Telegram</option>
           </select>
           <select
             value={filters.waitingFor}
@@ -752,6 +898,162 @@ async function sendHumanReply() {
             <option value="pending">Pagamento pendente</option>
             <option value="approved">Pagamento aprovado</option>
           </select>
+        </div>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Quarta onda</p>
+              <h2 className="mt-2 text-xl font-semibold text-[#10261d]">Telegram como distribuicao premium</h2>
+              <p className="mt-2 text-sm text-[#66756c]">
+                Canal oficial de broadcast do ecossistema, separado da semantica de thread e pronto
+                para evoluir para grupo no futuro sem refatoracao caotica.
+              </p>
+            </div>
+            <div className="space-y-2 text-right text-sm text-[#4e6057]">
+              <Chip className={toneForChannel("site")}>Canal Telegram</Chip>
+              <p>{payload?.telegram.channel.username || "@adv_noemia"}</p>
+              <p>{payload?.telegram.channel.botConfigured ? "bot validado" : "bot pendente"}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl bg-[#f7f2e8] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">Posts</p>
+              <strong className="mt-2 block text-2xl text-[#10261d]">{payload?.telegram.metrics.totalPosts || 0}</strong>
+            </div>
+            <div className="rounded-2xl bg-[#f7f2e8] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">Ultimos 7 dias</p>
+              <strong className="mt-2 block text-2xl text-[#10261d]">{payload?.telegram.metrics.postsLast7Days || 0}</strong>
+            </div>
+            <div className="rounded-2xl bg-[#f7f2e8] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">Sinais premium</p>
+              <strong className="mt-2 block text-2xl text-[#10261d]">{payload?.telegram.metrics.premiumSignals || 0}</strong>
+            </div>
+            <div className="rounded-2xl bg-[#f7f2e8] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">Waitlist e founders</p>
+              <strong className="mt-2 block text-2xl text-[#10261d]">
+                {(payload?.telegram.metrics.waitlistSignals || 0) + (payload?.telegram.metrics.founderSignals || 0)}
+              </strong>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <input
+              value={telegramTitle}
+              onChange={(event) => setTelegramTitle(event.target.value)}
+              placeholder="Titulo opcional da publicacao"
+              className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+            />
+            <input
+              value={telegramTopic}
+              onChange={(event) => setTelegramTopic(event.target.value)}
+              placeholder="Topico editorial ou estrategico"
+              className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+            />
+            <input
+              value={telegramEditorialSource}
+              onChange={(event) => setTelegramEditorialSource(event.target.value)}
+              placeholder="Origem editorial"
+              className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+            />
+            <select
+              value={telegramSignalType}
+              onChange={(event) => setTelegramSignalType(event.target.value)}
+              className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+            >
+              <option value="editorial_bridge">Ponte editorial</option>
+              <option value="premium_signal">Sinal premium</option>
+              <option value="waitlist_signal">Sinal waitlist</option>
+              <option value="founder_signal">Sinal founder</option>
+            </select>
+            <input
+              value={telegramCtaLabel}
+              onChange={(event) => setTelegramCtaLabel(event.target.value)}
+              placeholder="CTA"
+              className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+            />
+            <input
+              value={telegramCtaUrl}
+              onChange={(event) => setTelegramCtaUrl(event.target.value)}
+              placeholder="URL do CTA"
+              className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
+            />
+          </div>
+
+          <textarea
+            value={telegramComposer}
+            onChange={(event) => setTelegramComposer(event.target.value)}
+            placeholder="Escreva a publicacao premium do Telegram com tom curado, ponte editorial e proximo passo claro."
+            rows={6}
+            className="mt-4 w-full rounded-[1.6rem] border border-[#d8cfbf] bg-white px-4 py-4 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
+          />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-[#718179]">
+              Telegram opera como broadcast nobre: distribuir, sinalizar e conectar o ecossistema sem virar inbox caotica.
+            </p>
+            <button
+              type="button"
+              onClick={() => void publishTelegramPost()}
+              disabled={sending || !telegramComposer.trim()}
+              className="inline-flex items-center gap-2 rounded-full bg-[#10261d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#18362a] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Send className="h-4 w-4" />
+              Publicar no Telegram
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
+            <h2 className="text-lg font-semibold text-[#10261d]">Leitura executiva do canal</h2>
+            <div className="mt-4 space-y-3 text-sm text-[#4e6057]">
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span>Bridges editoriais</span>
+                <strong>{payload?.telegram.metrics.editorialBridges || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span>Envios bem-sucedidos</span>
+                <strong>{payload?.telegram.metrics.sentPosts || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span>Falhas de envio</span>
+                <strong>{payload?.telegram.metrics.failedPosts || 0}</strong>
+              </div>
+              <div className="rounded-2xl border border-[#ece3d4] bg-[#fcfaf6] px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Papel oficial</p>
+                <p className="mt-2">{payload?.telegram.discipline.officialRole}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
+            <h2 className="text-lg font-semibold text-[#10261d]">Publicacoes recentes</h2>
+            <div className="mt-4 space-y-3">
+              {payload?.telegram.recentPosts?.length ? (
+                payload.telegram.recentPosts.slice(0, 5).map((post) => (
+                  <div key={post.id} className="rounded-2xl border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <strong className="text-sm text-[#10261d]">{post.title || "Publicacao sem titulo"}</strong>
+                      <Chip className={toneForFollowUp(post.status === "failed" ? "overdue" : "resolved")}>
+                        {post.status}
+                      </Chip>
+                    </div>
+                    <p className="mt-2 text-sm text-[#4e6057]">{post.bodyPreview}</p>
+                    <p className="mt-2 text-xs text-[#6f7f77]">
+                      {post.signalType || "sem sinal"} • {post.topic || "tema livre"} • {formatDateTime(post.postedAt || post.createdAt)}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-[#6b7b72]">
+                  O canal ainda nao tem publicacoes registradas por dentro do sistema.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -887,7 +1189,19 @@ async function sendHumanReply() {
                   >
                     <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] opacity-75">
                       <span>{message.senderType}</span>
-                      <span>{message.surface === "public_comment" ? "comentario" : message.surface === "direct_message" ? "dm" : "sistema"}</span>
+                      <span>
+                        {message.surface === "public_comment"
+                          ? "comentario"
+                          : message.surface === "direct_message"
+                            ? "dm"
+                            : message.surface === "telegram_private"
+                              ? "telegram privado"
+                              : message.surface === "telegram_group"
+                                ? "telegram grupo"
+                                : message.surface === "site_chat"
+                                  ? "site"
+                                  : "sistema"}
+                      </span>
                       <span>{message.sendStatus}</span>
                       <span>{formatDateTime(message.createdAt)}</span>
                     </div>
@@ -980,7 +1294,7 @@ async function sendHumanReply() {
                 />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-xs text-[#718179]">
-                    WhatsApp, Instagram e Site Chat operam com historico interno, ownership e handoff preservados nesta central.
+                    WhatsApp, Instagram, Site Chat e Telegram operam com historico interno, ownership e handoff preservados nesta central.
                   </p>
                   <button
                     type="button"
@@ -1029,6 +1343,19 @@ async function sendHumanReply() {
                   <p>Topico: {selectedThread.context.origin.topicLabel || selectedThread.context.social.topicLabel || "geral"}</p>
                   <p>Visitor stage: {selectedThread.context.origin.visitorStage || "anonimo"}</p>
                 </div>
+                {selectedThread.thread.channel === "telegram" ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Telegram</p>
+                    <p>Superficie: {selectedThread.context.telegram.surface || "unknown"}</p>
+                    <p>Grupo: {selectedThread.context.telegram.groupTitle || "nao aplicavel"}</p>
+                    <p>Username: {selectedThread.context.telegram.username || "nao identificado"}</p>
+                    <p>Relevancia: {selectedThread.context.telegram.relevance || "operacao privada"}</p>
+                    <p>
+                      Movimento para privado:{" "}
+                      {selectedThread.context.telegram.shouldMoveToPrivate ? "sim" : "nao"}
+                    </p>
+                  </div>
+                ) : null}
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Founder e comunidade</p>
                   <p>Founder: {selectedThread.context.founder.isFounder ? "sim" : "nao"}</p>
@@ -1201,8 +1528,16 @@ async function sendHumanReply() {
                 <strong>{payload?.metrics.siteVolume || 0}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume Telegram</span>
+                <strong>{payload?.metrics.telegramVolume || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> DMs / comentarios</span>
                 <strong>{`${payload?.metrics.instagramDmVolume || 0} / ${payload?.metrics.instagramCommentSignals || 0}`}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Telegram privado / grupo</span>
+                <strong>{`${payload?.metrics.telegramPrivateVolume || 0} / ${payload?.metrics.telegramGroupSignals || 0}`}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human Site</span>
@@ -1231,6 +1566,18 @@ async function sendHumanReply() {
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up social</span>
                 <strong>{payload?.metrics.instagramFollowUpPendingCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human Telegram</span>
+                <strong>{payload?.metrics.telegramWaitingHumanCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Handoff Telegram</span>
+                <strong>{payload?.metrics.telegramHandoffCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up Telegram</span>
+                <strong>{payload?.metrics.telegramFollowUpPendingCount || 0}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Mensagens falhadas</span>

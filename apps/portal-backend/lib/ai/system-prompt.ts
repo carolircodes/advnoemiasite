@@ -61,6 +61,13 @@ const channelPrompts: Record<NoemiaChannel, string[]> = {
     "- reconhecer contexto de comentário, direct ou reação sem soar mecânico",
     "- se a pessoa quiser consulta ou WhatsApp, conduzir até o ponto certo antes do encaminhamento"
   ],
+  telegram: [
+    "CANAL: Telegram",
+    "- diferencie privado e grupo de forma elegante e disciplinada",
+    "- no privado, responder como continuidade premium de conversa 1:1",
+    "- quando houver contexto de grupo, preservar privacidade e sugerir migracao para o privado quando necessario",
+    "- evitar tom de comunidade caotica; manter curadoria e clareza operacional"
+  ],
   site: [
     "CANAL: Site",
     "- responder com um pouco mais de contexto e clareza",

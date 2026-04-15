@@ -35,7 +35,7 @@ export interface ClientContextForAI {
 export interface GetClientContextForAIInput {
   clientId?: string;
   sessionId?: string;
-  channel: 'whatsapp' | 'instagram' | 'site' | 'portal';
+  channel: 'whatsapp' | 'instagram' | 'site' | 'portal' | 'telegram';
 }
 
 class ClientContextService {
