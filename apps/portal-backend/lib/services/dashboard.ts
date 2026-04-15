@@ -220,6 +220,177 @@ function createEmptyQueueMap(): StaffOperationalQueueMap {
   };
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return (
+    error?.code === "42703" ||
+    (typeof error?.message === "string" && error.message.includes("does not exist"))
+  );
+}
+
+async function loadCaseEvents(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+  const result = await supabase
+    .from("case_events")
+    .select(
+      "id,case_id,event_type,title,description,public_summary,occurred_at,visible_to_client,should_notify_client"
+    )
+    .order("occurred_at", { ascending: false })
+    .limit(100);
+
+  if (!isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyResult = await supabase
+    .from("case_events")
+    .select("id,case_id,event_type,title,description,public_summary,occurred_at,should_notify_client")
+    .order("occurred_at", { ascending: false })
+    .limit(100);
+
+  if (legacyResult.error) {
+    return legacyResult;
+  }
+
+  return {
+    data: (legacyResult.data || []).map((item) => ({
+      ...item,
+      visible_to_client:
+        typeof item.public_summary === "string" && item.public_summary.trim().length > 0,
+      should_notify_client: item.should_notify_client ?? true
+    })),
+    error: null
+  };
+}
+
+async function loadDocuments(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+  const result = await supabase
+    .from("documents")
+    .select(
+      "id,case_id,file_name,category,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
+    )
+    .order("document_date", { ascending: false })
+    .limit(100);
+
+  if (!isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyResult = await supabase
+    .from("documents")
+    .select("id,case_id,file_name,category,visibility,created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (legacyResult.error) {
+    return legacyResult;
+  }
+
+  return {
+    data: (legacyResult.data || []).map((item) => ({
+      ...item,
+      status: "recebido",
+      document_date: item.created_at,
+      storage_path: null,
+      mime_type: null,
+      file_size_bytes: null,
+      description: ""
+    })),
+    error: null
+  };
+}
+
+async function loadAppointments(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+  const result = await supabase
+    .from("appointments")
+    .select(
+      "id,case_id,client_id,title,appointment_type,status,visible_to_client,starts_at,notes,created_at,updated_at"
+    )
+    .order("starts_at", { ascending: true })
+    .limit(100);
+
+  if (!isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyResult = await supabase
+    .from("appointments")
+    .select("id,case_id,client_id,starts_at,notes,status,created_at,updated_at")
+    .order("starts_at", { ascending: true })
+    .limit(100);
+
+  if (legacyResult.error) {
+    return legacyResult;
+  }
+
+  return {
+    data: (legacyResult.data || []).map((item) => ({
+      ...item,
+      title: "Compromisso do caso",
+      appointment_type: "reuniao",
+      visible_to_client: true
+    })),
+    error: null
+  };
+}
+
+async function loadAppointmentHistory(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
+) {
+  const result = await supabase
+    .from("appointment_history")
+    .select(
+      "id,appointment_id,case_id,client_id,change_type,title,appointment_type,status,visible_to_client,starts_at,changed_fields,created_at"
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  return {
+    data: [],
+    error: null
+  };
+}
+
+async function loadConversationSessions(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
+) {
+  const result = await supabase
+    .from("conversation_sessions")
+    .select("id,thread_status,waiting_for,priority,owner_mode,follow_up_status,channel,last_message_at")
+    .order("updated_at", { ascending: false })
+    .limit(300);
+
+  if (!isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyResult = await supabase
+    .from("conversation_sessions")
+    .select("id,channel,handoff_to_human,last_inbound_at,last_outbound_at,updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(300);
+
+  if (legacyResult.error) {
+    return legacyResult;
+  }
+
+  return {
+    data: (legacyResult.data || []).map((item) => ({
+      id: item.id,
+      channel: item.channel,
+      thread_status: item.handoff_to_human ? "handoff" : "ai_active",
+      waiting_for: item.handoff_to_human ? "human" : "none",
+      priority: "medium",
+      owner_mode: item.handoff_to_human ? "hybrid" : "ai",
+      follow_up_status: "none",
+      last_message_at: item.last_inbound_at || item.last_outbound_at || item.updated_at || null
+    })),
+    error: null
+  };
+}
+
 export async function getStaffOverview() {
   const supabase = await createServerSupabaseClient();
   const [
@@ -247,20 +418,8 @@ export async function getStaffOverview() {
       )
       .order("created_at", { ascending: false })
       .limit(100),
-    supabase
-      .from("case_events")
-      .select(
-        "id,case_id,event_type,title,description,public_summary,occurred_at,visible_to_client,should_notify_client"
-      )
-      .order("occurred_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("documents")
-      .select(
-        "id,case_id,file_name,category,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
-      )
-      .order("document_date", { ascending: false })
-      .limit(100),
+    loadCaseEvents(supabase),
+    loadDocuments(supabase),
     supabase
       .from("document_requests")
       .select(
@@ -275,30 +434,14 @@ export async function getStaffOverview() {
       )
       .order("submitted_at", { ascending: false })
       .limit(100),
-    supabase
-      .from("appointments")
-      .select(
-        "id,case_id,client_id,title,appointment_type,status,visible_to_client,starts_at,notes,created_at,updated_at"
-      )
-      .order("starts_at", { ascending: true })
-      .limit(100),
-    supabase
-      .from("appointment_history")
-      .select(
-        "id,appointment_id,case_id,client_id,change_type,title,appointment_type,status,visible_to_client,starts_at,changed_fields,created_at"
-      )
-      .order("created_at", { ascending: false })
-      .limit(100),
+    loadAppointments(supabase),
+    loadAppointmentHistory(supabase),
     supabase
       .from("notifications_outbox")
       .select("id,status,template_key,created_at")
       .order("created_at", { ascending: false })
       .limit(100),
-    supabase
-      .from("conversation_sessions")
-      .select("id,thread_status,waiting_for,priority,owner_mode,follow_up_status,channel,last_message_at")
-      .order("updated_at", { ascending: false })
-      .limit(300)
+    loadConversationSessions(supabase)
     ]);
 
   if (clientsResult.error) {

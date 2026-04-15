@@ -56,6 +56,55 @@ type Suggestion = {
   href: string;
 };
 
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return (
+    error?.code === "42703" ||
+    (typeof error?.message === "string" && error.message.includes("does not exist"))
+  );
+}
+
+async function loadUpcomingAppointments(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  nowIso: string,
+  soonThreshold: string
+) {
+  const result = await supabase
+    .from("appointments")
+    .select("id,case_id,title,status,visible_to_client,starts_at")
+    .in("status", ["scheduled", "confirmed"])
+    .eq("visible_to_client", true)
+    .gte("starts_at", nowIso)
+    .lte("starts_at", soonThreshold)
+    .order("starts_at", { ascending: true })
+    .limit(1000);
+
+  if (!isMissingColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyResult = await supabase
+    .from("appointments")
+    .select("id,case_id,status,starts_at")
+    .in("status", ["scheduled", "confirmed"])
+    .gte("starts_at", nowIso)
+    .lte("starts_at", soonThreshold)
+    .order("starts_at", { ascending: true })
+    .limit(1000);
+
+  if (legacyResult.error) {
+    return legacyResult;
+  }
+
+  return {
+    data: (legacyResult.data || []).map((item) => ({
+      ...item,
+      title: "Compromisso do caso",
+      visible_to_client: true
+    })),
+    error: null
+  };
+}
+
 type ProductEventRecord = {
   id: string;
   event_key: string;
@@ -195,15 +244,7 @@ export async function getBusinessIntelligenceOverview(rawDays = 30) {
       .eq("visible_to_client", true)
       .order("created_at", { ascending: false })
       .limit(1000),
-    supabase
-      .from("appointments")
-      .select("id,case_id,title,status,visible_to_client,starts_at")
-      .in("status", ["scheduled", "confirmed"])
-      .eq("visible_to_client", true)
-      .gte("starts_at", now.toISOString())
-      .lte("starts_at", soonThreshold)
-      .order("starts_at", { ascending: true })
-      .limit(1000),
+    loadUpcomingAppointments(supabase, now.toISOString(), soonThreshold),
     supabase
       .from("notifications_outbox")
       .select("id,template_key,status,created_at,related_table")
