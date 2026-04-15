@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { sendInstagramDirectMessage } from "../meta/instagram-service";
 import { sendWhatsAppMessage } from "../meta/whatsapp-service";
+import { sendSiteChatMessage } from "../site/site-chat-service";
 
 type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal";
 type ThreadStatus =
@@ -209,7 +210,7 @@ export type ConversationThreadListItem = {
   id: string;
   channel: ConversationChannel;
   channelLabel: string;
-  threadOriginType: "dm" | "comment" | "comment_to_dm" | "unknown";
+  threadOriginType: "dm" | "comment" | "comment_to_dm" | "site_chat" | "unknown";
   threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
@@ -254,7 +255,7 @@ export type ConversationThreadDetail = {
     senderType: "contact" | "ai" | "human" | "system";
     sendStatus: string;
     messageType: string;
-    surface: "direct_message" | "public_comment" | "system";
+    surface: "direct_message" | "public_comment" | "site_chat" | "system";
     socialOrigin: string | null;
     createdAt: string;
     isRead: boolean;
@@ -319,6 +320,23 @@ export type ConversationThreadDetail = {
       operatorAction: string | null;
       rationale: string | null;
     };
+    origin: {
+      sourceLabel: string | null;
+      visitorStage: string | null;
+      sessionId: string | null;
+      pagePath: string | null;
+      pageTitle: string | null;
+      articleTitle: string | null;
+      ctaLabel: string | null;
+      campaignLabel: string | null;
+      topicLabel: string | null;
+      contentId: string | null;
+      referrer: string | null;
+      acquisitionTags: string[];
+      utmSource: string | null;
+      utmMedium: string | null;
+      utmCampaign: string | null;
+    };
   };
   events: Array<{
     id: string;
@@ -360,6 +378,12 @@ export type ConversationInboxMetrics = {
   instagramFollowUpPendingCount: number;
   instagramHotThreads: number;
   founderOrWaitlistInstagramThreads: number;
+  siteVolume: number;
+  siteWaitingHumanCount: number;
+  siteHandoffCount: number;
+  siteFollowUpPendingCount: number;
+  siteHotThreads: number;
+  siteQualifiedThreads: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
   failedMessagesCount: number;
@@ -425,6 +449,7 @@ function getChannelLabel(channel: ConversationChannel) {
 
 function inferThreadOrigin(session: SessionRow) {
   const socialAcquisition = safeObject(session.metadata?.social_acquisition);
+  const siteOrigin = safeObject(session.metadata?.site_origin);
   const entryType = asString(socialAcquisition.entryType);
 
   if (entryType === "instagram_comment") {
@@ -437,6 +462,13 @@ function inferThreadOrigin(session: SessionRow) {
 
   if (entryType === "instagram_dm") {
     return { type: "dm" as const, label: "DM oficial" };
+  }
+
+  if (session.channel === "site") {
+    return {
+      type: "site_chat" as const,
+      label: asString(siteOrigin.ctaLabel) ? "Chat do site com CTA" : "Chat do site"
+    };
   }
 
   return {
@@ -496,6 +528,10 @@ function buildEventSummary(event: EventRow) {
       return "Comentario do Instagram encaminhado para revisao humana.";
     case "instagram_comment_dm_started":
       return "Comentario publico ganhou continuidade privada no direct.";
+    case "site_context_captured":
+      return "Origem, CTA e contexto de navegacao capturados no site.";
+    case "site_handoff_requested":
+      return "Thread do site sinalizada para handoff humano.";
     default:
       return asString(data.summary) || "Evento operacional registrado.";
   }
@@ -982,6 +1018,22 @@ class ConversationInboxService {
         accumulator.instagramHotThreads += item.channel === "instagram" && item.hot ? 1 : 0;
         accumulator.founderOrWaitlistInstagramThreads +=
           item.channel === "instagram" && (item.hasFounderContext || item.hasWaitlistContext) ? 1 : 0;
+        accumulator.siteVolume += item.channel === "site" ? 1 : 0;
+        accumulator.siteWaitingHumanCount += item.channel === "site" && item.waitingFor === "human" ? 1 : 0;
+        accumulator.siteHandoffCount +=
+          item.channel === "site" && (item.handoffState === "active" || item.threadStatus === "handoff")
+            ? 1
+            : 0;
+        accumulator.siteFollowUpPendingCount +=
+          item.channel === "site" && ["pending", "due", "overdue"].includes(item.followUpStatus)
+            ? 1
+            : 0;
+        accumulator.siteHotThreads += item.channel === "site" && item.hot ? 1 : 0;
+        accumulator.siteQualifiedThreads +=
+          item.channel === "site" &&
+          ["qualified", "triage", "engaged", "handoff"].includes(item.leadStage || "")
+            ? 1
+            : 0;
         return accumulator;
       },
       {
@@ -1006,6 +1058,12 @@ class ConversationInboxService {
         instagramFollowUpPendingCount: 0,
         instagramHotThreads: 0,
         founderOrWaitlistInstagramThreads: 0,
+        siteVolume: 0,
+        siteWaitingHumanCount: 0,
+        siteHandoffCount: 0,
+        siteFollowUpPendingCount: 0,
+        siteHotThreads: 0,
+        siteQualifiedThreads: 0,
         firstResponseTimeMinutes: average(firstResponseTimes),
         humanResponseTimeMinutes: average(humanResponseTimes),
         failedMessagesCount: (messageStatusRows || []).filter((row) => row.send_status === "failed").length,
@@ -1045,6 +1103,7 @@ class ConversationInboxService {
     const profile = client?.profile_id ? bundle.profilesById.get(client.profile_id) || null : null;
     const triage = bundle.triageBySession.get(threadId) || null;
     const socialAcquisition = safeObject((session as SessionRow).metadata?.social_acquisition);
+    const siteOrigin = safeObject((session as SessionRow).metadata?.site_origin);
     const publicCommentPolicy = safeObject((session as SessionRow).metadata?.public_comment_policy);
     const appointments = resolvedClientId
       ? bundle.appointmentsByClientId.get(resolvedClientId) || []
@@ -1115,6 +1174,9 @@ class ConversationInboxService {
         surface:
           asString(message.metadata_json?.responseSurface) === "public_comment"
             ? "public_comment"
+            : asString(message.metadata_json?.responseSurface) === "site_chat" ||
+                message.message_type === "site_chat"
+              ? "site_chat"
             : message.message_type === "system_event"
               ? "system"
               : "direct_message",
@@ -1198,6 +1260,23 @@ class ConversationInboxService {
           publicCommentSafety: asString(publicCommentPolicy.safetyDecision),
           operatorAction: asString(publicCommentPolicy.operatorAction),
           rationale: asString(publicCommentPolicy.rationale)
+        },
+        origin: {
+          sourceLabel: asString(siteOrigin.sourceLabel),
+          visitorStage: asString(siteOrigin.visitorStage),
+          sessionId: asString(siteOrigin.sessionId) || (session as SessionRow).external_user_id,
+          pagePath: asString(siteOrigin.pagePath),
+          pageTitle: asString(siteOrigin.pageTitle),
+          articleTitle: asString(siteOrigin.articleTitle),
+          ctaLabel: asString(siteOrigin.ctaLabel),
+          campaignLabel: asString(siteOrigin.campaignLabel),
+          topicLabel: asString(siteOrigin.topicLabel),
+          contentId: asString(siteOrigin.contentId),
+          referrer: asString(siteOrigin.referrer),
+          acquisitionTags: safeArray(siteOrigin.acquisitionTags).map((tag) => String(tag)),
+          utmSource: asString(siteOrigin.utmSource),
+          utmMedium: asString(siteOrigin.utmMedium),
+          utmCampaign: asString(siteOrigin.utmCampaign)
         }
       },
       events: ((eventsData || []) as EventRow[]).map((event) => ({
@@ -1265,10 +1344,28 @@ class ConversationInboxService {
               responseType: "human_reply",
               reason: "internal_inbox_manual_reply"
             })
-          : null;
+          : detail.thread.channel === "site"
+            ? await sendSiteChatMessage(content, {
+                sessionId: detail.context.origin.sessionId || detail.thread.contactLabel,
+                threadId: input.threadId,
+                origin: {
+                  sessionId: detail.context.origin.sessionId || undefined,
+                  pagePath: detail.context.origin.pagePath || undefined,
+                  ctaLabel: detail.context.origin.ctaLabel || undefined,
+                  source: detail.context.origin.sourceLabel || undefined,
+                  visitorStage:
+                    detail.context.origin.visitorStage === "anonymous_visitor" ||
+                    detail.context.origin.visitorStage === "known_lead" ||
+                    detail.context.origin.visitorStage === "authenticated_client" ||
+                    detail.context.origin.visitorStage === "staff"
+                      ? detail.context.origin.visitorStage
+                      : undefined
+                }
+              })
+            : null;
 
     if (!sendResult) {
-      throw new Error("A resposta manual pelo painel esta disponivel apenas para WhatsApp e Instagram.");
+      throw new Error("A resposta manual pelo painel esta disponivel apenas para WhatsApp, Instagram e Site Chat.");
     }
     const sendSucceeded = "success" in sendResult ? sendResult.success : sendResult.ok;
     const outboundMessageId = "messageId" in sendResult ? sendResult.messageId || null : null;
@@ -1287,7 +1384,12 @@ class ConversationInboxService {
         authored_name: input.authorName,
         channel: detail.thread.channel
       },
-      message_type: detail.thread.channel === "instagram" ? "social_dm" : "text",
+      message_type:
+        detail.thread.channel === "instagram"
+          ? "social_dm"
+          : detail.thread.channel === "site"
+            ? "site_chat"
+            : "text",
       sender_type: "human",
       send_status: sendSucceeded ? "sent" : "failed",
       delivery_status: sendSucceeded ? "accepted" : "failed",
@@ -1315,7 +1417,9 @@ class ConversationInboxService {
         sendResult.error ||
           (detail.thread.channel === "instagram"
             ? "Falha ao enviar resposta humana pelo Instagram."
-            : "Falha ao enviar resposta humana pelo WhatsApp.")
+            : detail.thread.channel === "site"
+              ? "Falha ao registrar resposta humana no Site Chat."
+              : "Falha ao enviar resposta humana pelo WhatsApp.")
       );
     }
 

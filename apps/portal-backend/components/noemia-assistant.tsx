@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 type ChatMessage = {
+  id: string;
   role: "user" | "assistant";
   content: string;
 };
@@ -12,6 +13,9 @@ type NoemiaAssistantProps = {
   displayName: string;
   suggestedPrompts: string[];
   currentPath?: string;
+  ctaLabel?: string;
+  articleTitle?: string;
+  contentId?: string;
 };
 
 const audienceCopy = {
@@ -57,23 +61,133 @@ const audienceCopy = {
   }
 } as const;
 
+const SITE_SESSION_STORAGE_KEY = "noemia_site_chat_session_id";
+
+function buildBrowserSessionId() {
+  if (typeof window !== "undefined" && typeof window.crypto?.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+
+  return `site-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function NoemiaAssistant({
   audience,
   displayName,
   suggestedPrompts,
-  currentPath = "/noemia"
+  currentPath = "/noemia",
+  ctaLabel,
+  articleTitle,
+  contentId
 }: NoemiaAssistantProps) {
   const copy = audienceCopy[audience];
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content: copy.welcome
-    }
-  ]);
+  const welcomeMessage = {
+    id: "welcome",
+    role: "assistant" as const,
+    content: copy.welcome
+  };
+  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const [lastSuccess, setLastSuccess] = useState(false);
+  const [siteSessionId, setSiteSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (audience !== "visitor" || typeof window === "undefined") {
+      return;
+    }
+
+    const stored = window.localStorage.getItem(SITE_SESSION_STORAGE_KEY);
+    const nextSessionId = stored || buildBrowserSessionId();
+    if (!stored) {
+      window.localStorage.setItem(SITE_SESSION_STORAGE_KEY, nextSessionId);
+    }
+    setSiteSessionId(nextSessionId);
+  }, [audience]);
+
+  useEffect(() => {
+    if (audience !== "visitor" || !siteSessionId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function syncConversation() {
+      const activeSessionId = siteSessionId;
+      if (!activeSessionId) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/noemia/chat?sessionId=${encodeURIComponent(activeSessionId)}`, {
+          cache: "no-store"
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result?.ok || !Array.isArray(result?.data?.messages)) {
+          return;
+        }
+
+        const serverMessages = result.data.messages.map(
+          (message: { id: string; role: "user" | "assistant"; content: string }) => ({
+            id: message.id,
+            role: message.role,
+            content: message.content
+          })
+        );
+
+        if (!cancelled) {
+          setMessages(serverMessages.length ? [welcomeMessage, ...serverMessages] : [welcomeMessage]);
+        }
+      } catch {
+        // Polling de sincronizacao fica silencioso para nao poluir a UX.
+      }
+    }
+
+    void syncConversation();
+    const interval = window.setInterval(() => {
+      void syncConversation();
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [audience, siteSessionId, welcomeMessage.content]);
+
+  function buildPayload(cleanMessage: string, nextHistory: ChatMessage[]) {
+    const url =
+      typeof window !== "undefined" ? new URL(window.location.href) : new URL(`https://app.local${currentPath}`);
+    const urlParams = Object.fromEntries(url.searchParams.entries());
+
+    return {
+      audience,
+      channel: audience === "visitor" ? "site" : "portal",
+      currentPath,
+      message: cleanMessage,
+      sessionId: audience === "visitor" ? siteSessionId : undefined,
+      history: nextHistory
+        .filter((message) => message.id !== "welcome")
+        .slice(-8)
+        .map((message) => ({ role: message.role, content: message.content })),
+      currentUrl: typeof window !== "undefined" ? window.location.href : undefined,
+      referrer: typeof document !== "undefined" ? document.referrer : undefined,
+      pageTitle: typeof document !== "undefined" ? document.title : undefined,
+      articleTitle,
+      ctaLabel,
+      contentId,
+      urlParams,
+      metaContext: {
+        tema: urlParams.tema || "",
+        origem: urlParams.origem || urlParams.source || "site",
+        campanha: urlParams.campanha || urlParams.utm_campaign || "",
+        video: urlParams.video || "",
+        sessionId: audience === "visitor" ? siteSessionId || "" : "",
+        timestamp: Date.now()
+      }
+    };
+  }
 
   function sendMessage(nextMessage: string) {
     const cleanMessage = nextMessage.trim();
@@ -85,7 +199,12 @@ export function NoemiaAssistant({
 
     setError("");
     setLastSuccess(false);
-    const nextHistory = [...messages, { role: "user" as const, content: cleanMessage }];
+    const userMessage = {
+      id: `local-user-${Date.now()}`,
+      role: "user" as const,
+      content: cleanMessage
+    };
+    const nextHistory = [...messages, userMessage];
     setMessages(nextHistory);
     setDraft("");
 
@@ -96,12 +215,7 @@ export function NoemiaAssistant({
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            audience,
-            currentPath,
-            message: cleanMessage,
-            history: nextHistory.slice(-8)
-          })
+          body: JSON.stringify(buildPayload(cleanMessage, nextHistory))
         });
         const result = await response.json().catch(() => ({}));
 
@@ -110,10 +224,16 @@ export function NoemiaAssistant({
           return;
         }
 
+        if (audience === "visitor" && typeof result?.sessionId === "string" && result.sessionId) {
+          window.localStorage.setItem(SITE_SESSION_STORAGE_KEY, result.sessionId);
+          setSiteSessionId(result.sessionId);
+        }
+
         setLastSuccess(true);
         setMessages((current) => [
           ...current,
           {
+            id: `local-assistant-${Date.now()}`,
             role: "assistant",
             content: result.answer
           }
@@ -165,7 +285,7 @@ export function NoemiaAssistant({
       <div className="conversation-feed">
         {messages.map((message, index) => (
           <article
-            key={`${message.role}-${index}`}
+            key={`${message.id}-${index}`}
             className={message.role === "assistant" ? "chat-bubble assistant" : "chat-bubble user"}
           >
             <span>{message.role === "assistant" ? "NoemIA" : displayName}</span>

@@ -35,6 +35,12 @@ type Metrics = {
   instagramFollowUpPendingCount: number;
   instagramHotThreads: number;
   founderOrWaitlistInstagramThreads: number;
+  siteVolume: number;
+  siteWaitingHumanCount: number;
+  siteHandoffCount: number;
+  siteFollowUpPendingCount: number;
+  siteHotThreads: number;
+  siteQualifiedThreads: number;
   firstResponseTimeMinutes: number | null;
   humanResponseTimeMinutes: number | null;
   failedMessagesCount: number;
@@ -46,7 +52,7 @@ type ThreadItem = {
   id: string;
   channel: "instagram" | "whatsapp" | "site" | "portal";
   channelLabel: string;
-  threadOriginType: "dm" | "comment" | "comment_to_dm" | "unknown";
+  threadOriginType: "dm" | "comment" | "comment_to_dm" | "site_chat" | "unknown";
   threadOriginLabel: string;
   displayName: string;
   contactLabel: string;
@@ -91,7 +97,7 @@ type ThreadDetail = {
     senderType: "contact" | "ai" | "human" | "system";
     sendStatus: string;
     messageType: string;
-    surface: "direct_message" | "public_comment" | "system";
+    surface: "direct_message" | "public_comment" | "site_chat" | "system";
     socialOrigin: string | null;
     createdAt: string;
     isRead: boolean;
@@ -155,6 +161,23 @@ type ThreadDetail = {
       publicCommentSafety: string | null;
       operatorAction: string | null;
       rationale: string | null;
+    };
+    origin: {
+      sourceLabel: string | null;
+      visitorStage: string | null;
+      sessionId: string | null;
+      pagePath: string | null;
+      pageTitle: string | null;
+      articleTitle: string | null;
+      ctaLabel: string | null;
+      campaignLabel: string | null;
+      topicLabel: string | null;
+      contentId: string | null;
+      referrer: string | null;
+      acquisitionTags: string[];
+      utmSource: string | null;
+      utmMedium: string | null;
+      utmCampaign: string | null;
     };
   };
   events: Array<{
@@ -251,12 +274,20 @@ function toneForChannel(channel: string) {
     return "border-[#cfe5d3] bg-[#effaf1] text-[#2f6c45]";
   }
 
+  if (channel === "site") {
+    return "border-[#d9d0be] bg-[#f8f3ea] text-[#6b5a3d]";
+  }
+
   return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
 }
 
 function toneForSurface(surface: string) {
   if (surface === "public_comment") {
     return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
+  }
+
+  if (surface === "site_chat") {
+    return "border-[#ddd4c3] bg-[#faf6ef] text-[#6a5840]";
   }
 
   if (surface === "direct_message") {
@@ -552,8 +583,9 @@ async function sendHumanReply() {
               Central premium de conversas da NoemIA
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#5e6e65]">
-              WhatsApp e Instagram agora entram como canais operacionais reais, com thread unica,
-              sinais sociais legiveis, handoff premium e leitura executiva sem bagunca.
+              WhatsApp, Instagram e Site Chat agora entram como canais operacionais reais, com
+              thread unica, contexto de origem legivel, handoff premium e leitura executiva sem
+              bagunca.
             </p>
           </div>
           <button
@@ -574,7 +606,7 @@ async function sendHumanReply() {
         <MetricCard label="Threads quentes" value={payload?.metrics.hotThreads || 0} icon={<Flame className="h-5 w-5" />} />
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
         <button
           type="button"
           onClick={() => setFilters((current) => ({ ...current, inboxMode: "needs_human", waitingFor: "human" }))}
@@ -610,6 +642,15 @@ async function sendHumanReply() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Instagram</p>
           <p className="mt-2 text-lg font-semibold text-[#10261d]">DMs e sinais sociais</p>
           <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.instagramVolume || 0} threads Instagram na central.</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({ ...current, channel: "site" }))}
+          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Site Chat</p>
+          <p className="mt-2 text-lg font-semibold text-[#10261d]">Leads em tempo real</p>
+          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.siteVolume || 0} threads do site na central.</p>
         </button>
         <button
           type="button"
@@ -658,6 +699,7 @@ async function sendHumanReply() {
             <option value="all">Todos os canais</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="instagram">Instagram</option>
+            <option value="site">Site Chat</option>
           </select>
           <select
             value={filters.waitingFor}
@@ -757,7 +799,15 @@ async function sendHumanReply() {
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#4b5d55]">{thread.preview}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Chip className={toneForChannel(thread.channel)}>{thread.channelLabel}</Chip>
-                    <Chip className={toneForSurface(thread.threadOriginType === "comment" ? "public_comment" : "direct_message")}>
+                    <Chip
+                      className={toneForSurface(
+                        thread.threadOriginType === "comment"
+                          ? "public_comment"
+                          : thread.threadOriginType === "site_chat"
+                            ? "site_chat"
+                            : "direct_message"
+                      )}
+                    >
                       {thread.threadOriginLabel}
                     </Chip>
                     <Chip className={toneForPriority(thread.priority)}>{thread.priority}</Chip>
@@ -797,7 +847,15 @@ async function sendHumanReply() {
                   <Chip className={toneForChannel(selectedThread.thread.channel)}>
                     {selectedThread.thread.channelLabel}
                   </Chip>
-                  <Chip className={toneForSurface(selectedThread.thread.threadOriginType === "comment" ? "public_comment" : "direct_message")}>
+                  <Chip
+                    className={toneForSurface(
+                      selectedThread.thread.threadOriginType === "comment"
+                        ? "public_comment"
+                        : selectedThread.thread.threadOriginType === "site_chat"
+                          ? "site_chat"
+                          : "direct_message"
+                    )}
+                  >
                     {selectedThread.thread.threadOriginLabel}
                   </Chip>
                   <Chip className={toneForOwner(selectedThread.thread.ownerMode)}>
@@ -922,7 +980,7 @@ async function sendHumanReply() {
                 />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-xs text-[#718179]">
-                    WhatsApp e Instagram operam com historico interno, ownership e handoff preservados nesta central.
+                    WhatsApp, Instagram e Site Chat operam com historico interno, ownership e handoff preservados nesta central.
                   </p>
                   <button
                     type="button"
@@ -962,12 +1020,14 @@ async function sendHumanReply() {
                   <p>Intento atual: {selectedThread.context.lead.currentIntent || "Sem leitura"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Origem social</p>
-                  <p>Entrada: {selectedThread.context.social.sourceLabel || "sem leitura social"}</p>
-                  <p>Tipo: {selectedThread.context.social.entryType || "nao classificado"}</p>
-                  <p>Topico: {selectedThread.context.social.topicLabel || "geral"}</p>
-                  <p>Conteudo: {selectedThread.context.social.contentLabel || "nao identificado"}</p>
-                  <p>Campanha: {selectedThread.context.social.campaignLabel || "organico"}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Origem e navegacao</p>
+                  <p>Canal de entrada: {selectedThread.context.origin.sourceLabel || selectedThread.context.social.sourceLabel || "sem leitura"}</p>
+                  <p>Pagina: {selectedThread.context.origin.pagePath || "nao identificada"}</p>
+                  <p>Artigo: {selectedThread.context.origin.articleTitle || selectedThread.context.social.contentLabel || "nao identificado"}</p>
+                  <p>CTA: {selectedThread.context.origin.ctaLabel || "nao identificado"}</p>
+                  <p>Campanha: {selectedThread.context.origin.campaignLabel || selectedThread.context.social.campaignLabel || "organico"}</p>
+                  <p>Topico: {selectedThread.context.origin.topicLabel || selectedThread.context.social.topicLabel || "geral"}</p>
+                  <p>Visitor stage: {selectedThread.context.origin.visitorStage || "anonimo"}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Founder e comunidade</p>
@@ -1001,6 +1061,17 @@ async function sendHumanReply() {
                     <p>
                       Decisao: {selectedThread.context.social.publicCommentDecision || "sem politica"} •
                       transicao {selectedThread.context.social.directTransitionStatus || "n/a"}
+                    </p>
+                  </div>
+                ) : null}
+                {selectedThread.context.origin.referrer || selectedThread.context.origin.utmSource ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Aquisicao</p>
+                    <p>Referrer: {selectedThread.context.origin.referrer || "direto"}</p>
+                    <p>
+                      UTM: {selectedThread.context.origin.utmSource || "n/a"} /{" "}
+                      {selectedThread.context.origin.utmMedium || "n/a"} /{" "}
+                      {selectedThread.context.origin.utmCampaign || "n/a"}
                     </p>
                   </div>
                 ) : null}
@@ -1126,8 +1197,28 @@ async function sendHumanReply() {
                 <strong>{payload?.metrics.instagramVolume || 0}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume Site</span>
+                <strong>{payload?.metrics.siteVolume || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> DMs / comentarios</span>
                 <strong>{`${payload?.metrics.instagramDmVolume || 0} / ${payload?.metrics.instagramCommentSignals || 0}`}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human Site</span>
+                <strong>{payload?.metrics.siteWaitingHumanCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Handoff Site</span>
+                <strong>{payload?.metrics.siteHandoffCount || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Site quente / qualificado</span>
+                <strong>{`${payload?.metrics.siteHotThreads || 0} / ${payload?.metrics.siteQualifiedThreads || 0}`}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
+                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up Site</span>
+                <strong>{payload?.metrics.siteFollowUpPendingCount || 0}</strong>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human IG</span>
