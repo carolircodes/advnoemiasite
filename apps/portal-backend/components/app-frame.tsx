@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { TrackedLink } from "@/components/tracked-link";
+import { LEGAL_CONTACT_EMAIL, PUBLIC_SITE_LEGAL_LINKS } from "@/lib/public-site";
 
 type Action = {
   href: string;
@@ -136,6 +137,29 @@ export function AppFrame({
         ) : null}
       </header>
       <main className="page-grid">{children}</main>
+      <footer className="site-footer" aria-label="Rodape institucional">
+        <div className="site-footer-copy">
+          <span className="site-footer-eyebrow">Informacoes institucionais</span>
+          <strong>Noemia Paixao Advocacia</strong>
+          <p>
+            Atendimento juridico com comunicacao clara, fluxos organizados e canais
+            oficiais integrados ao ecossistema digital do escritorio.
+          </p>
+        </div>
+        <div className="site-footer-links">
+          {PUBLIC_SITE_LEGAL_LINKS.map((item) => (
+            <Link key={item.href} href={item.href} className="site-footer-link">
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <div className="site-footer-contact">
+          <span className="site-footer-eyebrow">Contato institucional</span>
+          <a href={`mailto:${LEGAL_CONTACT_EMAIL}`} className="site-footer-link">
+            {LEGAL_CONTACT_EMAIL}
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
