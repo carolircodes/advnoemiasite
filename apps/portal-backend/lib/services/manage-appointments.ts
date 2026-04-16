@@ -43,13 +43,13 @@ type AppointmentContext = {
   };
   clientRecord: {
     id: string;
-    profile_id: string;
+    profile_id: string | null;
   };
   profileRecord: {
     id: string;
     email: string | null;
     full_name: string | null;
-  };
+  } | null;
 };
 
 function formatAppointmentDateTime(value: string) {
@@ -235,14 +235,20 @@ async function resolveCaseContext(caseId: string) {
     throw new Error(clientError?.message || "Cliente nao encontrado para este caso.");
   }
 
-  const { data: profileRecord, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,email,full_name")
-    .eq("id", clientRecord.profile_id)
-    .single();
+  let profileRecord: AppointmentContext["profileRecord"] = null;
 
-  if (profileError || !profileRecord) {
-    throw new Error(profileError?.message || "Perfil do cliente nao encontrado.");
+  if (clientRecord.profile_id) {
+    const { data, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email,full_name")
+      .eq("id", clientRecord.profile_id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new Error(profileError.message || "Perfil do cliente nao encontrado.");
+    }
+
+    profileRecord = data || null;
   }
 
   return {
@@ -290,14 +296,20 @@ async function resolveAppointmentContext(appointmentId: string): Promise<Appoint
     throw new Error(clientError?.message || "Cliente nao encontrado para este compromisso.");
   }
 
-  const { data: profileRecord, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,email,full_name")
-    .eq("id", clientRecord.profile_id)
-    .single();
+  let profileRecord: AppointmentContext["profileRecord"] = null;
 
-  if (profileError || !profileRecord) {
-    throw new Error(profileError?.message || "Perfil do cliente nao encontrado.");
+  if (clientRecord.profile_id) {
+    const { data, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email,full_name")
+      .eq("id", clientRecord.profile_id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new Error(profileError.message || "Perfil do cliente nao encontrado.");
+    }
+
+    profileRecord = data || null;
   }
 
   return {
@@ -655,7 +667,7 @@ export async function registerCaseAppointment(rawInput: unknown, actorProfileId:
       actorProfileId
     });
 
-    if (currentState.visibleToClient) {
+      if (currentState.visibleToClient && profileRecord) {
       const activity = await createVisibleAppointmentActivity({
         changeType: "created",
         currentState,
@@ -778,7 +790,7 @@ export async function updateCaseAppointment(rawInput: unknown, actorProfileId: s
       actorProfileId
     });
 
-    if (currentState.visibleToClient) {
+      if (currentState.visibleToClient && context.profileRecord) {
       const activity = await createVisibleAppointmentActivity({
         changeType,
         currentState,

@@ -10,6 +10,7 @@ import {
 import { getRevenueOfferByCode } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 import { commercialClosingService } from "@/lib/services/commercial-closing";
+import { commercialAppointmentService } from "@/lib/services/commercial-appointment";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type PaymentWebhookContext = {
@@ -332,25 +333,27 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
 
     const { offerCode, leadId } = reference;
 
-    const { data: existingPayment } = await supabase
+    const { data: existingApprovedPayment } = await supabase
       .from("payments")
       .select("*")
       .eq("lead_id", leadId)
       .eq("status", "approved")
       .single();
 
-    if (existingPayment) {
-      console.log("[payment.webhook] Payment already processed", {
-        paymentId: paymentInfo.id
-      });
-      return;
-    }
+    const previousPayment =
+      existingApprovedPayment ||
+      (await findPaymentRecordForWebhook(
+        supabase,
+        leadId,
+        paymentInfo.external_reference
+      ));
 
-    const previousPayment = await findPaymentRecordForWebhook(
-      supabase,
-      leadId,
-      paymentInfo.external_reference
-    );
+    if (existingApprovedPayment) {
+      console.log("[payment.webhook] Payment already processed; replaying reconciliation", {
+        paymentId: paymentInfo.id,
+        leadId
+      });
+    }
 
     if (!previousPayment?.id) {
       console.error("[payment.webhook] Payment record not found for approval", {
@@ -369,7 +372,7 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
         payment_type_id: paymentInfo.payment_type_id,
         status_detail: paymentInfo.status_detail,
         transaction_amount: paymentInfo.transaction_amount,
-        approved_at: new Date().toISOString(),
+        approved_at: previousPayment.approved_at || new Date().toISOString(),
         metadata: mergeMercadoPagoMetadata(previousPayment?.metadata, paymentInfo)
       })
       .eq("id", previousPayment?.id)
@@ -411,7 +414,7 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
             : null;
 
       if (profileId) {
-        await commercialClosingService.syncPipelineClosingFromProfile({
+        const assessment = await commercialClosingService.syncPipelineClosingFromProfile({
           profileId,
           payload: {
             paymentState: "approved",
@@ -423,6 +426,14 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
                 : null
           }
         });
+
+        if (assessment?.pipelineId) {
+          await commercialAppointmentService.syncFormalConsultation({
+            pipelineId: assessment.pipelineId,
+            source: "payment_webhook",
+            createEvent: false
+          });
+        }
       }
     } catch (closingSyncError) {
       console.error("[payment.webhook] Failed to sync approved closing state", {
@@ -598,7 +609,7 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
             : null;
 
       if (profileId) {
-        await commercialClosingService.syncPipelineClosingFromProfile({
+        const assessment = await commercialClosingService.syncPipelineClosingFromProfile({
           profileId,
           payload: {
             paymentState: "failed",
@@ -606,6 +617,14 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
             paymentReference: String(paymentInfo.id)
           }
         });
+
+        if (assessment?.pipelineId) {
+          await commercialAppointmentService.syncFormalConsultation({
+            pipelineId: assessment.pipelineId,
+            source: "payment_webhook",
+            createEvent: false
+          });
+        }
       }
     } catch (closingSyncError) {
       console.error("[payment.webhook] Failed to sync rejected closing state", {
@@ -707,7 +726,7 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
             : null;
 
       if (profileId) {
-        await commercialClosingService.syncPipelineClosingFromProfile({
+        const assessment = await commercialClosingService.syncPipelineClosingFromProfile({
           profileId,
           payload: {
             paymentState: "pending",
@@ -715,6 +734,14 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
             paymentReference: String(paymentInfo.id)
           }
         });
+
+        if (assessment?.pipelineId) {
+          await commercialAppointmentService.syncFormalConsultation({
+            pipelineId: assessment.pipelineId,
+            source: "payment_webhook",
+            createEvent: false
+          });
+        }
       }
     } catch (closingSyncError) {
       console.error("[payment.webhook] Failed to sync pending closing state", {

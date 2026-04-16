@@ -26,7 +26,7 @@ type CaseRecord = {
 
 type ClientRecord = {
   id: string;
-  profile_id: string;
+  profile_id: string | null;
 };
 
 type ProfileRecord = {
@@ -76,20 +76,26 @@ async function resolveClientContext(clientId: string) {
     throw new Error(clientError?.message || "Cliente nao encontrado para esta operacao.");
   }
 
-  const { data: profileRecord, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,email,full_name")
-    .eq("id", clientRecord.profile_id)
-    .single();
+  let profileRecord: ProfileRecord | null = null;
 
-  if (profileError || !profileRecord) {
-    throw new Error(profileError?.message || "Perfil do cliente nao encontrado.");
+  if (clientRecord.profile_id) {
+    const { data, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email,full_name")
+      .eq("id", clientRecord.profile_id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new Error(profileError.message || "Perfil do cliente nao encontrado.");
+    }
+
+    profileRecord = (data as ProfileRecord | null) || null;
   }
 
   return {
     supabase,
     clientRecord: clientRecord as ClientRecord,
-    profileRecord: profileRecord as ProfileRecord
+    profileRecord
   };
 }
 
@@ -316,7 +322,7 @@ export async function createCaseForClient(rawInput: unknown, actorProfileId: str
   let notificationId: string | null = null;
 
   try {
-    if (visibleToClient) {
+    if (visibleToClient && profileRecord) {
       const areaLabel = caseAreaLabels[input.area];
       const statusLabel = caseStatusLabels[input.status];
       const activity = await createVisibleCaseEvent({
@@ -460,7 +466,7 @@ export async function updateCaseDetails(rawInput: unknown, actorProfileId: strin
   let notificationId: string | null = null;
 
   try {
-    if (visibleToClient) {
+    if (visibleToClient && profileRecord) {
       const activity = await createVisibleCaseEvent({
         caseId: caseRecord.id,
         clientId: clientRecord.id,
@@ -577,7 +583,7 @@ export async function updateCaseStatus(rawInput: unknown, actorProfileId: string
       ? input.internalNote || `O status do seu caso foi atualizado para ${nextStatusLabel}.`
       : "";
 
-    if (visibleToClient) {
+    if (visibleToClient && profileRecord) {
       const activity = await createVisibleCaseEvent({
         caseId: caseRecord.id,
         clientId: clientRecord.id,

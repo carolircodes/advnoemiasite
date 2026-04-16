@@ -222,6 +222,13 @@ type ThreadDetail = {
       paymentExpiredAt: string | null;
       paymentAbandonedAt: string | null;
       consultationConfirmedAt: string | null;
+      consultationCaseId: string | null;
+      consultationAppointmentId: string | null;
+      appointmentState: string | null;
+      consultationPreconfirmedAt: string | null;
+      appointmentCreatedAt: string | null;
+      appointmentConfirmedAt: string | null;
+      consultationConfirmationSource: string | null;
       closingState: string | null;
       closingBlockReason: string | null;
       closingSignal: string | null;
@@ -1412,6 +1419,30 @@ async function sendHumanReply() {
                   <p>Horario comercial: {selectedThread.context.commercial.schedulingSuggestedAt ? formatDateTime(selectedThread.context.commercial.schedulingSuggestedAt) : "sem horario sugerido"}</p>
                 </div>
                 <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Appointment formal</p>
+                  <p>Estado: {selectedThread.context.commercial.appointmentState || "not_created"}</p>
+                  <p>
+                    Appointment:{" "}
+                    {selectedThread.context.commercial.consultationAppointmentId
+                      ? selectedThread.context.commercial.consultationAppointmentId.slice(0, 8)
+                      : "ainda nao criado"}
+                  </p>
+                  <p>
+                    Caso:{" "}
+                    {selectedThread.context.commercial.consultationCaseId
+                      ? selectedThread.context.commercial.consultationCaseId.slice(0, 8)
+                      : "sem caso formal"}
+                  </p>
+                  <p>
+                    Confirmacao:{" "}
+                    {selectedThread.context.commercial.appointmentConfirmedAt
+                      ? formatDateTime(selectedThread.context.commercial.appointmentConfirmedAt)
+                      : selectedThread.context.commercial.consultationPreconfirmedAt
+                        ? `preconfirmada em ${formatDateTime(selectedThread.context.commercial.consultationPreconfirmedAt)}`
+                        : "sem confirmacao formal"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Follow-up e risco</p>
                   <p>Estado: {selectedThread.context.operational.followUpStatus || "none"}</p>
                   <p>Prazo: {formatDateTime(selectedThread.context.operational.followUpDueAt)}</p>
@@ -1470,6 +1501,18 @@ async function sendHumanReply() {
                     </p>
                     <p>
                       Proximo passo: {selectedThread.context.commercial.closingNextStep || "sem proximo passo definido"}
+                    </p>
+                  </div>
+                ) : null}
+                {selectedThread.context.commercial.consultationConfirmationSource ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Fonte da confirmacao</p>
+                    <p className="font-medium text-[#10261d]">
+                      {selectedThread.context.commercial.consultationConfirmationSource}
+                    </p>
+                    <p>
+                      Appointment: {selectedThread.context.commercial.appointmentState || "not_created"} •
+                      pagamento {selectedThread.context.commercial.paymentState || "not_started"}
                     </p>
                   </div>
                 ) : null}

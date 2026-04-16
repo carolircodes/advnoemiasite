@@ -576,7 +576,7 @@ class CommercialClosingService {
 
     await supabase.from("client_pipeline").update(patch).eq("id", pipeline.id);
 
-    return this.syncPipelineClosingAssessment({
+    const assessment = await this.syncPipelineClosingAssessment({
       pipelineId: pipeline.id,
       pipelineStage: pipeline.stage,
       consultationReadiness: pipeline.consultation_readiness,
@@ -610,6 +610,11 @@ class CommercialClosingService {
       paymentAbandonedAt: input.payload.paymentAbandonedAt ?? pipeline.payment_abandoned_at,
       consultationConfirmedAt: pipeline.consultation_confirmed_at
     });
+
+    return {
+      pipelineId: pipeline.id,
+      assessment
+    };
   }
 }
 

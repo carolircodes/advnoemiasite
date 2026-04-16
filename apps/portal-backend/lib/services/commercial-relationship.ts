@@ -6,6 +6,7 @@ import {
   evaluateCommercialClosing,
   type CommercialClosingAssessment
 } from "./commercial-closing";
+import { commercialAppointmentService } from "./commercial-appointment";
 import {
   commercialConversionService,
   evaluateCommercialConversion,
@@ -101,6 +102,13 @@ export type CommercialThreadContext = {
     paymentExpiredAt: string | null;
     paymentAbandonedAt: string | null;
     consultationConfirmedAt: string | null;
+    consultationCaseId: string | null;
+    consultationAppointmentId: string | null;
+    appointmentState: string | null;
+    consultationPreconfirmedAt: string | null;
+    appointmentCreatedAt: string | null;
+    appointmentConfirmedAt: string | null;
+    consultationConfirmationSource: string | null;
   } | null;
 };
 
@@ -609,7 +617,7 @@ class CommercialRelationshipService {
       this.supabase
         .from("client_pipeline")
         .select(
-          "id, stage, lead_temperature, follow_up_status, owner_profile_id, owner_assigned_at, next_step, next_step_due_at, waiting_on, follow_up_state, follow_up_reason, notes, last_contact_at, last_commercial_note_at, consultation_readiness, conversion_stage, recommended_action, recommended_action_detail, conversion_signal, blocking_reason, objection_state, objection_hint, opportunity_state, consultation_recommendation_state, consultation_recommendation_reason, consultation_suggested_copy, recommended_follow_up_window, advancement_reason, consultation_offer_state, consultation_offer_sent_at, consultation_offer_reason, consultation_offer_copy, consultation_offer_amount, scheduling_state, scheduling_intent, scheduling_suggested_at, lead_schedule_preference, desired_schedule_window, schedule_confirmed_at, payment_state, payment_link_sent_at, payment_link_url, payment_reference, payment_pending_at, payment_approved_at, payment_failed_at, payment_expired_at, payment_abandoned_at, consultation_confirmed_at, closing_state, closing_block_reason, closing_signal, closing_next_step, closing_recommended_action, closing_recommended_action_detail, closing_copy_suggestion"
+          "id, stage, lead_temperature, follow_up_status, owner_profile_id, owner_assigned_at, next_step, next_step_due_at, waiting_on, follow_up_state, follow_up_reason, notes, last_contact_at, last_commercial_note_at, consultation_readiness, conversion_stage, recommended_action, recommended_action_detail, conversion_signal, blocking_reason, objection_state, objection_hint, opportunity_state, consultation_recommendation_state, consultation_recommendation_reason, consultation_suggested_copy, recommended_follow_up_window, advancement_reason, consultation_offer_state, consultation_offer_sent_at, consultation_offer_reason, consultation_offer_copy, consultation_offer_amount, scheduling_state, scheduling_intent, scheduling_suggested_at, lead_schedule_preference, desired_schedule_window, schedule_confirmed_at, payment_state, payment_link_sent_at, payment_link_url, payment_reference, payment_pending_at, payment_approved_at, payment_failed_at, payment_expired_at, payment_abandoned_at, consultation_confirmed_at, consultation_case_id, consultation_appointment_id, appointment_state, consultation_preconfirmed_at, appointment_created_at, appointment_confirmed_at, consultation_confirmation_source, closing_state, closing_block_reason, closing_signal, closing_next_step, closing_recommended_action, closing_recommended_action_detail, closing_copy_suggestion"
         )
         .eq("id", link.pipelineId)
         .maybeSingle(),
@@ -757,6 +765,13 @@ class CommercialRelationshipService {
       sessionId,
       createEvent: false
     });
+    const formalization = await commercialAppointmentService.syncFormalConsultation({
+      pipelineId: link.pipelineId,
+      actorProfileId: pipeline?.owner_profile_id || null,
+      sessionId,
+      source: "thread_context",
+      createEvent: false
+    });
 
     return {
       clientId: link.clientId,
@@ -799,7 +814,29 @@ class CommercialRelationshipService {
         paymentFailedAt: pipeline?.payment_failed_at || null,
         paymentExpiredAt: pipeline?.payment_expired_at || null,
         paymentAbandonedAt: pipeline?.payment_abandoned_at || null,
-        consultationConfirmedAt: pipeline?.consultation_confirmed_at || null
+        consultationConfirmedAt:
+          formalization?.consultationConfirmedAt || pipeline?.consultation_confirmed_at || null,
+        consultationCaseId: formalization?.caseId || pipeline?.consultation_case_id || null,
+        consultationAppointmentId:
+          formalization?.appointmentId || pipeline?.consultation_appointment_id || null,
+        appointmentState:
+          formalization?.appointmentState || pipeline?.appointment_state || null,
+        consultationPreconfirmedAt:
+          formalization?.consultationPreconfirmedAt ||
+          pipeline?.consultation_preconfirmed_at ||
+          null,
+        appointmentCreatedAt:
+          (formalization?.appointmentId ? pipeline?.appointment_created_at || new Date().toISOString() : null) ||
+          pipeline?.appointment_created_at ||
+          null,
+        appointmentConfirmedAt:
+          formalization?.consultationConfirmedAt ||
+          pipeline?.appointment_confirmed_at ||
+          null,
+        consultationConfirmationSource:
+          formalization?.confirmationSource ||
+          pipeline?.consultation_confirmation_source ||
+          null
       }
     };
   }

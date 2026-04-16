@@ -9,6 +9,7 @@ import {
   resolvePaymentPricing
 } from "@/lib/payment/pricing";
 import { commercialClosingService } from "@/lib/services/commercial-closing";
+import { commercialAppointmentService } from "@/lib/services/commercial-appointment";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 type PaymentCreateContext = {
@@ -229,6 +230,7 @@ export async function POST(request: NextRequest) {
       price_reason: resolvedPricing.auditReason,
       pricing_context: resolvedPricing.safeMetadata
     };
+    const supportsAutoReturn = /^https:\/\//i.test(baseUrl);
 
     const preferenceData = {
       items: [
@@ -255,8 +257,6 @@ export async function POST(request: NextRequest) {
         failure: `${baseUrl}/pagamento/falha`,
         pending: `${baseUrl}/pagamento/pendente`
       },
-      notification_url: `${baseUrl}/api/payment/webhook`,
-      auto_return: "approved",
       external_reference: externalReference,
       metadata: {
         lead_id: leadId,
@@ -274,6 +274,13 @@ export async function POST(request: NextRequest) {
         ...metadata
       }
     };
+
+    if (supportsAutoReturn) {
+      Object.assign(preferenceData, {
+        notification_url: `${baseUrl}/api/payment/webhook`,
+        auto_return: "approved" as const
+      });
+    }
 
     const response = await preference.create({ body: preferenceData });
 
@@ -314,7 +321,7 @@ export async function POST(request: NextRequest) {
       .eq("id", leadId);
 
     try {
-      await commercialClosingService.syncPipelineClosingFromProfile({
+      const assessment = await commercialClosingService.syncPipelineClosingFromProfile({
         profileId: userId,
         payload: {
           paymentState: "link_sent",
@@ -325,6 +332,14 @@ export async function POST(request: NextRequest) {
           consultationOfferAmount: amount
         }
       });
+
+      if (assessment?.pipelineId) {
+        await commercialAppointmentService.syncFormalConsultation({
+          pipelineId: assessment.pipelineId,
+          source: "payment_create",
+          createEvent: false
+        });
+      }
     } catch (closingSyncError) {
       console.error("[payment.create] Failed to sync commercial closing state", {
         closingSyncError,

@@ -383,6 +383,13 @@ export type ConversationThreadDetail = {
       paymentExpiredAt: string | null;
       paymentAbandonedAt: string | null;
       consultationConfirmedAt: string | null;
+      consultationCaseId: string | null;
+      consultationAppointmentId: string | null;
+      appointmentState: string | null;
+      consultationPreconfirmedAt: string | null;
+      appointmentCreatedAt: string | null;
+      appointmentConfirmedAt: string | null;
+      consultationConfirmationSource: string | null;
       closingState: string | null;
       closingBlockReason: string | null;
       closingSignal: string | null;
@@ -1602,6 +1609,19 @@ class ConversationInboxService {
             commercialContext.closingSnapshot?.paymentAbandonedAt || null,
           consultationConfirmedAt:
             commercialContext.closingSnapshot?.consultationConfirmedAt || null,
+          consultationCaseId:
+            commercialContext.closingSnapshot?.consultationCaseId || null,
+          consultationAppointmentId:
+            commercialContext.closingSnapshot?.consultationAppointmentId || null,
+          appointmentState: commercialContext.closingSnapshot?.appointmentState || null,
+          consultationPreconfirmedAt:
+            commercialContext.closingSnapshot?.consultationPreconfirmedAt || null,
+          appointmentCreatedAt:
+            commercialContext.closingSnapshot?.appointmentCreatedAt || null,
+          appointmentConfirmedAt:
+            commercialContext.closingSnapshot?.appointmentConfirmedAt || null,
+          consultationConfirmationSource:
+            commercialContext.closingSnapshot?.consultationConfirmationSource || null,
           closingState: commercialContext.closing?.closingState || null,
           closingBlockReason: commercialContext.closing?.closingBlockReason || null,
           closingSignal: commercialContext.closing?.closingSignal || null,

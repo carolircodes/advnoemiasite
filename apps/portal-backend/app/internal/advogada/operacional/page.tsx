@@ -82,6 +82,13 @@ interface OperationalContact {
   paymentExpiredAt?: string | null;
   paymentAbandonedAt?: string | null;
   consultationConfirmedAt?: string | null;
+  consultationCaseId?: string | null;
+  consultationAppointmentId?: string | null;
+  appointmentState: string;
+  consultationPreconfirmedAt?: string | null;
+  appointmentCreatedAt?: string | null;
+  appointmentConfirmedAt?: string | null;
+  consultationConfirmationSource?: string | null;
   closingState: string;
   closingBlockReason?: string | null;
   closingSignal: string;
@@ -1030,6 +1037,10 @@ export default function OperationalPanel() {
     await applyOperationalAction(contact, 'mark_closing_lost', undefined, reason || undefined);
   }
 
+  async function materializeAppointment(contact: OperationalContact) {
+    await applyOperationalAction(contact, 'materialize_appointment');
+  }
+
   function getAttentionTone(bucket: OperationalContact['attentionBucket']): 'red' | 'orange' | 'blue' | 'gray' {
     switch (bucket) {
       case 'needs_attention':
@@ -1698,6 +1709,29 @@ export default function OperationalPanel() {
                       </p>
                     ) : null}
                   </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Appointment formal
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {formatStageLabel(contact.appointmentState)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.consultationAppointmentId
+                        ? `Appointment formal vinculado ao caso ${contact.consultationCaseId?.slice(0, 8) || 'sem caso'}.`
+                        : contact.consultationPreconfirmedAt
+                          ? 'Consulta preconfirmada; appointment formal sera criado apos conciliacao total.'
+                          : 'Ainda sem appointment formal criado.'}
+                    </p>
+                    {contact.appointmentConfirmedAt || contact.consultationConfirmedAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        {contact.appointmentConfirmedAt
+                          ? `Confirmado em ${formatDate(contact.appointmentConfirmedAt)}`
+                          : `Consulta confirmada em ${formatDate(contact.consultationConfirmedAt || '')}`}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
                 {(contact.closingCopySuggestion || contact.closingSignal) ? (
@@ -2185,6 +2219,15 @@ export default function OperationalPanel() {
                   >
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Pagamento aprovado
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:materialize_appointment`}
+                    onClick={() => void materializeAppointment(contact)}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Criar appointment
                   </ActionButton>
 
                   <ActionButton

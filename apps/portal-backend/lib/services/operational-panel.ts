@@ -3,6 +3,7 @@ import {
   commercialClosingService,
   evaluateCommercialClosing
 } from "./commercial-closing";
+import { commercialAppointmentService } from "./commercial-appointment";
 import { evaluateCommercialConversion } from "./commercial-conversion";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { getCommercialAutomationPlans, type CommercialAutomationPlan } from "./commercial-automation";
@@ -82,6 +83,13 @@ export interface OperationalContact {
   paymentExpiredAt?: string | null;
   paymentAbandonedAt?: string | null;
   consultationConfirmedAt?: string | null;
+  consultationCaseId?: string | null;
+  consultationAppointmentId?: string | null;
+  appointmentState: string;
+  consultationPreconfirmedAt?: string | null;
+  appointmentCreatedAt?: string | null;
+  appointmentConfirmedAt?: string | null;
+  consultationConfirmationSource?: string | null;
   closingState: string;
   closingBlockReason?: string | null;
   closingSignal: string;
@@ -232,6 +240,7 @@ export interface OperationalAction {
     | "mark_waiting_team"
     | "register_payment_pending"
     | "register_payment_approved"
+    | "materialize_appointment"
     | "confirm_consultation"
     | "mark_closing_lost";
   value?: string;
@@ -327,6 +336,13 @@ class OperationalPanel {
             payment_expired_at,
             payment_abandoned_at,
             consultation_confirmed_at,
+            consultation_case_id,
+            consultation_appointment_id,
+            appointment_state,
+            consultation_preconfirmed_at,
+            appointment_created_at,
+            appointment_confirmed_at,
+            consultation_confirmation_source,
             closing_state,
             closing_block_reason,
             closing_signal,
@@ -731,6 +747,13 @@ class OperationalPanel {
       paymentExpiredAt: pipeline.payment_expired_at || undefined,
       paymentAbandonedAt: pipeline.payment_abandoned_at || undefined,
       consultationConfirmedAt: pipeline.consultation_confirmed_at || undefined,
+      consultationCaseId: pipeline.consultation_case_id || undefined,
+      consultationAppointmentId: pipeline.consultation_appointment_id || undefined,
+      appointmentState: pipeline.appointment_state || "not_created",
+      consultationPreconfirmedAt: pipeline.consultation_preconfirmed_at || undefined,
+      appointmentCreatedAt: pipeline.appointment_created_at || undefined,
+      appointmentConfirmedAt: pipeline.appointment_confirmed_at || undefined,
+      consultationConfirmationSource: pipeline.consultation_confirmation_source || undefined,
       closingState: pipeline.closing_state || closing.closingState,
       closingBlockReason: pipeline.closing_block_reason || closing.closingBlockReason,
       closingSignal: pipeline.closing_signal || closing.closingSignal,
@@ -1035,6 +1058,8 @@ class OperationalPanel {
           updateData.closing_state = "payment_in_progress";
           updateData.follow_up_status = "resolved";
           break;
+        case "materialize_appointment":
+          break;
         case "confirm_consultation":
           updateData.stage = "consultation_scheduled";
           updateData.payment_state = "approved";
@@ -1131,6 +1156,13 @@ class OperationalPanel {
           payment_expired_at,
           payment_abandoned_at,
           consultation_confirmed_at,
+          consultation_case_id,
+          consultation_appointment_id,
+          appointment_state,
+          consultation_preconfirmed_at,
+          appointment_created_at,
+          appointment_confirmed_at,
+          consultation_confirmation_source,
           notes
         `
         )
@@ -1173,6 +1205,17 @@ class OperationalPanel {
           paymentAbandonedAt: refreshedPipeline.payment_abandoned_at,
           consultationConfirmedAt: refreshedPipeline.consultation_confirmed_at,
           latestNote: refreshedPipeline.notes
+        });
+
+        await commercialAppointmentService.syncFormalConsultation({
+          pipelineId: refreshedPipeline.id,
+          actorProfileId:
+            typeof payload.actorProfileId === "string"
+              ? payload.actorProfileId
+              : null,
+          sessionId: action.sessionId,
+          source: "operational_manual",
+          createEvent: true
         });
       }
 
