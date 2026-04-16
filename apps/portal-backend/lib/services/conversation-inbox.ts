@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "../supabase/admin";
+import { sendFacebookDirectMessage } from "../meta/facebook-service";
 import { sendInstagramDirectMessage } from "../meta/instagram-service";
 import { sendWhatsAppMessage } from "../meta/whatsapp-service";
 import { sendSiteChatMessage } from "../site/site-chat-service";
@@ -15,7 +16,13 @@ import {
 } from "./lead-identity";
 import { commercialRelationshipService } from "./commercial-relationship";
 
-type ConversationChannel = "instagram" | "whatsapp" | "site" | "portal" | "telegram";
+type ConversationChannel =
+  | "instagram"
+  | "facebook"
+  | "whatsapp"
+  | "site"
+  | "portal"
+  | "telegram";
 type ThreadStatus =
   | "new"
   | "unread"
@@ -264,6 +271,7 @@ export type ConversationThreadDetail = {
     internalNotes: string | null;
     tags: string[];
     aiEnabled: boolean;
+    externalUserId: string;
     assignedTo: {
       id: string | null;
       name: string | null;
@@ -554,6 +562,8 @@ function getChannelLabel(channel: ConversationChannel) {
   switch (channel) {
     case "instagram":
       return "Instagram";
+    case "facebook":
+      return "Facebook";
     case "whatsapp":
       return "WhatsApp";
     case "telegram":
@@ -575,12 +585,24 @@ function inferThreadOrigin(session: SessionRow) {
     return { type: "comment" as const, label: "Comentario relevante" };
   }
 
+  if (entryType === "facebook_comment") {
+    return { type: "comment" as const, label: "Comentario relevante da pagina" };
+  }
+
   if (entryType === "instagram_comment_to_dm") {
     return { type: "comment_to_dm" as const, label: "Comentario convertido em DM" };
   }
 
+  if (entryType === "facebook_comment_to_dm") {
+    return { type: "comment_to_dm" as const, label: "Comentario convertido em Messenger" };
+  }
+
   if (entryType === "instagram_dm") {
     return { type: "dm" as const, label: "DM oficial" };
+  }
+
+  if (entryType === "facebook_dm") {
+    return { type: "dm" as const, label: "Messenger oficial" };
   }
 
   if (session.channel === "site") {
@@ -607,8 +629,16 @@ function inferThreadOrigin(session: SessionRow) {
   }
 
   return {
-    type: session.channel === "instagram" ? ("dm" as const) : ("unknown" as const),
-    label: session.channel === "instagram" ? "DM oficial" : "Thread operacional"
+    type:
+      session.channel === "instagram" || session.channel === "facebook"
+        ? ("dm" as const)
+        : ("unknown" as const),
+    label:
+      session.channel === "instagram"
+        ? "DM oficial"
+        : session.channel === "facebook"
+          ? "Messenger oficial"
+          : "Thread operacional"
   };
 }
 
@@ -661,6 +691,12 @@ function buildEventSummary(event: EventRow) {
       return "Comentario relevante capturado como sinal operacional.";
     case "instagram_comment_handoff_requested":
       return "Comentario do Instagram encaminhado para revisao humana.";
+    case "facebook_comment_signal_captured":
+      return "Comentario relevante do Facebook capturado como sinal operacional.";
+    case "facebook_comment_handoff_requested":
+      return "Comentario do Facebook encaminhado para revisao humana.";
+    case "facebook_comment_dm_started":
+      return "Comentario do Facebook ganhou continuidade privada no Messenger.";
     case "instagram_comment_dm_started":
       return "Comentario publico ganhou continuidade privada no direct.";
     case "site_context_captured":
@@ -1448,6 +1484,7 @@ class ConversationInboxService {
         internalNotes: (session as SessionRow).internal_notes,
         tags: safeArray((session as SessionRow).tags).map((tag) => String(tag)),
         aiEnabled: Boolean((session as SessionRow).ai_enabled),
+        externalUserId: (session as SessionRow).external_user_id,
         assignedTo: {
           id: (session as SessionRow).owner_user_id,
           name: (session as SessionRow).owner_user_id
@@ -1748,12 +1785,19 @@ class ConversationInboxService {
       detail.thread.channel === "whatsapp"
         ? await sendWhatsAppMessage(detail.context.person.phone || detail.thread.contactLabel, content)
         : detail.thread.channel === "instagram"
-          ? await sendInstagramDirectMessage(detail.context.person.phone || detail.thread.contactLabel, content, {
+          ? await sendInstagramDirectMessage(detail.thread.externalUserId, content, {
               sessionId: input.threadId,
-              externalUserId: detail.context.person.phone || detail.thread.contactLabel,
+              externalUserId: detail.thread.externalUserId,
               responseType: "human_reply",
               reason: "internal_inbox_manual_reply"
             })
+          : detail.thread.channel === "facebook"
+            ? await sendFacebookDirectMessage(detail.thread.externalUserId, content, {
+                sessionId: input.threadId,
+                externalUserId: detail.thread.externalUserId,
+                responseType: "human_reply",
+                reason: "internal_inbox_manual_reply"
+              })
           : detail.thread.channel === "site"
             ? await sendSiteChatMessage(content, {
                 sessionId: detail.context.origin.sessionId || detail.thread.contactLabel,
@@ -1787,7 +1831,7 @@ class ConversationInboxService {
 
     if (!sendResult) {
       throw new Error(
-        "A resposta manual pelo painel esta disponivel apenas para WhatsApp, Instagram, Site Chat e Telegram."
+        "A resposta manual pelo painel esta disponivel apenas para WhatsApp, Instagram, Facebook, Site Chat e Telegram."
       );
     }
     const sendSucceeded = "success" in sendResult ? sendResult.success : sendResult.ok;
@@ -1808,7 +1852,7 @@ class ConversationInboxService {
         channel: detail.thread.channel
       },
       message_type:
-        detail.thread.channel === "instagram"
+        detail.thread.channel === "instagram" || detail.thread.channel === "facebook"
           ? "social_dm"
           : detail.thread.channel === "telegram"
             ? detail.context.telegram.surface === "group"
@@ -1844,6 +1888,8 @@ class ConversationInboxService {
         sendResult.error ||
           (detail.thread.channel === "instagram"
             ? "Falha ao enviar resposta humana pelo Instagram."
+            : detail.thread.channel === "facebook"
+              ? "Falha ao enviar resposta humana pelo Facebook Messenger."
             : detail.thread.channel === "telegram"
               ? "Falha ao enviar resposta humana pelo Telegram."
             : detail.thread.channel === "site"

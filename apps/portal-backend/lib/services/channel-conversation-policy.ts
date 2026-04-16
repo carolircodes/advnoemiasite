@@ -46,7 +46,7 @@ export type ConversationPolicySummary = {
 };
 
 type PolicyInput = {
-  channel: "instagram" | "whatsapp";
+  channel: "instagram" | "facebook" | "whatsapp";
   session: ConversationSession;
   conversationState: ConversationState | null;
   messageText: string;

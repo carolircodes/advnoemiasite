@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
       channel: (searchParams.get("channel") as
         | "all"
         | "instagram"
+        | "facebook"
         | "whatsapp"
         | "site"
         | "portal"

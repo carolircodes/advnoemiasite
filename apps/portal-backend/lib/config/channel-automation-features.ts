@@ -24,6 +24,8 @@ export const channelAutomationFeatures = {
   unifiedMaterialRouting: readBooleanFlag("CHANNEL_ENABLE_MATERIAL_ROUTING", true),
   instagramCommentPublicReply: readBooleanFlag("INSTAGRAM_ENABLE_PUBLIC_COMMENT_REPLY", true),
   instagramCommentAutoDm: readBooleanFlag("INSTAGRAM_ENABLE_COMMENT_AUTO_DM", false),
+  facebookCommentPublicReply: readBooleanFlag("FACEBOOK_ENABLE_PUBLIC_COMMENT_REPLY", true),
+  facebookCommentAutoDm: readBooleanFlag("FACEBOOK_ENABLE_COMMENT_AUTO_DM", false),
   instagramLeadCapture: readBooleanFlag("INSTAGRAM_ENABLE_LEAD_CAPTURE_AUTOMATION", false),
   instagramKeywordAutomation: readBooleanFlag("INSTAGRAM_ENABLE_KEYWORD_AUTOMATION", false),
   instagramCommentCampaignAutomation: readBooleanFlag(

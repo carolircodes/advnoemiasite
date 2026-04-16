@@ -389,7 +389,7 @@ export default function OperationalPanel() {
   const [showSuggestedMessage, setShowSuggestedMessage] = useState(false);
   const [showAssistedSend, setShowAssistedSend] = useState(false);
   const [availableChannels, setAvailableChannels] = useState<Array<{ channel: string; externalUserId: string; lastContactAt?: string }>>([]);
-  const [selectedChannel, setSelectedChannel] = useState<'whatsapp' | 'instagram' | ''>('');
+  const [selectedChannel, setSelectedChannel] = useState<'whatsapp' | 'instagram' | 'facebook' | ''>('');
   const [messageContent, setMessageContent] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [staffOwners, setStaffOwners] = useState<StaffOwner[]>([]);
@@ -557,14 +557,14 @@ export default function OperationalPanel() {
         
         // Pré-selecionar canal se houver apenas um
         if (result.data && result.data.length === 1) {
-          setSelectedChannel(result.data[0].channel as 'whatsapp' | 'instagram');
+          setSelectedChannel(result.data[0].channel as 'whatsapp' | 'instagram' | 'facebook');
         }
         
         // Pré-preencher conteúdo se houver mensagem sugerida
         if (contact.suggestedMessage?.content) {
           setMessageContent(contact.suggestedMessage.content);
           if (contact.suggestedMessage.channel) {
-            setSelectedChannel(contact.suggestedMessage.channel as 'whatsapp' | 'instagram');
+            setSelectedChannel(contact.suggestedMessage.channel as 'whatsapp' | 'instagram' | 'facebook');
           }
         }
       }
@@ -675,6 +675,8 @@ export default function OperationalPanel() {
         return <MessageCircle className="h-4 w-4" />;
       case 'instagram':
         return <Camera className="h-4 w-4" />;
+      case 'facebook':
+        return <MessageSquare className="h-4 w-4" />;
       case 'site':
         return <Globe className="h-4 w-4" />;
       case 'portal':
@@ -1405,6 +1407,7 @@ export default function OperationalPanel() {
               <option value="">Todos</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="instagram">Instagram</option>
+              <option value="facebook">Facebook</option>
               <option value="site">Site</option>
               <option value="portal">Portal</option>
             </select>
@@ -2368,7 +2371,7 @@ export default function OperationalPanel() {
                   {availableChannels.length === 0 ? (
                     <div className="rounded-xl border border-[#d8d2c4] bg-[#fff8f0] p-4">
                       <p className="text-sm text-[#9a5d09]">
-                        Nenhum canal disponível para este cliente. O cliente precisa ter WhatsApp ou Instagram cadastrado.
+                        Nenhum canal disponível para este cliente. O cliente precisa ter WhatsApp, Instagram ou Facebook cadastrado.
                       </p>
                     </div>
                   ) : (
@@ -2380,7 +2383,7 @@ export default function OperationalPanel() {
                             name="channel"
                             value={channel.channel}
                             checked={selectedChannel === channel.channel}
-                            onChange={(e) => setSelectedChannel(e.target.value as 'whatsapp' | 'instagram')}
+                            onChange={(e) => setSelectedChannel(e.target.value as 'whatsapp' | 'instagram' | 'facebook')}
                             className="text-[#10261d]"
                           />
                           <div className="flex items-center gap-2">

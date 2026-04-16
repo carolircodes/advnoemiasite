@@ -15,7 +15,7 @@ export type CommentSafetyDecision =
 export type PublicBrevityRule = "micro" | "short";
 
 export type CommentPolicyResult = {
-  policyName: "instagram_comment_premium_v1";
+  policyName: "meta_comment_premium_v1";
   decision: CommentPolicyDecision;
   safetyDecision: CommentSafetyDecision;
   brevityRule: PublicBrevityRule;
@@ -35,6 +35,7 @@ export type CommentPolicyResult = {
 };
 
 type EvaluateInput = {
+  channel: "instagram" | "facebook";
   commentText: string;
   topic: string;
   autoDmSupported: boolean;
@@ -64,9 +65,11 @@ function buildTopicAwareAcolhimento(topic: string) {
   return "Obrigada por comentar. Esse ponto merece uma orientacao cuidadosa.";
 }
 
-function buildDmInvite(topic: string) {
+function buildDmInvite(channel: "instagram" | "facebook", topic: string) {
   const opening = buildTopicAwareAcolhimento(topic);
-  return `${opening} Se quiser, me chama no direct para eu te orientar com mais cuidado e discricao.`;
+  return channel === "facebook"
+    ? `${opening} Se preferir, me chame no Messenger da pagina para eu te orientar com mais cuidado e discricao.`
+    : `${opening} Se quiser, me chama no direct para eu te orientar com mais cuidado e discricao.`;
 }
 
 export function evaluateInstagramCommentPolicy(
@@ -92,7 +95,7 @@ export function evaluateInstagramCommentPolicy(
 
   if (inappropriate) {
     return {
-      policyName: "instagram_comment_premium_v1",
+      policyName: "meta_comment_premium_v1",
       decision: "no_auto_reply",
       safetyDecision: "auto_reply_avoided",
       brevityRule: "micro",
@@ -109,11 +112,11 @@ export function evaluateInstagramCommentPolicy(
 
   if (sensitive) {
     return {
-      policyName: "instagram_comment_premium_v1",
+      policyName: "meta_comment_premium_v1",
       decision: "human_review",
       safetyDecision: "human_review_required",
       brevityRule: "short",
-      publicReply: buildDmInvite(input.topic),
+      publicReply: buildDmInvite(input.channel, input.topic),
       inviteToDm: true,
       shouldAttemptAutoDm: false,
       autoDmSupported: input.autoDmSupported,
@@ -126,11 +129,11 @@ export function evaluateInstagramCommentPolicy(
 
   if (asksForGuidance) {
     return {
-      policyName: "instagram_comment_premium_v1",
+      policyName: "meta_comment_premium_v1",
       decision: "public_reply_and_invite_dm",
       safetyDecision: "safe_public_reply_with_dm_invite",
       brevityRule: "short",
-      publicReply: buildDmInvite(input.topic),
+      publicReply: buildDmInvite(input.channel, input.topic),
       inviteToDm: true,
       shouldAttemptAutoDm: input.autoDmSupported,
       autoDmSupported: input.autoDmSupported,
@@ -143,7 +146,7 @@ export function evaluateInstagramCommentPolicy(
 
   if (briefSafeQuestion) {
     return {
-      policyName: "instagram_comment_premium_v1",
+      policyName: "meta_comment_premium_v1",
       decision: "public_reply_only",
       safetyDecision: "safe_public_reply",
       brevityRule: "micro",
@@ -159,11 +162,11 @@ export function evaluateInstagramCommentPolicy(
   }
 
   return {
-    policyName: "instagram_comment_premium_v1",
+    policyName: "meta_comment_premium_v1",
     decision: "public_reply_and_invite_dm",
     safetyDecision: "safe_public_reply_with_dm_invite",
     brevityRule: "short",
-    publicReply: buildDmInvite(input.topic),
+    publicReply: buildDmInvite(input.channel, input.topic),
     inviteToDm: true,
     shouldAttemptAutoDm: input.autoDmSupported,
     autoDmSupported: input.autoDmSupported,

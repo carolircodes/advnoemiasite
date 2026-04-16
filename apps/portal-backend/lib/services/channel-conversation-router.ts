@@ -54,8 +54,13 @@ import {
   buildLeadNamePrompt
 } from "./lead-identity";
 
-type SupportedChannel = "instagram" | "whatsapp";
-type ConversationSource = "instagram_comment" | "instagram_dm" | "whatsapp_inbound";
+type SupportedChannel = "instagram" | "facebook" | "whatsapp";
+type ConversationSource =
+  | "instagram_comment"
+  | "instagram_dm"
+  | "facebook_comment"
+  | "facebook_dm"
+  | "whatsapp_inbound";
 type MessageDirection = "reply" | "handoff" | "ignored" | "fallback";
 type LeadStage = "initial" | "engaged" | "triage" | "qualified" | "handoff";
 type TriageStatus = "not_started" | "in_progress" | "qualified" | "handoff";
@@ -352,8 +357,11 @@ function buildDeterministicEventId(event: ChannelConversationEvent) {
     return messageId;
   }
 
-  if (event.source === "instagram_comment" && event.commentContext?.commentId) {
-    return `instagram_comment:${event.commentContext.commentId}`;
+  if (
+    (event.source === "instagram_comment" || event.source === "facebook_comment") &&
+    event.commentContext?.commentId
+  ) {
+    return `${event.channel}_comment:${event.commentContext.commentId}`;
   }
 
   return `${event.channel}:${event.source}:${event.externalUserId}:${normalizeText(event.messageText)}`;
@@ -453,7 +461,7 @@ function inferTriageStatus(leadStage: LeadStage, handoffTriggered: boolean): Tri
 }
 
 function shouldUseUnsupportedFallback(event: ChannelConversationEvent) {
-  if (event.source === "instagram_comment") {
+  if (event.source === "instagram_comment" || event.source === "facebook_comment") {
     return false;
   }
 
@@ -664,7 +672,7 @@ function selectRecommendedMaterial(
     normalizedMessage.includes("material") ||
     normalizedMessage.includes("passo a passo") ||
     normalizedMessage.includes("documento") ||
-    event.source === "instagram_comment";
+    event.source === "instagram_comment" || event.source === "facebook_comment";
 
   const lastMaterialUrl =
     typeof session.metadata?.last_material_url === "string"
@@ -1624,10 +1632,19 @@ async function handleInstagramCommentEntry(args: {
 }): Promise<RouterDecision> {
   const commentContext = args.event.commentContext!;
   const now = new Date().toISOString();
+  const commentChannel = args.event.channel === "facebook" ? "facebook" : "instagram";
+  const channelLabel = commentChannel === "facebook" ? "Facebook" : "Instagram";
+  const publicReplyFeatureEnabled =
+    commentChannel === "facebook"
+      ? channelAutomationFeatures.facebookCommentPublicReply
+      : channelAutomationFeatures.instagramCommentPublicReply;
   const autoDmSupported =
-    channelAutomationFeatures.instagramCommentAutoDm &&
+    (commentChannel === "facebook"
+      ? channelAutomationFeatures.facebookCommentAutoDm
+      : channelAutomationFeatures.instagramCommentAutoDm) &&
     typeof args.transport.sendDirectFromComment === "function";
   const commentPolicy = evaluateInstagramCommentPolicy({
+    channel: commentChannel,
     commentText: args.event.messageText,
     topic: args.acquisitionSnapshot.topic,
     autoDmSupported
@@ -1668,10 +1685,10 @@ async function handleInstagramCommentEntry(args: {
 
   await safeCreateConversationEvent({
     sessionId: args.session.id,
-    eventType: "instagram_comment_signal_captured",
+    eventType: `${commentChannel}_comment_signal_captured`,
     actorType: "system",
     eventData: {
-      summary: "Comentario do Instagram capturado como sinal operacional.",
+      summary: `Comentario do ${channelLabel} capturado como sinal operacional.`,
       commentId: commentContext.commentId,
       decision: commentPolicy.decision
     }
@@ -1679,7 +1696,7 @@ async function handleInstagramCommentEntry(args: {
 
   let publicReplySent = false;
   if (
-    channelAutomationFeatures.instagramCommentPublicReply &&
+    publicReplyFeatureEnabled &&
     commentPolicy.publicReply &&
     args.transport.sendPublicCommentReply
   ) {
@@ -1702,7 +1719,7 @@ async function handleInstagramCommentEntry(args: {
   if (publicReplySent) {
     await safeSaveMessage(args.session.id, undefined, "assistant", commentPolicy.publicReply!, "outbound", {
       channel: args.event.channel,
-      source: "instagram_public_comment_reply",
+      source: `${commentChannel}_public_comment_reply`,
       eventId: args.eventId,
       responseSurface: "public_comment",
       commentPolicy
@@ -1761,7 +1778,7 @@ async function handleInstagramCommentEntry(args: {
     if (dmStarted) {
       await safeSaveMessage(args.session.id, undefined, "assistant", commentPolicy.publicReply, "outbound", {
         channel: args.event.channel,
-        source: "instagram_comment_auto_dm",
+        source: `${commentChannel}_comment_auto_dm`,
         eventId: args.eventId,
         responseSurface: "direct_message",
         commentPolicy
@@ -1774,10 +1791,13 @@ async function handleInstagramCommentEntry(args: {
 
       await safeCreateConversationEvent({
         sessionId: args.session.id,
-        eventType: "instagram_comment_dm_started",
+        eventType: `${commentChannel}_comment_dm_started`,
         actorType: "ai",
         eventData: {
-          summary: "Comentario relevante ganhou continuidade privada no direct.",
+          summary:
+            commentChannel === "facebook"
+              ? "Comentario relevante ganhou continuidade privada no Messenger."
+              : "Comentario relevante ganhou continuidade privada no direct.",
           commentId: commentContext.commentId
         }
       });
@@ -1826,10 +1846,10 @@ async function handleInstagramCommentEntry(args: {
   if (commentPolicy.humanReviewRequired) {
     await safeCreateConversationEvent({
       sessionId: args.session.id,
-      eventType: "instagram_comment_handoff_requested",
+      eventType: `${commentChannel}_comment_handoff_requested`,
       actorType: "ai",
       eventData: {
-        summary: "Comentario relevante pede revisao humana no Instagram.",
+        summary: `Comentario relevante pede revisao humana no ${channelLabel}.`,
         decision: commentPolicy.decision,
         safetyDecision: commentPolicy.safetyDecision
       }
@@ -2137,12 +2157,18 @@ export async function processChannelConversationEvent(
       await transport.markAsRead(event.externalMessageId);
     }
 
-    if (transport.sendTypingIndicator && event.source !== "instagram_comment") {
+    if (
+      transport.sendTypingIndicator &&
+      event.source !== "instagram_comment" &&
+      event.source !== "facebook_comment"
+    ) {
       await transport.sendTypingIndicator(event.externalUserId);
     }
 
     let session = await conversationPersistence.getOrCreateSession(event.channel, event.externalUserId);
-    const isCommentSource = event.source === "instagram_comment" && !!event.commentContext;
+    const isCommentSource =
+      (event.source === "instagram_comment" || event.source === "facebook_comment") &&
+      !!event.commentContext;
     const existingAcquisitionSnapshot = getSocialAcquisitionFromMetadata(session.metadata);
     const acquisitionSnapshot = buildSocialAcquisitionSnapshot({
       channel: event.channel,
@@ -2242,9 +2268,13 @@ export async function processChannelConversationEvent(
 
   if (isCommentSource) {
     const commentContext = event.commentContext!;
+    const commentChannel = event.channel === "facebook" ? "facebook" : "instagram";
+    const commentSource =
+      event.source === "facebook_comment" ? "facebook_comment" : "instagram_comment";
 
     session = await instagramCommentContext.createSessionWithCommentContext(event.externalUserId, {
-      source: "instagram_comment",
+      channel: commentChannel,
+      source: commentSource,
       media_id: commentContext.mediaId,
       keyword: detectThemeFromText(commentContext.commentText),
       theme: detectThemeFromText(commentContext.commentText),
@@ -2284,7 +2314,10 @@ export async function processChannelConversationEvent(
       messageType,
       socialAcquisition: buildSocialAcquisitionPayload(acquisitionSnapshot)
     }, {
-      messageType: event.source === "instagram_dm" ? "social_dm" : "text",
+      messageType:
+        event.source === "instagram_dm" || event.source === "facebook_dm"
+          ? "social_dm"
+          : "text",
       senderType: "contact",
       sendStatus: "received",
       isRead: false
@@ -2298,8 +2331,10 @@ export async function processChannelConversationEvent(
         isFirstTouch
       });
     } else if (
-      existingAcquisitionSnapshot?.entryType === "instagram_comment" &&
-      acquisitionSnapshot.entryType === "instagram_comment_to_dm"
+      (existingAcquisitionSnapshot?.entryType === "instagram_comment" ||
+        existingAcquisitionSnapshot?.entryType === "facebook_comment") &&
+      (acquisitionSnapshot.entryType === "instagram_comment_to_dm" ||
+        acquisitionSnapshot.entryType === "facebook_comment_to_dm")
     ) {
       await trackSocialAcquisitionEvent({
         eventName: "dm_started_from_comment",
@@ -2451,6 +2486,8 @@ export async function processChannelConversationEvent(
           language_adaptation:
             event.channel === "instagram"
               ? "leve, acolhedora e natural para DM/comentario"
+              : event.channel === "facebook"
+                ? "sóbria, clara e acolhedora para Messenger/comentario de pagina"
               : "objetiva, clara e humana para WhatsApp"
         }
         : {
@@ -2965,7 +3002,10 @@ export async function processChannelConversationEvent(
       responseTime: coreResponse.metadata.responseTime,
       classification: coreResponse.metadata.classification
     }, {
-      messageType: event.channel === "instagram" ? "social_dm" : "text",
+      messageType:
+        event.channel === "instagram" || event.channel === "facebook"
+          ? "social_dm"
+          : "text",
       senderType: "ai",
       sendStatus: sendResult.ok ? "sent" : "failed",
       deliveryStatus: sendResult.ok ? "accepted" : "failed",
@@ -3207,7 +3247,8 @@ export async function processChannelConversationEvent(
     });
 
     if (
-      acquisitionSnapshot.entryType === "instagram_comment_to_dm" &&
+      (acquisitionSnapshot.entryType === "instagram_comment_to_dm" ||
+        acquisitionSnapshot.entryType === "facebook_comment_to_dm") &&
       (conversionSignal === "triage_progress" ||
         conversionSignal === "consultation_intent" ||
         conversionSignal === "human_handoff")

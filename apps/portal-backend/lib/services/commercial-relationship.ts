@@ -16,7 +16,7 @@ import { clientIdentityService } from "./client-identity";
 import { clientMergeService } from "./client-merge";
 import { sanitizeHumanName } from "./lead-identity";
 
-type SupportedChannel = "instagram" | "whatsapp" | "site" | "portal" | "telegram";
+type SupportedChannel = "instagram" | "facebook" | "whatsapp" | "site" | "portal" | "telegram";
 type InboxFollowUpStatus = "none" | "pending" | "due" | "overdue" | "resolved" | "converted";
 type CommercialFollowUpState =
   | "none"

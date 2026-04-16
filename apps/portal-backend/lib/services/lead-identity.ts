@@ -1,4 +1,4 @@
-type IdentityChannel = "instagram" | "whatsapp" | "site" | "portal" | "telegram";
+type IdentityChannel = "instagram" | "facebook" | "whatsapp" | "site" | "portal" | "telegram";
 
 export type LeadIdentityStatus = "resolved" | "provisional" | "pending";
 export type LeadIdentitySource =
@@ -286,6 +286,10 @@ export function buildOperationalContactLabel(channel: IdentityChannel, externalU
 
   if (channel === "instagram") {
     return `Instagram • ${externalUserId.slice(0, 10)}`;
+  }
+
+  if (channel === "facebook") {
+    return `Facebook • ${externalUserId.slice(0, 10)}`;
   }
 
   if (channel === "site") {

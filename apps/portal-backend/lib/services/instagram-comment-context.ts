@@ -1,7 +1,8 @@
 import { conversationPersistence } from './conversation-persistence';
 
 export interface CommentContext {
-  source: 'instagram_comment';
+  channel: 'instagram' | 'facebook';
+  source: 'instagram_comment' | 'facebook_comment';
   media_id: string;
   keyword: string;
   theme: string;
@@ -33,7 +34,7 @@ class InstagramCommentContextService {
       console.log('AREA:', commentContext.area);
 
       const session = await conversationPersistence.getOrCreateSession(
-        'instagram',
+        commentContext.channel,
         userId
       );
 
@@ -49,6 +50,7 @@ class InstagramCommentContextService {
           keyword: commentContext.keyword,
           theme: commentContext.theme,
           area: commentContext.area,
+          channel: commentContext.channel,
           campaign_id: commentContext.campaign_id,
           comment_id: commentContext.comment_id,
           comment_text: commentContext.comment_text,
@@ -71,7 +73,7 @@ class InstagramCommentContextService {
         commentContext.comment_text,
         'inbound',
         {
-          channel: 'instagram',
+          channel: commentContext.channel,
           source: commentContext.source,
           externalUserId: userId,
           externalMessageId: commentContext.comment_id,
@@ -111,8 +113,9 @@ class InstagramCommentContextService {
 
       const metadata = session.metadata as any;
       
-      if (metadata.source === 'instagram_comment') {
+      if (metadata.source === 'instagram_comment' || metadata.source === 'facebook_comment') {
         return {
+          channel: metadata.channel === 'facebook' ? 'facebook' : 'instagram',
           source: metadata.source,
           media_id: metadata.media_id,
           keyword: metadata.keyword,
@@ -157,6 +160,7 @@ class InstagramCommentContextService {
       return {
         ...baseContext,
         commentSource: commentContext.source,
+        commentChannel: commentContext.channel,
         commentMediaId: commentContext.media_id,
         commentKeyword: commentContext.keyword,
         commentTheme: commentContext.theme,

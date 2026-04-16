@@ -1,8 +1,9 @@
 import "server-only";
 
 export type InstagramSendSurface = "direct_message" | "public_comment";
+export type MetaSocialChannel = "instagram" | "facebook";
 
-export type InstagramSendContext = {
+export type MetaSendContext = {
   eventId?: string | null;
   externalUserId?: string | null;
   sessionId?: string | null;
@@ -21,6 +22,7 @@ export type InstagramSendResult = {
   error: string | null;
   metadata: Record<string, unknown>;
 };
+export type MetaSendResult = InstagramSendResult;
 
 type InstagramGraphSendResponse = {
   id?: string;
@@ -29,8 +31,13 @@ type InstagramGraphSendResponse = {
   comment_id?: string;
 };
 
-function getInstagramConfig() {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN?.trim() || "";
+function getMetaConfig(channel: MetaSocialChannel) {
+  const accessToken =
+    channel === "facebook"
+      ? process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim() ||
+        process.env.META_PAGE_ACCESS_TOKEN?.trim() ||
+        ""
+      : process.env.INSTAGRAM_ACCESS_TOKEN?.trim() || "";
   const pageId = process.env.FACEBOOK_PAGE_ID?.trim() || "";
 
   return {
@@ -40,7 +47,8 @@ function getInstagramConfig() {
   };
 }
 
-async function postInstagramGraph(
+async function postMetaGraph(
+  channel: MetaSocialChannel,
   path: string,
   body: Record<string, unknown>
 ): Promise<{
@@ -49,7 +57,7 @@ async function postInstagramGraph(
   data: InstagramGraphSendResponse | null;
   error: string | null;
 }> {
-  const { accessToken } = getInstagramConfig();
+  const { accessToken } = getMetaConfig(channel);
 
   if (!accessToken) {
     return {
@@ -103,12 +111,13 @@ async function postInstagramGraph(
   }
 }
 
-export async function sendInstagramDirectMessage(
+export async function sendMetaDirectMessage(
+  channel: MetaSocialChannel,
   recipientId: string,
   messageText: string,
-  context: InstagramSendContext = {}
+  context: MetaSendContext = {}
 ): Promise<InstagramSendResult> {
-  const { pageId, configured } = getInstagramConfig();
+  const { pageId, configured } = getMetaConfig(channel);
 
   if (!configured) {
     return {
@@ -117,8 +126,9 @@ export async function sendInstagramDirectMessage(
       status: "failed",
       surface: "direct_message",
       rawStatus: null,
-      error: "instagram_direct_config_missing",
+      error: `${channel}_direct_config_missing`,
       metadata: {
+        channel,
         configured,
         hasPageId: Boolean(pageId),
         ...context
@@ -126,7 +136,7 @@ export async function sendInstagramDirectMessage(
     };
   }
 
-  const graphResult = await postInstagramGraph(`${pageId}/messages`, {
+  const graphResult = await postMetaGraph(channel, `${pageId}/messages`, {
     recipient: {
       id: recipientId
     },
@@ -143,6 +153,7 @@ export async function sendInstagramDirectMessage(
     rawStatus: graphResult.status,
     error: graphResult.error,
     metadata: {
+      channel,
       recipientId,
       responseType: context.responseType || "direct_message",
       graphRecipientId: graphResult.data?.recipient_id || null,
@@ -151,12 +162,13 @@ export async function sendInstagramDirectMessage(
   };
 }
 
-export async function sendInstagramCommentReply(
+export async function sendMetaCommentReply(
+  channel: MetaSocialChannel,
   commentId: string,
   messageText: string,
-  context: InstagramSendContext = {}
+  context: MetaSendContext = {}
 ): Promise<InstagramSendResult> {
-  const graphResult = await postInstagramGraph(`${commentId}/comments`, {
+  const graphResult = await postMetaGraph(channel, `${commentId}/comments`, {
     message: messageText
   });
 
@@ -168,9 +180,26 @@ export async function sendInstagramCommentReply(
     rawStatus: graphResult.status,
     error: graphResult.error,
     metadata: {
+      channel,
       commentId,
       responseType: context.responseType || "public_comment",
       ...context
     }
   };
+}
+
+export async function sendInstagramDirectMessage(
+  recipientId: string,
+  messageText: string,
+  context: MetaSendContext = {}
+): Promise<InstagramSendResult> {
+  return sendMetaDirectMessage("instagram", recipientId, messageText, context);
+}
+
+export async function sendInstagramCommentReply(
+  commentId: string,
+  messageText: string,
+  context: MetaSendContext = {}
+): Promise<InstagramSendResult> {
+  return sendMetaCommentReply("instagram", commentId, messageText, context);
 }

@@ -6,7 +6,7 @@ import { commercialRelationshipService } from "./commercial-relationship";
 
 export interface ConversationSession {
   id: string;
-  channel: 'instagram' | 'whatsapp' | 'site' | 'portal' | 'telegram';
+  channel: 'instagram' | 'facebook' | 'whatsapp' | 'site' | 'portal' | 'telegram';
   external_user_id: string;
   external_thread_id?: string;
   lead_name?: string;
@@ -85,7 +85,7 @@ export interface ConversationSession {
 
 export interface ProcessedWebhookEvent {
   id: string;
-  channel: 'instagram' | 'whatsapp' | 'telegram';
+  channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram';
   external_event_id: string;
   external_message_id?: string;
   external_user_id?: string;
@@ -162,7 +162,7 @@ class ConversationPersistenceService {
 
   // Verificar se evento já foi processado (idempotência)
   async isEventProcessed(
-    channel: 'instagram' | 'whatsapp' | 'telegram',
+    channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram',
     externalEventId: string
   ): Promise<boolean> {
     try {
@@ -187,7 +187,7 @@ class ConversationPersistenceService {
 
   // Marcar evento como processado
   async markEventProcessed(
-    channel: 'instagram' | 'whatsapp' | 'telegram',
+    channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram',
     externalEventId: string,
     externalMessageId?: string,
     externalUserId?: string,
@@ -336,7 +336,7 @@ class ConversationPersistenceService {
 
   // Obter ou criar sessão de conversação (Fase 2.3 - Integrado com clientIdentityService)
   async getOrCreateSession(
-    channel: 'instagram' | 'whatsapp' | 'site' | 'portal' | 'telegram',
+    channel: 'instagram' | 'facebook' | 'whatsapp' | 'site' | 'portal' | 'telegram',
     externalUserId: string,
     externalThreadId?: string
   ): Promise<ConversationSession> {
@@ -409,6 +409,7 @@ class ConversationPersistenceService {
         } else if (
           channel === 'whatsapp' ||
           channel === 'instagram' ||
+          channel === 'facebook' ||
           channel === 'site' ||
           channel === 'telegram'
         ) {
@@ -455,6 +456,7 @@ class ConversationPersistenceService {
       } else if (
         channel === 'whatsapp' ||
         channel === 'instagram' ||
+        channel === 'facebook' ||
         channel === 'site' ||
         channel === 'telegram'
       ) {

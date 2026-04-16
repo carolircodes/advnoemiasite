@@ -1,7 +1,7 @@
 import { conversationPersistence, ConversationMessage } from './conversation-persistence';
 
 export interface WebhookEvent {
-  channel: 'instagram' | 'whatsapp' | 'telegram';
+  channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram';
   externalEventId?: string;
   externalMessageId?: string;
   externalUserId: string;

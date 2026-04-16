@@ -14,7 +14,7 @@ export interface Client {
 export interface ClientChannel {
   id: string;
   client_id: string;
-  channel: "whatsapp" | "instagram" | "site" | "portal" | "telegram";
+  channel: "whatsapp" | "instagram" | "facebook" | "site" | "portal" | "telegram";
   external_user_id: string;
   external_thread_id?: string;
   last_contact_at: string;
@@ -48,7 +48,7 @@ export interface ClientPipeline {
 }
 
 export interface GetOrCreateClientAndChannelInput {
-  channel: "whatsapp" | "instagram" | "site" | "portal" | "telegram";
+  channel: "whatsapp" | "instagram" | "facebook" | "site" | "portal" | "telegram";
   externalUserId: string;
   externalThreadId?: string;
   name?: string;

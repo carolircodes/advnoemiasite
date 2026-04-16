@@ -4,6 +4,8 @@
  */
 
 import { createWebhookSupabaseClient } from '../supabase/webhook';
+import { sendFacebookDirectMessage } from '../meta/facebook-service';
+import { sendInstagramDirectMessage } from '../meta/instagram-service';
 import { sendWhatsAppMessage } from '../meta/whatsapp-service';
 import { conversationInboxService } from './conversation-inbox';
 
@@ -11,7 +13,7 @@ interface SendAssistedFollowUpParams {
   clientId: string;
   pipelineId: string;
   followUpMessageId?: string;
-  channel: 'whatsapp' | 'instagram';
+  channel: 'whatsapp' | 'instagram' | 'facebook';
   content: string;
   approvedBy: string;
   messageType?: string;
@@ -21,7 +23,7 @@ interface SendAssistedFollowUpParams {
 interface ClientChannel {
   id: string;
   client_id: string;
-  channel: 'whatsapp' | 'instagram' | 'portal' | 'site';
+  channel: 'whatsapp' | 'instagram' | 'facebook' | 'portal' | 'site';
   external_user_id: string;
   is_active: boolean;
   created_at: string;
@@ -34,7 +36,7 @@ interface FollowUpMessage {
   pipeline_id: string;
   message_type: string;
   content: string;
-  channel: 'whatsapp' | 'instagram' | 'portal' | 'site';
+  channel: 'whatsapp' | 'instagram' | 'facebook' | 'portal' | 'site';
   status: 'pending' | 'sent' | 'replied' | 'cancelled';
   scheduled_at?: string;
   sent_at?: string;
@@ -171,11 +173,15 @@ class AssistedFollowUpService {
                 success: false,
                 error: error instanceof Error ? error.message : 'Erro ao unificar follow-up na inbox'
               }))
-          : await this.sendFollowUpMessage({
-              channel: params.channel,
-              externalUserId: channelValidation.externalUserId!,
-              content: params.content
-            });
+          : params.channel === 'facebook'
+            ? await this.sendFollowUpViaFacebook(
+                channelValidation.externalUserId!,
+                params.content
+              )
+          : await this.sendFollowUpViaInstagram(
+              channelValidation.externalUserId!,
+              params.content
+            );
 
       const sendError = 'error' in sendResult ? sendResult.error : undefined;
       const sendMessageId = 'messageId' in sendResult ? sendResult.messageId : undefined;
@@ -288,7 +294,7 @@ class AssistedFollowUpService {
    */
   private async validateClientChannel(
     clientId: string, 
-    channel: 'whatsapp' | 'instagram'
+    channel: 'whatsapp' | 'instagram' | 'facebook'
   ): Promise<{ valid: boolean; externalUserId?: string; error?: string }> {
     try {
       const { data, error } = await this.supabase
@@ -351,7 +357,7 @@ class AssistedFollowUpService {
    * Envia mensagem pelo canal específico
    */
   private async sendFollowUpMessage(params: {
-    channel: 'whatsapp' | 'instagram';
+    channel: 'whatsapp' | 'instagram' | 'facebook';
     externalUserId: string;
     content: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
@@ -466,6 +472,36 @@ class AssistedFollowUpService {
     }
   }
 
+  private async sendFollowUpViaFacebook(
+    userId: string,
+    content: string
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const result = await sendFacebookDirectMessage(userId, content, {
+        externalUserId: userId,
+        responseType: 'follow_up',
+        reason: 'assisted_follow_up'
+      });
+
+      console.log('FOLLOW_UP_FACEBOOK_SENT', {
+        userId,
+        messageId: result.messageId,
+        contentLength: content.length
+      });
+
+      return {
+        success: result.ok,
+        messageId: result.messageId || undefined,
+        error: result.error || undefined
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao enviar Facebook Messenger'
+      };
+    }
+  }
+
   /**
    * Registra o envio da mensagem
    */
@@ -473,7 +509,7 @@ class AssistedFollowUpService {
     clientId: string;
     pipelineId: string;
     followUpMessageId?: string;
-    channel: 'whatsapp' | 'instagram';
+    channel: 'whatsapp' | 'instagram' | 'facebook';
     content: string;
     messageId?: string;
     approvedBy: string;
@@ -547,7 +583,7 @@ class AssistedFollowUpService {
   private async updatePipelineAfterSend(params: {
     clientId: string;
     pipelineId: string;
-    channel: 'whatsapp' | 'instagram';
+    channel: 'whatsapp' | 'instagram' | 'facebook';
   }): Promise<{ success: boolean; error?: string }> {
     try {
       // Atualizar informações básicas do pipeline
@@ -619,7 +655,7 @@ class AssistedFollowUpService {
         .select('channel, external_user_id, last_contact_at')
         .eq('client_id', clientId)
         .eq('is_active', true)
-        .in('channel', ['whatsapp', 'instagram']);
+        .in('channel', ['whatsapp', 'instagram', 'facebook']);
 
       if (error) {
         return { success: false, channels: [], error: 'Erro ao buscar canais do cliente' };

@@ -6,6 +6,7 @@ import {
   shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
+import { sendFacebookCommentReply, sendFacebookDirectMessage } from "@/lib/meta/facebook-service";
 import {
   sendInstagramCommentReply,
   sendInstagramDirectMessage
@@ -17,6 +18,8 @@ import { processChannelConversationEvent } from "../../../../lib/services/channe
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN?.trim();
 const APP_SECRET =
   process.env.INSTAGRAM_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
+
+type MetaChannel = "instagram" | "facebook";
 
 function logEvent(
   event: string,
@@ -31,7 +34,7 @@ function logEvent(
       action: event.toLowerCase(),
       eventId: typeof data?.eventId === "string" ? data.eventId : null,
       sessionId: typeof data?.sessionId === "string" ? data.sessionId : null,
-      channel: "instagram",
+      channel: typeof data?.channel === "string" ? data.channel : "meta",
       pipelineId: typeof data?.pipelineId === "string" ? data.pipelineId : null,
       decisionState: typeof data?.decisionState === "string" ? data.decisionState : null,
       sendResult: typeof data?.sendResult === "string" ? data.sendResult : null,
@@ -51,7 +54,7 @@ function verifySignature(rawBuffer: Buffer, signature: string) {
   return timingSafeEqualText(signature, expectedSignature);
 }
 
-function extractInstagramDmMessageText(message: Record<string, unknown>) {
+function extractDmMessageText(message: Record<string, unknown>) {
   const textValue = typeof message.text === "string" ? message.text : "";
   if (textValue.trim().length > 0) {
     return textValue;
@@ -63,6 +66,238 @@ function extractInstagramDmMessageText(message: Record<string, unknown>) {
   }
 
   return "";
+}
+
+async function sendDirectMessage(
+  channel: MetaChannel,
+  recipientId: string,
+  messageText: string,
+  context?: {
+    eventId: string;
+    externalUserId: string;
+    sessionId?: string | null;
+    pipelineId?: string | null;
+    messageType?: string | null;
+    responseType?: string | null;
+    responseLength?: number | null;
+    reason?: string | null;
+  }
+) {
+  const result =
+    channel === "facebook"
+      ? await sendFacebookDirectMessage(recipientId, messageText, {
+          ...context
+        })
+      : await sendInstagramDirectMessage(recipientId, messageText, {
+          ...context
+        });
+
+  logEvent(result.ok ? "META_SEND_SUCCESS" : "META_SEND_ERROR", {
+    channel,
+    recipientId,
+    ...result.metadata,
+    messageId: result.messageId,
+    rawStatus: result.rawStatus,
+    error: result.error
+  }, result.ok ? "info" : "error");
+
+  return result;
+}
+
+async function sendCommentReply(
+  channel: MetaChannel,
+  commentId: string,
+  messageText: string,
+  context?: {
+    eventId: string;
+    externalUserId: string;
+    sessionId?: string | null;
+    pipelineId?: string | null;
+    responseType?: string | null;
+    responseLength?: number | null;
+    reason?: string | null;
+  }
+) {
+  const result =
+    channel === "facebook"
+      ? await sendFacebookCommentReply(commentId, messageText, {
+          ...context
+        })
+      : await sendInstagramCommentReply(commentId, messageText, {
+          ...context
+        });
+
+  logEvent(result.ok ? "META_COMMENT_REPLY_SUCCESS" : "META_COMMENT_REPLY_ERROR", {
+    channel,
+    commentId,
+    ...result.metadata,
+    messageId: result.messageId,
+    rawStatus: result.rawStatus,
+    error: result.error
+  }, result.ok ? "info" : "error");
+
+  return result.ok;
+}
+
+async function processMetaMessagingEntry(channel: MetaChannel, entry: Record<string, unknown>) {
+  for (const messaging of Array.isArray(entry.messaging) ? entry.messaging : []) {
+    const senderId =
+      typeof (messaging as Record<string, any>).sender?.id === "string"
+        ? (messaging as Record<string, any>).sender.id
+        : "";
+    const senderUsername =
+      typeof (messaging as Record<string, any>).sender?.username === "string"
+        ? (messaging as Record<string, any>).sender.username
+        : undefined;
+    const senderDisplayName =
+      typeof (messaging as Record<string, any>).sender?.name === "string"
+        ? (messaging as Record<string, any>).sender.name
+        : undefined;
+    const message = ((messaging as Record<string, any>).message || {}) as Record<string, unknown>;
+    const messageText = extractDmMessageText(message);
+    const messageId = typeof message.mid === "string" ? message.mid : "";
+
+    if (!senderId || !messageText) {
+      continue;
+    }
+
+    await processChannelConversationEvent(
+      {
+        channel,
+        source: channel === "facebook" ? "facebook_dm" : "instagram_dm",
+        externalUserId: senderId,
+        externalMessageId: messageId || undefined,
+        externalEventId: messageId || undefined,
+        messageText,
+        messageType: typeof message.type === "string" ? message.type : "text",
+        isEcho: (message as { is_echo?: boolean }).is_echo === true,
+        timestamp: (messaging as Record<string, any>).timestamp,
+        displayName: senderDisplayName,
+        username: senderUsername
+      },
+      {
+        sendText: async (recipientId, outboundText, outboundContext) =>
+          sendDirectMessage(channel, recipientId, outboundText, outboundContext)
+      }
+    );
+  }
+}
+
+async function processMetaChangeEntry(channel: MetaChannel, entry: Record<string, unknown>) {
+  for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+    const typedChange = change as Record<string, any>;
+    const value = (typedChange.value || {}) as Record<string, any>;
+
+    if (
+      (channel === "instagram" && typedChange.field === "comments") ||
+      (channel === "facebook" &&
+        (typedChange.field === "feed" || typedChange.field === "comments") &&
+        (value.item === "comment" || typeof value.comment_id === "string"))
+    ) {
+      const senderId = typeof value.from?.id === "string" ? value.from.id : "";
+      const commentId =
+        typeof value.comment_id === "string"
+          ? value.comment_id
+          : typeof value.id === "string"
+            ? value.id
+            : "";
+      const commentText =
+        typeof value.message === "string"
+          ? value.message
+          : typeof value.text === "string"
+            ? value.text
+            : "";
+      const mediaId =
+        typeof value.post_id === "string"
+          ? value.post_id
+          : typeof value.media?.id === "string"
+            ? value.media.id
+            : "";
+
+      if (!senderId || !commentId || !commentText) {
+        continue;
+      }
+
+      await processChannelConversationEvent(
+        {
+          channel,
+          source: channel === "facebook" ? "facebook_comment" : "instagram_comment",
+          externalUserId: senderId,
+          externalMessageId: commentId,
+          externalEventId: `${channel}_comment:${commentId}`,
+          messageText: commentText,
+          messageType: "text",
+          displayName: typeof value.from?.name === "string" ? value.from.name : undefined,
+          username:
+            typeof value.from?.username === "string"
+              ? value.from.username
+              : undefined,
+          commentContext: {
+            commentId,
+            mediaId,
+            commentText,
+            username:
+              typeof value.from?.username === "string"
+                ? value.from.username
+                : undefined
+          }
+        },
+        {
+          sendText: async (recipientId, outboundText, outboundContext) =>
+            sendDirectMessage(channel, recipientId, outboundText, outboundContext),
+          sendPublicCommentReply: async (targetCommentId, outboundText, outboundContext) =>
+            sendCommentReply(channel, targetCommentId, outboundText, outboundContext),
+          sendDirectFromComment: async (recipientId, outboundText, outboundContext) => {
+            const result = await sendDirectMessage(channel, recipientId, outboundText, outboundContext);
+            return result.ok;
+          }
+        }
+      );
+
+      continue;
+    }
+
+    if (channel !== "instagram" || typedChange.field !== "messages") {
+      continue;
+    }
+
+    for (const message of Array.isArray(value.messages) ? value.messages : []) {
+      const typedMessage = message as Record<string, any>;
+      const senderId = typeof typedMessage.from?.id === "string" ? typedMessage.from.id : "";
+      const senderUsername =
+        typeof typedMessage.from?.username === "string"
+          ? typedMessage.from.username
+          : undefined;
+      const senderDisplayName =
+        typeof typedMessage.from?.name === "string" ? typedMessage.from.name : undefined;
+      const messageId = typeof typedMessage.mid === "string" ? typedMessage.mid : "";
+      const messageText = extractDmMessageText(typedMessage);
+
+      if (!senderId || !messageText) {
+        continue;
+      }
+
+      await processChannelConversationEvent(
+        {
+          channel: "instagram",
+          source: "instagram_dm",
+          externalUserId: senderId,
+          externalMessageId: messageId || undefined,
+          externalEventId: messageId || undefined,
+          messageText,
+          messageType: typeof typedMessage.type === "string" ? typedMessage.type : "text",
+          isEcho: typedMessage.is_echo === true,
+          timestamp: typedMessage.timestamp,
+          displayName: senderDisplayName,
+          username: senderUsername
+        },
+        {
+          sendText: async (recipientId, outboundText, outboundContext) =>
+            sendDirectMessage("instagram", recipientId, outboundText, outboundContext)
+        }
+      );
+    }
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -106,7 +341,7 @@ export async function POST(request: NextRequest) {
         logEvent(
           "META_SIGNATURE_SECRET_MISSING",
           {
-            note: "META/Instagram webhook secret is required when signature enforcement is active."
+            note: "META webhook secret is required when signature enforcement is active."
           },
           "error"
         );
@@ -164,190 +399,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
 
-    if (data.object !== "instagram") {
+    if (data.object !== "instagram" && data.object !== "page") {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    for (const entry of data.entry || []) {
-      for (const messaging of entry.messaging || []) {
-        const senderId =
-          typeof messaging.sender?.id === "string" ? messaging.sender.id : "";
-        const senderUsername =
-          typeof messaging.sender?.username === "string" ? messaging.sender.username : undefined;
-        const senderDisplayName =
-          typeof messaging.sender?.name === "string" ? messaging.sender.name : undefined;
-        const message = messaging.message || {};
-        const messageText = extractInstagramDmMessageText(message);
-        const messageId = typeof message.mid === "string" ? message.mid : "";
+    const channel: MetaChannel = data.object === "page" ? "facebook" : "instagram";
 
-        if (!senderId || !messageText) {
-          continue;
-        }
-
-        await processChannelConversationEvent(
-          {
-            channel: "instagram",
-            source: "instagram_dm",
-            externalUserId: senderId,
-            externalMessageId: messageId || undefined,
-            externalEventId: messageId || undefined,
-            messageText,
-            messageType: typeof message.type === "string" ? message.type : "text",
-            isEcho: message.is_echo === true,
-            timestamp: messaging.timestamp,
-            displayName: senderDisplayName,
-            username: senderUsername
-          },
-          {
-            sendText: async (recipientId, messageText, context) => {
-              const result = await sendInstagramDirectMessage(recipientId, messageText, context);
-
-              logEvent(result.ok ? "INSTAGRAM_SEND_SUCCESS" : "INSTAGRAM_SEND_ERROR", {
-                recipientId,
-                ...result.metadata,
-                messageId: result.messageId,
-                rawStatus: result.rawStatus,
-                error: result.error
-              }, result.ok ? "info" : "error");
-
-              return result;
-            }
-          }
-        );
-      }
-
-      for (const change of entry.changes || []) {
-        if (change.field === "comments") {
-          const comment = change.value || {};
-          const senderId = typeof comment.from?.id === "string" ? comment.from.id : "";
-          const commentId = typeof comment.id === "string" ? comment.id : "";
-          const commentText = typeof comment.text === "string" ? comment.text : "";
-          const mediaId = typeof comment.media?.id === "string" ? comment.media.id : "";
-
-          if (!senderId || !commentId || !commentText) {
-            continue;
-          }
-
-          await processChannelConversationEvent(
-            {
-              channel: "instagram",
-              source: "instagram_comment",
-              externalUserId: senderId,
-              externalMessageId: commentId,
-              externalEventId: `instagram_comment:${commentId}`,
-              messageText: commentText,
-              messageType: "text",
-              commentContext: {
-                commentId,
-                mediaId,
-                commentText,
-                username:
-                  typeof comment.from?.username === "string"
-                    ? comment.from.username
-                    : undefined
-              }
-            },
-            {
-              sendText: async (recipientId, messageText, context) => {
-                const result = await sendInstagramDirectMessage(recipientId, messageText, context);
-
-                logEvent(result.ok ? "INSTAGRAM_SEND_SUCCESS" : "INSTAGRAM_SEND_ERROR", {
-                  recipientId,
-                  ...result.metadata,
-                  messageId: result.messageId,
-                  rawStatus: result.rawStatus,
-                  error: result.error
-                }, result.ok ? "info" : "error");
-
-                return result;
-              },
-              sendPublicCommentReply: async (targetCommentId, messageText, context) => {
-                const result = await sendInstagramCommentReply(targetCommentId, messageText, context);
-
-                logEvent(
-                  result.ok ? "INSTAGRAM_COMMENT_REPLY_SUCCESS" : "INSTAGRAM_COMMENT_REPLY_ERROR",
-                  {
-                    commentId: targetCommentId,
-                    ...result.metadata,
-                    messageId: result.messageId,
-                    rawStatus: result.rawStatus,
-                    error: result.error
-                  },
-                  result.ok ? "info" : "error"
-                );
-
-                return result.ok;
-              },
-              sendDirectFromComment: async (recipientId, messageText, context) => {
-                const result = await sendInstagramDirectMessage(recipientId, messageText, context);
-
-                logEvent(
-                  result.ok ? "INSTAGRAM_COMMENT_AUTO_DM_SUCCESS" : "INSTAGRAM_COMMENT_AUTO_DM_ERROR",
-                  {
-                    recipientId,
-                    ...result.metadata,
-                    messageId: result.messageId,
-                    rawStatus: result.rawStatus,
-                    error: result.error
-                  },
-                  result.ok ? "info" : "error"
-                );
-
-                return result.ok;
-              }
-            }
-          );
-        }
-
-        if (change.field !== "messages") {
-          continue;
-        }
-
-        for (const message of change.value?.messages || []) {
-          const senderId = typeof message.from?.id === "string" ? message.from.id : "";
-          const senderUsername =
-            typeof message.from?.username === "string" ? message.from.username : undefined;
-          const senderDisplayName =
-            typeof message.from?.name === "string" ? message.from.name : undefined;
-          const messageId = typeof message.mid === "string" ? message.mid : "";
-          const messageText = extractInstagramDmMessageText(message);
-
-          if (!senderId || !messageText) {
-            continue;
-          }
-
-          await processChannelConversationEvent(
-            {
-              channel: "instagram",
-              source: "instagram_dm",
-              externalUserId: senderId,
-              externalMessageId: messageId || undefined,
-              externalEventId: messageId || undefined,
-              messageText,
-              messageType: typeof message.type === "string" ? message.type : "text",
-              isEcho: message.is_echo === true,
-            timestamp: message.timestamp,
-            displayName: senderDisplayName,
-            username: senderUsername
-          },
-          {
-            sendText: async (recipientId, messageText, context) => {
-              const result = await sendInstagramDirectMessage(recipientId, messageText, context);
-
-              logEvent(result.ok ? "INSTAGRAM_SEND_SUCCESS" : "INSTAGRAM_SEND_ERROR", {
-                recipientId,
-                ...result.metadata,
-                messageId: result.messageId,
-                rawStatus: result.rawStatus,
-                error: result.error
-              }, result.ok ? "info" : "error");
-
-              return result;
-            }
-          }
-        );
-      }
-      }
+    for (const entry of Array.isArray(data.entry) ? data.entry : []) {
+      const typedEntry = entry as Record<string, unknown>;
+      await processMetaMessagingEntry(channel, typedEntry);
+      await processMetaChangeEntry(channel, typedEntry);
     }
 
     return NextResponse.json({ received: true }, { status: 200 });

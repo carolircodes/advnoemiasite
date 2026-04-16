@@ -23,6 +23,9 @@ export type SocialEntryType =
   | "instagram_comment"
   | "instagram_dm"
   | "instagram_comment_to_dm"
+  | "facebook_comment"
+  | "facebook_dm"
+  | "facebook_comment_to_dm"
   | "whatsapp_inbound"
   | "site_entry"
   | "portal_entry";
@@ -30,6 +33,7 @@ export type SocialEntryType =
 export type SocialEntryPoint =
   | "comment"
   | "direct"
+  | "messenger"
   | "whatsapp"
   | "site"
   | "portal";
@@ -37,6 +41,7 @@ export type SocialEntryPoint =
 export type DiscoveryMechanism =
   | "organic_comment"
   | "organic_direct"
+  | "organic_messenger"
   | "whatsapp_inbound"
   | "cta_link"
   | "bio_link"
@@ -49,6 +54,9 @@ export type SocialContentType =
   | "instagram_reel"
   | "instagram_comment_thread"
   | "instagram_dm_thread"
+  | "facebook_post"
+  | "facebook_comment_thread"
+  | "facebook_messenger_thread"
   | "whatsapp_chat"
   | "site_page"
   | "portal_workspace"
@@ -66,7 +74,7 @@ export type CommercialIntentSignal = "low" | "medium" | "high";
 
 export type SocialAcquisitionSnapshot = {
   schemaVersion: "social-acquisition-v1";
-  channel: "instagram" | "whatsapp" | "site" | "portal";
+  channel: "instagram" | "facebook" | "whatsapp" | "site" | "portal";
   source: string;
   sourceLabel: string;
   entryType: SocialEntryType;
@@ -92,7 +100,7 @@ export type SocialAcquisitionSnapshot = {
 };
 
 type BuildSnapshotInput = {
-  channel: "instagram" | "whatsapp";
+  channel: "instagram" | "facebook" | "whatsapp";
   source: string;
   messageText: string;
   occurredAt?: string;
@@ -206,15 +214,18 @@ function inferIntentSignal(messageText: string): CommercialIntentSignal {
 }
 
 function inferCommercialContext(topic: string, entryType: SocialEntryType) {
-  if (entryType === "instagram_comment") {
+  if (entryType === "instagram_comment" || entryType === "facebook_comment") {
     return `captacao_social_publica_${topic}`;
   }
 
-  if (entryType === "instagram_comment_to_dm") {
+  if (
+    entryType === "instagram_comment_to_dm" ||
+    entryType === "facebook_comment_to_dm"
+  ) {
     return `continuacao_social_privada_${topic}`;
   }
 
-  if (entryType === "instagram_dm") {
+  if (entryType === "instagram_dm" || entryType === "facebook_dm") {
     return `captacao_social_privada_${topic}`;
   }
 
@@ -229,17 +240,20 @@ function inferOperatorAction(
   entryType: SocialEntryType,
   intentSignal: CommercialIntentSignal
 ) {
-  if (entryType === "instagram_comment") {
+  if (entryType === "instagram_comment" || entryType === "facebook_comment") {
     return intentSignal === "high"
       ? "responder com brevidade premium e convidar para direct"
       : "acolher em publico sem aprofundar";
   }
 
-  if (entryType === "instagram_comment_to_dm") {
+  if (
+    entryType === "instagram_comment_to_dm" ||
+    entryType === "facebook_comment_to_dm"
+  ) {
     return "continuar triagem no direct preservando o contexto do comentario";
   }
 
-  if (entryType === "instagram_dm") {
+  if (entryType === "instagram_dm" || entryType === "facebook_dm") {
     return "continuar triagem no direct";
   }
 
@@ -254,6 +268,8 @@ function inferSourceLabel(source: string) {
   const labels: Record<string, string> = {
     instagram_comment: "Instagram comentario",
     instagram_dm: "Instagram direct",
+    facebook_comment: "Facebook comentario",
+    facebook_dm: "Facebook Messenger",
     whatsapp_inbound: "WhatsApp inbound",
     site_entry: "Site",
     portal_entry: "Portal"
@@ -263,7 +279,7 @@ function inferSourceLabel(source: string) {
 }
 
 function inferEntryDefinition(
-  channel: "instagram" | "whatsapp",
+  channel: "instagram" | "facebook" | "whatsapp",
   source: string
 ): {
   entryType: SocialEntryType;
@@ -295,6 +311,28 @@ function inferEntryDefinition(
     };
   }
 
+  if (channel === "facebook" && source === "facebook_comment") {
+    return {
+      entryType: "facebook_comment",
+      entryPoint: "comment",
+      discoveryMechanism: "organic_comment",
+      contentType: "facebook_comment_thread",
+      eventOrigin: "social",
+      contentOriginLabel: "Conteudo organico da Pagina com comentario publico"
+    };
+  }
+
+  if (channel === "facebook") {
+    return {
+      entryType: "facebook_dm",
+      entryPoint: "messenger",
+      discoveryMechanism: "organic_messenger",
+      contentType: "facebook_messenger_thread",
+      eventOrigin: "social",
+      contentOriginLabel: "Conversa privada no Messenger da Pagina"
+    };
+  }
+
   return {
     entryType: "whatsapp_inbound",
     entryPoint: "whatsapp",
@@ -320,20 +358,30 @@ export function getSocialAcquisitionFromMetadata(
 export function promoteCommentSnapshotToDm(
   snapshot: SocialAcquisitionSnapshot
 ): SocialAcquisitionSnapshot {
-  if (snapshot.entryType !== "instagram_comment") {
+  if (
+    snapshot.entryType !== "instagram_comment" &&
+    snapshot.entryType !== "facebook_comment"
+  ) {
     return snapshot;
   }
 
+  const isFacebook = snapshot.channel === "facebook";
+
   return {
     ...snapshot,
-    source: "instagram_comment_to_dm",
-    sourceLabel: "Instagram comentario para direct",
-    entryType: "instagram_comment_to_dm",
-    entryPoint: "direct",
-    discoveryMechanism: "organic_direct",
-    contentType: "instagram_dm_thread",
+    source: isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm",
+    sourceLabel: isFacebook
+      ? "Facebook comentario para Messenger"
+      : "Instagram comentario para direct",
+    entryType: isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm",
+    entryPoint: isFacebook ? "messenger" : "direct",
+    discoveryMechanism: isFacebook ? "organic_messenger" : "organic_direct",
+    contentType: isFacebook ? "facebook_messenger_thread" : "instagram_dm_thread",
     contentOriginLabel: "Comentario convertido em conversa privada",
-    commercialContext: inferCommercialContext(snapshot.topic, "instagram_comment_to_dm"),
+    commercialContext: inferCommercialContext(
+      snapshot.topic,
+      isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm"
+    ),
     recommendedOperatorAction:
       "continuar triagem no direct preservando o contexto do comentario",
     directTransitionStatus: "dm_started",
@@ -380,20 +428,29 @@ export function buildSocialAcquisitionSnapshot(
         ? "instagram_organic_comment_capture"
         : input.channel === "instagram"
           ? "instagram_direct_conversation"
-          : "whatsapp_inbound_conversation"),
+          : input.channel === "facebook" && input.source === "facebook_comment"
+            ? "facebook_organic_comment_capture"
+            : input.channel === "facebook"
+              ? "facebook_messenger_conversation"
+              : "whatsapp_inbound_conversation"),
     campaignLabel:
       input.existing?.campaignLabel ||
       (input.channel === "instagram" && input.source === "instagram_comment"
         ? "Instagram comentario organico"
         : input.channel === "instagram"
           ? "Instagram direct"
+          : input.channel === "facebook" && input.source === "facebook_comment"
+            ? "Facebook comentario organico"
+            : input.channel === "facebook"
+              ? "Facebook Messenger"
           : "WhatsApp inbound"),
     contentOriginLabel: entry.contentOriginLabel,
     commercialContext: inferCommercialContext(topic, entry.entryType),
     intentSignal,
     recommendedOperatorAction: inferOperatorAction(entry.entryType, intentSignal),
     directTransitionStatus:
-      input.channel === "instagram" && input.source === "instagram_comment"
+      (input.channel === "instagram" && input.source === "instagram_comment") ||
+      (input.channel === "facebook" && input.source === "facebook_comment")
         ? "awaiting_dm"
         : "not_applicable",
     commentId: input.commentContext?.commentId || input.existing?.commentId || null,
@@ -401,13 +458,25 @@ export function buildSocialAcquisitionSnapshot(
     lastResolvedAt: now
   };
 
-  if (input.existing?.entryType === "instagram_comment" && input.source === "instagram_dm") {
+  if (
+    (
+      input.existing?.entryType === "instagram_comment" &&
+      input.source === "instagram_dm"
+    ) ||
+    (
+      input.existing?.entryType === "facebook_comment" &&
+      input.source === "facebook_dm"
+    )
+  ) {
     return promoteCommentSnapshotToDm({
       ...input.existing,
       topic,
       topicLabel: formatTopicLabel(topic),
       intentSignal,
-      recommendedOperatorAction: inferOperatorAction("instagram_comment_to_dm", intentSignal)
+      recommendedOperatorAction: inferOperatorAction(
+        input.channel === "facebook" ? "facebook_comment_to_dm" : "instagram_comment_to_dm",
+        intentSignal
+      )
     });
   }
 
@@ -452,6 +521,8 @@ export async function trackSocialAcquisitionEvent(input: TrackSocialEventInput) 
         input.pagePath ||
         (input.snapshot.channel === "instagram"
           ? "/instagram/social"
+          : input.snapshot.channel === "facebook"
+            ? "/facebook/social"
           : input.snapshot.channel === "whatsapp"
             ? "/whatsapp/inbound"
             : "/social/acquisition"),
