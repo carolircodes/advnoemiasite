@@ -8,6 +8,7 @@ import {
   normalizePhoneNumber,
   resolvePaymentPricing
 } from "@/lib/payment/pricing";
+import { commercialClosingService } from "@/lib/services/commercial-closing";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 type PaymentCreateContext = {
@@ -311,6 +312,26 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq("id", leadId);
+
+    try {
+      await commercialClosingService.syncPipelineClosingFromProfile({
+        profileId: userId,
+        payload: {
+          paymentState: "link_sent",
+          paymentLinkSentAt: checkoutStartedAt,
+          paymentLinkUrl: response.init_point,
+          paymentReference: response.id,
+          paymentPendingAt: checkoutStartedAt,
+          consultationOfferAmount: amount
+        }
+      });
+    } catch (closingSyncError) {
+      console.error("[payment.create] Failed to sync commercial closing state", {
+        closingSyncError,
+        userId,
+        leadId
+      });
+    }
 
     try {
       await recordRevenueTelemetry({

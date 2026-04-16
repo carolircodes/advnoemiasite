@@ -23,6 +23,11 @@ type CommercialAutomationContact = {
   attentionBucket: "needs_attention" | "follow_up" | "blocked" | "monitor";
   priorityLabel: "high" | "medium" | "low";
   daysSinceLastContact: number;
+  consultationReadiness?: string;
+  recommendedAction?: string;
+  opportunityState?: string;
+  blockingReason?: string | null;
+  consultationRecommendationState?: string;
   channels: Array<{
     channel: string;
     externalUserId: string;
@@ -78,6 +83,32 @@ function buildCandidate(contact: CommercialAutomationContact): Omit<CommercialAu
       label: "Retomar consulta oferecida",
       detail: "O lead ja recebeu convite de consulta e ainda pode converter nesta janela.",
       messageType: "consultation_followup"
+    };
+  }
+
+  if (
+    !contact.isClient &&
+    contact.consultationRecommendationState === "recommend_now" &&
+    contact.recommendedAction === "offer_consultation"
+  ) {
+    return {
+      ruleKey: "consultation-ready-advance",
+      label: "Sugerir consulta no timing certo",
+      detail: "A leitura comercial indica prontidao real para consulta, com criterio e sem excesso.",
+      messageType: "consultation_followup"
+    };
+  }
+
+  if (
+    !contact.isClient &&
+    contact.blockingReason === "missing_documents" &&
+    contact.daysSinceLastContact >= 1
+  ) {
+    return {
+      ruleKey: "document-context-unblock",
+      label: "Destravar com documento",
+      detail: "A conversa avancou, mas o fechamento depende de contexto documental.",
+      messageType: "document_request_nudge"
     };
   }
 

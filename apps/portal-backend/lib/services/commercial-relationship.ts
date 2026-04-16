@@ -1,6 +1,16 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "../supabase/admin";
+import {
+  commercialClosingService,
+  evaluateCommercialClosing,
+  type CommercialClosingAssessment
+} from "./commercial-closing";
+import {
+  commercialConversionService,
+  evaluateCommercialConversion,
+  type CommercialConversionAssessment
+} from "./commercial-conversion";
 import { clientIdentityService } from "./client-identity";
 import { clientMergeService } from "./client-merge";
 import { sanitizeHumanName } from "./lead-identity";
@@ -69,6 +79,28 @@ export type CommercialThreadContext = {
     kind: string;
     authorName: string | null;
     createdAt: string;
+  } | null;
+  conversion: CommercialConversionAssessment | null;
+  closing: CommercialClosingAssessment | null;
+  closingSnapshot: {
+    consultationOfferSentAt: string | null;
+    consultationOfferReason: string | null;
+    consultationOfferCopy: string | null;
+    consultationOfferAmount: number | null;
+    schedulingIntent: string | null;
+    schedulingSuggestedAt: string | null;
+    leadSchedulePreference: string | null;
+    desiredScheduleWindow: string | null;
+    scheduleConfirmedAt: string | null;
+    paymentLinkSentAt: string | null;
+    paymentLinkUrl: string | null;
+    paymentReference: string | null;
+    paymentPendingAt: string | null;
+    paymentApprovedAt: string | null;
+    paymentFailedAt: string | null;
+    paymentExpiredAt: string | null;
+    paymentAbandonedAt: string | null;
+    consultationConfirmedAt: string | null;
   } | null;
 };
 
@@ -566,15 +598,18 @@ class CommercialRelationshipService {
         followUpState: "none",
         followUpReason: null,
         lastCommercialNoteAt: null,
-        latestCommercialNote: null
+        latestCommercialNote: null,
+        conversion: null,
+        closing: null,
+        closingSnapshot: null
       };
     }
 
-    const [{ data: pipeline }, { data: latestNote }] = await Promise.all([
+    const [{ data: pipeline }, { data: latestNote }, { data: triage }] = await Promise.all([
       this.supabase
         .from("client_pipeline")
         .select(
-          "id, owner_profile_id, owner_assigned_at, next_step, next_step_due_at, waiting_on, follow_up_state, follow_up_reason, last_commercial_note_at"
+          "id, stage, lead_temperature, follow_up_status, owner_profile_id, owner_assigned_at, next_step, next_step_due_at, waiting_on, follow_up_state, follow_up_reason, notes, last_contact_at, last_commercial_note_at, consultation_readiness, conversion_stage, recommended_action, recommended_action_detail, conversion_signal, blocking_reason, objection_state, objection_hint, opportunity_state, consultation_recommendation_state, consultation_recommendation_reason, consultation_suggested_copy, recommended_follow_up_window, advancement_reason, consultation_offer_state, consultation_offer_sent_at, consultation_offer_reason, consultation_offer_copy, consultation_offer_amount, scheduling_state, scheduling_intent, scheduling_suggested_at, lead_schedule_preference, desired_schedule_window, schedule_confirmed_at, payment_state, payment_link_sent_at, payment_link_url, payment_reference, payment_pending_at, payment_approved_at, payment_failed_at, payment_expired_at, payment_abandoned_at, consultation_confirmed_at, closing_state, closing_block_reason, closing_signal, closing_next_step, closing_recommended_action, closing_recommended_action_detail, closing_copy_suggestion"
         )
         .eq("id", link.pipelineId)
         .maybeSingle(),
@@ -584,8 +619,144 @@ class CommercialRelationshipService {
         .eq("session_id", sessionId)
         .order("created_at", { ascending: false })
         .limit(1)
+        .maybeSingle(),
+      this.supabase
+        .from("noemia_triage_summaries")
+        .select("consultation_stage, report_data")
+        .eq("session_id", sessionId)
         .maybeSingle()
     ]);
+
+    const conversionInput = {
+      pipelineId: link.pipelineId,
+      pipelineStage: pipeline?.stage || null,
+      leadTemperature: pipeline?.lead_temperature || null,
+      followUpStatus: pipeline?.follow_up_status || null,
+      followUpState: pipeline?.follow_up_state || null,
+      followUpReason: pipeline?.follow_up_reason || null,
+      waitingOn: pipeline?.waiting_on || null,
+      nextStep: pipeline?.next_step || null,
+      nextStepDueAt: pipeline?.next_step_due_at || null,
+      notes: pipeline?.notes || null,
+      lastContactAt: pipeline?.last_contact_at || null,
+      ownerProfileId: pipeline?.owner_profile_id || null,
+      latestSummary:
+        typeof triage?.report_data?.resumo_caso === "string"
+          ? triage.report_data.resumo_caso
+          : null,
+      latestNote: latestNote?.note_body || null,
+      conversationState: {
+        reportSummary:
+          typeof triage?.report_data?.resumo_caso === "string"
+            ? triage.report_data.resumo_caso
+            : null,
+        consultationStage: triage?.consultation_stage || null,
+        consultationIntentLevel:
+          typeof triage?.report_data?.consultation_intent_level === "string"
+            ? triage.report_data.consultation_intent_level
+            : null,
+        consultationInviteState:
+          typeof triage?.report_data?.consultation_invite_state === "string"
+            ? triage.report_data.consultation_invite_state
+            : null,
+        consultationInviteTiming:
+          typeof triage?.report_data?.consultation_invite_timing === "string"
+            ? triage.report_data.consultation_invite_timing
+            : null,
+        consultationInviteCopy:
+          typeof triage?.report_data?.consultation_invite_copy === "string"
+            ? triage.report_data.consultation_invite_copy
+            : null,
+        consultationValueAngle:
+          typeof triage?.report_data?.consultation_value_angle === "string"
+            ? triage.report_data.consultation_value_angle
+            : null,
+        schedulingStatus:
+          typeof triage?.report_data?.scheduling_status === "string"
+            ? triage.report_data.scheduling_status
+            : null,
+        schedulingReadiness:
+          typeof triage?.report_data?.scheduling_readiness === "string"
+            ? triage.report_data.scheduling_readiness
+            : null,
+        closeOpportunityState:
+          typeof triage?.report_data?.close_opportunity_state === "string"
+            ? triage.report_data.close_opportunity_state
+            : null,
+        objectionsDetected: Array.isArray(triage?.report_data?.objections_detected)
+          ? triage.report_data.objections_detected
+          : null,
+        hesitationSignals: Array.isArray(triage?.report_data?.hesitation_signals)
+          ? triage.report_data.hesitation_signals
+          : null,
+        valueSignals: Array.isArray(triage?.report_data?.value_signals)
+          ? triage.report_data.value_signals
+          : null,
+        urgencySignals: Array.isArray(triage?.report_data?.urgency_signals)
+          ? triage.report_data.urgency_signals
+          : null,
+        conversionScore:
+          typeof triage?.report_data?.conversion_score === "number"
+            ? triage.report_data.conversion_score
+            : null,
+        humanHandoffReady: triage?.report_data?.human_handoff_ready === true
+      }
+    };
+
+    const conversion = evaluateCommercialConversion(conversionInput);
+    const closingInput = {
+      pipelineId: link.pipelineId,
+      pipelineStage: pipeline?.stage || null,
+      consultationReadiness: pipeline?.consultation_readiness || conversion.consultationReadiness,
+      consultationRecommendationState:
+        pipeline?.consultation_recommendation_state || conversion.consultationRecommendationState,
+      consultationSuggestedCopy:
+        pipeline?.consultation_suggested_copy || conversion.consultationSuggestedCopy,
+      opportunityState: pipeline?.opportunity_state || conversion.opportunityState,
+      blockingReason: pipeline?.blocking_reason || conversion.blockingReason,
+      objectionState: pipeline?.objection_state || conversion.objectionState,
+      waitingOn: pipeline?.waiting_on || null,
+      nextStep: pipeline?.next_step || null,
+      consultationOfferState: pipeline?.consultation_offer_state || null,
+      consultationOfferSentAt: pipeline?.consultation_offer_sent_at || null,
+      consultationOfferReason: pipeline?.consultation_offer_reason || null,
+      consultationOfferCopy: pipeline?.consultation_offer_copy || null,
+      consultationOfferAmount: pipeline?.consultation_offer_amount || null,
+      schedulingState: pipeline?.scheduling_state || null,
+      schedulingIntent: pipeline?.scheduling_intent || null,
+      schedulingSuggestedAt: pipeline?.scheduling_suggested_at || null,
+      leadSchedulePreference: pipeline?.lead_schedule_preference || null,
+      desiredScheduleWindow: pipeline?.desired_schedule_window || null,
+      scheduleConfirmedAt: pipeline?.schedule_confirmed_at || null,
+      paymentState: pipeline?.payment_state || null,
+      paymentLinkSentAt: pipeline?.payment_link_sent_at || null,
+      paymentLinkUrl: pipeline?.payment_link_url || null,
+      paymentReference: pipeline?.payment_reference || null,
+      paymentPendingAt: pipeline?.payment_pending_at || null,
+      paymentApprovedAt: pipeline?.payment_approved_at || null,
+      paymentFailedAt: pipeline?.payment_failed_at || null,
+      paymentExpiredAt: pipeline?.payment_expired_at || null,
+      paymentAbandonedAt: pipeline?.payment_abandoned_at || null,
+      consultationConfirmedAt: pipeline?.consultation_confirmed_at || null,
+      latestSummary:
+        typeof triage?.report_data?.resumo_caso === "string"
+          ? triage.report_data.resumo_caso
+          : null,
+      latestNote: latestNote?.note_body || null
+    };
+    const closing = evaluateCommercialClosing(closingInput);
+    await commercialConversionService.syncPipelineAssessment({
+      ...conversionInput,
+      pipelineId: link.pipelineId,
+      sessionId,
+      createEvent: false
+    });
+    await commercialClosingService.syncPipelineClosingAssessment({
+      ...closingInput,
+      pipelineId: link.pipelineId,
+      sessionId,
+      createEvent: false
+    });
 
     return {
       clientId: link.clientId,
@@ -607,7 +778,29 @@ class CommercialRelationshipService {
             authorName: latestNote.author_name,
             createdAt: latestNote.created_at
           }
-        : null
+        : null,
+      conversion,
+      closing,
+      closingSnapshot: {
+        consultationOfferSentAt: pipeline?.consultation_offer_sent_at || null,
+        consultationOfferReason: pipeline?.consultation_offer_reason || null,
+        consultationOfferCopy: pipeline?.consultation_offer_copy || null,
+        consultationOfferAmount: pipeline?.consultation_offer_amount || null,
+        schedulingIntent: pipeline?.scheduling_intent || null,
+        schedulingSuggestedAt: pipeline?.scheduling_suggested_at || null,
+        leadSchedulePreference: pipeline?.lead_schedule_preference || null,
+        desiredScheduleWindow: pipeline?.desired_schedule_window || null,
+        scheduleConfirmedAt: pipeline?.schedule_confirmed_at || null,
+        paymentLinkSentAt: pipeline?.payment_link_sent_at || null,
+        paymentLinkUrl: pipeline?.payment_link_url || null,
+        paymentReference: pipeline?.payment_reference || null,
+        paymentPendingAt: pipeline?.payment_pending_at || null,
+        paymentApprovedAt: pipeline?.payment_approved_at || null,
+        paymentFailedAt: pipeline?.payment_failed_at || null,
+        paymentExpiredAt: pipeline?.payment_expired_at || null,
+        paymentAbandonedAt: pipeline?.payment_abandoned_at || null,
+        consultationConfirmedAt: pipeline?.consultation_confirmed_at || null
+      }
     };
   }
 }

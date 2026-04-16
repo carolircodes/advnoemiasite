@@ -47,6 +47,50 @@ interface OperationalContact {
   ownerProfileId?: string;
   ownerName?: string;
   ownerAssignedAt?: string;
+  consultationReadiness: string;
+  conversionStage: string;
+  recommendedAction: string;
+  recommendedActionLabel: string;
+  recommendedActionDetail: string;
+  conversionSignal: string;
+  blockingReason?: string | null;
+  objectionState: string;
+  objectionHint?: string | null;
+  opportunityState: string;
+  consultationRecommendationState: string;
+  consultationRecommendationReason?: string | null;
+  consultationSuggestedCopy?: string | null;
+  recommendedFollowUpWindow?: string | null;
+  consultationOfferState: string;
+  consultationOfferSentAt?: string | null;
+  consultationOfferReason?: string | null;
+  consultationOfferCopy?: string | null;
+  consultationOfferAmount?: number | null;
+  schedulingState: string;
+  schedulingIntent?: string | null;
+  schedulingSuggestedAt?: string | null;
+  leadSchedulePreference?: string | null;
+  desiredScheduleWindow?: string | null;
+  scheduleConfirmedAt?: string | null;
+  paymentState: string;
+  paymentLinkSentAt?: string | null;
+  paymentLinkUrl?: string | null;
+  paymentReference?: string | null;
+  paymentPendingAt?: string | null;
+  paymentApprovedAt?: string | null;
+  paymentFailedAt?: string | null;
+  paymentExpiredAt?: string | null;
+  paymentAbandonedAt?: string | null;
+  consultationConfirmedAt?: string | null;
+  closingState: string;
+  closingBlockReason?: string | null;
+  closingSignal: string;
+  closingNextStep: string;
+  closingRecommendedAction: string;
+  closingRecommendedActionLabel: string;
+  closingRecommendedActionDetail: string;
+  closingCopySuggestion?: string | null;
+  advancementReason: string;
   channels: Array<{
     channel: string;
     externalUserId: string;
@@ -421,7 +465,8 @@ export default function OperationalPanel() {
     contact: OperationalContact,
     actionType: string,
     value?: string,
-    notes?: string
+    notes?: string,
+    payload?: Record<string, unknown>
   ) {
     setActionLoading(`${contact.clientId}:${actionType}`);
 
@@ -433,9 +478,11 @@ export default function OperationalPanel() {
           action: 'applyAction',
           clientId: contact.clientId,
           pipelineId: contact.pipelineId,
+          sessionId: contact.sessionId,
           actionType,
           value,
           notes,
+          payload,
         }),
       });
 
@@ -649,6 +696,64 @@ export default function OperationalPanel() {
     return stage.replaceAll('_', ' ');
   }
 
+  function getReadinessTone(
+    readiness: string
+  ): 'red' | 'orange' | 'blue' | 'green' | 'gold' | 'gray' {
+    switch (readiness) {
+      case 'ready_for_consultation':
+      case 'closing':
+        return 'green';
+      case 'almost_ready':
+      case 'advanced_triage':
+        return 'gold';
+      case 'blocked_by_objection':
+      case 'blocked_by_silence':
+      case 'blocked_by_missing_context':
+        return 'red';
+      case 'clarifying':
+        return 'blue';
+      default:
+        return 'gray';
+    }
+  }
+
+  function getOpportunityTone(
+    state: string
+  ): 'red' | 'orange' | 'green' | 'gray' {
+    switch (state) {
+      case 'closing':
+        return 'green';
+      case 'hot':
+        return 'red';
+      case 'warm':
+        return 'orange';
+      default:
+        return 'gray';
+    }
+  }
+
+  function getClosingTone(
+    state: string
+  ): 'red' | 'orange' | 'blue' | 'green' | 'gold' | 'gray' {
+    switch (state) {
+      case 'consultation_confirmed':
+        return 'green';
+      case 'payment_in_progress':
+        return 'gold';
+      case 'scheduling_in_progress':
+      case 'proposal_sent':
+      case 'consultation_recommended':
+        return 'orange';
+      case 'blocked':
+      case 'lost':
+        return 'red';
+      case 'reactivable':
+        return 'blue';
+      default:
+        return 'gray';
+    }
+  }
+
   async function loadStaffOwners() {
     try {
       const response = await fetch('/api/internal/operational?action=getStaffOwners');
@@ -698,6 +803,7 @@ export default function OperationalPanel() {
           action: 'assignOwner',
           sessionId: contact.sessionId,
           ownerProfileId: selectedOwner.id,
+          ownerName: selectedOwner.full_name,
         }),
       });
 
@@ -819,6 +925,109 @@ export default function OperationalPanel() {
     } finally {
       setActionLoading(null);
     }
+  }
+
+  async function proposeConsultation(contact: OperationalContact) {
+    const reason = window.prompt(
+      'Motivo da proposta de consulta:',
+      contact.consultationRecommendationReason || contact.recommendedActionDetail || ''
+    );
+
+    if (!reason?.trim()) {
+      return;
+    }
+
+    const copy = window.prompt(
+      'Copy comercial da proposta:',
+      contact.closingCopySuggestion || contact.consultationSuggestedCopy || ''
+    );
+    const amountRaw = window.prompt(
+      'Valor da consulta (opcional, ex.: 100.00):',
+      contact.consultationOfferAmount ? String(contact.consultationOfferAmount) : '100.00'
+    );
+    const parsedAmount =
+      amountRaw && !Number.isNaN(Number(amountRaw.replace(',', '.')))
+        ? Number(amountRaw.replace(',', '.'))
+        : undefined;
+
+    await applyOperationalAction(contact, 'propose_consultation', undefined, reason.trim(), {
+      reason: reason.trim(),
+      copy: copy?.trim() || null,
+      amount: parsedAmount,
+      nextStep: 'Aguardar retorno do lead sobre proposta e horario.'
+    });
+  }
+
+  async function registerSchedule(contact: OperationalContact) {
+    const intent = window.prompt(
+      'Intencao de agenda / contexto:',
+      contact.schedulingIntent || contact.closingNextStep || ''
+    );
+
+    if (intent === null) {
+      return;
+    }
+
+    const preference = window.prompt(
+      'Horario preferido do lead:',
+      contact.leadSchedulePreference || ''
+    );
+    const desiredWindow = window.prompt(
+      'Janela desejada:',
+      contact.desiredScheduleWindow || ''
+    );
+    const suggestedAt = window.prompt(
+      'Horario sugerido (ISO, opcional):',
+      contact.schedulingSuggestedAt || ''
+    );
+    const confirmedAt = window.prompt(
+      'Horario confirmado (ISO, opcional):',
+      contact.scheduleConfirmedAt || ''
+    );
+
+    await applyOperationalAction(contact, 'register_schedule', undefined, undefined, {
+      intent: intent?.trim() || null,
+      preference: preference?.trim() || null,
+      window: desiredWindow?.trim() || null,
+      suggestedAt: suggestedAt?.trim() || null,
+      confirmedAt: confirmedAt?.trim() || null
+    });
+  }
+
+  async function registerPayment(contact: OperationalContact, mode: 'pending' | 'approved') {
+    const paymentUrl =
+      mode === 'pending'
+        ? window.prompt('Link de pagamento (opcional):', contact.paymentLinkUrl || '')
+        : null;
+    const paymentReference = window.prompt(
+      'Referencia do pagamento (opcional):',
+      contact.paymentReference || ''
+    );
+
+    await applyOperationalAction(
+      contact,
+      mode === 'pending' ? 'register_payment_pending' : 'register_payment_approved',
+      undefined,
+      undefined,
+      {
+        paymentState: mode,
+        paymentUrl: paymentUrl?.trim() || null,
+        paymentReference: paymentReference?.trim() || null
+      }
+    );
+  }
+
+  async function markClosingLost(contact: OperationalContact) {
+    const reason = window.prompt(
+      'Motivo da perda de fechamento:',
+      contact.closingBlockReason || contact.blockingReason || ''
+    );
+
+    if (reason === null) {
+      return;
+    }
+
+    await applyOperationalAction(contact, 'mark_closing_lost', undefined, reason || undefined);
   }
 
   function getAttentionTone(bucket: OperationalContact['attentionBucket']): 'red' | 'orange' | 'blue' | 'gray' {
@@ -1272,6 +1481,20 @@ export default function OperationalPanel() {
                       {contact.followUpCount > 0 ? (
                         <StatusChip tone="neutral">{contact.followUpCount} follow-up(s)</StatusChip>
                       ) : null}
+
+                      <StatusChip tone={getReadinessTone(contact.consultationReadiness)}>
+                        {formatStageLabel(contact.consultationReadiness)}
+                      </StatusChip>
+
+                      <StatusChip tone={getOpportunityTone(contact.opportunityState)}>
+                        {contact.opportunityState === 'closing'
+                          ? 'Fechamento'
+                          : contact.opportunityState === 'hot'
+                            ? 'Oportunidade quente'
+                            : contact.opportunityState === 'warm'
+                              ? 'Oportunidade morna'
+                              : 'Monitorar'}
+                      </StatusChip>
                     </div>
                   </div>
                 </div>
@@ -1327,6 +1550,24 @@ export default function OperationalPanel() {
 
                   <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Prontidao para consulta
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {formatStageLabel(contact.consultationReadiness)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.consultationRecommendationReason ||
+                        'A leitura ainda nao recomenda um convite mais forte.'}
+                    </p>
+                    {contact.consultationSuggestedCopy ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        Copy pronta para sugerir consulta.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
                       Proximo passo oficial
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
@@ -1335,10 +1576,144 @@ export default function OperationalPanel() {
                     <p className="mt-1 text-sm text-[#5d6d66]">
                       {contact.waitingOn
                         ? `Aguardando ${contact.waitingOn}.`
-                        : 'Sem bloqueio explicito registrado.'}
+                        : contact.blockingReason
+                          ? `Bloqueio ${formatStageLabel(contact.blockingReason)}.`
+                          : 'Sem bloqueio explicito registrado.'}
                     </p>
                   </div>
                 </div>
+
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1.1fr_1fr_1fr]">
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Estagio de conversao
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {formatStageLabel(contact.conversionStage)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">{contact.conversionSignal}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Bloqueio e objecao
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.blockingReason ? formatStageLabel(contact.blockingReason) : 'Sem trava dominante'}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.objectionHint || 'Sem objecao dominante no momento.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Janela sugerida
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.recommendedFollowUpWindow || 'Sem janela sugerida'}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">{contact.advancementReason}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 lg:grid-cols-4">
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Estado de fechamento
+                    </p>
+                    <div className="mt-2">
+                      <StatusChip tone={getClosingTone(contact.closingState)}>
+                        {formatStageLabel(contact.closingState)}
+                      </StatusChip>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.closingRecommendedActionLabel}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.closingRecommendedActionDetail}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Proposta de consulta
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {formatStageLabel(contact.consultationOfferState)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.consultationOfferReason ||
+                        contact.consultationOfferCopy ||
+                        'Proposta ainda nao materializada.'}
+                    </p>
+                    {contact.consultationOfferSentAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        Enviada em {formatDate(contact.consultationOfferSentAt)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Agenda comercial
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {formatStageLabel(contact.schedulingState)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.desiredScheduleWindow ||
+                        contact.leadSchedulePreference ||
+                        contact.schedulingIntent ||
+                        'Sem janela ou preferencia registrada.'}
+                    </p>
+                    {contact.schedulingSuggestedAt || contact.scheduleConfirmedAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        {contact.scheduleConfirmedAt
+                          ? `Confirmado em ${formatDate(contact.scheduleConfirmedAt)}`
+                          : `Horario sugerido: ${formatDate(contact.schedulingSuggestedAt || '')}`}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Pagamento
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {formatStageLabel(contact.paymentState)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">
+                      {contact.paymentLinkUrl
+                        ? 'Link de pagamento registrado no trilho comercial.'
+                        : contact.closingBlockReason
+                          ? `Bloqueio: ${formatStageLabel(contact.closingBlockReason)}`
+                          : 'Pagamento ainda nao iniciado.'}
+                    </p>
+                    {contact.paymentApprovedAt || contact.paymentPendingAt ? (
+                      <p className="mt-2 text-xs text-[#6a7a73]">
+                        {contact.paymentApprovedAt
+                          ? `Aprovado em ${formatDate(contact.paymentApprovedAt)}`
+                          : `Pendente desde ${formatDate(contact.paymentPendingAt || '')}`}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                {(contact.closingCopySuggestion || contact.closingSignal) ? (
+                  <div className="mt-3 rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
+                      Trilha de fechamento
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[#10261d]">
+                      {contact.closingNextStep}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5d6d66]">{contact.closingSignal}</p>
+                    {contact.closingCopySuggestion ? (
+                      <p className="mt-3 text-sm text-[#20342b]">{contact.closingCopySuggestion}</p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {contact.latestCommercialNote ? (
                   <div className="mt-3 rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
@@ -1599,12 +1974,10 @@ export default function OperationalPanel() {
                       Proxima melhor acao
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
-                      {contact.conversationState?.nextBestActionDetail
-                        ? 'Mover oportunidade com criterio'
-                        : contact.nextBestAction.title}
+                      {contact.recommendedActionLabel}
                     </p>
                     <p className="mt-1 text-sm leading-6 text-[#56675f]">
-                      {contact.conversationState?.nextBestActionDetail || contact.nextBestAction.detail}
+                      {contact.recommendedActionDetail}
                     </p>
                   </div>
 
@@ -1753,29 +2126,83 @@ export default function OperationalPanel() {
 
                   <ActionButton
                     variant="outline"
-                    disabled={actionLoading === `${contact.clientId}:mark_consultation_offered`}
-                    onClick={() => void applyOperationalAction(contact, 'mark_consultation_offered')}
+                    disabled={actionLoading === `${contact.clientId}:mark_ready_for_consultation`}
+                    onClick={() => void applyOperationalAction(contact, 'mark_ready_for_consultation')}
+                  >
+                    <Target className="mr-2 h-4 w-4" />
+                    Apto para consulta
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:mark_hot_opportunity`}
+                    onClick={() => void applyOperationalAction(contact, 'mark_hot_opportunity')}
+                  >
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Oportunidade quente
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:mark_reactivatable`}
+                    onClick={() => void applyOperationalAction(contact, 'mark_reactivatable')}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Marcar reativavel
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:propose_consultation`}
+                    onClick={() => void proposeConsultation(contact)}
                   >
                     <Calendar className="mr-2 h-4 w-4" />
-                    Oferecer consulta
+                    Propor consulta
                   </ActionButton>
 
                   <ActionButton
                     variant="outline"
-                    disabled={actionLoading === `${contact.clientId}:mark_consultation_scheduled`}
-                    onClick={() => void applyOperationalAction(contact, 'mark_consultation_scheduled')}
+                    disabled={actionLoading === `${contact.clientId}:register_schedule`}
+                    onClick={() => void registerSchedule(contact)}
                   >
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    Consulta agendada
+                    Registrar horario
                   </ActionButton>
 
                   <ActionButton
                     variant="outline"
-                    disabled={actionLoading === `${contact.clientId}:mark_proposal_sent`}
-                    onClick={() => void applyOperationalAction(contact, 'mark_proposal_sent')}
+                    disabled={actionLoading === `${contact.clientId}:register_payment_pending`}
+                    onClick={() => void registerPayment(contact, 'pending')}
                   >
                     <Send className="mr-2 h-4 w-4" />
-                    Proposta enviada
+                    Pagamento pendente
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:register_payment_approved`}
+                    onClick={() => void registerPayment(contact, 'approved')}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Pagamento aprovado
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:confirm_consultation`}
+                    onClick={() => void applyOperationalAction(contact, 'confirm_consultation')}
+                  >
+                    <Target className="mr-2 h-4 w-4" />
+                    Confirmar consulta
+                  </ActionButton>
+
+                  <ActionButton
+                    variant="outline"
+                    disabled={actionLoading === `${contact.clientId}:mark_closing_lost`}
+                    onClick={() => void markClosingLost(contact)}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Fechamento perdido
                   </ActionButton>
 
                   {!contact.isClient ? (

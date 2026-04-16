@@ -5,7 +5,7 @@ import {
   CONSULTATION_ONLINE_AMOUNT_CENTS,
   buildCheckoutPaymentMethods,
   resolvePaymentPricing
-} from "../lib/payment/pricing";
+} from "../lib/payment/pricing.ts";
 
 test("ignora override para remetente comum pedindo link de 5 reais", () => {
   const pricing = resolvePaymentPricing({

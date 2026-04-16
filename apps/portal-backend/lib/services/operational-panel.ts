@@ -1,4 +1,9 @@
 import { createWebhookSupabaseClient } from "../supabase/webhook";
+import {
+  commercialClosingService,
+  evaluateCommercialClosing
+} from "./commercial-closing";
+import { evaluateCommercialConversion } from "./commercial-conversion";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { getCommercialAutomationPlans, type CommercialAutomationPlan } from "./commercial-automation";
 import { followUpEngine } from "./follow-up-engine";
@@ -42,6 +47,50 @@ export interface OperationalContact {
   ownerProfileId?: string;
   ownerName?: string;
   ownerAssignedAt?: string;
+  consultationReadiness: string;
+  conversionStage: string;
+  recommendedAction: string;
+  recommendedActionLabel: string;
+  recommendedActionDetail: string;
+  conversionSignal: string;
+  blockingReason?: string | null;
+  objectionState: string;
+  objectionHint?: string | null;
+  opportunityState: string;
+  consultationRecommendationState: string;
+  consultationRecommendationReason?: string | null;
+  consultationSuggestedCopy?: string | null;
+  recommendedFollowUpWindow?: string | null;
+  consultationOfferState: string;
+  consultationOfferSentAt?: string | null;
+  consultationOfferReason?: string | null;
+  consultationOfferCopy?: string | null;
+  consultationOfferAmount?: number | null;
+  schedulingState: string;
+  schedulingIntent?: string | null;
+  schedulingSuggestedAt?: string | null;
+  leadSchedulePreference?: string | null;
+  desiredScheduleWindow?: string | null;
+  scheduleConfirmedAt?: string | null;
+  paymentState: string;
+  paymentLinkSentAt?: string | null;
+  paymentLinkUrl?: string | null;
+  paymentReference?: string | null;
+  paymentPendingAt?: string | null;
+  paymentApprovedAt?: string | null;
+  paymentFailedAt?: string | null;
+  paymentExpiredAt?: string | null;
+  paymentAbandonedAt?: string | null;
+  consultationConfirmedAt?: string | null;
+  closingState: string;
+  closingBlockReason?: string | null;
+  closingSignal: string;
+  closingNextStep: string;
+  closingRecommendedAction: string;
+  closingRecommendedActionLabel: string;
+  closingRecommendedActionDetail: string;
+  closingCopySuggestion?: string | null;
+  advancementReason: string;
   channels: Array<{
     channel: string;
     externalUserId: string;
@@ -160,6 +209,7 @@ export interface OperationalPanelMetrics {
 export interface OperationalAction {
   clientId: string;
   pipelineId: string;
+  sessionId?: string;
   action:
     | "update_stage"
     | "update_temperature"
@@ -169,9 +219,24 @@ export interface OperationalAction {
     | "mark_contract_pending"
     | "mark_client"
     | "mark_lost"
-    | "mark_inactive";
+    | "mark_inactive"
+    | "mark_ready_for_consultation"
+    | "mark_waiting_client"
+    | "mark_hot_opportunity"
+    | "mark_reactivatable"
+    | "register_objection"
+    | "register_block"
+    | "refresh_conversion_state"
+    | "propose_consultation"
+    | "register_schedule"
+    | "mark_waiting_team"
+    | "register_payment_pending"
+    | "register_payment_approved"
+    | "confirm_consultation"
+    | "mark_closing_lost";
   value?: string;
   notes?: string;
+  payload?: Record<string, unknown>;
 }
 
 function getSinglePipeline(
@@ -227,6 +292,49 @@ class OperationalPanel {
             next_step,
             next_step_due_at,
             waiting_on,
+            consultation_readiness,
+            conversion_stage,
+            recommended_action,
+            recommended_action_detail,
+            conversion_signal,
+            blocking_reason,
+            objection_state,
+            objection_hint,
+            opportunity_state,
+            consultation_recommendation_state,
+            consultation_recommendation_reason,
+            consultation_suggested_copy,
+            recommended_follow_up_window,
+            advancement_reason,
+            consultation_offer_state,
+            consultation_offer_sent_at,
+            consultation_offer_reason,
+            consultation_offer_copy,
+            consultation_offer_amount,
+            scheduling_state,
+            scheduling_intent,
+            scheduling_suggested_at,
+            lead_schedule_preference,
+            desired_schedule_window,
+            schedule_confirmed_at,
+            payment_state,
+            payment_link_sent_at,
+            payment_link_url,
+            payment_reference,
+            payment_pending_at,
+            payment_approved_at,
+            payment_failed_at,
+            payment_expired_at,
+            payment_abandoned_at,
+            consultation_confirmed_at,
+            closing_state,
+            closing_block_reason,
+            closing_signal,
+            closing_next_step,
+            closing_recommended_action,
+            closing_recommended_action_detail,
+            closing_copy_suggestion,
+            last_closing_signal_at,
             last_thread_session_id,
             last_commercial_note_at
           ),
@@ -381,6 +489,11 @@ class OperationalPanel {
           attentionBucket: contact.attentionBucket,
           priorityLabel: contact.priorityLabel,
           daysSinceLastContact: contact.daysSinceLastContact,
+          consultationReadiness: contact.consultationReadiness,
+          recommendedAction: contact.recommendedAction,
+          opportunityState: contact.opportunityState,
+          blockingReason: contact.blockingReason,
+          consultationRecommendationState: contact.consultationRecommendationState,
           channels: contact.channels,
           growthContext: contact.growthContext
         }))
@@ -471,7 +584,69 @@ class OperationalPanel {
       : "";
 
     let suggestedMessage;
-    if (priority.label !== "low") {
+    const conversion = evaluateCommercialConversion({
+      pipelineId: pipeline.id,
+      pipelineStage: pipeline.stage,
+      leadTemperature: pipeline.lead_temperature,
+      followUpStatus: pipeline.follow_up_status,
+      followUpState: pipeline.follow_up_state,
+      followUpReason: pipeline.follow_up_reason,
+      waitingOn: pipeline.waiting_on,
+      nextStep: pipeline.next_step || latestSession?.next_action_hint || null,
+      nextStepDueAt: pipeline.next_step_due_at || pipeline.next_follow_up_at || null,
+      notes: pipeline.notes || null,
+      lastContactAt: pipeline.last_contact_at,
+      ownerProfileId: pipeline.owner_profile_id || latestSession?.owner_user_id || null,
+      latestSummary: latestSession?.last_summary || latestSession?.last_message_preview || null,
+      latestNote: pipeline.notes || null,
+      pendingDocumentsCount: growthContext?.pendingDocumentsCount || 0,
+      conversationState: latestTriageSummary
+        ? projectPanelConversationState(latestTriageSummary)
+        : null
+    });
+    const closing = evaluateCommercialClosing({
+      pipelineId: pipeline.id,
+      pipelineStage: pipeline.stage,
+      consultationReadiness: pipeline.consultation_readiness || conversion.consultationReadiness,
+      consultationRecommendationState:
+        pipeline.consultation_recommendation_state || conversion.consultationRecommendationState,
+      consultationSuggestedCopy:
+        pipeline.consultation_suggested_copy || conversion.consultationSuggestedCopy,
+      opportunityState: pipeline.opportunity_state || conversion.opportunityState,
+      blockingReason: pipeline.blocking_reason || conversion.blockingReason,
+      objectionState: pipeline.objection_state || conversion.objectionState,
+      waitingOn: pipeline.waiting_on,
+      nextStep: pipeline.next_step || latestSession?.next_action_hint || null,
+      consultationOfferState: pipeline.consultation_offer_state,
+      consultationOfferSentAt: pipeline.consultation_offer_sent_at,
+      consultationOfferReason: pipeline.consultation_offer_reason,
+      consultationOfferCopy: pipeline.consultation_offer_copy,
+      consultationOfferAmount: pipeline.consultation_offer_amount,
+      schedulingState: pipeline.scheduling_state,
+      schedulingIntent: pipeline.scheduling_intent,
+      schedulingSuggestedAt: pipeline.scheduling_suggested_at,
+      leadSchedulePreference: pipeline.lead_schedule_preference,
+      desiredScheduleWindow: pipeline.desired_schedule_window,
+      scheduleConfirmedAt: pipeline.schedule_confirmed_at,
+      paymentState: pipeline.payment_state,
+      paymentLinkSentAt: pipeline.payment_link_sent_at,
+      paymentLinkUrl: pipeline.payment_link_url,
+      paymentReference: pipeline.payment_reference,
+      paymentPendingAt: pipeline.payment_pending_at,
+      paymentApprovedAt: pipeline.payment_approved_at,
+      paymentFailedAt: pipeline.payment_failed_at,
+      paymentExpiredAt: pipeline.payment_expired_at,
+      paymentAbandonedAt: pipeline.payment_abandoned_at,
+      consultationConfirmedAt: pipeline.consultation_confirmed_at,
+      latestSummary: latestSession?.last_summary || latestSession?.last_message_preview || null,
+      latestNote: pipeline.notes || null
+    });
+
+    if (
+      priority.label !== "low" ||
+      conversion.consultationRecommendationState === "recommend_now" ||
+      closing.shouldOverrideCommercialAction
+    ) {
       suggestedMessage = await this.prepareSuggestedMessage(
         client.id,
         pipeline.id,
@@ -513,6 +688,61 @@ class OperationalPanel {
             ? ownerProfilesById.get(latestSession.owner_user_id)?.full_name
             : null) || undefined,
       ownerAssignedAt: pipeline.owner_assigned_at || undefined,
+      consultationReadiness: pipeline.consultation_readiness || conversion.consultationReadiness,
+      conversionStage: pipeline.conversion_stage || conversion.conversionStage,
+      recommendedAction: pipeline.recommended_action || conversion.recommendedAction,
+      recommendedActionLabel: conversion.recommendedActionLabel,
+      recommendedActionDetail:
+        pipeline.recommended_action_detail || conversion.recommendedActionDetail,
+      conversionSignal: pipeline.conversion_signal || conversion.conversionSignal,
+      blockingReason: pipeline.blocking_reason || conversion.blockingReason,
+      objectionState: pipeline.objection_state || conversion.objectionState,
+      objectionHint: pipeline.objection_hint || conversion.objectionHint,
+      opportunityState: pipeline.opportunity_state || conversion.opportunityState,
+      consultationRecommendationState:
+        pipeline.consultation_recommendation_state || conversion.consultationRecommendationState,
+      consultationRecommendationReason:
+        pipeline.consultation_recommendation_reason || conversion.consultationRecommendationReason || undefined,
+      consultationSuggestedCopy:
+        pipeline.consultation_suggested_copy || conversion.consultationSuggestedCopy || undefined,
+      recommendedFollowUpWindow:
+        pipeline.recommended_follow_up_window || conversion.recommendedFollowUpWindow || undefined,
+      consultationOfferState: pipeline.consultation_offer_state || closing.consultationOfferState,
+      consultationOfferSentAt: pipeline.consultation_offer_sent_at || undefined,
+      consultationOfferReason: pipeline.consultation_offer_reason || undefined,
+      consultationOfferCopy: pipeline.consultation_offer_copy || undefined,
+      consultationOfferAmount:
+        typeof pipeline.consultation_offer_amount === "number"
+          ? pipeline.consultation_offer_amount
+          : undefined,
+      schedulingState: pipeline.scheduling_state || closing.schedulingState,
+      schedulingIntent: pipeline.scheduling_intent || undefined,
+      schedulingSuggestedAt: pipeline.scheduling_suggested_at || undefined,
+      leadSchedulePreference: pipeline.lead_schedule_preference || undefined,
+      desiredScheduleWindow: pipeline.desired_schedule_window || undefined,
+      scheduleConfirmedAt: pipeline.schedule_confirmed_at || undefined,
+      paymentState: pipeline.payment_state || closing.paymentState,
+      paymentLinkSentAt: pipeline.payment_link_sent_at || undefined,
+      paymentLinkUrl: pipeline.payment_link_url || undefined,
+      paymentReference: pipeline.payment_reference || undefined,
+      paymentPendingAt: pipeline.payment_pending_at || undefined,
+      paymentApprovedAt: pipeline.payment_approved_at || undefined,
+      paymentFailedAt: pipeline.payment_failed_at || undefined,
+      paymentExpiredAt: pipeline.payment_expired_at || undefined,
+      paymentAbandonedAt: pipeline.payment_abandoned_at || undefined,
+      consultationConfirmedAt: pipeline.consultation_confirmed_at || undefined,
+      closingState: pipeline.closing_state || closing.closingState,
+      closingBlockReason: pipeline.closing_block_reason || closing.closingBlockReason,
+      closingSignal: pipeline.closing_signal || closing.closingSignal,
+      closingNextStep: pipeline.closing_next_step || closing.closingNextStep,
+      closingRecommendedAction:
+        pipeline.closing_recommended_action || closing.closingRecommendedAction,
+      closingRecommendedActionLabel: closing.closingRecommendedActionLabel,
+      closingRecommendedActionDetail:
+        pipeline.closing_recommended_action_detail || closing.closingRecommendedActionDetail,
+      closingCopySuggestion:
+        pipeline.closing_copy_suggestion || closing.closingCopySuggestion || undefined,
+      advancementReason: pipeline.advancement_reason || conversion.advancementReason,
       channels: channels.map((channel: any) => ({
         channel: channel.channel,
         externalUserId: channel.external_user_id,
@@ -634,6 +864,8 @@ class OperationalPanel {
       const updateData: Record<string, unknown> = {
         updated_at: new Date().toISOString()
       };
+      const payload = action.payload || {};
+      const now = new Date().toISOString();
 
       switch (action.action) {
         case "update_stage":
@@ -645,18 +877,185 @@ class OperationalPanel {
         case "mark_consultation_offered":
           updateData.stage = "consultation_offered";
           updateData.follow_up_status = "pending";
+          updateData.consultation_offer_state = "offered";
+          updateData.consultation_offer_sent_at = now;
+          updateData.closing_state = "proposal_sent";
           break;
         case "mark_consultation_scheduled":
           updateData.stage = "consultation_scheduled";
           updateData.follow_up_status = "completed";
+          updateData.scheduling_state = "confirmed";
+          updateData.schedule_confirmed_at = now;
+          updateData.consultation_scheduled_at = now;
+          updateData.closing_state = "scheduling_in_progress";
           break;
         case "mark_proposal_sent":
           updateData.stage = "proposal_sent";
           updateData.follow_up_status = "pending";
+          updateData.consultation_offer_state = "offered";
+          updateData.consultation_offer_sent_at = now;
+          updateData.closing_state = "proposal_sent";
           break;
         case "mark_contract_pending":
           updateData.stage = "contract_pending";
           updateData.follow_up_status = "pending";
+          break;
+        case "mark_ready_for_consultation":
+          updateData.stage = "qualified_for_consultation";
+          updateData.consultation_readiness = "ready_for_consultation";
+          updateData.conversion_stage = "consultation_ready";
+          updateData.consultation_recommendation_state = "recommend_now";
+          updateData.opportunity_state = "hot";
+          updateData.recommended_action = "offer_consultation";
+          updateData.consultation_offer_state = "recommended";
+          updateData.closing_state = "consultation_recommended";
+          break;
+        case "mark_waiting_client":
+          updateData.follow_up_status = "pending";
+          updateData.follow_up_state = "waiting_client";
+          updateData.waiting_on = "client";
+          updateData.recommended_action = "mark_waiting_client";
+          break;
+        case "mark_hot_opportunity":
+          updateData.lead_temperature = "hot";
+          updateData.opportunity_state = "hot";
+          updateData.recommended_action = "mark_hot_opportunity";
+          break;
+        case "mark_reactivatable":
+          updateData.stage = "reactivation_queue";
+          updateData.conversion_stage = "reactivable";
+          updateData.consultation_readiness = "blocked_by_silence";
+          updateData.blocking_reason = "lead_silent";
+          updateData.recommended_action = "reactivate_lead";
+          break;
+        case "register_objection":
+          updateData.objection_state = action.value || "insecurity";
+          updateData.blocking_reason =
+            action.value === "value"
+              ? "objection_value"
+              : action.value === "viability"
+                ? "objection_viability"
+                : "objection_insecurity";
+          updateData.consultation_readiness = "blocked_by_objection";
+          updateData.recommended_action = "register_objection";
+          break;
+        case "register_block":
+          updateData.blocking_reason = action.value || "missing_context";
+          updateData.consultation_readiness =
+            action.value === "missing_documents"
+              ? "blocked_by_missing_context"
+              : action.value === "lead_silent"
+                ? "blocked_by_silence"
+                : "clarifying";
+          updateData.recommended_action =
+            action.value === "missing_documents"
+              ? "request_documents"
+              : action.value === "lead_silent"
+                ? "reactivate_lead"
+                : "request_additional_information";
+          break;
+        case "refresh_conversion_state":
+          break;
+        case "propose_consultation":
+          updateData.stage = "consultation_offered";
+          updateData.consultation_offer_state = "offered";
+          updateData.consultation_offer_sent_at = now;
+          updateData.consultation_offer_reason =
+            typeof payload.reason === "string" ? payload.reason : action.notes || null;
+          updateData.consultation_offer_copy =
+            typeof payload.copy === "string" ? payload.copy : null;
+          updateData.consultation_offer_amount =
+            typeof payload.amount === "number" ? payload.amount : null;
+          updateData.proposal_sent_at = now;
+          updateData.follow_up_status = "pending";
+          updateData.follow_up_state = "waiting_client";
+          updateData.waiting_on = "client";
+          updateData.closing_state = "proposal_sent";
+          updateData.closing_next_step =
+            typeof payload.nextStep === "string"
+              ? payload.nextStep
+              : "Aguardar retorno do lead sobre a proposta de consulta.";
+          break;
+        case "register_schedule":
+          updateData.consultation_offer_state = "awaiting_schedule";
+          updateData.scheduling_state =
+            payload.confirmedAt
+              ? "confirmed"
+              : payload.suggestedAt
+                ? "slot_suggested"
+                : "collecting_availability";
+          updateData.scheduling_intent =
+            typeof payload.intent === "string" ? payload.intent : null;
+          updateData.lead_schedule_preference =
+            typeof payload.preference === "string" ? payload.preference : null;
+          updateData.desired_schedule_window =
+            typeof payload.window === "string" ? payload.window : null;
+          updateData.scheduling_suggested_at =
+            typeof payload.suggestedAt === "string" && payload.suggestedAt.trim()
+              ? payload.suggestedAt
+              : null;
+          updateData.schedule_confirmed_at =
+            typeof payload.confirmedAt === "string" && payload.confirmedAt.trim()
+              ? payload.confirmedAt
+              : null;
+          updateData.waiting_on = payload.confirmedAt ? "team" : "client";
+          updateData.follow_up_state = payload.confirmedAt ? "waiting_team" : "waiting_client";
+          updateData.follow_up_status = "pending";
+          updateData.closing_state = "scheduling_in_progress";
+          updateData.next_step =
+            typeof payload.nextStep === "string"
+              ? payload.nextStep
+              : payload.confirmedAt
+                ? "Confirmar horario internamente e preparar pagamento."
+                : "Aguardar confirmacao do horario sugerido.";
+          break;
+        case "mark_waiting_team":
+          updateData.waiting_on = "team";
+          updateData.follow_up_state = "waiting_team";
+          updateData.follow_up_status = "pending";
+          updateData.closing_block_reason = "waiting_office";
+          break;
+        case "register_payment_pending":
+          updateData.payment_state =
+            typeof payload.paymentState === "string" ? payload.paymentState : "pending";
+          updateData.payment_link_sent_at = now;
+          updateData.payment_pending_at = now;
+          updateData.payment_link_url =
+            typeof payload.paymentUrl === "string" ? payload.paymentUrl : null;
+          updateData.payment_reference =
+            typeof payload.paymentReference === "string" ? payload.paymentReference : null;
+          updateData.follow_up_status = "pending";
+          updateData.follow_up_state = "waiting_client";
+          updateData.waiting_on = "client";
+          updateData.closing_state = "payment_in_progress";
+          break;
+        case "register_payment_approved":
+          updateData.payment_state = "approved";
+          updateData.payment_approved_at = now;
+          updateData.closing_state = "payment_in_progress";
+          updateData.follow_up_status = "resolved";
+          break;
+        case "confirm_consultation":
+          updateData.stage = "consultation_scheduled";
+          updateData.payment_state = "approved";
+          updateData.payment_approved_at = now;
+          updateData.scheduling_state = "confirmed";
+          updateData.schedule_confirmed_at = now;
+          updateData.consultation_confirmed_at = now;
+          updateData.consultation_scheduled_at = now;
+          updateData.consultation_offer_state = "confirmed";
+          updateData.follow_up_status = "completed";
+          updateData.follow_up_state = "completed";
+          updateData.waiting_on = "none";
+          updateData.closing_state = "consultation_confirmed";
+          break;
+        case "mark_closing_lost":
+          updateData.stage = "closed_lost";
+          updateData.closed_lost_at = now;
+          updateData.consultation_offer_state = "lost";
+          updateData.closing_state = "lost";
+          updateData.follow_up_status = "completed";
+          updateData.follow_up_state = "completed";
           break;
         case "mark_client":
           await this.supabase
@@ -676,6 +1075,7 @@ class OperationalPanel {
 
       if (action.notes) {
         updateData.notes = action.notes;
+        updateData.advancement_reason = action.notes;
       }
 
       const { error } = await this.supabase
@@ -695,6 +1095,86 @@ class OperationalPanel {
         action: action.action,
         value: action.value
       });
+
+      const { data: refreshedPipeline } = await this.supabase
+        .from("client_pipeline")
+        .select(
+          `
+          id,
+          stage,
+          consultation_readiness,
+          consultation_recommendation_state,
+          consultation_suggested_copy,
+          opportunity_state,
+          blocking_reason,
+          objection_state,
+          waiting_on,
+          next_step,
+          consultation_offer_state,
+          consultation_offer_sent_at,
+          consultation_offer_reason,
+          consultation_offer_copy,
+          consultation_offer_amount,
+          scheduling_state,
+          scheduling_intent,
+          scheduling_suggested_at,
+          lead_schedule_preference,
+          desired_schedule_window,
+          schedule_confirmed_at,
+          payment_state,
+          payment_link_sent_at,
+          payment_link_url,
+          payment_reference,
+          payment_pending_at,
+          payment_approved_at,
+          payment_failed_at,
+          payment_expired_at,
+          payment_abandoned_at,
+          consultation_confirmed_at,
+          notes
+        `
+        )
+        .eq("id", action.pipelineId)
+        .maybeSingle();
+
+      if (refreshedPipeline?.id) {
+        await commercialClosingService.syncPipelineClosingAssessment({
+          pipelineId: refreshedPipeline.id,
+          sessionId: action.sessionId,
+          createEvent: true,
+          pipelineStage: refreshedPipeline.stage,
+          consultationReadiness: refreshedPipeline.consultation_readiness,
+          consultationRecommendationState: refreshedPipeline.consultation_recommendation_state,
+          consultationSuggestedCopy: refreshedPipeline.consultation_suggested_copy,
+          opportunityState: refreshedPipeline.opportunity_state,
+          blockingReason: refreshedPipeline.blocking_reason,
+          objectionState: refreshedPipeline.objection_state,
+          waitingOn: refreshedPipeline.waiting_on,
+          nextStep: refreshedPipeline.next_step,
+          consultationOfferState: refreshedPipeline.consultation_offer_state,
+          consultationOfferSentAt: refreshedPipeline.consultation_offer_sent_at,
+          consultationOfferReason: refreshedPipeline.consultation_offer_reason,
+          consultationOfferCopy: refreshedPipeline.consultation_offer_copy,
+          consultationOfferAmount: refreshedPipeline.consultation_offer_amount,
+          schedulingState: refreshedPipeline.scheduling_state,
+          schedulingIntent: refreshedPipeline.scheduling_intent,
+          schedulingSuggestedAt: refreshedPipeline.scheduling_suggested_at,
+          leadSchedulePreference: refreshedPipeline.lead_schedule_preference,
+          desiredScheduleWindow: refreshedPipeline.desired_schedule_window,
+          scheduleConfirmedAt: refreshedPipeline.schedule_confirmed_at,
+          paymentState: refreshedPipeline.payment_state,
+          paymentLinkSentAt: refreshedPipeline.payment_link_sent_at,
+          paymentLinkUrl: refreshedPipeline.payment_link_url,
+          paymentReference: refreshedPipeline.payment_reference,
+          paymentPendingAt: refreshedPipeline.payment_pending_at,
+          paymentApprovedAt: refreshedPipeline.payment_approved_at,
+          paymentFailedAt: refreshedPipeline.payment_failed_at,
+          paymentExpiredAt: refreshedPipeline.payment_expired_at,
+          paymentAbandonedAt: refreshedPipeline.payment_abandoned_at,
+          consultationConfirmedAt: refreshedPipeline.consultation_confirmed_at,
+          latestNote: refreshedPipeline.notes
+        });
+      }
 
       return true;
     } catch (error) {
@@ -911,7 +1391,9 @@ class OperationalPanel {
 
       if (
         contact.conversationState?.consultationInviteState === "invite_now" ||
-        contact.pipelineStage === "consultation_offered"
+        contact.pipelineStage === "consultation_offered" ||
+        contact.consultationRecommendationState === "recommend_now" ||
+        contact.consultationOfferState === "offered"
       ) {
         metrics.consultationOffered += 1;
       }
@@ -919,21 +1401,28 @@ class OperationalPanel {
       if (
         contact.conversationState?.schedulingStatus === "pending_confirmation" ||
         contact.conversationState?.schedulingStatus === "confirmed" ||
-        contact.pipelineStage === "consultation_scheduled"
+        contact.pipelineStage === "consultation_scheduled" ||
+        contact.schedulingState === "slot_suggested" ||
+        contact.schedulingState === "confirmed"
       ) {
         metrics.consultationScheduled += 1;
       }
 
-      if (contact.conversationState?.humanHandoffReady || contact.conversationState?.readyForLawyer) {
+      if (
+        contact.conversationState?.humanHandoffReady ||
+        contact.conversationState?.readyForLawyer ||
+        contact.consultationReadiness === "ready_for_consultation" ||
+        contact.consultationReadiness === "closing"
+      ) {
         metrics.consultationReady += 1;
         metrics.humanHandoffReady += 1;
       }
 
-      if (contact.pipelineStage === "proposal_sent") {
+      if (contact.pipelineStage === "proposal_sent" || contact.closingState === "proposal_sent") {
         metrics.proposalSent += 1;
       }
 
-      if (contact.pipelineStage === "contract_pending") {
+      if (contact.pipelineStage === "contract_pending" || contact.paymentState === "pending") {
         metrics.contractPending += 1;
       }
 

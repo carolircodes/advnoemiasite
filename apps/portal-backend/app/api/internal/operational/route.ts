@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
       approvedBy,
       followUpMessageId,
       messageType,
+      payload,
       ownerProfileId,
+      ownerName,
       noteBody,
       noteKind,
       isSensitive,
@@ -73,9 +75,11 @@ export async function POST(request: NextRequest) {
       const success = await operationalPanel.applyOperationalAction({
         clientId,
         pipelineId,
+        sessionId,
         action: actionType,
         value,
-        notes
+        notes,
+        payload
       });
 
       return NextResponse.json({
@@ -191,7 +195,7 @@ export async function POST(request: NextRequest) {
       const result = await commercialRelationshipService.assignCommercialOwner({
         sessionId,
         ownerProfileId: ownerProfileId || access.profile.id,
-        ownerName: access.profile.full_name,
+        ownerName: ownerName || access.profile.full_name,
         actorProfileId: access.profile.id,
         actorName: access.profile.full_name
       });

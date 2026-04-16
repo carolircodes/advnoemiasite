@@ -347,6 +347,50 @@ export type ConversationThreadDetail = {
       followUpReason: string | null;
       latestNoteBody: string | null;
       latestNoteAt: string | null;
+      consultationReadiness: string | null;
+      conversionStage: string | null;
+      recommendedAction: string | null;
+      recommendedActionLabel: string | null;
+      recommendedActionDetail: string | null;
+      conversionSignal: string | null;
+      blockingReason: string | null;
+      objectionState: string | null;
+      objectionHint: string | null;
+      opportunityState: string | null;
+      consultationRecommendationState: string | null;
+      consultationRecommendationReason: string | null;
+      consultationSuggestedCopy: string | null;
+      recommendedFollowUpWindow: string | null;
+      advancementReason: string | null;
+      consultationOfferState: string | null;
+      consultationOfferSentAt: string | null;
+      consultationOfferReason: string | null;
+      consultationOfferCopy: string | null;
+      consultationOfferAmount: number | null;
+      schedulingState: string | null;
+      schedulingIntent: string | null;
+      schedulingSuggestedAt: string | null;
+      leadSchedulePreference: string | null;
+      desiredScheduleWindow: string | null;
+      scheduleConfirmedAt: string | null;
+      paymentState: string | null;
+      paymentLinkSentAt: string | null;
+      paymentLinkUrl: string | null;
+      paymentReference: string | null;
+      paymentPendingAt: string | null;
+      paymentApprovedAt: string | null;
+      paymentFailedAt: string | null;
+      paymentExpiredAt: string | null;
+      paymentAbandonedAt: string | null;
+      consultationConfirmedAt: string | null;
+      closingState: string | null;
+      closingBlockReason: string | null;
+      closingSignal: string | null;
+      closingNextStep: string | null;
+      closingRecommendedAction: string | null;
+      closingRecommendedActionLabel: string | null;
+      closingRecommendedActionDetail: string | null;
+      closingCopySuggestion: string | null;
       linkedChannels: Array<{
         channel: string;
         externalUserId: string;
@@ -1501,6 +1545,73 @@ class ConversationInboxService {
           latestNoteAt:
             commercialContext.latestCommercialNote?.createdAt ||
             commercialContext.lastCommercialNoteAt,
+          consultationReadiness: commercialContext.conversion?.consultationReadiness || null,
+          conversionStage: commercialContext.conversion?.conversionStage || null,
+          recommendedAction: commercialContext.conversion?.recommendedAction || null,
+          recommendedActionLabel: commercialContext.conversion?.recommendedActionLabel || null,
+          recommendedActionDetail: commercialContext.conversion?.recommendedActionDetail || null,
+          conversionSignal: commercialContext.conversion?.conversionSignal || null,
+          blockingReason: commercialContext.conversion?.blockingReason || null,
+          objectionState: commercialContext.conversion?.objectionState || null,
+          objectionHint: commercialContext.conversion?.objectionHint || null,
+          opportunityState: commercialContext.conversion?.opportunityState || null,
+          consultationRecommendationState:
+            commercialContext.conversion?.consultationRecommendationState || null,
+          consultationRecommendationReason:
+            commercialContext.conversion?.consultationRecommendationReason || null,
+          consultationSuggestedCopy:
+            commercialContext.conversion?.consultationSuggestedCopy || null,
+          recommendedFollowUpWindow:
+            commercialContext.conversion?.recommendedFollowUpWindow || null,
+          advancementReason: commercialContext.conversion?.advancementReason || null,
+          consultationOfferState: commercialContext.closing?.consultationOfferState || null,
+          consultationOfferSentAt:
+            commercialContext.closingSnapshot?.consultationOfferSentAt || null,
+          consultationOfferReason:
+            commercialContext.closingSnapshot?.consultationOfferReason || null,
+          consultationOfferCopy:
+            commercialContext.closingSnapshot?.consultationOfferCopy || null,
+          consultationOfferAmount:
+            commercialContext.closingSnapshot?.consultationOfferAmount || null,
+          schedulingState: commercialContext.closing?.schedulingState || null,
+          schedulingIntent: commercialContext.closingSnapshot?.schedulingIntent || null,
+          schedulingSuggestedAt:
+            commercialContext.closingSnapshot?.schedulingSuggestedAt || null,
+          leadSchedulePreference:
+            commercialContext.closingSnapshot?.leadSchedulePreference || null,
+          desiredScheduleWindow:
+            commercialContext.closingSnapshot?.desiredScheduleWindow || null,
+          scheduleConfirmedAt:
+            commercialContext.closingSnapshot?.scheduleConfirmedAt || null,
+          paymentState: commercialContext.closing?.paymentState || null,
+          paymentLinkSentAt:
+            commercialContext.closingSnapshot?.paymentLinkSentAt || null,
+          paymentLinkUrl:
+            commercialContext.closingSnapshot?.paymentLinkUrl || latestPayment?.payment_url || null,
+          paymentReference:
+            commercialContext.closingSnapshot?.paymentReference || null,
+          paymentPendingAt:
+            commercialContext.closingSnapshot?.paymentPendingAt || null,
+          paymentApprovedAt:
+            commercialContext.closingSnapshot?.paymentApprovedAt || latestPayment?.approved_at || null,
+          paymentFailedAt:
+            commercialContext.closingSnapshot?.paymentFailedAt || null,
+          paymentExpiredAt:
+            commercialContext.closingSnapshot?.paymentExpiredAt || null,
+          paymentAbandonedAt:
+            commercialContext.closingSnapshot?.paymentAbandonedAt || null,
+          consultationConfirmedAt:
+            commercialContext.closingSnapshot?.consultationConfirmedAt || null,
+          closingState: commercialContext.closing?.closingState || null,
+          closingBlockReason: commercialContext.closing?.closingBlockReason || null,
+          closingSignal: commercialContext.closing?.closingSignal || null,
+          closingNextStep: commercialContext.closing?.closingNextStep || null,
+          closingRecommendedAction: commercialContext.closing?.closingRecommendedAction || null,
+          closingRecommendedActionLabel:
+            commercialContext.closing?.closingRecommendedActionLabel || null,
+          closingRecommendedActionDetail:
+            commercialContext.closing?.closingRecommendedActionDetail || null,
+          closingCopySuggestion: commercialContext.closing?.closingCopySuggestion || null,
           linkedChannels: (linkedChannelsData || []).map((channel) => ({
             channel: channel.channel,
             externalUserId: channel.external_user_id,

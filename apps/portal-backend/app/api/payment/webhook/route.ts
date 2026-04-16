@@ -9,6 +9,7 @@ import {
 } from "@/lib/http/webhook-security";
 import { getRevenueOfferByCode } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
+import { commercialClosingService } from "@/lib/services/commercial-closing";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type PaymentWebhookContext = {
@@ -401,6 +402,36 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       payment?.metadata?.offer_code || paymentInfo.metadata?.offer_code || offerCode
     );
 
+    try {
+      const profileId =
+        typeof payment?.user_id === "string"
+          ? payment.user_id
+          : typeof previousPayment?.user_id === "string"
+            ? previousPayment.user_id
+            : null;
+
+      if (profileId) {
+        await commercialClosingService.syncPipelineClosingFromProfile({
+          profileId,
+          payload: {
+            paymentState: "approved",
+            paymentApprovedAt: new Date().toISOString(),
+            paymentReference: String(paymentInfo.id),
+            consultationOfferAmount:
+              typeof paymentInfo.transaction_amount === "number"
+                ? paymentInfo.transaction_amount
+                : null
+          }
+        });
+      }
+    } catch (closingSyncError) {
+      console.error("[payment.webhook] Failed to sync approved closing state", {
+        closingSyncError,
+        paymentId: payment?.id,
+        mercadoPagoPaymentId: paymentInfo.id
+      });
+    }
+
     await sendPaymentConfirmationMessage(supabase, lead);
 
     try {
@@ -559,6 +590,32 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
       .eq("id", leadId);
 
     try {
+      const profileId =
+        typeof payment?.user_id === "string"
+          ? payment.user_id
+          : typeof previousPayment?.user_id === "string"
+            ? previousPayment.user_id
+            : null;
+
+      if (profileId) {
+        await commercialClosingService.syncPipelineClosingFromProfile({
+          profileId,
+          payload: {
+            paymentState: "failed",
+            paymentFailedAt: new Date().toISOString(),
+            paymentReference: String(paymentInfo.id)
+          }
+        });
+      }
+    } catch (closingSyncError) {
+      console.error("[payment.webhook] Failed to sync rejected closing state", {
+        closingSyncError,
+        leadId,
+        mercadoPagoPaymentId: paymentInfo.id
+      });
+    }
+
+    try {
       const offer = getRevenueOfferByCode(
         payment?.metadata?.offer_code || paymentInfo.metadata?.offer_code || offerCode
       );
@@ -640,6 +697,32 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
       .eq("id", previousPayment?.id)
       .select()
       .maybeSingle();
+
+    try {
+      const profileId =
+        typeof payment?.user_id === "string"
+          ? payment.user_id
+          : typeof previousPayment?.user_id === "string"
+            ? previousPayment.user_id
+            : null;
+
+      if (profileId) {
+        await commercialClosingService.syncPipelineClosingFromProfile({
+          profileId,
+          payload: {
+            paymentState: "pending",
+            paymentPendingAt: new Date().toISOString(),
+            paymentReference: String(paymentInfo.id)
+          }
+        });
+      }
+    } catch (closingSyncError) {
+      console.error("[payment.webhook] Failed to sync pending closing state", {
+        closingSyncError,
+        leadId,
+        mercadoPagoPaymentId: paymentInfo.id
+      });
+    }
 
     try {
       const offer = getRevenueOfferByCode(

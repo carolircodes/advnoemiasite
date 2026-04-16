@@ -186,6 +186,50 @@ type ThreadDetail = {
       followUpReason: string | null;
       latestNoteBody: string | null;
       latestNoteAt: string | null;
+      consultationReadiness: string | null;
+      conversionStage: string | null;
+      recommendedAction: string | null;
+      recommendedActionLabel: string | null;
+      recommendedActionDetail: string | null;
+      conversionSignal: string | null;
+      blockingReason: string | null;
+      objectionState: string | null;
+      objectionHint: string | null;
+      opportunityState: string | null;
+      consultationRecommendationState: string | null;
+      consultationRecommendationReason: string | null;
+      consultationSuggestedCopy: string | null;
+      recommendedFollowUpWindow: string | null;
+      advancementReason: string | null;
+      consultationOfferState: string | null;
+      consultationOfferSentAt: string | null;
+      consultationOfferReason: string | null;
+      consultationOfferCopy: string | null;
+      consultationOfferAmount: number | null;
+      schedulingState: string | null;
+      schedulingIntent: string | null;
+      schedulingSuggestedAt: string | null;
+      leadSchedulePreference: string | null;
+      desiredScheduleWindow: string | null;
+      scheduleConfirmedAt: string | null;
+      paymentState: string | null;
+      paymentLinkSentAt: string | null;
+      paymentLinkUrl: string | null;
+      paymentReference: string | null;
+      paymentPendingAt: string | null;
+      paymentApprovedAt: string | null;
+      paymentFailedAt: string | null;
+      paymentExpiredAt: string | null;
+      paymentAbandonedAt: string | null;
+      consultationConfirmedAt: string | null;
+      closingState: string | null;
+      closingBlockReason: string | null;
+      closingSignal: string | null;
+      closingNextStep: string | null;
+      closingRecommendedAction: string | null;
+      closingRecommendedActionLabel: string | null;
+      closingRecommendedActionDetail: string | null;
+      closingCopySuggestion: string | null;
       linkedChannels: Array<{
         channel: string;
         externalUserId: string;
@@ -1312,9 +1356,23 @@ async function sendHumanReply() {
                   <p>Owner: {selectedThread.thread.assignedTo.name || "sem owner comercial"}</p>
                   <p>Follow-up: {selectedThread.context.commercial.followUpState || "none"}</p>
                   <p>Motivo: {selectedThread.context.commercial.followUpReason || "sem motivo registrado"}</p>
+                  <p>Prontidao: {selectedThread.context.commercial.consultationReadiness || "sem leitura"}</p>
+                  <p>Estagio de conversao: {selectedThread.context.commercial.conversionStage || "sem estagio"}</p>
+                  <p>Acao recomendada: {selectedThread.context.commercial.recommendedActionLabel || "sem recomendacao"}</p>
+                  <p>Bloqueio: {selectedThread.context.commercial.blockingReason || "sem trava dominante"}</p>
+                  <p>Oportunidade: {selectedThread.context.commercial.opportunityState || "monitor"}</p>
                   <p>Proximo passo: {selectedThread.context.commercial.nextStep || "nao definido"}</p>
                   <p>Aguardando: {selectedThread.context.commercial.waitingOn || "nenhum bloqueio explicito"}</p>
                   <p>Canal vinculado: {selectedThread.context.commercial.clientChannelId || "sem client_channel materializado"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Fechamento premium</p>
+                  <p>Estado: {selectedThread.context.commercial.closingState || "open"}</p>
+                  <p>Proposta: {selectedThread.context.commercial.consultationOfferState || "not_offered"}</p>
+                  <p>Agenda: {selectedThread.context.commercial.schedulingState || "not_started"}</p>
+                  <p>Pagamento: {selectedThread.context.commercial.paymentState || "not_started"}</p>
+                  <p>Acao de fechamento: {selectedThread.context.commercial.closingRecommendedActionLabel || "sem acao"}</p>
+                  <p>Bloqueio de fechamento: {selectedThread.context.commercial.closingBlockReason || "sem bloqueio dominante"}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Origem e navegacao</p>
@@ -1350,6 +1408,8 @@ async function sendHumanReply() {
                   <p>Pagamentos pendentes: {selectedThread.context.payment.pendingCount}</p>
                   <p>Status mais recente: {selectedThread.context.payment.latestStatus || "sem pagamento"}</p>
                   <p>Proximo compromisso: {formatDateTime(selectedThread.context.agenda.nextAppointmentAt)}</p>
+                  <p>Pagamento comercial: {selectedThread.context.commercial.paymentState || "not_started"}</p>
+                  <p>Horario comercial: {selectedThread.context.commercial.schedulingSuggestedAt ? formatDateTime(selectedThread.context.commercial.schedulingSuggestedAt) : "sem horario sugerido"}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Follow-up e risco</p>
@@ -1361,15 +1421,56 @@ async function sendHumanReply() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Proxima acao</p>
                   <p className="font-medium text-[#10261d]">
-                    {selectedThread.context.operational.nextSuggestedAction || "Revisar manualmente"}
+                    {selectedThread.context.commercial.closingRecommendedActionLabel ||
+                      selectedThread.context.commercial.recommendedActionLabel ||
+                      selectedThread.context.operational.nextSuggestedAction ||
+                      "Revisar manualmente"}
                   </p>
-                  <p>{selectedThread.context.commercial.nextStep || selectedThread.context.operational.nextSuggestedActionDetail || selectedThread.thread.nextAction}</p>
+                  <p>
+                    {selectedThread.context.commercial.closingRecommendedActionDetail ||
+                      selectedThread.context.commercial.recommendedActionDetail ||
+                      selectedThread.context.commercial.closingNextStep ||
+                      selectedThread.context.commercial.nextStep ||
+                      selectedThread.context.operational.nextSuggestedActionDetail ||
+                      selectedThread.thread.nextAction}
+                  </p>
                 </div>
+                {selectedThread.context.commercial.consultationRecommendationReason ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Consulta</p>
+                    <p className="font-medium text-[#10261d]">
+                      {selectedThread.context.commercial.consultationRecommendationState || "hold"}
+                    </p>
+                    <p>{selectedThread.context.commercial.consultationRecommendationReason}</p>
+                  </div>
+                ) : null}
                 {selectedThread.context.commercial.latestNoteBody ? (
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Ultima nota comercial</p>
                     <p className="font-medium text-[#10261d]">{selectedThread.context.commercial.latestNoteBody}</p>
                     <p>{formatDateTime(selectedThread.context.commercial.latestNoteAt)}</p>
+                  </div>
+                ) : null}
+                {selectedThread.context.commercial.consultationSuggestedCopy ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Copy sugerida</p>
+                    <p className="font-medium text-[#10261d]">
+                      {selectedThread.context.commercial.consultationSuggestedCopy}
+                    </p>
+                    <p>
+                      Follow-up sugerido: {selectedThread.context.commercial.recommendedFollowUpWindow || "sem janela"}
+                    </p>
+                  </div>
+                ) : null}
+                {selectedThread.context.commercial.closingCopySuggestion ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Copy de fechamento</p>
+                    <p className="font-medium text-[#10261d]">
+                      {selectedThread.context.commercial.closingCopySuggestion}
+                    </p>
+                    <p>
+                      Proximo passo: {selectedThread.context.commercial.closingNextStep || "sem proximo passo definido"}
+                    </p>
                   </div>
                 ) : null}
                 {selectedThread.context.social.commentText ? (
