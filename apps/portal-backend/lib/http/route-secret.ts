@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { timingSafeEqualText } from "./webhook-security";
+import { timingSafeEqualText } from "./webhook-security.ts";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
