@@ -9,6 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types tests/run.ts",
     "validate:schema": "node scripts/check-schema-governance.mjs",
     "audit:phase12": "node scripts/audit-phase12-activation.mjs",
     "prepare:phase12:founding": "node scripts/prepare-phase12-founding-rollout.mjs",

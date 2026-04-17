@@ -19,6 +19,8 @@ build/
 
 # Logs
 *.log
+*.out
+*.err
 
 # Runtime data
 pids
@@ -71,3 +73,10 @@ apps/portal-backend/.codex-chrome-gui/
 # Supabase local state
 apps/portal-backend/supabase/.temp/
 apps/portal-backend/supabase/.branches/
+
+# Sensitive/generated diagnostics
+apps/portal-backend/mp-*.json
+apps/portal-backend/*.dump
+apps/portal-backend/*.bak
+apps/portal-backend/tmp/
+apps/portal-backend/uploads/

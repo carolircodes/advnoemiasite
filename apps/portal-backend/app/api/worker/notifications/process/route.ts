@@ -3,41 +3,25 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { getNotificationEnv } from "../../../../../lib/config/env";
+import { assertRouteSecret } from "../../../../../lib/http/route-secret";
 import { processPendingNotifications } from "../../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getBearerToken(value: string | null) {
-  if (!value?.startsWith("Bearer ")) {
-    return null;
-  }
-
-  return value.slice("Bearer ".length).trim() || null;
-}
-
 export async function POST(request: Request) {
   const notificationEnv = getNotificationEnv();
 
-  if (!notificationEnv.workerSecret) {
-    return NextResponse.json(
-      {
-        error:
-          "Defina NOTIFICATIONS_WORKER_SECRET para proteger a rota de processamento da outbox."
-      },
-      { status: 500 }
-    );
-  }
+  const access = assertRouteSecret({
+    request,
+    expectedSecret: notificationEnv.workerSecret,
+    secretName: "NOTIFICATIONS_WORKER_SECRET",
+    errorMessage: "Worker nao autorizado para processar notificacoes.",
+    headerNames: ["x-worker-secret"]
+  });
 
-  const headerSecret =
-    request.headers.get("x-worker-secret") ||
-    getBearerToken(request.headers.get("authorization"));
-
-  if (headerSecret !== notificationEnv.workerSecret) {
-    return NextResponse.json(
-      { error: "Worker nao autorizado para processar notificacoes." },
-      { status: 401 }
-    );
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   let requestedLimit = 10;

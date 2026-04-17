@@ -5,6 +5,8 @@
   "scripts": {
     "build": "npm run build --workspace portal-backend",
     "build:portal": "npm run build --workspace portal-backend",
+    "typecheck": "npm run typecheck --workspace portal-backend",
+    "test": "npm run test --workspace portal-backend",
     "start": "npm run start --workspace portal-backend",
     "dev": "npm run dev --workspace portal-backend"
   },

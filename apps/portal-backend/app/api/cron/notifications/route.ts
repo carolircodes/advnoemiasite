@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { getNotificationEnv, getServerEnv } from "../../../../lib/config/env";
+import { assertRouteSecret } from "../../../../lib/http/route-secret";
 import { processPendingNotifications } from "../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
@@ -11,37 +12,39 @@ export const dynamic = "force-dynamic";
 /**
  * Endpoint acionado pelo Vercel Cron Jobs a cada 5 minutos.
  *
- * Em produção: Vercel envia `Authorization: Bearer <CRON_SECRET>`.
- * Em desenvolvimento: CRON_SECRET não é exigido — o cron pode ser chamado
- * manualmente via GET http://localhost:3000/api/cron/notifications para testar.
+ * Em producao: Vercel envia `Authorization: Bearer <CRON_SECRET>`.
+ * Em desenvolvimento local: o fallback sem segredo so e aceito em localhost.
  *
  * Este endpoint chama processPendingNotifications() diretamente (sem HTTP
- * interno), o que é mais eficiente e evita problemas de rede em serverless.
+ * interno), o que e mais eficiente e evita problemas de rede em serverless.
  */
 export async function GET(request: Request) {
   const env = getServerEnv();
   const notificationEnv = getNotificationEnv();
 
-  if (env.CRON_SECRET) {
-    const authHeader = request.headers.get("authorization");
+  const access = assertRouteSecret({
+    request,
+    expectedSecret: env.CRON_SECRET,
+    secretName: "CRON_SECRET",
+    errorMessage: "Nao autorizado para disparar o cron de notificacoes.",
+    allowLocalWithoutSecret: true
+  });
 
-    if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: "Nao autorizado para disparar o cron de notificacoes." },
-        { status: 401 }
-      );
-    }
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   if (!notificationEnv.emailFrom) {
     return NextResponse.json(
-      { 
+      {
         ok: false,
-        error: "EMAIL_FROM não configurado. Defina a variável de ambiente antes de processar notificações.",
+        error:
+          "EMAIL_FROM nao configurado. Defina a variavel de ambiente antes de processar notificacoes.",
         provider: notificationEnv.provider,
-        recommendation: "Configure EMAIL_FROM e RESEND_API_KEY ou variáveis SMTP no painel do Vercel"
+        recommendation:
+          "Configure EMAIL_FROM e RESEND_API_KEY ou variaveis SMTP no painel do Vercel"
       },
-      { status: 200 } // Mudar para 200 para não quebrar o cron
+      { status: 200 }
     );
   }
 
@@ -56,12 +59,13 @@ export async function GET(request: Request) {
         ok: false,
         error:
           notificationEnv.provider === "resend"
-            ? "RESEND_API_KEY não configurado."
-            : "NOTIFICATIONS_SMTP_HOST ou NOTIFICATIONS_SMTP_PORT não configurados.",
+            ? "RESEND_API_KEY nao configurado."
+            : "NOTIFICATIONS_SMTP_HOST ou NOTIFICATIONS_SMTP_PORT nao configurados.",
         provider: notificationEnv.provider,
-        recommendation: "Configure as variáveis de ambiente do provedor de email no painel do Vercel"
+        recommendation:
+          "Configure as variaveis de ambiente do provedor de email no painel do Vercel"
       },
-      { status: 200 } // Mudar para 200 para não quebrar o cron
+      { status: 200 }
     );
   }
 

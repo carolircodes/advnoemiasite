@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
+import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { hasInternalServiceSecretAccess } from "@/lib/http/route-secret";
 import {
   amountCentsToDecimal,
   buildCheckoutPaymentMethods,
@@ -75,6 +77,35 @@ function extractLeadIdFromExternalReference(externalReference: string | null) {
 
   const match = externalReference.match(/^(.*)_([0-9a-fA-F-]{36})_(\d+)$/);
   return match?.[2] || null;
+}
+
+function buildPublicPaymentPayload(payment: any) {
+  const metadata =
+    payment?.metadata && typeof payment.metadata === "object" ? payment.metadata : {};
+
+  return {
+    id: payment.id,
+    status: payment.status,
+    amount: payment.amount,
+    payment_url: payment.payment_url,
+    external_id: payment.external_id,
+    metadata: {
+      offer_code: typeof metadata.offer_code === "string" ? metadata.offer_code : null,
+      offer_name: typeof metadata.offer_name === "string" ? metadata.offer_name : null,
+      offer_kind: typeof metadata.offer_kind === "string" ? metadata.offer_kind : null
+    },
+    created_at: payment.created_at,
+    updated_at: payment.updated_at
+  };
+}
+
+async function canUseInternalPaymentLookup(request: NextRequest) {
+  if (hasInternalServiceSecretAccess(request)) {
+    return true;
+  }
+
+  const auth = await requireInternalApiProfile();
+  return auth.ok;
 }
 
 type PersistedPaymentRecord = {
@@ -443,8 +474,9 @@ export async function GET(request: NextRequest) {
   const paymentId =
     searchParams.get("payment_id") || searchParams.get("collection_id");
   const externalReference = searchParams.get("external_reference");
-  const leadId =
-    searchParams.get("lead_id") || extractLeadIdFromExternalReference(externalReference);
+  const directLeadId = searchParams.get("lead_id");
+  const leadId = directLeadId || extractLeadIdFromExternalReference(externalReference);
+  const usesProtectedLeadLookup = Boolean(directLeadId) && !paymentId && !externalReference;
 
   if (!paymentId && !leadId) {
     return NextResponse.json(
@@ -454,6 +486,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (usesProtectedLeadLookup) {
+      const allowed = await canUseInternalPaymentLookup(request);
+
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "lead_id_exige_acesso_interno" },
+          { status: 401 }
+        );
+      }
+    }
+
     let payment = null;
 
     if (paymentId) {
@@ -494,21 +537,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      payment: {
-        id: payment.id,
-        status: payment.status,
-        amount: payment.amount,
-        base_amount_cents: payment.base_amount_cents,
-        final_amount_cents: payment.final_amount_cents,
-        price_source: payment.price_source,
-        requested_test_amount_cents: payment.requested_test_amount_cents,
-        owner_override_phone: payment.owner_override_phone,
-        payment_url: payment.payment_url,
-        external_id: payment.external_id,
-        metadata: payment.metadata || null,
-        created_at: payment.created_at,
-        updated_at: payment.updated_at
-      }
+      payment: buildPublicPaymentPayload(payment)
     });
   } catch (error) {
     console.error("[payment.create] Failed to fetch payment status", { error });

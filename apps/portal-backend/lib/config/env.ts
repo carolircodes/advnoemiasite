@@ -63,14 +63,17 @@ const envSchema = z
     EMAIL_FROM: optionalString(),
 
     CRON_SECRET: optionalString(),
+    INTERNAL_API_SECRET: optionalString(),
 
     OPENAI_API_KEY: optionalString(),
     OPENAI_MODEL: optionalString(),
     TELEGRAM_BOT_TOKEN: optionalString(),
+    TELEGRAM_WEBHOOK_SECRET: optionalString(),
     TELEGRAM_CHANNEL_USERNAME: optionalString(),
     TELEGRAM_CHANNEL_URL: optionalUrl(),
     TELEGRAM_CURATED_GROUP_ID: optionalString(),
     TELEGRAM_CURATED_GROUP_TITLE: optionalString(),
+    ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET: optionalString(),
 
     PORTAL_ADMIN_EMAIL: z.preprocess(emptyToUndefined, z.string().email().optional()),
     PORTAL_ADMIN_FULL_NAME: optionalString(),

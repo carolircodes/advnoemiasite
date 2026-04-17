@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { hasInternalServiceSecretAccess } from "@/lib/http/route-secret";
 import { extractAmountCentsFromMessage } from "@/lib/payment/pricing";
 import { generatePaymentLink, generatePaymentMessage } from "@/lib/payment/payment-service";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
@@ -10,8 +12,28 @@ function createPaymentSupabaseClient() {
   return createAdminSupabaseClient();
 }
 
+async function guardPrivilegedNoemiaPaymentRoute(request: NextRequest) {
+  if (hasInternalServiceSecretAccess(request)) {
+    return null;
+  }
+
+  const auth = await requireInternalApiProfile();
+
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const accessDenied = await guardPrivilegedNoemiaPaymentRoute(request);
+
+    if (accessDenied) {
+      return accessDenied;
+    }
+
     const supabase = createPaymentSupabaseClient();
     const { leadId, userId, message, intentionType, offerCode } = await request.json();
 
@@ -193,6 +215,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const accessDenied = await guardPrivilegedNoemiaPaymentRoute(request);
+
+  if (accessDenied) {
+    return accessDenied;
+  }
+
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get("lead_id");
 

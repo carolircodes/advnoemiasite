@@ -1,0 +1,49 @@
+{
+  "nota_maturidade": "4.8/10",
+  "estado_geral": "O sistema possui uma base operacional real e superior a um MVP simples, com Next.js, Supabase Auth/RLS, portal do cliente, painel interno, intake publico, webhooks e pagamentos. Entretanto, a arquitetura esta desequilibrada: o core juridico convive com expansao prematura de growth, IA, social acquisition, monetizacao e ecossistema no mesmo workspace. A base compila, mas ainda nao esta madura para escalar com seguranca e governanca compatíveis com a ambicao declarada.",
+  "riscos_criticos": [
+    "Webhook do Telegram sem autenticacao visivel no codigo auditado.",
+    "Arquivos sensiveis de pagamento versionados no Git.",
+    "Ausencia de CI, lint oficial, test script e esteira minima de qualidade.",
+    "SEO/editorial ainda muito fraco para suportar crescimento organico agressivo.",
+    "Acoplamento excessivo entre marketing, portal, IA, canais, comercial e ecossistema."
+  ],
+  "top_10_problemas": [
+    "Webhook do Telegram aceita payload sem prova clara de origem.",
+    "mp-card-token.json, mp-payment.json e mp-test-user.json estao versionados.",
+    "Marketing, portal, growth, IA e ecossistema estao no mesmo app Next.",
+    "Sitemap atual indexa so poucas rotas institucionais.",
+    "A rota /triagem e apenas um redirect para ancora na home.",
+    "Ha sinais de schema drift e compatibilidade legado em modulos de conversa.",
+    "Pouca cobertura de testes e ausencia de CI/CD versionado.",
+    "Repositorio raiz esta poluido com relatorios, HTML legado e artefatos historicos.",
+    "Noemia Core e Channel Router concentram complexidade excessiva em arquivos gigantes.",
+    "O sistema ainda nao esta pronto para app sem retrabalho consideravel."
+  ],
+  "top_10_melhorias": [
+    "Proteger webhook do Telegram com secret/assinatura/rate limit.",
+    "Remover artefatos sensiveis do Git e instituir scanner de segredos.",
+    "Criar CI minima com build, typecheck, lint e testes.",
+    "Separar layout e robots de publico versus autenticado.",
+    "Criar arquitetura editorial real para artigos, hubs, autores e taxonomias.",
+    "Modularizar Noemia Core e Channel Conversation Router.",
+    "Endurecer governanca de schema e remover fallback legado progressivamente.",
+    "Padronizar observabilidade e correlation IDs.",
+    "Separar dominios tecnicos: portal, marketing/editorial, workers/eventos.",
+    "Construir analytics de jornada completa SEO -> lead -> consulta -> cliente."
+  ],
+  "lacunas_estrategicas": [
+    "Arquitetura editorial para conteudo em escala.",
+    "Governanca real para subdominio de artigos.",
+    "CRM/funil consolidado com analytics de origem a receita.",
+    "Comunidade e membership operacionais de verdade.",
+    "Camada robusta de automacao e monitoramento multicanal.",
+    "APIs maduras e versionaveis para futuro app.",
+    "Esteira de engenharia para equipe crescer com seguranca."
+  ],
+  "prontidao_para_escala": "Baixa a media. O core juridico suporta operacao relevante, mas a base ainda tem acoplamento alto, pouca disciplina de engenharia, observabilidade insuficiente e seguranca desigual entre canais.",
+  "prontidao_para_conteudo": "Baixa. Existe pagina inicial forte e alguma metadata, mas nao existe arquitetura editorial real, nem base robusta para clusters, autores, tags, hubs, series e indexacao em escala.",
+  "prontidao_para_comunidade": "Baixa. Ha fundacao estrutural no schema, mas nao ha evidencia de produto, governanca, operacao e metricas maduras para comunidade.",
+  "prontidao_para_produtos_digitais": "Baixa a media. Ha sinais de pagamentos e modelagem de ecossistema, mas a operacao de catalogo, recorrencia, fulfilment e analytics ainda nao esta consolidada.",
+  "observacoes_finais": "A conclusao objetiva para app e: nao esta pronto para app ainda. O melhor proximo movimento nao e expandir escopo, mas consolidar o core, separar dominios tecnicos, estruturar SEO/conteudo e instituir disciplina forte de engenharia. O subdominio de artigos so deve ser considerado depois que existir uma operacao editorial madura; antes disso, subpasta tende a ser a estrategia mais forte para SEO."
+}

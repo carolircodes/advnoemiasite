@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { assertRouteSecret } from "@/lib/http/route-secret";
 import { syncSubscriptionFromPreapprovalId } from "@/lib/services/ecosystem-billing";
-
-function isWebhookAuthorized(request: NextRequest) {
-  const expectedSecret = process.env.ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET?.trim();
-
-  if (!expectedSecret) {
-    return true;
-  }
-
-  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  const querySecret = request.nextUrl.searchParams.get("secret");
-
-  return bearer === expectedSecret || querySecret === expectedSecret;
-}
 
 function extractPreapprovalId(request: NextRequest, event: any) {
   return (
@@ -41,8 +29,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isWebhookAuthorized(request)) {
-      return NextResponse.json({ ok: false, error: "webhook_unauthorized" }, { status: 401 });
+    const access = assertRouteSecret({
+      request,
+      expectedSecret: process.env.ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET,
+      secretName: "ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET",
+      errorMessage: "webhook_unauthorized",
+      headerNames: ["x-ecosystem-webhook-secret"],
+      queryParamNames: ["secret"],
+      allowLocalWithoutSecret: true
+    });
+
+    if (!access.ok) {
+      return NextResponse.json({ ok: false, error: access.error }, { status: access.status });
     }
 
     let payload: any = {};
