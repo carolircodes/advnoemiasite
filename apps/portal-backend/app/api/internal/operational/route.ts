@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { assistedFollowUpService } from "@/lib/services/assisted-follow-up";
 import { commercialRelationshipService } from "@/lib/services/commercial-relationship";
@@ -8,10 +9,13 @@ import { followUpResponseHandler } from "@/lib/services/follow-up-response-handl
 import { operationalPanel } from "@/lib/services/operational-panel";
 
 export async function POST(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_operational",
+    action: "post"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -254,15 +258,18 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("OPERATIONAL_PANEL_API_ERROR", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError(extractErrorMessage(error, "Internal server error"), 500);
   }
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_operational",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -325,6 +332,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: panelData });
   } catch (error) {
     console.error("OPERATIONAL_PANEL_API_GET_ERROR", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError(extractErrorMessage(error, "Internal server error"), 500);
   }
 }

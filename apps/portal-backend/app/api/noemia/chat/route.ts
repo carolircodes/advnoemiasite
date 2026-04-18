@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { processNoemiaCore, type ConversationState } from "@/lib/ai/noemia-core";
 import { getCurrentProfile } from "@/lib/auth/guards";
 import { askNoemiaSchema } from "@/lib/domain/portal";
-import { buildRateLimitHeaders, consumeRateLimit, getClientIp } from "@/lib/http/request-guards";
+import {
+  buildDurableRateLimitHeaders,
+  consumeDurableRateLimit
+} from "@/lib/http/durable-abuse-protection";
+import { getClientIp } from "@/lib/http/request-guards";
 import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-middleware";
 import { resolveEntryCaseArea } from "@/lib/entry-context";
 import { conversationPersistence } from "@/lib/services/conversation-persistence";
@@ -116,7 +120,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let profile: Awaited<ReturnType<typeof getCurrentProfile>> = null;
-  const rateLimit = consumeRateLimit({
+  const rateLimit = await consumeDurableRateLimit({
     bucket: "noemia-chat",
     key: `${getClientIp(request)}:${request.headers.get("x-product-session-id") || "anon"}`,
     limit: 18,
@@ -133,7 +137,7 @@ export async function POST(request: NextRequest) {
       },
       {
         status: 429,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }
@@ -236,7 +240,7 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(result, {
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       });
     } catch (error) {
       console.warn("[noemia.chat] Falling back after Noemia Core error", error);
@@ -285,7 +289,7 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(fallbackResult, {
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       });
     }
   } catch (error) {
@@ -300,7 +304,7 @@ export async function POST(request: NextRequest) {
       },
       {
         status: 500,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }

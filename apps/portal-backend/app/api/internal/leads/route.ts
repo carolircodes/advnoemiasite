@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const leadStatusAliases: Record<string, string> = {
@@ -39,7 +40,14 @@ function normalizeWorkspaceLead(record: Record<string, unknown>) {
 
 export async function GET() {
   try {
-    await requireProfile(["admin", "advogada"]);
+    const access = await requireStaffRouteAccess({
+      service: "internal_leads",
+      action: "read"
+    });
+
+    if (!access.ok) {
+      return access.response;
+    }
 
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
@@ -55,24 +63,26 @@ export async function GET() {
     return NextResponse.json(Array.isArray(data) ? data.map(normalizeWorkspaceLead) : []);
   } catch (error) {
     console.error("Erro na rota de leads:", error);
-
-    if (error instanceof Error && error.message.includes("Unauthorized")) {
-      return NextResponse.json({ error: "NÃ£o autorizado" }, { status: 401 });
-    }
-
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+    return jsonError(extractErrorMessage(error, "Erro interno do servidor"), 500);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    await requireProfile(["admin", "advogada"]);
+    const access = await requireStaffRouteAccess({
+      service: "internal_leads",
+      action: "update"
+    });
+
+    if (!access.ok) {
+      return access.response;
+    }
 
     const body = await request.json();
     const { id, lead_status, funnel_stage, urgency, operational_status } = body;
 
     if (!id) {
-      return NextResponse.json({ error: "ID do lead Ã© obrigatÃ³rio" }, { status: 400 });
+      return NextResponse.json({ error: "ID do lead e obrigatorio" }, { status: 400 });
     }
 
     const updateData: Record<string, unknown> = {
@@ -100,11 +110,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Erro na rota de leads POST:", error);
-
-    if (error instanceof Error && error.message.includes("Unauthorized")) {
-      return NextResponse.json({ error: "NÃ£o autorizado" }, { status: 401 });
-    }
-
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+    return jsonError(extractErrorMessage(error, "Erro interno do servidor"), 500);
   }
 }

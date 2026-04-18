@@ -5,12 +5,18 @@ import { MercadoPagoConfig, Preference } from "mercadopago";
 import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
 import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import {
-  buildRateLimitHeaders,
   buildRequestFingerprint,
-  consumeRateLimit,
   getClientIp,
   parseJsonBody
 } from "@/lib/http/request-guards";
+import {
+  buildDurableRateLimitHeaders,
+  buildIdempotencyFingerprint,
+  claimDurableIdempotencyKey,
+  completeDurableIdempotencyKey,
+  consumeDurableRateLimit,
+  failDurableIdempotencyKey
+} from "@/lib/http/durable-abuse-protection";
 import {
   amountCentsToDecimal,
   buildCheckoutPaymentMethods,
@@ -130,7 +136,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { mercadopago, supabase, baseUrl } = context.value;
-  const rateLimit = consumeRateLimit({
+  const rateLimit = await consumeDurableRateLimit({
     bucket: "payment-create",
     key: `${getClientIp(request)}:${request.headers.get("x-idempotency-key") || "none"}`,
     limit: 8,
@@ -147,10 +153,17 @@ export async function POST(request: NextRequest) {
       { ok: false, error: "payment_create_rate_limited" },
       {
         status: 429,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }
+
+  let idempotencyState:
+    | {
+        keyHash: string;
+        requestFingerprint: string;
+      }
+    | null = null;
 
   try {
     const parsedBody = await parseJsonBody(request, paymentCreateRequestSchema, {
@@ -204,6 +217,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const idempotencyKey =
+      request.headers.get("x-idempotency-key")?.trim() ||
+      `${leadId}:${userId}:${selectedOffer.code}:${resolvedPricing.finalAmountCents}`;
+    const requestIdempotencyFingerprint = buildIdempotencyFingerprint([
+      leadId,
+      userId,
+      selectedOffer.code,
+      resolvedPricing.finalAmountCents,
+      resolvedPricing.priceSource,
+      requestFingerprint
+    ]);
+    const idempotency = await claimDurableIdempotencyKey({
+      scope: "payment-create",
+      key: idempotencyKey,
+      requestFingerprint: requestIdempotencyFingerprint,
+      ttlMs: 15 * 60 * 1000
+    });
+
+    if (idempotency.ok && idempotency.status === "replay") {
+      return NextResponse.json(idempotency.responsePayload, {
+        headers: {
+          ...buildDurableRateLimitHeaders(rateLimit),
+          "X-Idempotent-Replay": "true"
+        }
+      });
+    }
+
+    if (!idempotency.ok) {
+      return jsonError(
+        idempotency.status === "conflict"
+          ? "payment_create_idempotency_conflict"
+          : "payment_create_in_progress",
+        409,
+        {
+          details: {
+            retryAfterSeconds: idempotency.retryAfterSeconds
+          }
+        }
+      );
+    }
+
+    idempotencyState = {
+      keyHash: idempotency.keyHash,
+      requestFingerprint: requestIdempotencyFingerprint
+    };
+
     const { data: existingPayment } = await supabase
       .from("payments")
       .select("*")
@@ -225,7 +284,7 @@ export async function POST(request: NextRequest) {
         payment_url?: string | null;
         external_id?: string | null;
       };
-      return NextResponse.json({
+      const payload = {
         success: true,
         paymentUrl: pendingPayment.payment_url,
         paymentId: pendingPayment.external_id,
@@ -239,6 +298,18 @@ export async function POST(request: NextRequest) {
           kind: selectedOffer.kind
         },
         message: "Pagamento ja gerado anteriormente"
+      };
+
+      await completeDurableIdempotencyKey({
+        scope: "payment-create",
+        keyHash: idempotencyState.keyHash,
+        requestFingerprint: idempotencyState.requestFingerprint,
+        resourceId: pendingPayment.external_id,
+        responsePayload: payload
+      });
+
+      return NextResponse.json(payload, {
+        headers: buildDurableRateLimitHeaders(rateLimit)
       });
     }
 
@@ -446,7 +517,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       paymentUrl: response.init_point,
       paymentId: response.id,
@@ -460,10 +531,29 @@ export async function POST(request: NextRequest) {
         kind: selectedOffer.kind
       },
       message: "Link de pagamento gerado com sucesso"
-    }, {
-      headers: buildRateLimitHeaders(rateLimit)
+    };
+
+    await completeDurableIdempotencyKey({
+      scope: "payment-create",
+      keyHash: idempotencyState.keyHash,
+      requestFingerprint: idempotencyState.requestFingerprint,
+      resourceId: response.id,
+      responsePayload: payload
+    });
+
+    return NextResponse.json(payload, {
+      headers: buildDurableRateLimitHeaders(rateLimit)
     });
   } catch (error) {
+    if (idempotencyState) {
+      await failDurableIdempotencyKey({
+        scope: "payment-create",
+        keyHash: idempotencyState.keyHash,
+        requestFingerprint: idempotencyState.requestFingerprint,
+        error: extractErrorMessage(error, "internal_server_error")
+      });
+    }
+
     console.error("[payment.create] Internal error", {
       error: extractErrorMessage(error, "internal_server_error")
     });
@@ -471,7 +561,7 @@ export async function POST(request: NextRequest) {
       { ok: false, error: "internal_server_error" },
       {
         status: 500,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }
@@ -485,7 +575,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { supabase } = context.value;
-  const rateLimit = consumeRateLimit({
+  const rateLimit = await consumeDurableRateLimit({
     bucket: "payment-status",
     key: getClientIp(request),
     limit: 20,
@@ -497,7 +587,7 @@ export async function GET(request: NextRequest) {
       { ok: false, error: "payment_status_rate_limited" },
       {
         status: 429,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }
@@ -515,7 +605,7 @@ export async function GET(request: NextRequest) {
       { ok: false, error: "invalid_payment_lookup" },
       {
         status: 400,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }
@@ -584,7 +674,7 @@ export async function GET(request: NextRequest) {
         { ok: false, error: "payment_status_unavailable" },
         {
           status: 404,
-          headers: buildRateLimitHeaders(rateLimit)
+          headers: buildDurableRateLimitHeaders(rateLimit)
         }
       );
     }
@@ -595,7 +685,7 @@ export async function GET(request: NextRequest) {
         payment: buildPublicPaymentPayload(payment)
       },
       {
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   } catch (error) {
@@ -606,7 +696,7 @@ export async function GET(request: NextRequest) {
       { ok: false, error: "internal_server_error" },
       {
         status: 500,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
   }

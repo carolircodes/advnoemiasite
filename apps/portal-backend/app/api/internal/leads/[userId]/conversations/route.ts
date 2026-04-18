@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireProfile } from "@/lib/auth/guards";
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ userId: string }> }
 ) {
   try {
-    await requireProfile(["admin", "advogada"]);
+    const access = await requireStaffRouteAccess({
+      service: "internal_lead_conversations",
+      action: "read"
+    });
+
+    if (!access.ok) {
+      return access.response;
+    }
+
     const { userId } = await context.params;
     const supabase = await createServerSupabaseClient();
-
-    // Buscar conversas do usuário
     const { data: conversations, error } = await supabase
       .from("noemia_conversations")
       .select("*")
@@ -27,20 +35,8 @@ export async function GET(
     }
 
     return NextResponse.json(conversations || []);
-
   } catch (error) {
     console.error("Erro na rota de conversas:", error);
-    
-    if (error instanceof Error && error.message.includes("Unauthorized")) {
-      return NextResponse.json(
-        { error: "Não autorizado" },
-        { status: 401 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
+    return jsonError(extractErrorMessage(error, "Erro interno do servidor"), 500);
   }
 }

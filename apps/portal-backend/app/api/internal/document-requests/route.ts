@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import {
   listLatestDocumentRequests,
   requestCaseDocument,
@@ -8,10 +9,13 @@ import {
 } from "@/lib/services/manage-documents";
 
 export async function GET() {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_document_requests",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const items = await listLatestDocumentRequests(20);
@@ -19,10 +23,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_document_requests",
+    action: "write"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -30,21 +37,21 @@ export async function POST(request: Request) {
     const result = await requestCaseDocument(payload, access.profile.id);
     return NextResponse.json({ ok: true, result }, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Nao foi possivel criar a solicitacao."
-      },
-      { status: 400 }
+    return jsonError(
+      extractErrorMessage(error, "Nao foi possivel criar a solicitacao."),
+      400
     );
   }
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_document_requests",
+    action: "update"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -52,12 +59,9 @@ export async function PATCH(request: Request) {
     const result = await updateDocumentRequestStatus(payload, access.profile.id);
     return NextResponse.json({ ok: true, result }, { status: 200 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Nao foi possivel atualizar a solicitacao."
-      },
-      { status: 400 }
+    return jsonError(
+      extractErrorMessage(error, "Nao foi possivel atualizar a solicitacao."),
+      400
     );
   }
 }

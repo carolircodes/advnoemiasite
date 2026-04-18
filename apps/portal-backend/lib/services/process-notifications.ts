@@ -1,11 +1,17 @@
 import "server-only";
 
+import { traceOperationalEvent } from "../observability/operational-trace";
 import { routeNotificationByChannel } from "../notifications/channel-router";
 import { renderNotificationEmail } from "../notifications/email-templates";
-import { runOperationalAutomationRules } from "./automation-rules";
 import { createAdminSupabaseClient } from "../supabase/admin";
+import {
+  classifyNotificationError,
+  type NotificationErrorKind
+} from "./notification-error-classification";
+import { runOperationalAutomationRules } from "./automation-rules";
 
 const MAX_NOTIFICATION_ATTEMPTS = 5;
+const NOTIFICATION_WORKER_ID = `${process.env.VERCEL_REGION || "local"}:${process.pid}`;
 
 type NotificationRecord = {
   id: string;
@@ -30,24 +36,37 @@ function truncateErrorMessage(message: string) {
   return message.slice(0, 900);
 }
 
-async function markNotificationAsProcessing(record: NotificationRecord) {
+async function claimNotificationForProcessing(record: NotificationRecord) {
   const supabase = createAdminSupabaseClient();
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("notifications_outbox")
     .update({
       status: "processing",
       attempts: record.attempts + 1,
       last_attempt_at: now,
-      error_message: null
+      error_message: null,
+      last_error_kind: null,
+      processing_started_at: now,
+      processing_worker: NOTIFICATION_WORKER_ID
     })
-    .eq("id", record.id);
+    .eq("id", record.id)
+    .eq("attempts", record.attempts)
+    .in("status", ["pending", "failed"])
+    .lte("available_at", now)
+    .select(
+      "id,event_type,channel,recipient_profile_id,recipient_email,subject,template_key,payload,status,attempts,available_at"
+    )
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Nao foi possivel marcar a notificacao como em processamento: ${error.message}`);
   }
 
-  return now;
+  return {
+    claimedRecord: (data as NotificationRecord | null) || null,
+    processingTimestamp: now
+  };
 }
 
 async function markNotificationAsSent(id: string) {
@@ -58,7 +77,10 @@ async function markNotificationAsSent(id: string) {
     .update({
       status: "sent",
       sent_at: now,
-      error_message: null
+      error_message: null,
+      last_error_kind: null,
+      processing_started_at: null,
+      processing_worker: null
     })
     .eq("id", id);
 
@@ -75,7 +97,10 @@ async function markNotificationAsSkipped(id: string, reason: string) {
     .update({
       status: "skipped",
       sent_at: now,
-      error_message: truncateErrorMessage(reason)
+      error_message: truncateErrorMessage(reason),
+      last_error_kind: "validation",
+      processing_started_at: null,
+      processing_worker: null
     })
     .eq("id", id);
 
@@ -87,7 +112,8 @@ async function markNotificationAsSkipped(id: string, reason: string) {
 async function markNotificationAsFailed(
   record: NotificationRecord,
   processingTimestamp: string,
-  errorMessage: string
+  errorMessage: string,
+  errorKind: NotificationErrorKind
 ) {
   const supabase = createAdminSupabaseClient();
   const nextAttemptAt = new Date(
@@ -99,7 +125,10 @@ async function markNotificationAsFailed(
     .update({
       status: "failed",
       available_at: terminalFailure ? processingTimestamp : nextAttemptAt,
-      error_message: truncateErrorMessage(errorMessage)
+      error_message: truncateErrorMessage(errorMessage),
+      last_error_kind: errorKind,
+      processing_started_at: null,
+      processing_worker: null
     })
     .eq("id", record.id);
 
@@ -125,7 +154,6 @@ async function logNotificationSentToHistory(record: NotificationRecord) {
       }
     });
   } catch (logError) {
-    // Nao-bloqueante: falha no log nao interrompe o envio
     console.warn(
       "[notifications.history] Falha ao registrar historico de envio:",
       logError instanceof Error ? logError.message : String(logError)
@@ -134,67 +162,106 @@ async function logNotificationSentToHistory(record: NotificationRecord) {
 }
 
 async function processNotification(record: NotificationRecord) {
-  const processingTimestamp = await markNotificationAsProcessing(record);
+  const { claimedRecord, processingTimestamp } = await claimNotificationForProcessing(record);
 
-  if (record.template_key === "client-invite") {
-    await markNotificationAsSkipped(
-      record.id,
-      "Convite principal enviado pelo fluxo nativo do Supabase Auth."
-    );
+  if (!claimedRecord) {
+    traceOperationalEvent("warn", "NOTIFICATION_PROCESSING_CONTENDED", {
+      service: "notifications_worker",
+      action: "claim"
+    }, {
+      notificationId: record.id,
+      workerId: NOTIFICATION_WORKER_ID
+    });
+
     return {
       id: record.id,
+      status: "contended" as const
+    };
+  }
+
+  if (claimedRecord.template_key === "client-invite") {
+    await markNotificationAsSkipped(
+      claimedRecord.id,
+      "Convite principal enviado pelo fluxo nativo do Supabase Auth."
+    );
+
+    return {
+      id: claimedRecord.id,
       status: "skipped" as const
     };
   }
 
-  const channel = record.channel || "email";
+  const channel = claimedRecord.channel || "email";
 
   try {
     if (channel === "email") {
-      const renderedEmail = renderNotificationEmail(record);
+      const renderedEmail = renderNotificationEmail(claimedRecord);
       await routeNotificationByChannel("email", {
-        to: record.recipient_email,
+        to: claimedRecord.recipient_email,
         subject: renderedEmail.subject,
         html: renderedEmail.html,
         text: renderedEmail.text
       });
     } else if (channel === "whatsapp") {
-      // Para WhatsApp, usar payload com mensagem específica
-      const payload = record.payload as any;
-      const whatsappMessage = payload?.message || record.subject;
-      
+      const payload = claimedRecord.payload || {};
+      const whatsappMessage =
+        typeof payload.message === "string" && payload.message.trim().length > 0
+          ? payload.message
+          : claimedRecord.subject;
+
       await routeNotificationByChannel("whatsapp", {
-        to: record.recipient_email, // Para WhatsApp, este campo contém o telefone
-        subject: record.subject,
+        to: claimedRecord.recipient_email,
+        subject: claimedRecord.subject,
         html: "",
         text: whatsappMessage
       });
     } else {
-      // Canais futuros (noemia): roteador lança erro informativo
       await routeNotificationByChannel(channel, {
-        to: record.recipient_email,
-        subject: record.subject,
+        to: claimedRecord.recipient_email,
+        subject: claimedRecord.subject,
         html: "",
         text: ""
       });
     }
 
-    await markNotificationAsSent(record.id);
-    await logNotificationSentToHistory(record);
+    await markNotificationAsSent(claimedRecord.id);
+    await logNotificationSentToHistory(claimedRecord);
+
+    traceOperationalEvent("info", "NOTIFICATION_SENT", {
+      service: "notifications_worker",
+      action: "send"
+    }, {
+      notificationId: claimedRecord.id,
+      channel,
+      workerId: NOTIFICATION_WORKER_ID
+    });
 
     return {
-      id: record.id,
+      id: claimedRecord.id,
       status: "sent" as const
     };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Falha desconhecida ao enviar notificacao.";
-    await markNotificationAsFailed(record, processingTimestamp, message);
+    const errorKind = classifyNotificationError(error);
+
+    await markNotificationAsFailed(claimedRecord, processingTimestamp, message, errorKind);
+
+    traceOperationalEvent("error", "NOTIFICATION_SEND_FAILED", {
+      service: "notifications_worker",
+      action: "send"
+    }, {
+      notificationId: claimedRecord.id,
+      channel,
+      workerId: NOTIFICATION_WORKER_ID,
+      errorKind
+    }, error);
 
     return {
-      id: record.id,
+      id: claimedRecord.id,
       status: "failed" as const,
-      error: message
+      error: message,
+      errorKind
     };
   }
 }
@@ -231,6 +298,7 @@ export async function processPendingNotifications(limit = 10) {
     sent: results.filter((item) => item.status === "sent").length,
     skipped: results.filter((item) => item.status === "skipped").length,
     failed: results.filter((item) => item.status === "failed").length,
+    contended: results.filter((item) => item.status === "contended").length,
     results
   };
 }

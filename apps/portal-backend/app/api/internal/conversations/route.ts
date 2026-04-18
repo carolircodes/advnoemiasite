@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
+import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { getSchemaCompatibilityReportForSurface } from "@/lib/schema/compatibility";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
-import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 
 async function ensureConversationInboxSchema() {
   const report = await getSchemaCompatibilityReportForSurface("internal_conversations");
@@ -40,10 +41,13 @@ async function ensureConversationInboxSchema() {
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_conversations",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const schemaResponse = await ensureConversationInboxSchema();
@@ -119,21 +123,21 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Nao foi possivel carregar a central de conversas."
-      },
-      { status: 500 }
+    return jsonError(
+      extractErrorMessage(error, "Nao foi possivel carregar a central de conversas."),
+      500
     );
   }
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_conversations",
+    action: "write"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const schemaResponse = await ensureConversationInboxSchema();
@@ -216,12 +220,9 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Nao foi possivel operar a thread selecionada."
-      },
-      { status: 400 }
+    return jsonError(
+      extractErrorMessage(error, "Nao foi possivel operar a thread selecionada."),
+      400
     );
   }
 }

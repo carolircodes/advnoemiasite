@@ -1,35 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { NextRequest, NextResponse } from "next/server";
+
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import { getCommercialAutomationPlans, queueEligibleCommercialAutomations } from "@/lib/services/commercial-automation";
 import { followUpEngine } from "@/lib/services/follow-up-engine";
 import { operationalPanel } from "@/lib/services/operational-panel";
 
 export async function POST(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_follow_up",
+    action: "post"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
     const body = await request.json();
-    
     const { action, clientId, pipelineId, channel, messageType, scheduledFor, followUpMessageId, status, limit } = body;
 
-    if (action === 'getEligible') {
-      // Listar clientes elegíveis para follow-up
+    if (action === "getEligible") {
       const eligibleClients = await followUpEngine.getClientsEligibleForFollowUp(limit || 20);
-      
       return NextResponse.json({
         success: true,
         data: eligibleClients,
         count: eligibleClients.length
       });
-    } else if (action === 'generateMessage') {
-      // Gerar mensagem de follow-up
+    }
+
+    if (action === "generateMessage") {
       if (!clientId || !pipelineId || !channel) {
         return NextResponse.json(
-          { error: 'clientId, pipelineId, and channel are required for generateMessage action' },
+          { error: "clientId, pipelineId, and channel are required for generateMessage action" },
           { status: 400 }
         );
       }
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
 
       if (!message) {
         return NextResponse.json(
-          { error: 'Failed to generate follow-up message' },
+          { error: "Failed to generate follow-up message" },
           { status: 500 }
         );
       }
@@ -52,12 +55,15 @@ export async function POST(request: NextRequest) {
         success: true,
         data: message
       });
+    }
 
-    } else if (action === 'scheduleFollowUp') {
-      // Agendar follow-up
+    if (action === "scheduleFollowUp") {
       if (!clientId || !pipelineId || !channel || !messageType || !scheduledFor) {
         return NextResponse.json(
-          { error: 'clientId, pipelineId, channel, messageType, and scheduledFor are required for scheduleFollowUp action' },
+          {
+            error:
+              "clientId, pipelineId, channel, messageType, and scheduledFor are required for scheduleFollowUp action"
+          },
           { status: 400 }
         );
       }
@@ -72,14 +78,14 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: scheduled,
-        message: scheduled ? 'Follow-up scheduled successfully' : 'Failed to schedule follow-up'
+        message: scheduled ? "Follow-up scheduled successfully" : "Failed to schedule follow-up"
       });
+    }
 
-    } else if (action === 'markResult') {
-      // Marcar resultado do follow-up
+    if (action === "markResult") {
       if (!followUpMessageId || !status) {
         return NextResponse.json(
-          { error: 'followUpMessageId and status are required for markResult action' },
+          { error: "followUpMessageId and status are required for markResult action" },
           { status: 400 }
         );
       }
@@ -92,14 +98,17 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: updated,
-        message: updated ? 'Follow-up result updated successfully' : 'Failed to update follow-up result'
+        message: updated ? "Follow-up result updated successfully" : "Failed to update follow-up result"
       });
+    }
 
-    } else if (action === 'saveMessage') {
-      // Salvar mensagem gerada
+    if (action === "saveMessage") {
       if (!clientId || !pipelineId || !channel || !messageType || !body.content) {
         return NextResponse.json(
-          { error: 'clientId, pipelineId, channel, messageType, and content are required for saveMessage action' },
+          {
+            error:
+              "clientId, pipelineId, channel, messageType, and content are required for saveMessage action"
+          },
           { status: 400 }
         );
       }
@@ -115,7 +124,7 @@ export async function POST(request: NextRequest) {
 
       if (!messageId) {
         return NextResponse.json(
-          { error: 'Failed to save follow-up message' },
+          { error: "Failed to save follow-up message" },
           { status: 500 }
         );
       }
@@ -124,28 +133,27 @@ export async function POST(request: NextRequest) {
         success: true,
         data: { messageId }
       });
+    }
 
-    } else if (action === 'getPriority') {
-      // Listar follow-ups prioritários
+    if (action === "getPriority") {
       const priorityFollowUps = await followUpEngine.getPriorityFollowUps(limit || 20);
-      
       return NextResponse.json({
         success: true,
         data: priorityFollowUps,
         count: priorityFollowUps.length
       });
+    }
 
-    } else if (action === 'getScheduled') {
-      // Listar follow-ups agendados
+    if (action === "getScheduled") {
       const scheduledFollowUps = await followUpEngine.getScheduledFollowUps(limit || 50);
-      
       return NextResponse.json({
         success: true,
         data: scheduledFollowUps,
         count: scheduledFollowUps.length
       });
+    }
 
-    } else if (action === 'getCommercialPlans') {
+    if (action === "getCommercialPlans") {
       const contactsResult = await operationalPanel.getOperationalContacts({}, limit || 20, 0);
       const plans = await getCommercialAutomationPlans(contactsResult.contacts);
 
@@ -157,8 +165,9 @@ export async function POST(request: NextRequest) {
           plan: plans.get(contact.clientId) || null
         }))
       });
+    }
 
-    } else if (action === 'queueCommercialAutomations') {
+    if (action === "queueCommercialAutomations") {
       const contactsResult = await operationalPanel.getOperationalContacts({}, limit || 20, 0);
       const summary = await queueEligibleCommercialAutomations(contactsResult.contacts, limit || 10);
 
@@ -166,60 +175,64 @@ export async function POST(request: NextRequest) {
         success: true,
         data: summary
       });
-
-    } else {
-      return NextResponse.json(
-        { error: 'Invalid action. Supported actions: getEligible, generateMessage, scheduleFollowUp, markResult, saveMessage, getPriority, getScheduled, getCommercialPlans, queueCommercialAutomations' },
-        { status: 400 }
-      );
     }
-  } catch (error) {
-    console.error('FOLLOW_UP_API_ERROR', error);
+
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      {
+        error:
+          "Invalid action. Supported actions: getEligible, generateMessage, scheduleFollowUp, markResult, saveMessage, getPriority, getScheduled, getCommercialPlans, queueCommercialAutomations"
+      },
+      { status: 400 }
     );
+  } catch (error) {
+    console.error("FOLLOW_UP_API_ERROR", error);
+    return jsonError(extractErrorMessage(error, "Internal server error"), 500);
   }
 }
 
-// GET para consultas
 export async function GET(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_follow_up",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const action = searchParams.get("action");
+    const limit = parseInt(searchParams.get("limit") || "20", 10);
 
-    if (action === 'getEligible') {
+    if (action === "getEligible") {
       const eligibleClients = await followUpEngine.getClientsEligibleForFollowUp(limit);
-      
       return NextResponse.json({
         success: true,
         data: eligibleClients,
         count: eligibleClients.length
       });
-    } else if (action === 'getPriority') {
+    }
+
+    if (action === "getPriority") {
       const priorityFollowUps = await followUpEngine.getPriorityFollowUps(limit);
-      
       return NextResponse.json({
         success: true,
         data: priorityFollowUps,
         count: priorityFollowUps.length
       });
-    } else if (action === 'getScheduled') {
+    }
+
+    if (action === "getScheduled") {
       const scheduledFollowUps = await followUpEngine.getScheduledFollowUps(limit);
-      
       return NextResponse.json({
         success: true,
         data: scheduledFollowUps,
         count: scheduledFollowUps.length
       });
-    } else if (action === 'getCommercialPlans') {
+    }
+
+    if (action === "getCommercialPlans") {
       const contactsResult = await operationalPanel.getOperationalContacts({}, limit, 0);
       const plans = await getCommercialAutomationPlans(contactsResult.contacts);
 
@@ -231,21 +244,16 @@ export async function GET(request: NextRequest) {
           plan: plans.get(contact.clientId) || null
         }))
       });
-    } else {
-      // Default: listar elegíveis
-      const eligibleClients = await followUpEngine.getClientsEligibleForFollowUp(limit);
-      
-      return NextResponse.json({
-        success: true,
-        data: eligibleClients,
-        count: eligibleClients.length
-      });
     }
+
+    const eligibleClients = await followUpEngine.getClientsEligibleForFollowUp(limit);
+    return NextResponse.json({
+      success: true,
+      data: eligibleClients,
+      count: eligibleClients.length
+    });
   } catch (error) {
-    console.error('FOLLOW_UP_API_GET_ERROR', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("FOLLOW_UP_API_GET_ERROR", error);
+    return jsonError(extractErrorMessage(error, "Internal server error"), 500);
   }
 }

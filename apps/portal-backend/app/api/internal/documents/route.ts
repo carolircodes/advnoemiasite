@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import {
   listLatestDocuments,
   registerCaseDocument
 } from "@/lib/services/manage-documents";
 
 export async function GET() {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_documents",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const items = await listLatestDocuments(20);
@@ -18,10 +22,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_documents",
+    action: "write"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -55,11 +62,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ ok: true, result }, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Nao foi possivel registrar o documento."
-      },
-      { status: 400 }
+    return jsonError(
+      extractErrorMessage(error, "Nao foi possivel registrar o documento."),
+      400
     );
   }
 }

@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 
 import { extractErrorMessage } from "../../../../lib/http/api-response";
 import {
-  buildRateLimitHeaders,
-  consumeRateLimit
-} from "../../../../lib/http/request-guards";
+  buildDurableRateLimitHeaders,
+  consumeDurableRateLimit
+} from "../../../../lib/http/durable-abuse-protection";
+import { getClientIp } from "../../../../lib/http/request-guards";
 import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
 import { submitPublicTriage } from "../../../../lib/services/public-intake";
 
@@ -15,18 +16,8 @@ export async function OPTIONS(request: Request) {
   return corsPreflightResponse(request);
 }
 
-function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-
-  if (!forwardedFor) {
-    return null;
-  }
-
-  return forwardedFor.split(",")[0]?.trim() || null;
-}
-
 export async function POST(request: Request) {
-  const rateLimit = consumeRateLimit({
+  const rateLimit = await consumeDurableRateLimit({
     bucket: "public-triage",
     key: getClientIp(request) || "unknown",
     limit: 5,
@@ -41,7 +32,7 @@ export async function POST(request: Request) {
       },
       {
         status: 429,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
 
@@ -71,7 +62,7 @@ export async function POST(request: Request) {
       },
       {
         status: 201,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
     return withPublicApiCors(request, res);
@@ -87,7 +78,7 @@ export async function POST(request: Request) {
       },
       {
         status: 400,
-        headers: buildRateLimitHeaders(rateLimit)
+        headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
     return withPublicApiCors(request, res);
