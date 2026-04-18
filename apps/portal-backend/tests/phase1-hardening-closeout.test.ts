@@ -115,6 +115,22 @@ test("route secret helper rejects wrong secrets and accepts header/query matches
   assert.deepEqual(viaQuery, { ok: true, source: "query" });
 });
 
+test("telegram webhook guard accepts Telegram's official secret header", () => {
+  const result = assertRouteSecret({
+    request: new Request("https://portal.advnoemia.com.br/api/telegram/webhook", {
+      headers: {
+        "x-telegram-bot-api-secret-token": "telegram-secret"
+      }
+    }),
+    expectedSecret: "telegram-secret",
+    secretName: "TELEGRAM_WEBHOOK_SECRET",
+    errorMessage: "Webhook do Telegram nao autorizado.",
+    headerNames: ["x-telegram-bot-api-secret-token", "x-telegram-webhook-secret"]
+  });
+
+  assert.deepEqual(result, { ok: true, source: "header" });
+});
+
 test("internal service secret helper only grants access with the configured secret", () => {
   return withEnv({ INTERNAL_API_SECRET: "internal-secret" }, () => {
     const denied = hasInternalServiceSecretAccess(

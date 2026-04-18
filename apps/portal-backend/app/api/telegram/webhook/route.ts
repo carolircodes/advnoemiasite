@@ -10,7 +10,10 @@ export async function POST(request: NextRequest) {
       expectedSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
       secretName: "TELEGRAM_WEBHOOK_SECRET",
       errorMessage: "Webhook do Telegram nao autorizado.",
-      headerNames: ["x-telegram-webhook-secret"],
+      headerNames: [
+        "x-telegram-bot-api-secret-token",
+        "x-telegram-webhook-secret"
+      ],
       allowLocalWithoutSecret: true
     });
 

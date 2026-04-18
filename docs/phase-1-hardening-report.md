@@ -290,6 +290,118 @@ Decision:
 
 - defer lint baseline to Phase 2
 
+## April 17, 2026 operational follow-up
+
+### Vercel project and domain mapping
+
+- The repo deploys to two Vercel production projects under the same team:
+  - `advnoemiasite`
+    - domains: `advnoemia.com.br`, `www.advnoemia.com.br`, `api.advnoemia.com.br`
+    - role: public marketing site / static host
+  - `advnoemiaportal`
+    - domain: `portal.advnoemia.com.br`
+    - role: Next.js portal backend that serves the hardened API routes
+- The hardened routes verified below belong to `advnoemiaportal`, not the apex/www site.
+- Direct probes confirmed that `https://www.advnoemia.com.br/api/telegram/webhook` and
+  `https://www.advnoemia.com.br/api/cron/notifications` return Vercel `NOT_FOUND`.
+- Direct probes confirmed that `https://portal.advnoemia.com.br/api/telegram/webhook`,
+  `https://portal.advnoemia.com.br/api/payment/webhook` and
+  `https://portal.advnoemia.com.br/api/cron/notifications` resolve on the live portal deployment.
+
+### Route ownership and expected public paths
+
+- `apps/portal-backend/app/api/telegram/webhook/route.ts`
+  - public path: `/api/telegram/webhook`
+  - public host: `https://portal.advnoemia.com.br`
+- `apps/portal-backend/app/api/worker/notifications/process/route.ts`
+  - public path: `/api/worker/notifications/process`
+  - public host: `https://portal.advnoemia.com.br`
+- `apps/portal-backend/app/api/cron/notifications/route.ts`
+  - public path: `/api/cron/notifications`
+  - public host: `https://portal.advnoemia.com.br`
+- `apps/portal-backend/app/api/payment/create/route.ts`
+  - public path: `/api/payment/create`
+  - public host: `https://portal.advnoemia.com.br`
+- `apps/portal-backend/app/api/payment/webhook/route.ts`
+  - public path: `/api/payment/webhook`
+  - public host: `https://portal.advnoemia.com.br`
+- `apps/portal-backend/app/api/noemia/payment/route.ts`
+  - public path: `/api/noemia/payment`
+  - public host: `https://portal.advnoemia.com.br`
+- `apps/portal-backend/app/api/ecosystem/subscription/webhook/route.ts`
+  - public path: `/api/ecosystem/subscription/webhook`
+  - public host: `https://portal.advnoemia.com.br`
+
+### Environment matrix by hardened route
+
+- Telegram webhook
+  - route: `POST /api/telegram/webhook`
+  - required: `TELEGRAM_WEBHOOK_SECRET`
+  - supporting integration env: `TELEGRAM_BOT_TOKEN`
+  - live finding: route existed on `portal.advnoemia.com.br`; unauthenticated POST returned `401`, so the secret is configured in the portal production project
+- Premium subscription webhook
+  - route: `POST /api/ecosystem/subscription/webhook`
+  - required: `ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET`
+  - live finding: code reads its own dedicated env name; it is not an alias for `MERCADO_PAGO_WEBHOOK_SECRET`
+- Notifications cron
+  - route: `GET /api/cron/notifications`
+  - required: `CRON_SECRET`
+  - supporting notification env: `EMAIL_FROM` plus either `RESEND_API_KEY` or SMTP variables
+  - live finding: unauthenticated GET on `portal.advnoemia.com.br` returned `401`, so the route is deployed and protected in production
+- Notifications worker
+  - route: `POST /api/worker/notifications/process`
+  - required: `NOTIFICATIONS_WORKER_SECRET`
+- Internal payment / internal service routes
+  - route family: internal routes guarded by `hasInternalServiceSecretAccess()`
+  - required: `INTERNAL_API_SECRET`
+- Mercado Pago checkout/webhook
+  - routes: `/api/payment/create`, `/api/payment/webhook`
+  - required: `MERCADO_PAGO_ACCESS_TOKEN`
+  - required for signature validation: `MERCADO_PAGO_WEBHOOK_SECRET`
+  - supporting: `NEXT_PUBLIC_BASE_URL` or `NEXT_PUBLIC_APP_URL`
+  - webhook diagnostics on production confirmed:
+    - access token configured
+    - webhook secret configured
+    - Supabase base/admin env configured
+    - site URL configured
+- Shared base envs still required by the portal:
+  - `NEXT_PUBLIC_APP_URL=https://portal.advnoemia.com.br`
+  - `NEXT_PUBLIC_PUBLIC_SITE_URL=https://advnoemia.com.br`
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+
+### Telegram repair status
+
+- Root cause 1: Telegram was registered against `https://advnoemia.com.br/api/telegram/webhook`, which redirects to `www` and then lands on a project that does not contain the webhook route.
+- Root cause 2: the route only trusted `x-telegram-webhook-secret`, but Telegram sends
+  `X-Telegram-Bot-Api-Secret-Token` when `secret_token` is configured via Bot API.
+- The route now accepts both header names, preserving manual probes while matching Telegram's real delivery behavior.
+- Telegram Bot API follow-up on April 18, 2026:
+  - previous `getWebhookInfo` showed:
+    - URL on the wrong apex host
+    - `last_error_message = Wrong response from the webhook: 307 Temporary Redirect`
+  - after repair, the webhook was re-registered to:
+    - `https://portal.advnoemia.com.br/api/telegram/webhook`
+- Operational note:
+  - the currently configured production `TELEGRAM_WEBHOOK_SECRET` still matched the exposed local value at the time of validation, because an authenticated manual probe using the local secret passed the guard on the deployed route
+  - treat that secret as compromised and rotate it in Vercel after the fixed deployment is live
+  - the currently configured Telegram bot token also remains active enough to answer `getWebhookInfo`, so treat bot token rotation as still required through BotFather
+
+### Mercado Pago closeout
+
+- `MERCADO_PAGO_ACCESS_TOKEN` and `MERCADO_PAGO_WEBHOOK_SECRET` are both actively used by code.
+- `ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET` is a separate recurring-subscription secret, not an alias of the Mercado Pago webhook secret.
+- No git history rewrite was performed.
+- Rotation remains required for Mercado Pago credentials historically associated with the removed diagnostic artifacts.
+
+### Remaining manual actions outside the repo
+
+- rotate `TELEGRAM_BOT_TOKEN` in BotFather, then update the new token in Vercel for the portal project
+- rotate `TELEGRAM_WEBHOOK_SECRET` in the portal project and re-run `setWebhook` with the new secret
+- rotate Mercado Pago credentials/tokens tied to the historical diagnostic artifacts
+- confirm GitHub branch protection settings on `main`
+
 ## Final verdict
 
 `Phase 1 closed with manual follow-up`
@@ -297,8 +409,5 @@ Decision:
 Why:
 
 - The repository-side hardening is committed and validated.
-- CI/governance files are present and usable.
-- The remaining required actions are operational, not code changes:
-  - secret rotation
-  - environment provisioning
-  - GitHub branch protection configuration
+- The production topology is now mapped precisely.
+- The remaining risk after this follow-up is operational secret rotation and final deployment of the Telegram header compatibility fix.
