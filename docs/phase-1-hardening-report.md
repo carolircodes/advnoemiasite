@@ -343,6 +343,7 @@ Decision:
   - route: `POST /api/ecosystem/subscription/webhook`
   - required: `ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET`
   - live finding: code reads its own dedicated env name; it is not an alias for `MERCADO_PAGO_WEBHOOK_SECRET`
+  - production status on April 18, 2026: missing in the live portal project at the time of validation (`503 Defina ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET para proteger esta rota.`)
 - Notifications cron
   - route: `GET /api/cron/notifications`
   - required: `CRON_SECRET`
@@ -399,6 +400,7 @@ Decision:
 
 - rotate `TELEGRAM_BOT_TOKEN` in BotFather, then update the new token in Vercel for the portal project
 - rotate `TELEGRAM_WEBHOOK_SECRET` in the portal project and re-run `setWebhook` with the new secret
+- provision `ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET` in the portal project for production (and preview if the webhook is exercised there)
 - rotate Mercado Pago credentials/tokens tied to the historical diagnostic artifacts
 - confirm GitHub branch protection settings on `main`
 
