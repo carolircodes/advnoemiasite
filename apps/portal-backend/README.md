@@ -240,6 +240,26 @@ Eventos relevantes continuam alimentando `notifications_outbox`. Agora o portal 
 - o relatorio diferencia `healthy`, `degraded`, `missing_configuration`, `fallback` e `hard_failure`
 - a secao `abuseProtection` informa se a migracao duravel foi aplicada, se o limiter esta em modo duravel ou `memory-fallback` e quais fluxos criticos estao duravelmente protegidos
 - se a migracao `20260418120000_phase3_durable_abuse_controls.sql` nao estiver aplicada no ambiente, a readiness e os warnings de runtime passam a sinalizar esse desvio explicitamente
+- o bloco `operator` agora resume `alerts`, `urgentActions` e um `quickstart` operacional protegido para pos-deploy
+
+### Verificacao operacional rapida
+
+Antes de promover ou encerrar um deploy backend, execute:
+
+```powershell
+npm run operations:verify
+```
+
+Esse comando resume:
+
+- estado agregado do backend
+- convergencia por subsistema critico
+- expectativa da protecao duravel
+- acoes que exigem resposta do operador
+
+Checklist detalhado:
+
+- [`docs/BACKEND_OPERATOR_CHECKLIST.md`](docs/BACKEND_OPERATOR_CHECKLIST.md)
 - processa itens `pending` e `failed` disponiveis no horario atual
 - envia por SMTP ou Resend, conforme `NOTIFICATIONS_PROVIDER`
 - marca como `sent`, `failed` ou `skipped`

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 
 import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
+import {
+  buildPaymentReadinessSection,
+  getPaymentRuntimeDiagnostics
+} from "@/lib/diagnostics/payment-readiness";
 import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import {
   computeHmacSha256Hex,
@@ -25,52 +29,6 @@ type ParsedExternalReference = {
   offerCode: string;
   leadId: string;
 };
-
-type WebhookRuntimeDiagnostics = {
-  mercadoPagoAccessTokenConfigured: boolean;
-  mercadoPagoPublicKeyConfigured: boolean;
-  webhookSecretConfigured: boolean;
-  supabaseUrlConfigured: boolean;
-  supabaseSecretConfigured: boolean;
-  siteUrlConfigured: boolean;
-  siteUrlSource:
-    | "NEXT_PUBLIC_SITE_URL"
-    | "NEXT_PUBLIC_PUBLIC_SITE_URL"
-    | "NEXT_PUBLIC_BASE_URL"
-    | "NEXT_PUBLIC_APP_URL"
-    | null;
-};
-
-function getWebhookRuntimeDiagnostics(): WebhookRuntimeDiagnostics {
-  const siteUrlSource = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-    ? "NEXT_PUBLIC_SITE_URL"
-    : process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim()
-      ? "NEXT_PUBLIC_PUBLIC_SITE_URL"
-      : process.env.NEXT_PUBLIC_BASE_URL?.trim()
-        ? "NEXT_PUBLIC_BASE_URL"
-        : process.env.NEXT_PUBLIC_APP_URL?.trim()
-          ? "NEXT_PUBLIC_APP_URL"
-          : null;
-
-  return {
-    mercadoPagoAccessTokenConfigured: Boolean(
-      process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim()
-    ),
-    mercadoPagoPublicKeyConfigured: Boolean(
-      process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY?.trim()
-    ),
-    webhookSecretConfigured: Boolean(
-      process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim()
-    ),
-    supabaseUrlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()),
-    supabaseSecretConfigured: Boolean(
-      process.env.SUPABASE_SECRET_KEY?.trim() ||
-        process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-    ),
-    siteUrlConfigured: Boolean(siteUrlSource),
-    siteUrlSource
-  };
-}
 
 function getWebhookContext():
   | { ok: true; value: PaymentWebhookContext }
@@ -826,20 +784,24 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const diagnostics = getWebhookRuntimeDiagnostics();
+  const diagnostics = getPaymentRuntimeDiagnostics();
+  const paymentReadiness = buildPaymentReadinessSection();
 
   return NextResponse.json({
-    status: "webhook_active",
+    status: paymentReadiness.status,
     timestamp: new Date().toISOString(),
     message: "Webhook do Mercado Pago esta acessivel para validacao e monitoramento.",
+    summary: paymentReadiness.summary,
     validation: {
       topic: request.nextUrl.searchParams.get("topic"),
       id: request.nextUrl.searchParams.get("id"),
       dataId: request.nextUrl.searchParams.get("data.id")
     },
     runtime: diagnostics,
+    operatorAction: paymentReadiness.operatorAction,
+    verification: paymentReadiness.verification,
     signature: {
-      enforced: shouldEnforceWebhookSignature("MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"),
+      enforced: diagnostics.signatureEnforced,
       secretConfigured: diagnostics.webhookSecretConfigured
     }
   });

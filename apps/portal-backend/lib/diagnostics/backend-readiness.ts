@@ -1,223 +1,23 @@
-import { getAuthEnvDiagnostics, getNotificationEnv } from "../config/env.ts";
 import { getDurableProtectionStatus } from "../http/durable-abuse-protection.ts";
-
-type ReadinessLevel =
-  | "healthy"
-  | "degraded"
-  | "missing_configuration"
-  | "fallback"
-  | "hard_failure";
-
-type ReadinessSection = {
-  status: ReadinessLevel;
-  summary: string;
-  details: Record<string, unknown>;
-};
-
-const STATUS_ORDER: ReadinessLevel[] = [
-  "healthy",
-  "degraded",
-  "missing_configuration",
-  "fallback",
-  "hard_failure"
-];
-
-function hasConfiguredValue(value: string | undefined) {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function resolveHostKind(value: string | undefined) {
-  if (!hasConfiguredValue(value)) {
-    return "missing";
-  }
-
-  try {
-    const host = new URL(value as string).host.toLowerCase();
-
-    if (host === "portal.advnoemia.com.br") {
-      return "portal";
-    }
-
-    if (host === "advnoemia.com.br" || host === "www.advnoemia.com.br") {
-      return "marketing";
-    }
-
-    return "custom";
-  } catch {
-    return "invalid";
-  }
-}
-
-function combineStatuses(sections: ReadinessSection[]): ReadinessLevel {
-  return sections.reduce<ReadinessLevel>((worst, section) => {
-    return STATUS_ORDER.indexOf(section.status) > STATUS_ORDER.indexOf(worst)
-      ? section.status
-      : worst;
-  }, "healthy");
-}
-
-function buildDeploymentSection(appUrl: string | undefined): ReadinessSection {
-  const hostKind = resolveHostKind(appUrl);
-  const appUrlConfigured = hasConfiguredValue(appUrl);
-
-  if (!appUrlConfigured) {
-    return {
-      status: "missing_configuration",
-      summary: "NEXT_PUBLIC_APP_URL ausente para o portal backend.",
-      details: {
-        appUrlConfigured,
-        appUrlHostKind: hostKind,
-        portalHostAligned: false
-      }
-    };
-  }
-
-  if (hostKind === "portal") {
-    return {
-      status: "healthy",
-      summary: "Host do portal alinhado ao backend protegido.",
-      details: {
-        appUrlConfigured,
-        appUrlHostKind: hostKind,
-        portalHostAligned: true
-      }
-    };
-  }
-
-  if (hostKind === "marketing" || hostKind === "invalid") {
-    return {
-      status: "hard_failure",
-      summary: "Host do portal desalinhado; revisar NEXT_PUBLIC_APP_URL.",
-      details: {
-        appUrlConfigured,
-        appUrlHostKind: hostKind,
-        portalHostAligned: false
-      }
-    };
-  }
-
-  return {
-    status: "degraded",
-    summary: "Host do portal usa configuracao customizada; validar alinhamento operacional.",
-    details: {
-      appUrlConfigured,
-      appUrlHostKind: hostKind,
-      portalHostAligned: false
-    }
-  };
-}
-
-function buildPaymentsSection(): ReadinessSection {
-  const accessTokenConfigured = hasConfiguredValue(process.env.MERCADO_PAGO_ACCESS_TOKEN);
-  const webhookSecretConfigured = hasConfiguredValue(process.env.MERCADO_PAGO_WEBHOOK_SECRET);
-
-  if (accessTokenConfigured && webhookSecretConfigured) {
-    return {
-      status: "healthy",
-      summary: "Pagamento pronto para create e webhook assinados.",
-      details: {
-        accessTokenConfigured,
-        webhookSecretConfigured
-      }
-    };
-  }
-
-  if (!accessTokenConfigured && !webhookSecretConfigured) {
-    return {
-      status: "missing_configuration",
-      summary: "Credenciais de pagamento ausentes.",
-      details: {
-        accessTokenConfigured,
-        webhookSecretConfigured
-      }
-    };
-  }
-
-  return {
-    status: "degraded",
-    summary: "Pagamento parcialmente configurado; create e webhook nao estao completos.",
-    details: {
-      accessTokenConfigured,
-      webhookSecretConfigured
-    }
-  };
-}
-
-function buildTelegramSection(): ReadinessSection {
-  const botTokenConfigured = hasConfiguredValue(process.env.TELEGRAM_BOT_TOKEN);
-  const webhookSecretConfigured = hasConfiguredValue(process.env.TELEGRAM_WEBHOOK_SECRET);
-
-  if (botTokenConfigured && webhookSecretConfigured) {
-    return {
-      status: "healthy",
-      summary: "Telegram protegido e pronto para operacao.",
-      details: {
-        botTokenConfigured,
-        webhookSecretConfigured
-      }
-    };
-  }
-
-  if (!botTokenConfigured && !webhookSecretConfigured) {
-    return {
-      status: "missing_configuration",
-      summary: "Telegram ainda nao esta configurado.",
-      details: {
-        botTokenConfigured,
-        webhookSecretConfigured
-      }
-    };
-  }
-
-  return {
-    status: "degraded",
-    summary: "Telegram parcialmente configurado; revisar token e secret do webhook.",
-    details: {
-      botTokenConfigured,
-      webhookSecretConfigured
-    }
-  };
-}
-
-function buildPlatformSection(): ReadinessSection {
-  const authDiagnostics = getAuthEnvDiagnostics();
-  const publicAuthReady =
-    authDiagnostics.appUrlConfigured &&
-    authDiagnostics.supabaseUrlConfigured &&
-    authDiagnostics.publicKeySource !== null;
-  const adminAuthReady = authDiagnostics.adminKeySource !== null;
-
-  if (publicAuthReady && adminAuthReady) {
-    return {
-      status: "healthy",
-      summary: "Supabase publico e administrativo configurados.",
-      details: authDiagnostics
-    };
-  }
-
-  if (!publicAuthReady && !adminAuthReady) {
-    return {
-      status: "missing_configuration",
-      summary: "Auth publico e administrativo incompletos.",
-      details: authDiagnostics
-    };
-  }
-
-  return {
-    status: "degraded",
-    summary: "Base auth parcialmente configurada; operacoes privilegiadas podem degradar.",
-    details: authDiagnostics
-  };
-}
+import {
+  DURABLE_PROTECTION_EXPECTATIONS,
+  buildEnvironmentConvergenceSections
+} from "./environment-convergence.ts";
+import {
+  combineDiagnosticStatuses,
+  type DiagnosticSection
+} from "./status.ts";
 
 export async function buildBackendReadinessReport(dependencies?: {
   getWorkerDiagnostics?: () => Promise<{
     status: "healthy" | "degraded" | "missing_configuration" | "fallback" | "hard_failure";
+    code: string;
     summary: string;
+    operatorAction: string;
+    verification: string[];
     details: Record<string, unknown>;
   }>;
 }) {
-  const notificationEnv = getNotificationEnv();
   const durableProtection = await getDurableProtectionStatus();
   const worker =
     dependencies?.getWorkerDiagnostics ||
@@ -225,58 +25,104 @@ export async function buildBackendReadinessReport(dependencies?: {
       const module = await import("../services/process-notifications.ts");
       return module.inspectNotificationWorkerDiagnostics();
     });
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
-    undefined;
   const workerDiagnostics = await worker();
+  const envSections = buildEnvironmentConvergenceSections();
 
-  const deployment = buildDeploymentSection(appUrl);
-  const platform = buildPlatformSection();
-  const payments = buildPaymentsSection();
-  const telegram = buildTelegramSection();
-
-  const notifications: ReadinessSection = {
+  const notifications = {
+    ...envSections.notifications,
     status: workerDiagnostics.status,
+    code: workerDiagnostics.code,
     summary: workerDiagnostics.summary,
+    operatorAction: workerDiagnostics.operatorAction,
+    verification: workerDiagnostics.verification,
     details: {
-      provider: notificationEnv.provider,
-      cronSecretConfigured: hasConfiguredValue(process.env.CRON_SECRET),
-      workerSecretConfigured: hasConfiguredValue(process.env.NOTIFICATIONS_WORKER_SECRET),
+      provider: envSections.notifications.details.provider,
+      cronSecretConfigured: envSections.notifications.details.cronSecretConfigured,
+      workerSecretConfigured: envSections.notifications.details.workerSecretConfigured,
       providerConfigured: workerDiagnostics.details.providerConfigured,
       queue: workerDiagnostics.details.queue,
       retryPolicy: workerDiagnostics.details.retryPolicy
     }
   };
 
-  const abuseProtection: ReadinessSection = {
+  const abuseProtection: DiagnosticSection = {
     status:
       durableProtection.runtime.mode === "memory-fallback"
         ? "fallback"
         : durableProtection.migrationApplied
           ? "healthy"
           : "degraded",
+    code:
+      durableProtection.runtime.mode === "memory-fallback"
+        ? "durable_runtime_fallback_active"
+        : durableProtection.migrationApplied
+          ? "durable_runtime_ready"
+          : "durable_runtime_partial",
     summary:
       durableProtection.runtime.mode === "memory-fallback"
         ? "Limiter duravel degradado para memoria; aplicar ou reconciliar a migracao em todos os ambientes."
         : durableProtection.migrationApplied
           ? "Protecao duravel ativa para rate limit e idempotencia."
           : "Protecao duravel parcialmente indisponivel; fallback seguro mantido.",
+    operatorAction:
+      durableProtection.runtime.mode === "memory-fallback"
+        ? "Tratar o ambiente como nao convergido ate confirmar a migracao e as primitivas duraveis."
+        : durableProtection.migrationApplied
+          ? "Manter a verificacao protegida apos deploy e acompanhar novos eventos de fallback."
+          : "Confirmar a aplicacao da migracao e a disponibilidade simultanea de rate limit e idempotencia.",
+    verification: [
+      `Confirmar migracao ${DURABLE_PROTECTION_EXPECTATIONS.migrationName}.`,
+      `Confirmar funcao ${DURABLE_PROTECTION_EXPECTATIONS.requiredFunction}.`,
+      "Confirmar se runtime.mode esta em durable ou memory-fallback.",
+      "Conferir a cobertura por flow em abuseProtection.details.flows."
+    ],
     details: durableProtection
   };
 
-  const sections = {
-    deployment,
-    platform,
+  const sections: Record<string, DiagnosticSection> = {
+    deployment: envSections.deployment,
+    platform: envSections.platform,
+    perimeter: envSections.perimeter,
     abuseProtection,
-    payments,
+    durableExpectations: envSections.durableExpectations,
+    payments: envSections.payments,
     notifications,
-    telegram
+    telegram: envSections.telegram
   };
 
+  const operatorAlerts = Object.entries(sections)
+    .filter(([, section]) => section.status !== "healthy")
+    .map(([key, section]) => ({
+      subsystem: key,
+      status: section.status,
+      code: section.code,
+      summary: section.summary,
+      operatorAction: section.operatorAction
+    }));
+
+  const urgentActions = operatorAlerts
+    .filter((item) => item.status === "hard_failure" || item.status === "fallback")
+    .map((item) => `${item.subsystem}: ${item.operatorAction}`);
+
+  if (urgentActions.length === 0 && operatorAlerts.length > 0) {
+    urgentActions.push(...operatorAlerts.map((item) => `${item.subsystem}: ${item.operatorAction}`));
+  }
+
   return {
-    status: combineStatuses(Object.values(sections)),
+    schemaVersion: "phase5-2026-04-18",
+    status: combineDiagnosticStatuses(Object.values(sections)),
     checkedAt: new Date().toISOString(),
-    sections
+    sections,
+    operator: {
+      protectedEndpoint: "/api/internal/readiness",
+      access: "x-internal-api-secret ou sessao staff autenticada",
+      quickstart: [
+        "Executar npm run operations:verify no workspace do backend.",
+        "Consultar GET /api/internal/readiness com secret interno ou sessao staff.",
+        "Comparar operatorAlerts, abuseProtection.details.runtime e notifications.details.queue apos o deploy."
+      ],
+      urgentActions,
+      alerts: operatorAlerts
+    }
   };
 }

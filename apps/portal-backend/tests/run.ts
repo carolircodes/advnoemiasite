@@ -5,4 +5,5 @@ import "./phase1-hardening-closeout.test.ts";
 import "./phase2-hardening.test.ts";
 import "./phase3-hardening.test.ts";
 import "./phase4-hardening.test.ts";
+import "./phase5-hardening.test.ts";
 import "./payment-pricing.test.ts";

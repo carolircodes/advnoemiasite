@@ -272,7 +272,10 @@ test("backend readiness report keeps a stable protected shape and excludes secre
       const report = await buildBackendReadinessReport({
         getWorkerDiagnostics: async () => ({
           status: "healthy",
+          code: "notifications_worker_ready",
           summary: "Worker de notificacoes pronto e fila observavel.",
+          operatorAction: "Nenhuma acao imediata.",
+          verification: ["Executar uma rodada protegida do worker."],
           details: {
             providerConfigured: true,
             queue: {
