@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 
+import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import {
   computeHmacSha256Hex,
   parseMercadoPagoSignatureInput,
@@ -107,14 +109,7 @@ function paymentWebhookUnavailableResponse(missing: string[]) {
     missing
   });
 
-  return NextResponse.json(
-    {
-      error: "payment_webhook_not_configured",
-      message: "Configuracao obrigatoria ausente para webhook de pagamento.",
-      missing
-    },
-    { status: 503 }
-  );
+  return jsonError("payment_webhook_not_configured", 503);
 }
 
 function getMercadoPagoWebhookEventId(request: NextRequest, event: any) {
@@ -256,7 +251,7 @@ export async function POST(request: NextRequest) {
       event = JSON.parse(body);
     } catch (parseError) {
       console.error("[payment.webhook] Invalid JSON payload", { parseError });
-      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+      return jsonError("invalid_json", 400);
     }
 
     const signatureValidation = validateMercadoPagoWebhookSignature({
@@ -274,7 +269,7 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json(
-        { error: "invalid_webhook_signature", code: signatureValidation.code },
+        { ok: false, error: "invalid_webhook_signature", code: signatureValidation.code },
         { status: signatureValidation.status }
       );
     }
@@ -315,8 +310,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (error) {
-    console.error("[payment.webhook] Internal error", { error });
-    return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
+    console.error("[payment.webhook] Internal error", {
+      error: extractErrorMessage(error, "internal_server_error")
+    });
+    return jsonError("internal_server_error", 500);
   }
 }
 
@@ -810,6 +807,25 @@ Em instantes voce recebera as proximas orientacoes.`;
 }
 
 export async function GET(request: NextRequest) {
+  const diagnosticsAccess = await requireRouteSecretOrStaffAccess({
+    request,
+    service: "payment_webhook",
+    action: "diagnostics",
+    expectedSecret: process.env.INTERNAL_API_SECRET?.trim(),
+    secretName: "INTERNAL_API_SECRET",
+    errorMessage: "Apenas operadores autenticados podem ver diagnosticos do webhook.",
+    headerNames: ["x-internal-api-secret"],
+    allowStaffFallback: true
+  });
+
+  if (!diagnosticsAccess.ok) {
+    return NextResponse.json({
+      status: "webhook_active",
+      timestamp: new Date().toISOString(),
+      message: "Webhook do Mercado Pago acessivel."
+    });
+  }
+
   const diagnostics = getWebhookRuntimeDiagnostics();
 
   return NextResponse.json({

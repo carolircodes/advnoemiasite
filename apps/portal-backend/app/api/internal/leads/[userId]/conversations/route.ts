@@ -7,7 +7,7 @@ export async function GET(
   context: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const profile = await requireProfile(["admin", "advogada"]);
+    await requireProfile(["admin", "advogada"]);
     const { userId } = await context.params;
     const supabase = await createServerSupabaseClient();
 

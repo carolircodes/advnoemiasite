@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { assertRouteSecret } from "@/lib/http/route-secret";
+import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage } from "@/lib/http/api-response";
 import { syncSubscriptionFromPreapprovalId } from "@/lib/services/ecosystem-billing";
 
 function extractPreapprovalId(request: NextRequest, event: any) {
@@ -29,18 +30,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const access = assertRouteSecret({
+    const access = await requireRouteSecretOrStaffAccess({
       request,
       expectedSecret: process.env.ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET,
       secretName: "ECOSYSTEM_SUBSCRIPTION_WEBHOOK_SECRET",
       errorMessage: "webhook_unauthorized",
+      service: "ecosystem_subscription_webhook",
+      action: "receive_webhook",
       headerNames: ["x-ecosystem-webhook-secret"],
       queryParamNames: ["secret"],
       allowLocalWithoutSecret: true
     });
 
     if (!access.ok) {
-      return NextResponse.json({ ok: false, error: access.error }, { status: access.status });
+      return access.response;
     }
 
     let payload: any = {};
@@ -67,13 +70,14 @@ export async function POST(request: NextRequest) {
       result
     });
   } catch (error) {
+    console.error("[ecosystem.subscription.webhook] Processing error", {
+      error: extractErrorMessage(error, "Nao foi possivel sincronizar a recorrencia premium.")
+    });
+
     return NextResponse.json(
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nao foi possivel sincronizar a recorrencia premium."
+        error: "Nao foi possivel sincronizar a recorrencia premium."
       },
       { status: 500 }
     );

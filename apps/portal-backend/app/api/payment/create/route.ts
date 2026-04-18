@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
-import { hasInternalServiceSecretAccess } from "@/lib/http/route-secret";
+import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
+import {
+  buildRateLimitHeaders,
+  buildRequestFingerprint,
+  consumeRateLimit,
+  getClientIp,
+  parseJsonBody
+} from "@/lib/http/request-guards";
 import {
   amountCentsToDecimal,
   buildCheckoutPaymentMethods,
@@ -11,6 +18,11 @@ import {
   resolvePaymentPricing
 } from "@/lib/payment/pricing";
 import { buildPublicPaymentPayload } from "@/lib/payment/public-payment-payload";
+import {
+  buildSafePaymentMetadata,
+  paymentCreateRequestSchema,
+  publicPaymentLookupQuerySchema
+} from "@/lib/payment/payment-security";
 import { commercialClosingService } from "@/lib/services/commercial-closing";
 import { commercialAppointmentService } from "@/lib/services/commercial-appointment";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
@@ -61,14 +73,7 @@ function paymentCreateUnavailableResponse(missing: string[]) {
     missing
   });
 
-  return NextResponse.json(
-    {
-      error: "payment_create_not_configured",
-      message: "Configuracao obrigatoria ausente para criacao de pagamento.",
-      missing
-    },
-    { status: 503 }
-  );
+  return jsonError("payment_create_not_configured", 503);
 }
 
 function extractLeadIdFromExternalReference(externalReference: string | null) {
@@ -78,15 +83,6 @@ function extractLeadIdFromExternalReference(externalReference: string | null) {
 
   const match = externalReference.match(/^(.*)_([0-9a-fA-F-]{36})_(\d+)$/);
   return match?.[2] || null;
-}
-
-async function canUseInternalPaymentLookup(request: NextRequest) {
-  if (hasInternalServiceSecretAccess(request)) {
-    return true;
-  }
-
-  const auth = await requireInternalApiProfile();
-  return auth.ok;
 }
 
 type PersistedPaymentRecord = {
@@ -134,8 +130,37 @@ export async function POST(request: NextRequest) {
   }
 
   const { mercadopago, supabase, baseUrl } = context.value;
+  const rateLimit = consumeRateLimit({
+    bucket: "payment-create",
+    key: `${getClientIp(request)}:${request.headers.get("x-idempotency-key") || "none"}`,
+    limit: 8,
+    windowMs: 10 * 60 * 1000
+  });
+
+  if (!rateLimit.ok) {
+    console.warn("[payment.create] Rate limit exceeded", {
+      fingerprint: buildRequestFingerprint(request, "payment-create"),
+      ipAddress: getClientIp(request)
+    });
+
+    return NextResponse.json(
+      { ok: false, error: "payment_create_rate_limited" },
+      {
+        status: 429,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
+  }
 
   try {
+    const parsedBody = await parseJsonBody(request, paymentCreateRequestSchema, {
+      invalidBodyError: "invalid_payment_request"
+    });
+
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+
     const {
       leadId,
       userId,
@@ -144,15 +169,10 @@ export async function POST(request: NextRequest) {
       monetizationPath,
       monetizationSource,
       requestedAmountCents,
-      metadata = {}
-    } = await request.json();
-
-    if (!leadId || !userId) {
-      return NextResponse.json(
-        { error: "leadId e userId sao obrigatorios" },
-        { status: 400 }
-      );
-    }
+      metadata
+    } = parsedBody.data;
+    const safeMetadata = buildSafePaymentMetadata(metadata);
+    const requestFingerprint = buildRequestFingerprint(request, "payment-create");
 
     const selectedOffer =
       offerCode && typeof offerCode === "string"
@@ -233,6 +253,7 @@ export async function POST(request: NextRequest) {
       "noemia";
     const checkoutStartedAt = new Date().toISOString();
     const externalReference = `${selectedOffer.code}_${leadId}_${Date.now()}`;
+    const ipAddress = getClientIp(request);
     const safePriceMetadata = {
       base_amount_cents: resolvedPricing.baseAmountCents,
       final_amount_cents: resolvedPricing.finalAmountCents,
@@ -256,11 +277,12 @@ export async function POST(request: NextRequest) {
         }
       ],
       payer: {
-        email: metadata.email || undefined,
-        name: metadata.name || undefined,
+        email: typeof metadata.email === "string" ? metadata.email : undefined,
+        name: typeof metadata.name === "string" ? metadata.name : undefined,
         identification: {
-          type: metadata.documentType || undefined,
-          number: metadata.documentNumber || undefined
+          type: typeof metadata.documentType === "string" ? metadata.documentType : undefined,
+          number:
+            typeof metadata.documentNumber === "string" ? metadata.documentNumber : undefined
         }
       },
       payment_methods: buildCheckoutPaymentMethods(),
@@ -282,8 +304,10 @@ export async function POST(request: NextRequest) {
         checkout_started_at: checkoutStartedAt,
         external_reference: externalReference,
         requester_phone: requesterPhone || null,
+        request_fingerprint: requestFingerprint,
+        request_ip_hash: ipAddress === "unknown" ? null : buildRequestFingerprint(request, "payment-ip"),
         ...safePriceMetadata,
-        ...metadata
+        ...safeMetadata
       }
     };
 
@@ -320,7 +344,7 @@ export async function POST(request: NextRequest) {
 
     if (paymentError) {
       console.error("[payment.create] Failed to persist payment", { paymentError });
-      return NextResponse.json({ error: "payment_persistence_failed" }, { status: 500 });
+      return jsonError("payment_persistence_failed", 500);
     }
 
     await supabase
@@ -436,10 +460,20 @@ export async function POST(request: NextRequest) {
         kind: selectedOffer.kind
       },
       message: "Link de pagamento gerado com sucesso"
+    }, {
+      headers: buildRateLimitHeaders(rateLimit)
     });
   } catch (error) {
-    console.error("[payment.create] Internal error", { error });
-    return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
+    console.error("[payment.create] Internal error", {
+      error: extractErrorMessage(error, "internal_server_error")
+    });
+    return NextResponse.json(
+      { ok: false, error: "internal_server_error" },
+      {
+        status: 500,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
   }
 }
 
@@ -451,30 +485,63 @@ export async function GET(request: NextRequest) {
   }
 
   const { supabase } = context.value;
-  const { searchParams } = new URL(request.url);
-  const paymentId =
-    searchParams.get("payment_id") || searchParams.get("collection_id");
-  const externalReference = searchParams.get("external_reference");
-  const directLeadId = searchParams.get("lead_id");
-  const leadId = directLeadId || extractLeadIdFromExternalReference(externalReference);
-  const usesProtectedLeadLookup = Boolean(directLeadId) && !paymentId && !externalReference;
+  const rateLimit = consumeRateLimit({
+    bucket: "payment-status",
+    key: getClientIp(request),
+    limit: 20,
+    windowMs: 10 * 60 * 1000
+  });
 
-  if (!paymentId && !leadId) {
+  if (!rateLimit.ok) {
     return NextResponse.json(
-      { error: "payment_id, collection_id, external_reference ou lead_id sao obrigatorios" },
-      { status: 400 }
+      { ok: false, error: "payment_status_rate_limited" },
+      {
+        status: 429,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
     );
   }
 
+  const { searchParams } = new URL(request.url);
+  const parsedQuery = publicPaymentLookupQuerySchema.safeParse({
+    payment_id: searchParams.get("payment_id") || undefined,
+    collection_id: searchParams.get("collection_id") || undefined,
+    external_reference: searchParams.get("external_reference") || undefined,
+    lead_id: searchParams.get("lead_id") || undefined
+  });
+
+  if (!parsedQuery.success) {
+    return NextResponse.json(
+      { ok: false, error: "invalid_payment_lookup" },
+      {
+        status: 400,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
+  }
+
+  const paymentId =
+    parsedQuery.data.payment_id || parsedQuery.data.collection_id;
+  const externalReference = parsedQuery.data.external_reference || null;
+  const directLeadId = parsedQuery.data.lead_id || null;
+  const leadId = directLeadId || extractLeadIdFromExternalReference(externalReference);
+  const usesProtectedLeadLookup = Boolean(directLeadId) && !paymentId && !externalReference;
+
   try {
     if (usesProtectedLeadLookup) {
-      const allowed = await canUseInternalPaymentLookup(request);
+      const access = await requireRouteSecretOrStaffAccess({
+        request,
+        service: "payment_create",
+        action: "lookup_by_lead_id",
+        expectedSecret: process.env.INTERNAL_API_SECRET?.trim(),
+        secretName: "INTERNAL_API_SECRET",
+        errorMessage: "lead_id_exige_acesso_interno",
+        headerNames: ["x-internal-api-secret"],
+        allowStaffFallback: true
+      });
 
-      if (!allowed) {
-        return NextResponse.json(
-          { error: "lead_id_exige_acesso_interno" },
-          { status: 401 }
-        );
+      if (!access.ok) {
+        return access.response;
       }
     }
 
@@ -513,15 +580,34 @@ export async function GET(request: NextRequest) {
     }
 
     if (!payment) {
-      return NextResponse.json({ error: "pagamento_nao_encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "payment_status_unavailable" },
+        {
+          status: 404,
+          headers: buildRateLimitHeaders(rateLimit)
+        }
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      payment: buildPublicPaymentPayload(payment)
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        payment: buildPublicPaymentPayload(payment)
+      },
+      {
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
   } catch (error) {
-    console.error("[payment.create] Failed to fetch payment status", { error });
-    return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
+    console.error("[payment.create] Failed to fetch payment status", {
+      error: extractErrorMessage(error, "internal_server_error")
+    });
+    return NextResponse.json(
+      { ok: false, error: "internal_server_error" },
+      {
+        status: 500,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
   }
 }

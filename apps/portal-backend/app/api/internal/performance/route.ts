@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'overview';
     const testId = searchParams.get('testId');
 
-    let response: any = { success: true, data: null };
+    const response: any = { success: true, data: null };
 
     switch (type) {
       case 'overview':
@@ -56,10 +56,11 @@ export async function GET(request: NextRequest) {
         response.data = await getContentPerformanceData();
         break;
 
-      case 'business-metrics':
+      case 'business-metrics': {
         const period = searchParams.get('period') as 'daily' | 'weekly' | 'monthly' || 'weekly';
         response.data = await getBusinessMetrics(period);
         break;
+      }
 
       default:
         return NextResponse.json({

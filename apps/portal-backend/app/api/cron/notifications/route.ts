@@ -2,8 +2,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { requireRouteSecretOrStaffAccess } from "../../../../lib/auth/api-authorization";
 import { getNotificationEnv, getServerEnv } from "../../../../lib/config/env";
-import { assertRouteSecret } from "../../../../lib/http/route-secret";
 import { processPendingNotifications } from "../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
@@ -22,16 +22,18 @@ export async function GET(request: Request) {
   const env = getServerEnv();
   const notificationEnv = getNotificationEnv();
 
-  const access = assertRouteSecret({
+  const access = await requireRouteSecretOrStaffAccess({
     request,
     expectedSecret: env.CRON_SECRET,
     secretName: "CRON_SECRET",
     errorMessage: "Nao autorizado para disparar o cron de notificacoes.",
+    service: "notifications_cron",
+    action: "process",
     allowLocalWithoutSecret: true
   });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   if (!notificationEnv.emailFrom) {

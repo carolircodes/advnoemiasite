@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage } from "@/lib/http/api-response";
 import { createClientWithInvite, listLatestClients } from "@/lib/services/create-client";
 
 export async function GET() {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_clients",
+    action: "list"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const clients = await listLatestClients(20);
@@ -15,10 +19,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_clients",
+    action: "create"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -28,7 +35,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Nao foi possivel criar o cliente."
+        error: extractErrorMessage(error, "Nao foi possivel criar o cliente.")
       },
       { status: 400 }
     );

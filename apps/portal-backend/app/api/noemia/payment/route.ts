@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
-import { hasInternalServiceSecretAccess } from "@/lib/http/route-secret";
+import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage } from "@/lib/http/api-response";
+import { parseJsonBody } from "@/lib/http/request-guards";
 import { extractAmountCentsFromMessage } from "@/lib/payment/pricing";
+import { noemiaPaymentRequestSchema } from "@/lib/payment/payment-security";
 import { generatePaymentLink, generatePaymentMessage } from "@/lib/payment/payment-service";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
@@ -12,37 +14,37 @@ function createPaymentSupabaseClient() {
   return createAdminSupabaseClient();
 }
 
-async function guardPrivilegedNoemiaPaymentRoute(request: NextRequest) {
-  if (hasInternalServiceSecretAccess(request)) {
-    return null;
-  }
-
-  const auth = await requireInternalApiProfile();
-
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
-
-  return null;
+async function requireNoemiaPaymentAccess(request: NextRequest) {
+  return requireRouteSecretOrStaffAccess({
+    request,
+    service: "noemia_payment",
+    action: "privileged_payment_route",
+    expectedSecret: process.env.INTERNAL_API_SECRET?.trim(),
+    secretName: "INTERNAL_API_SECRET",
+    errorMessage: "Apenas perfis internos autorizados podem acessar esta rota.",
+    headerNames: ["x-internal-api-secret"],
+    allowStaffFallback: true
+  });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const accessDenied = await guardPrivilegedNoemiaPaymentRoute(request);
+    const access = await requireNoemiaPaymentAccess(request);
 
-    if (accessDenied) {
-      return accessDenied;
+    if (!access.ok) {
+      return access.response;
     }
 
     const supabase = createPaymentSupabaseClient();
-    const { leadId, userId, message, intentionType, offerCode } = await request.json();
+    const parsedBody = await parseJsonBody(request, noemiaPaymentRequestSchema, {
+      invalidBodyError: "invalid_noemia_payment_request",
+      includeValidationDetails: access.actor === "staff"
+    });
 
-    if (!leadId || !userId) {
-      return NextResponse.json(
-        { error: "leadId e userId sao obrigatorios" },
-        { status: 400 }
-      );
+    if (!parsedBody.ok) {
+      return parsedBody.response;
     }
+    const { leadId, userId, message, intentionType, offerCode } = parsedBody.data;
 
     const { data: lead, error: leadError } = await supabase
       .from("noemia_leads")
@@ -51,7 +53,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (leadError || !lead) {
-      return NextResponse.json({ error: "Lead nao encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Pagamento indisponivel para este lead." }, { status: 404 });
     }
 
     const { data: existingPayment } = await supabase
@@ -207,7 +209,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[noemia.payment] Internal error", {
-      error: error instanceof Error ? error.message : String(error)
+      error: extractErrorMessage(error, "Erro interno do servidor")
     });
 
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
@@ -215,10 +217,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const accessDenied = await guardPrivilegedNoemiaPaymentRoute(request);
+  const access = await requireNoemiaPaymentAccess(request);
 
-  if (accessDenied) {
-    return accessDenied;
+  if (!access.ok) {
+    return access.response;
   }
 
   const { searchParams } = new URL(request.url);

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { extractErrorMessage } from "../../../../lib/http/api-response";
+import {
+  buildRateLimitHeaders,
+  consumeRateLimit
+} from "../../../../lib/http/request-guards";
 import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
 import { submitPublicTriage } from "../../../../lib/services/public-intake";
 
@@ -21,6 +26,28 @@ function getClientIp(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const rateLimit = consumeRateLimit({
+    bucket: "public-triage",
+    key: getClientIp(request) || "unknown",
+    limit: 5,
+    windowMs: 10 * 60 * 1000
+  });
+
+  if (!rateLimit.ok) {
+    const res = NextResponse.json(
+      {
+        ok: false,
+        error: "triage_rate_limited"
+      },
+      {
+        status: 429,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
+
+    return withPublicApiCors(request, res);
+  }
+
   try {
     const payload = await request.json();
     const sessionId =
@@ -42,19 +69,26 @@ export async function POST(request: Request) {
         ok: true,
         intakeRequestId: result.id
       },
-      { status: 201 }
+      {
+        status: 201,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
     );
     return withPublicApiCors(request, res);
   } catch (error) {
+    console.warn("[public.triage] Request rejected", {
+      error: extractErrorMessage(error, "Nao foi possivel receber a triagem agora.")
+    });
+
     const res = NextResponse.json(
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nao foi possivel receber a triagem agora."
+        error: "Nao foi possivel receber a triagem agora."
       },
-      { status: 400 }
+      {
+        status: 400,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
     );
     return withPublicApiCors(request, res);
   }

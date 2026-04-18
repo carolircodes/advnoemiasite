@@ -2,8 +2,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { requireRouteSecretOrStaffAccess } from "../../../../../lib/auth/api-authorization";
 import { getNotificationEnv } from "../../../../../lib/config/env";
-import { assertRouteSecret } from "../../../../../lib/http/route-secret";
 import { processPendingNotifications } from "../../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
@@ -12,16 +12,18 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const notificationEnv = getNotificationEnv();
 
-  const access = assertRouteSecret({
+  const access = await requireRouteSecretOrStaffAccess({
     request,
     expectedSecret: notificationEnv.workerSecret,
     secretName: "NOTIFICATIONS_WORKER_SECRET",
     errorMessage: "Worker nao autorizado para processar notificacoes.",
+    service: "notifications_worker",
+    action: "process",
     headerNames: ["x-worker-secret"]
   });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   let requestedLimit = 10;

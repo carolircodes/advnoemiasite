@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
+import { extractErrorMessage } from "@/lib/http/api-response";
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { getSchemaCompatibilityReportForSurface } from "@/lib/schema/compatibility";
 import { telegramDistributionService } from "@/lib/services/telegram-distribution";
@@ -40,10 +41,13 @@ async function ensureTelegramDistributionSchema() {
 }
 
 export async function GET() {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_telegram_distribution",
+    action: "overview"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const schemaResponse = await ensureTelegramDistributionSchema();
@@ -57,10 +61,7 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nao foi possivel carregar a distribuicao do Telegram."
+        error: extractErrorMessage(error, "Nao foi possivel carregar a distribuicao do Telegram.")
       },
       { status: 500 }
     );
@@ -68,10 +69,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireStaffRouteAccess({
+    service: "internal_telegram_distribution",
+    action: "publish"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const schemaResponse = await ensureTelegramDistributionSchema();
@@ -90,10 +94,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nao foi possivel publicar na distribuicao do Telegram."
+        error: extractErrorMessage(error, "Nao foi possivel publicar na distribuicao do Telegram.")
       },
       { status: 400 }
     );

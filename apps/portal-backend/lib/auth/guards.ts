@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import {
   buildAccessDeniedPath,
   buildLoginRedirectPath,
-  getDefaultDestinationForProfile,
   isStaffRole
 } from "./access-control";
 import { isPortalRole, type PortalRole } from "../domain/portal";

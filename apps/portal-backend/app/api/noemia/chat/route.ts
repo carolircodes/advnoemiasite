@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processNoemiaCore, type ConversationState } from "@/lib/ai/noemia-core";
 import { getCurrentProfile } from "@/lib/auth/guards";
 import { askNoemiaSchema } from "@/lib/domain/portal";
+import { buildRateLimitHeaders, consumeRateLimit, getClientIp } from "@/lib/http/request-guards";
 import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-middleware";
 import { resolveEntryCaseArea } from "@/lib/entry-context";
 import { conversationPersistence } from "@/lib/services/conversation-persistence";
@@ -115,6 +116,27 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let profile: Awaited<ReturnType<typeof getCurrentProfile>> = null;
+  const rateLimit = consumeRateLimit({
+    bucket: "noemia-chat",
+    key: `${getClientIp(request)}:${request.headers.get("x-product-session-id") || "anon"}`,
+    limit: 18,
+    windowMs: 5 * 60 * 1000
+  });
+
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        audience: "visitor",
+        answer: "A NoemIA esta recebendo muitas mensagens agora. Tente novamente em instantes.",
+        error: "rate_limited"
+      },
+      {
+        status: 429,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
+    );
+  }
 
   try {
     profile = await getCurrentProfile();
@@ -213,7 +235,9 @@ export async function POST(request: NextRequest) {
         console.warn("[noemia.chat] Failed to record product event", trackingError);
       }
 
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        headers: buildRateLimitHeaders(rateLimit)
+      });
     } catch (error) {
       console.warn("[noemia.chat] Falling back after Noemia Core error", error);
 
@@ -260,7 +284,9 @@ export async function POST(request: NextRequest) {
         console.warn("[noemia.chat] Failed to record emergency fallback event", trackingError);
       }
 
-      return NextResponse.json(fallbackResult);
+      return NextResponse.json(fallbackResult, {
+        headers: buildRateLimitHeaders(rateLimit)
+      });
     }
   } catch (error) {
     console.error("[noemia.chat] Unhandled endpoint error", error);
@@ -272,7 +298,10 @@ export async function POST(request: NextRequest) {
         answer: "A NoemIA esta temporariamente indisponivel. Tente novamente em alguns instantes.",
         error: "internal_error"
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: buildRateLimitHeaders(rateLimit)
+      }
     );
   }
 }

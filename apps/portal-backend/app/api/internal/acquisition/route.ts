@@ -38,7 +38,7 @@ function normalizeTheme(theme: string) {
   return theme || "geral";
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const access = await requireInternalApiProfile();
 
   if (!access.ok) {
