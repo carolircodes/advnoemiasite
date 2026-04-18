@@ -158,7 +158,7 @@ export async function sendWhatsAppTemplate(
     if (templateData) {
       messagePayload.template!.components = [{
         type: 'body',
-        parameters: Object.entries(templateData).map(([key, value]) => ({
+        parameters: Object.entries(templateData).map(([_key, value]) => ({
           type: 'text',
           text: value
         }))

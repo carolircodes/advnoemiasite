@@ -145,7 +145,6 @@ async function handleInstagramComment(commentData: any) {
  */
 async function handleWhatsAppMessage(event: MetaEvent) {
   const message = event.data;
-  const senderPhone = message.from;
   const messageText = message.text?.body;
 
   if (!messageText) {
@@ -157,12 +156,12 @@ async function handleWhatsAppMessage(event: MetaEvent) {
   const theme = detectThemeFromText(messageText);
   
   // Enviar resposta contextual
-  const responseMessage = buildWhatsAppResponse(theme, senderPhone);
+  const responseMessage = buildWhatsAppResponse(theme);
   
-  await sendWhatsAppMessage(senderPhone, responseMessage);
+  await sendWhatsAppMessage(message.from, responseMessage);
   
   await logMetaEvent('whatsapp_message_processed', {
-    senderPhone,
+    senderPhone: message.from,
     theme,
     messageLength: messageText.length
   });
@@ -199,7 +198,7 @@ function buildCommentResponse(theme: string, contextLink: string): string {
 /**
  * Constrói resposta para WhatsApp
  */
-function buildWhatsAppResponse(theme: string, senderPhone: string): string {
+function buildWhatsAppResponse(theme: string): string {
   const responses = {
     aposentadoria: `Olá! 👋\n\nVi que você tem uma questão sobre aposentadoria. Para te atender com mais precisão, preparei uma triagem inicial:\n\n🔗 ${buildLegacySafeTriageLink('aposentadoria')}\n\nPreencha os dados que já vou te encaminhar para a advogada!`,
     

@@ -64,7 +64,10 @@ async function postMetaGraph(
       ok: false,
       status: null,
       data: null,
-      error: "instagram_access_token_missing"
+      error:
+        channel === "facebook"
+          ? "facebook_access_token_missing"
+          : "instagram_access_token_missing"
     };
   }
 

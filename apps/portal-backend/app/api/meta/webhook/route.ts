@@ -6,6 +6,11 @@ import {
   shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
+import {
+  resolveMetaWebhookConfig,
+  summarizeMetaWebhookPayload,
+  verifyMetaWebhookChallenge
+} from "@/lib/meta/meta-webhook-config";
 import { sendFacebookCommentReply, sendFacebookDirectMessage } from "@/lib/meta/facebook-service";
 import {
   sendInstagramCommentReply,
@@ -14,10 +19,6 @@ import {
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
-
-const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN?.trim();
-const APP_SECRET =
-  process.env.INSTAGRAM_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
 
 type MetaChannel = "instagram" | "facebook";
 
@@ -45,11 +46,13 @@ function logEvent(
 }
 
 function verifySignature(rawBuffer: Buffer, signature: string) {
-  if (!APP_SECRET || !signature) {
+  const config = resolveMetaWebhookConfig();
+
+  if (!config.appSecretConfigured || !signature) {
     return false;
   }
 
-  const expectedSignature = `sha256=${computeHmacSha256Hex(APP_SECRET, rawBuffer)}`;
+  const expectedSignature = `sha256=${computeHmacSha256Hex(config.appSecret, rawBuffer)}`;
 
   return timingSafeEqualText(signature, expectedSignature);
 }
@@ -301,7 +304,9 @@ async function processMetaChangeEntry(channel: MetaChannel, entry: Record<string
 }
 
 export async function GET(request: NextRequest) {
-  if (!VERIFY_TOKEN) {
+  const config = resolveMetaWebhookConfig();
+
+  if (!config.verifyTokenConfigured) {
     logEvent("META_VERIFY_TOKEN_MISSING", undefined, "error");
     return NextResponse.json(
       { error: "Webhook verification unavailable" },
@@ -313,13 +318,34 @@ export async function GET(request: NextRequest) {
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
+  const verification = verifyMetaWebhookChallenge({
+    mode,
+    token,
+    challenge,
+    verifyToken: config.verifyToken
+  });
 
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    return new Response(challenge || "", {
+  if (verification.ok) {
+    logEvent("META_VERIFY_CHALLENGE_ACCEPTED", {
+      challengeLength: verification.body.length,
+      appSecretSource: config.appSecretSource
+    });
+
+    return new Response(verification.body, {
       status: 200,
       headers: { "Content-Type": "text/plain" }
     });
   }
+
+  logEvent(
+    "META_VERIFY_CHALLENGE_REJECTED",
+    {
+      hasMode: Boolean(mode),
+      hasVerifyToken: Boolean(token),
+      hasChallenge: Boolean(challenge)
+    },
+    "warn"
+  );
 
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
@@ -328,20 +354,22 @@ export async function POST(request: NextRequest) {
   try {
     await assertOperationalSchemaCompatibility("meta_webhook");
 
+    const config = resolveMetaWebhookConfig();
     const rawBuffer = Buffer.from(await request.arrayBuffer());
     const signature = request.headers.get("x-hub-signature-256") || "";
-    const signatureValid = APP_SECRET ? verifySignature(rawBuffer, signature) : false;
+    const signatureValid = config.appSecretConfigured ? verifySignature(rawBuffer, signature) : false;
     const enforceSignature = shouldEnforceWebhookSignature("META_WEBHOOK_ENFORCE_SIGNATURE");
     const allowShadowAcceptance = shouldAllowShadowWebhookAcceptance(
       "META_WEBHOOK_ALLOW_SHADOW_SIGNATURE"
     );
 
-    if (!APP_SECRET) {
+    if (!config.appSecretConfigured) {
       if (!allowShadowAcceptance) {
         logEvent(
           "META_SIGNATURE_SECRET_MISSING",
           {
-            note: "META webhook secret is required when signature enforcement is active."
+            note: "META webhook secret is required when signature enforcement is active.",
+            appSecretSource: config.appSecretSource
           },
           "error"
         );
@@ -356,7 +384,8 @@ export async function POST(request: NextRequest) {
         "META_SIGNATURE_SHADOW_MODE",
         {
           note: "Signature validation unavailable, but shadow mode was explicitly enabled.",
-          shadowMode: true
+          shadowMode: true,
+          appSecretSource: config.appSecretSource
         },
         "warn"
       );
@@ -366,7 +395,8 @@ export async function POST(request: NextRequest) {
           "META_SIGNATURE_INVALID_REJECTED",
           {
             note: "Webhook rejected because the signature is invalid.",
-            shadowMode: allowShadowAcceptance
+            shadowMode: allowShadowAcceptance,
+            appSecretSource: config.appSecretSource
           },
           "warn"
         );
@@ -378,7 +408,8 @@ export async function POST(request: NextRequest) {
         "META_SIGNATURE_SHADOW_MODE",
         {
           note: "Webhook kept in explicit shadow validation mode.",
-          shadowMode: true
+          shadowMode: true,
+          appSecretSource: config.appSecretSource
         },
         "warn"
       );
@@ -404,6 +435,16 @@ export async function POST(request: NextRequest) {
     }
 
     const channel: MetaChannel = data.object === "page" ? "facebook" : "instagram";
+    const payloadSummary = summarizeMetaWebhookPayload(data);
+
+    logEvent("META_WEBHOOK_INBOUND_ACCEPTED", {
+      channel,
+      object: payloadSummary.object,
+      entryCount: payloadSummary.entryCount,
+      messagingCount: payloadSummary.messagingCount,
+      changeCount: payloadSummary.changeCount,
+      appSecretSource: config.appSecretSource
+    });
 
     for (const entry of Array.isArray(data.entry) ? data.entry : []) {
       const typedEntry = entry as Record<string, unknown>;

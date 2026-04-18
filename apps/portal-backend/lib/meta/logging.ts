@@ -178,7 +178,7 @@ async function sendToAnalytics(logEntry: MetaLogEntry): Promise<void> {
 export async function getLogsByPeriod(
   startDate: Date,
   endDate: Date,
-  platform?: 'instagram' | 'whatsapp'
+  _platform?: 'instagram' | 'whatsapp'
 ): Promise<MetaLogEntry[]> {
   try {
     // TODO: Implementar busca no banco de dados
@@ -257,7 +257,7 @@ export async function healthCheck(): Promise<{
       lastEvent: Date.now()
     };
     
-  } catch (error) {
+  } catch {
     return {
       status: 'unhealthy',
       checks: {},
