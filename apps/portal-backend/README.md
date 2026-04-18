@@ -255,7 +255,21 @@ Esse comando resume:
 - estado agregado do backend
 - convergencia por subsistema critico
 - expectativa da protecao duravel
-- acoes que exigem resposta do operador
+- blockers vs warnings
+- se o deploy esta liberado no perfil atual
+
+Modos de enforcement:
+
+- `npm run operations:verify`: modo local, preserva conveniencia de desenvolvimento e evidencia gaps sem bloquear tudo
+- `npm run operations:verify:ci`: modo repo-safe para CI, valida governanca sem depender de runtime administrativo real
+- `npm run operations:verify:release`: modo mais estrito para promocao production-like, bloqueando runtime duravel nao provado ou fallback critico
+
+O relatorio protegido em `GET /api/internal/readiness` agora tambem inclui `operator.releaseSafety`, com:
+
+- `enforcementLevel`
+- `deployAllowed`
+- `blockers`
+- `warnings`
 
 Checklist detalhado:
 

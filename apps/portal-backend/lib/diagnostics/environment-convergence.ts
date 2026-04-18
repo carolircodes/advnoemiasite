@@ -1,3 +1,4 @@
+import { buildBackendEnvCompletenessSnapshot } from "../config/backend-env-governance.ts";
 import { getAuthEnvDiagnostics, getNotificationEnv } from "../config/env.ts";
 import {
   createNotificationWorkerDiagnosticsMetadata
@@ -366,6 +367,47 @@ function buildDurableExpectationsSection(): DiagnosticSection {
   });
 }
 
+function buildEnvironmentCompletenessSection(): DiagnosticSection {
+  const snapshot = buildBackendEnvCompletenessSnapshot();
+  const subsystemSpecificMissing = snapshot.profiles.release.optionalMissing;
+
+  if (snapshot.profiles.release.satisfied && snapshot.profiles.full_durable.satisfied) {
+    return buildDiagnosticSection({
+      status: subsystemSpecificMissing.length > 0 ? "degraded" : "healthy",
+      code:
+        subsystemSpecificMissing.length > 0
+          ? "environment_completeness_subsystem_gaps"
+          : "environment_completeness_ready",
+      summary:
+        subsystemSpecificMissing.length > 0
+          ? "O backend atende os requisitos de release, mas ainda ha gaps de subsistemas opcionais."
+          : "O ambiente atende os requisitos classificados para release e verificacao duravel.",
+      operatorAction:
+        subsystemSpecificMissing.length > 0
+          ? "Concluir os gaps de subsistemas se eles fizerem parte da liberacao atual."
+          : "Usar este resumo como base para validacao de release e convergencia.",
+      verification: [
+        "Conferir profiles.release e profiles.full_durable.",
+        "Conferir se missing esta vazio para os subsistemas obrigatorios."
+      ],
+      details: snapshot
+    });
+  }
+
+  return buildDiagnosticSection({
+    status: "missing_configuration",
+    code: "environment_completeness_core_missing",
+    summary: "Ainda faltam variaveis classificadas como obrigatorias para release ou verificacao duravel.",
+    operatorAction:
+      "Preencher os requisitos faltantes antes de tratar o ambiente como pronto para governanca mais estrita.",
+    verification: [
+      "Revisar profiles.release.missing.",
+      "Revisar profiles.full_durable.missing."
+    ],
+    details: snapshot
+  });
+}
+
 export function buildEnvironmentConvergenceSections() {
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
@@ -379,6 +421,7 @@ export function buildEnvironmentConvergenceSections() {
     payments: buildPaymentReadinessSection(),
     notifications: buildNotificationsSection(),
     telegram: buildTelegramSection(),
-    durableExpectations: buildDurableExpectationsSection()
+    durableExpectations: buildDurableExpectationsSection(),
+    environmentCompleteness: buildEnvironmentCompletenessSection()
   };
 }

@@ -32,8 +32,15 @@ Esse comando resume:
 
 - status agregado do backend
 - estado de convergencia por subsistema
-- se a protecao duravel esta ativa ou em fallback
-- quais acoes exigem atencao imediata
+- nivel de enforcement
+- blockers vs warnings
+- se a protecao duravel esta ativa, em fallback ou ainda nao provada
+
+Modos uteis:
+
+- `npm run operations:verify`: leitura local/operacional sem bloquear tudo por padrao
+- `npm run operations:verify:ci`: gate repo-safe para CI, sem depender de runtime administrativo real
+- `npm run operations:verify:release`: gate mais estrito para promocao production-like
 
 ## 4. Conferir readiness protegida
 
@@ -52,6 +59,7 @@ Verifique:
 - `sections`
 - `operator.alerts`
 - `operator.urgentActions`
+- `operator.releaseSafety`
 
 Leitura operacional:
 
@@ -60,6 +68,12 @@ Leitura operacional:
 - `missing_configuration`: ambiente incompleto
 - `fallback`: comportamento seguro ativo, mas sem convergencia plena
 - `hard_failure`: tratar como incidente operacional
+
+Leitura de release-safety:
+
+- `release_blocker`: nao promover
+- `action_required`: deploy pode seguir em contextos nao finais, mas exige correcao consciente
+- `warning`: aceitavel no contexto atual, ainda assim deve ser observado
 
 ## 5. Confirmar protecao duravel
 
@@ -80,6 +94,7 @@ Resposta esperada:
 - aplicar ou reconciliar a migracao
 - revalidar readiness protegida
 - confirmar cobertura dos flows criticos em `abuseProtection.details.flows`
+- em promocao final, tratar `durable_runtime_fallback_active` ou `durable_runtime_verification_unavailable` como blocker
 
 ## 6. Confirmar pagamentos
 
@@ -97,6 +112,11 @@ Sinais de desvio:
 
 - `payments.status = missing_configuration`
 - `payments.code = payments_signature_not_enforced`
+
+Governanca:
+
+- em `production`, `payments_signature_not_enforced` passa a ser blocker de release
+- em `ci` ou verificacao local continua aparecendo como warning/action-required, sem fingir que o runtime real foi provado
 
 ## 7. Confirmar notificacoes e worker
 
@@ -140,6 +160,7 @@ Sinais de desvio:
 - segredos internos ausentes no perimetro
 - webhook de pagamento sem enforcement de assinatura
 - worker com itens presos ou falhas terminais persistentes
+- qualquer item listado em `operator.releaseSafety.blockers`
 
 ## 10. Follow-up manual que continua fora do codigo
 

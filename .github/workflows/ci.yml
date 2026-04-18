@@ -33,5 +33,25 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Backend Operations Governance
+        env:
+          NEXT_PUBLIC_APP_URL: https://portal.advnoemia.com.br
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-publishable-key
+          SUPABASE_SECRET_KEY: ci-secret-key
+          INTERNAL_API_SECRET: ci-internal-secret
+          NOTIFICATIONS_PROVIDER: resend
+          RESEND_API_KEY: ci-resend-key
+          EMAIL_FROM: noreply@advnoemia.com.br
+          NOTIFICATIONS_WORKER_SECRET: ci-worker-secret
+          CRON_SECRET: ci-cron-secret
+          MERCADO_PAGO_ACCESS_TOKEN: ci-mp-access-token
+          MERCADO_PAGO_WEBHOOK_SECRET: ci-mp-webhook-secret
+          NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY: ci-mp-public-key
+          MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE: "true"
+          TELEGRAM_BOT_TOKEN: ci-telegram-bot-token
+          TELEGRAM_WEBHOOK_SECRET: ci-telegram-webhook-secret
+        run: npm run operations:verify:ci
+
       - name: Build
         run: npm run build

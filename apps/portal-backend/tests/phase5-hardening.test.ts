@@ -147,9 +147,11 @@ test("backend readiness report exposes operator workflow without leaking secrets
       });
       const serialized = JSON.stringify(report);
 
-      assert.equal(report.schemaVersion, "phase5-2026-04-18");
+      assert.equal(report.schemaVersion, "phase6-2026-04-18");
       assert.equal(report.operator.protectedEndpoint, "/api/internal/readiness");
       assert.equal(Array.isArray(report.operator.quickstart), true);
+      assert.equal(typeof report.operator.releaseSafety.enforcementLevel, "string");
+      assert.equal(typeof report.sections.environmentCompleteness.code, "string");
       assert.equal(typeof report.sections.payments.operatorAction, "string");
       assert.equal(typeof report.sections.perimeter.code, "string");
       assert.equal(serialized.includes("internal-secret"), false);

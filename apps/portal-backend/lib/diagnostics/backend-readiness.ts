@@ -1,3 +1,7 @@
+import {
+  summarizeBackendEnforcement,
+  type BackendEnforcementProfile
+} from "./backend-enforcement.ts";
 import { getDurableProtectionStatus } from "../http/durable-abuse-protection.ts";
 import {
   DURABLE_PROTECTION_EXPECTATIONS,
@@ -9,6 +13,7 @@ import {
 } from "./status.ts";
 
 export async function buildBackendReadinessReport(dependencies?: {
+  enforcementProfile?: BackendEnforcementProfile;
   getWorkerDiagnostics?: () => Promise<{
     status: "healthy" | "degraded" | "missing_configuration" | "fallback" | "hard_failure";
     code: string;
@@ -85,6 +90,7 @@ export async function buildBackendReadinessReport(dependencies?: {
     perimeter: envSections.perimeter,
     abuseProtection,
     durableExpectations: envSections.durableExpectations,
+    environmentCompleteness: envSections.environmentCompleteness,
     payments: envSections.payments,
     notifications,
     telegram: envSections.telegram
@@ -108,8 +114,18 @@ export async function buildBackendReadinessReport(dependencies?: {
     urgentActions.push(...operatorAlerts.map((item) => `${item.subsystem}: ${item.operatorAction}`));
   }
 
+  const enforcement = summarizeBackendEnforcement(sections, {
+    profile: dependencies?.enforcementProfile || "production",
+    runtimeVerification: {
+      mode: "required",
+      attempted: true,
+      available: true,
+      reason: null
+    }
+  });
+
   return {
-    schemaVersion: "phase5-2026-04-18",
+    schemaVersion: "phase6-2026-04-18",
     status: combineDiagnosticStatuses(Object.values(sections)),
     checkedAt: new Date().toISOString(),
     sections,
@@ -121,6 +137,23 @@ export async function buildBackendReadinessReport(dependencies?: {
         "Consultar GET /api/internal/readiness com secret interno ou sessao staff.",
         "Comparar operatorAlerts, abuseProtection.details.runtime e notifications.details.queue apos o deploy."
       ],
+      releaseSafety: {
+        profile: dependencies?.enforcementProfile || "production",
+        enforcementLevel: enforcement.enforcementLevel,
+        deployAllowed: enforcement.deployAllowed,
+        blockers: enforcement.blockers.map((item) => ({
+          subsystem: item.subsystem,
+          code: item.code,
+          reason: item.enforcement.reason,
+          operatorAction: item.operatorAction
+        })),
+        warnings: enforcement.warnings.map((item) => ({
+          subsystem: item.subsystem,
+          code: item.code,
+          level: item.enforcement.level,
+          reason: item.enforcement.reason
+        }))
+      },
       urgentActions,
       alerts: operatorAlerts
     }
