@@ -232,6 +232,14 @@ Eventos relevantes continuam alimentando `notifications_outbox`. Agora o portal 
 
 - `POST /api/worker/notifications/process`
 - autenticacao por `x-worker-secret` ou `Authorization: Bearer ...`
+
+### Readiness protegida
+
+- `GET /api/internal/readiness`
+- acesso por `x-internal-api-secret` ou sessao staff autenticada
+- o relatorio diferencia `healthy`, `degraded`, `missing_configuration`, `fallback` e `hard_failure`
+- a secao `abuseProtection` informa se a migracao duravel foi aplicada, se o limiter esta em modo duravel ou `memory-fallback` e quais fluxos criticos estao duravelmente protegidos
+- se a migracao `20260418120000_phase3_durable_abuse_controls.sql` nao estiver aplicada no ambiente, a readiness e os warnings de runtime passam a sinalizar esse desvio explicitamente
 - processa itens `pending` e `failed` disponiveis no horario atual
 - envia por SMTP ou Resend, conforme `NOTIFICATIONS_PROVIDER`
 - marca como `sent`, `failed` ou `skipped`

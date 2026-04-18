@@ -66,6 +66,57 @@ type DurableProtectionAdapter = {
   }>;
 };
 
+type DurableFallbackReason = "migration_missing_or_unapplied" | "storage_unavailable";
+
+type DurableFallbackState = {
+  count: number;
+  lastFallbackAt: string | null;
+  lastFallbackReason: DurableFallbackReason | null;
+  buckets: Set<string>;
+  warnedMissingMigration: boolean;
+};
+
+const DURABLE_FALLBACK_STATE: DurableFallbackState = {
+  count: 0,
+  lastFallbackAt: null,
+  lastFallbackReason: null,
+  buckets: new Set<string>(),
+  warnedMissingMigration: false
+};
+
+const DURABLE_PROTECTED_FLOWS = [
+  {
+    flow: "lead_create",
+    bucket: "lead-create",
+    protections: ["rate_limit"] as const
+  },
+  {
+    flow: "public_events",
+    bucket: "public-events",
+    protections: ["rate_limit"] as const
+  },
+  {
+    flow: "public_triage",
+    bucket: "public-triage",
+    protections: ["rate_limit"] as const
+  },
+  {
+    flow: "noemia_chat",
+    bucket: "noemia-chat",
+    protections: ["rate_limit"] as const
+  },
+  {
+    flow: "payment_create",
+    bucket: "payment-create",
+    protections: ["rate_limit", "idempotency"] as const
+  },
+  {
+    flow: "payment_status",
+    bucket: "payment-status",
+    protections: ["rate_limit"] as const
+  }
+] as const;
+
 type ClaimIdempotencyOptions = {
   scope: string;
   key: string;
@@ -273,6 +324,38 @@ function createSupabaseAdapter(): DurableProtectionAdapter {
   };
 }
 
+function inferFallbackReason(error: unknown): DurableFallbackReason {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  if (
+    message.includes("claim_rate_limit_bucket") ||
+    message.includes("request_rate_limits") ||
+    message.includes("idempotency_keys") ||
+    message.includes("relation") ||
+    message.includes("does not exist") ||
+    message.includes("schema")
+  ) {
+    return "migration_missing_or_unapplied";
+  }
+
+  return "storage_unavailable";
+}
+
+function recordDurableFallback(bucket: string, error: unknown) {
+  const reason = inferFallbackReason(error);
+  DURABLE_FALLBACK_STATE.count += 1;
+  DURABLE_FALLBACK_STATE.lastFallbackAt = new Date().toISOString();
+  DURABLE_FALLBACK_STATE.lastFallbackReason = reason;
+  DURABLE_FALLBACK_STATE.buckets.add(bucket);
+
+  if (reason === "migration_missing_or_unapplied" && !DURABLE_FALLBACK_STATE.warnedMissingMigration) {
+    DURABLE_FALLBACK_STATE.warnedMissingMigration = true;
+    console.warn(
+      "[durable-abuse-protection] Durable limiter fallback suggests migration 20260418120000_phase3_durable_abuse_controls.sql is missing in this environment."
+    );
+  }
+}
+
 async function loadAdminSupabaseClient() {
   const module = await import("../supabase/admin.ts");
   return module.createAdminSupabaseClient();
@@ -292,6 +375,7 @@ export async function consumeDurableRateLimit(
 
     return normalizeRateLimitPayload(payload, options.limit);
   } catch (error) {
+    recordDurableFallback(options.bucket, error);
     traceOperationalEvent(
       options.bucket,
       error
@@ -463,14 +547,66 @@ export async function getDurableProtectionStatus(
   adapter: DurableProtectionAdapter = createSupabaseAdapter()
 ) {
   try {
-    return await adapter.getDurableStatus();
+    const durable = await adapter.getDurableStatus();
+    const migrationApplied = durable.rateLimits && durable.idempotency;
+    const fallbackMode =
+      DURABLE_FALLBACK_STATE.count > 0 && !migrationApplied ? "memory-fallback" : "durable";
+
+    return {
+      ...durable,
+      migrationApplied,
+      runtime: {
+        mode: fallbackMode as "durable" | "memory-fallback",
+        fallbackActive: DURABLE_FALLBACK_STATE.count > 0,
+        fallbackEventCount: DURABLE_FALLBACK_STATE.count,
+        lastFallbackAt: DURABLE_FALLBACK_STATE.lastFallbackAt,
+        lastFallbackReason: DURABLE_FALLBACK_STATE.lastFallbackReason,
+        activeFallbackBuckets: [...DURABLE_FALLBACK_STATE.buckets].sort()
+      },
+      flows: DURABLE_PROTECTED_FLOWS.map((flow) => ({
+        flow: flow.flow,
+        bucket: flow.bucket,
+        rateLimit:
+          durable.rateLimits ? "durable" : "memory-fallback",
+        idempotency: (flow.protections as readonly string[]).includes("idempotency")
+          ? durable.idempotency
+            ? "durable"
+            : "unavailable"
+          : "not_applicable"
+      }))
+    };
   } catch (error) {
     return {
       provider: "supabase-postgres" as const,
       available: false,
       rateLimits: false,
       idempotency: false,
-      error: error instanceof Error ? error.message : String(error)
+      migrationApplied: false,
+      runtime: {
+        mode: "memory-fallback" as const,
+        fallbackActive: DURABLE_FALLBACK_STATE.count > 0,
+        fallbackEventCount: DURABLE_FALLBACK_STATE.count,
+        lastFallbackAt: DURABLE_FALLBACK_STATE.lastFallbackAt,
+        lastFallbackReason:
+          DURABLE_FALLBACK_STATE.lastFallbackReason || inferFallbackReason(error),
+        activeFallbackBuckets: [...DURABLE_FALLBACK_STATE.buckets].sort()
+      },
+      flows: DURABLE_PROTECTED_FLOWS.map((flow) => ({
+        flow: flow.flow,
+        bucket: flow.bucket,
+        rateLimit: "memory-fallback",
+        idempotency: (flow.protections as readonly string[]).includes("idempotency")
+          ? "unavailable"
+          : "not_applicable"
+      }))
     };
   }
+}
+
+export function resetDurableProtectionRuntimeState() {
+  DURABLE_FALLBACK_STATE.count = 0;
+  DURABLE_FALLBACK_STATE.lastFallbackAt = null;
+  DURABLE_FALLBACK_STATE.lastFallbackReason = null;
+  DURABLE_FALLBACK_STATE.buckets.clear();
+  DURABLE_FALLBACK_STATE.warnedMissingMigration = false;
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireInternalOperatorAccess } from "@/lib/auth/api-authorization";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 type ProductEventRecord = {
@@ -38,11 +38,15 @@ function normalizeTheme(theme: string) {
   return theme || "geral";
 }
 
-export async function GET(_request: NextRequest) {
-  const access = await requireInternalApiProfile();
+export async function GET(request: NextRequest) {
+  const access = await requireInternalOperatorAccess({
+    request,
+    service: "internal_acquisition",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -298,10 +302,14 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireInternalOperatorAccess({
+    request,
+    service: "internal_acquisition",
+    action: "write"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   const body = await request.json().catch(() => ({}));

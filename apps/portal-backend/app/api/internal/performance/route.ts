@@ -5,15 +5,19 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireInternalOperatorAccess } from "@/lib/auth/api-authorization";
 import { abTestingService } from "../../../../lib/services/ab-testing";
 import { optimizationIntelligenceService } from "../../../../lib/services/optimization-intelligence";
 
 export async function GET(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireInternalOperatorAccess({
+    request,
+    service: "internal_performance",
+    action: "read"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {
@@ -23,7 +27,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'overview';
     const testId = searchParams.get('testId');
 
-    const response: any = { success: true, data: null };
+    const response: { success: true; data: unknown } = { success: true, data: null };
 
     switch (type) {
       case 'overview':
@@ -363,10 +367,14 @@ async function getBusinessMetrics(period: 'daily' | 'weekly' | 'monthly') {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireInternalApiProfile();
+  const access = await requireInternalOperatorAccess({
+    request,
+    service: "internal_performance",
+    action: "write"
+  });
 
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return access.response;
   }
 
   try {

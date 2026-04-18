@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  getNotificationWorkerDiagnostics,
+  type NotificationWorkerDiagnosticsAdapter
+} from "../diagnostics/notification-worker";
 import { traceOperationalEvent } from "../observability/operational-trace";
 import { routeNotificationByChannel } from "../notifications/channel-router";
 import { renderNotificationEmail } from "../notifications/email-templates";
@@ -34,6 +38,46 @@ function getRetryDelayMs(attempts: number) {
 
 function truncateErrorMessage(message: string) {
   return message.slice(0, 900);
+}
+
+function createNotificationWorkerDiagnosticsAdapter(): NotificationWorkerDiagnosticsAdapter {
+  return {
+    async countByStatus(status, options = {}) {
+      const supabase = createAdminSupabaseClient();
+      let query = supabase
+        .from("notifications_outbox")
+        .select("id", { head: true, count: "exact" })
+        .eq("status", status);
+
+      if (status === "failed") {
+        if (options.terminalOnly) {
+          query = query.gte("attempts", MAX_NOTIFICATION_ATTEMPTS);
+        } else {
+          query = query.lt("attempts", MAX_NOTIFICATION_ATTEMPTS);
+        }
+      }
+
+      if (status === "pending" && options.availableBefore) {
+        query = query.lte("available_at", options.availableBefore);
+      }
+
+      if (status === "processing" && options.staleBefore) {
+        query = query.lte("processing_started_at", options.staleBefore);
+      }
+
+      const { count, error } = await query;
+
+      if (error) {
+        throw new Error(`Nao foi possivel inspecionar a fila de notificacoes: ${error.message}`);
+      }
+
+      return count || 0;
+    }
+  };
+}
+
+export async function inspectNotificationWorkerDiagnostics() {
+  return getNotificationWorkerDiagnostics(createNotificationWorkerDiagnosticsAdapter());
 }
 
 async function claimNotificationForProcessing(record: NotificationRecord) {
@@ -292,6 +336,8 @@ export async function processPendingNotifications(limit = 10) {
     results.push(await processNotification(record));
   }
 
+  const diagnostics = await inspectNotificationWorkerDiagnostics();
+
   return {
     automation: automationSummary,
     processed: results.length,
@@ -299,6 +345,7 @@ export async function processPendingNotifications(limit = 10) {
     skipped: results.filter((item) => item.status === "skipped").length,
     failed: results.filter((item) => item.status === "failed").length,
     contended: results.filter((item) => item.status === "contended").length,
-    results
+    results,
+    diagnostics
   };
 }

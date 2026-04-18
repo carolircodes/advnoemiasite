@@ -160,6 +160,15 @@ export async function requireRouteSecretOrStaffAccess(options: {
     if (staffAccess.ok) {
       return staffAccess;
     }
+
+    if (staffAccess.status !== 401 || secretAccess.status === 503) {
+      return deniedAccess(
+        options.service,
+        options.action,
+        staffAccess.status,
+        staffAccess.error
+      );
+    }
   }
 
   return deniedAccess(
@@ -168,4 +177,24 @@ export async function requireRouteSecretOrStaffAccess(options: {
     secretAccess.status,
     secretAccess.error
   );
+}
+
+export async function requireInternalOperatorAccess(options: {
+  request: Request;
+  service: string;
+  action: string;
+  errorMessage?: string;
+  resolveStaffAccess?: StaffAccessResolver;
+}): Promise<RouteAccessResult> {
+  return requireRouteSecretOrStaffAccess({
+    request: options.request,
+    service: options.service,
+    action: options.action,
+    expectedSecret: process.env.INTERNAL_API_SECRET?.trim(),
+    secretName: "INTERNAL_API_SECRET",
+    errorMessage: options.errorMessage || "internal_route_requires_operator_access",
+    headerNames: ["x-internal-api-secret"],
+    allowStaffFallback: true,
+    resolveStaffAccess: options.resolveStaffAccess
+  });
 }

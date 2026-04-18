@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireInternalApiProfile } from "@/lib/auth/guards";
+import { requireInternalOperatorAccess } from "@/lib/auth/api-authorization";
 import { renderNotificationEmail } from "@/lib/notifications/email-templates";
 
 export const runtime = "nodejs";
@@ -57,10 +57,14 @@ const SAMPLES = {
 type PreviewTier = keyof typeof SAMPLES;
 
 export async function GET(request: Request) {
-  const auth = await requireInternalApiProfile();
+  const auth = await requireInternalOperatorAccess({
+    request,
+    service: "internal_email_preview",
+    action: "read"
+  });
 
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return auth.response;
   }
 
   const url = new URL(request.url);

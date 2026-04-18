@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint app/api/cron app/api/ecosystem app/api/internal app/api/leads app/api/noemia app/api/payment app/api/public lib/auth lib/http lib/observability lib/payment lib/services/process-notifications.ts lib/services/notification-error-classification.ts tests --ext .ts,.tsx --cache --cache-location .eslintcache",
+    "lint": "eslint app/api/cron app/api/ecosystem app/api/internal app/api/leads app/api/noemia app/api/payment app/api/public app/api/worker lib/auth lib/config lib/diagnostics lib/http lib/observability lib/payment lib/services/process-notifications.ts lib/services/notification-error-classification.ts tests --ext .ts,.tsx --cache --cache-location .eslintcache",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types tests/run.ts",
     "validate:schema": "node scripts/check-schema-governance.mjs",
