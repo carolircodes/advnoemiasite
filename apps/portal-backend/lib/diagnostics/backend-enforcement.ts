@@ -24,7 +24,9 @@ export type BackendActionDomain =
   | "env_config"
   | "external_provider"
   | "database_admin"
-  | "dashboard_manual";
+  | "dashboard_manual"
+  | "release_coordination"
+  | "incident_escalation";
 export type BackendActionOwner =
   | "release_manager"
   | "platform_operator"
@@ -33,6 +35,11 @@ export type BackendActionOwner =
 export type BackendCompletionType =
   | "automated_evidence"
   | "partially_codified"
+  | "external_manual";
+
+type ReleaseEvidenceProofBoundary =
+  | "automated"
+  | "inferred"
   | "external_manual";
 
 export type BackendSectionAssessment = {
@@ -57,13 +64,17 @@ type ReleaseEvidenceManualFollowUp = {
   actionDomain: BackendActionDomain;
   owner: BackendActionOwner;
   completionType: BackendCompletionType;
+  proofBoundary: ReleaseEvidenceProofBoundary;
+  partialEvidenceAvailable: boolean;
   title: string;
   why: string;
+  nextAction: string;
+  proofRequired: string[];
   successSignals: string[];
 };
 
 export type BackendOperationsVerificationReport = {
-  schemaVersion: "phase8-2026-04-18";
+  schemaVersion: "phase9-2026-04-18";
   profile: BackendEnforcementProfile;
   runtimeVerification: {
     mode: BackendRuntimeVerificationMode;
@@ -115,7 +126,10 @@ export type BackendOperationsVerificationReport = {
       actionDomain: BackendActionDomain;
       owner: BackendActionOwner;
       completionType: BackendCompletionType;
+      blocksReleaseUntilVerified: boolean;
       envNames: string[];
+      postRotationSteps: string[];
+      proofRequired: string[];
       verificationSignals: string[];
       followUp: string;
     }>;
@@ -128,14 +142,17 @@ export type BackendOperationsVerificationReport = {
         operatorAction: string;
         owner: BackendActionOwner;
         actionDomain: BackendActionDomain;
+        proofBoundary: ReleaseEvidenceProofBoundary;
       }>;
       review: Array<{
         subsystem: string;
         level: BackendEnforcementLevel;
         code: string;
         summary: string;
+        nextAction: string;
         owner: BackendActionOwner;
         actionDomain: BackendActionDomain;
+        proofBoundary: ReleaseEvidenceProofBoundary;
       }>;
     };
     releaseManagerSummary: {
@@ -156,11 +173,73 @@ export type BackendOperationsVerificationReport = {
         owner: BackendActionOwner;
         actionDomain: BackendActionDomain;
         nextAction: string;
+        proofBoundary: ReleaseEvidenceProofBoundary;
       }>;
       proofBoundary: {
         automated: number;
         inferred: number;
         external: number;
+      };
+    };
+    releaseHandoff: {
+      schemaVersion: "phase9-handoff-2026-04-18";
+      artifactSetVersion: "phase9-release-handoff-v1";
+      releaseChannel: {
+        subject: string;
+        decision:
+          | "approved"
+          | "approved_with_warnings"
+          | "manual_follow_up_required"
+          | "blocked";
+        severity: BackendEnforcementLevel;
+        requiresHumanApproval: boolean;
+        summaryLines: string[];
+        blockers: string[];
+        actionRequired: string[];
+        warnings: string[];
+        manualFollowUps: Array<{
+          title: string;
+          blocksRelease: boolean;
+          owner: BackendActionOwner;
+          actionDomain: BackendActionDomain;
+          completionType: BackendCompletionType;
+          proofBoundary: ReleaseEvidenceProofBoundary;
+          nextAction: string;
+        }>;
+      };
+      incidentChannel: {
+        title: string;
+        severity: BackendEnforcementLevel;
+        escalateNow: boolean;
+        proofBoundary: ReleaseEvidenceProofBoundary;
+        summaryLines: string[];
+        immediate: Array<{
+          subsystem: string;
+          level: BackendEnforcementLevel;
+          code: string;
+          owner: BackendActionOwner;
+          actionDomain: BackendActionDomain;
+          nextAction: string;
+          proofBoundary: ReleaseEvidenceProofBoundary;
+        }>;
+        manualFollowUps: Array<{
+          title: string;
+          blocksRelease: boolean;
+          owner: BackendActionOwner;
+          actionDomain: BackendActionDomain;
+          proofBoundary: ReleaseEvidenceProofBoundary;
+        }>;
+      };
+      artifactManifest: {
+        schemaVersion: "phase9-handoff-2026-04-18";
+        generatedAt: string;
+        recommendedReleaseArtifact: "handoff/release-channel-summary.md";
+        recommendedIncidentArtifact: "handoff/incident-escalation-summary.md";
+        artifacts: Array<{
+          path: string;
+          audience: "release_manager" | "operator" | "incident_channel" | "automation";
+          purpose: string;
+        }>;
       };
     };
   };
@@ -206,14 +285,49 @@ function inferActionOwner(actionDomain: BackendActionDomain): BackendActionOwner
   switch (actionDomain) {
     case "database_admin":
       return "database_admin";
+    case "incident_escalation":
+      return "platform_operator";
     case "external_provider":
     case "dashboard_manual":
       return "provider_operator";
+    case "release_coordination":
+      return "release_manager";
     case "env_config":
       return "platform_operator";
     case "repo_code":
     default:
       return "release_manager";
+  }
+}
+
+function inferProofBoundaryFromCompletionType(
+  completionType: BackendCompletionType
+): ReleaseEvidenceProofBoundary {
+  switch (completionType) {
+    case "automated_evidence":
+      return "automated";
+    case "external_manual":
+      return "external_manual";
+    case "partially_codified":
+    default:
+      return "inferred";
+  }
+}
+
+function inferProofBoundaryForSection(
+  actionDomain: BackendActionDomain
+): ReleaseEvidenceProofBoundary {
+  switch (actionDomain) {
+    case "database_admin":
+    case "external_provider":
+    case "dashboard_manual":
+    case "incident_escalation":
+      return "external_manual";
+    case "env_config":
+    case "release_coordination":
+    case "repo_code":
+    default:
+      return "inferred";
   }
 }
 
@@ -282,7 +396,18 @@ function buildSecretRotationGuidance(): BackendOperationsVerificationReport["rel
       actionDomain: "env_config",
       owner: "platform_operator",
       completionType: "partially_codified",
+      blocksReleaseUntilVerified: true,
       envNames: ["INTERNAL_API_SECRET", "NOTIFICATIONS_WORKER_SECRET", "CRON_SECRET"],
+      postRotationSteps: [
+        "Reexecutar operations:verify:release no ambiente alvo.",
+        "Confirmar GET /api/internal/readiness com o novo secret.",
+        "Confirmar falha explicita com o secret anterior."
+      ],
+      proofRequired: [
+        "Readiness protegida acessivel apenas com o novo secret.",
+        "Chamadas com o secret anterior ou ausente rejeitadas.",
+        "Nenhum blocker de perimeter na release evidence."
+      ],
       verificationSignals: [
         "Novo secret acessa /api/internal/readiness e o worker protegido.",
         "Chamadas sem secret ou com secret antigo falham.",
@@ -297,7 +422,18 @@ function buildSecretRotationGuidance(): BackendOperationsVerificationReport["rel
       actionDomain: "external_provider",
       owner: "provider_operator",
       completionType: "partially_codified",
+      blocksReleaseUntilVerified: true,
       envNames: ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET"],
+      postRotationSteps: [
+        "Revalidar GET /api/payment/webhook com acesso protegido.",
+        "Executar um webhook de teste ou fluxo controlado de pagamento.",
+        "Reexecutar operations:evidence:release e confirmar ausencia de blocker de assinatura."
+      ],
+      proofRequired: [
+        "signature.enforced = true no diagnostico protegido.",
+        "Nenhuma falha de assinatura ou token em fluxo de teste.",
+        "payments_signature_not_enforced ausente."
+      ],
       verificationSignals: [
         "payments_signature_not_enforced ausente.",
         "GET /api/payment/webhook com acesso protegido mostra signature.enforced = true.",
@@ -312,7 +448,18 @@ function buildSecretRotationGuidance(): BackendOperationsVerificationReport["rel
       actionDomain: "external_provider",
       owner: "provider_operator",
       completionType: "partially_codified",
+      blocksReleaseUntilVerified: false,
       envNames: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET"],
+      postRotationSteps: [
+        "Revalidar readiness protegida para telegram.status.",
+        "Confirmar webhook com novo secret.",
+        "Executar mensagem de teste no bot."
+      ],
+      proofRequired: [
+        "telegram.status = healthy.",
+        "Webhook aceita o novo secret e rejeita o anterior.",
+        "Mensagem de teste atravessa o fluxo sem falha de credencial."
+      ],
       verificationSignals: [
         "telegram.status = healthy na readiness protegida.",
         "Webhook do Telegram aceita o novo secret e rejeita o anterior.",
@@ -327,7 +474,18 @@ function buildSecretRotationGuidance(): BackendOperationsVerificationReport["rel
       actionDomain: "dashboard_manual",
       owner: "provider_operator",
       completionType: "external_manual",
+      blocksReleaseUntilVerified: false,
       envNames: ["META_VERIFY_TOKEN", "META_APP_SECRET", "FACEBOOK_PAGE_ACCESS_TOKEN"],
+      postRotationSteps: [
+        "Refazer verificacao GET /api/meta/webhook no dashboard da Meta.",
+        "Enviar evento real do canal apos a rotacao.",
+        "Confirmar runtime logs com META_WEBHOOK_INBOUND_ACCEPTED e ausencia de falha outbound."
+      ],
+      proofRequired: [
+        "GET de verificacao da Meta bem-sucedido.",
+        "Evento inbound real aceito apos a rotacao.",
+        "Resposta outbound sem erro de token ou assinatura."
+      ],
       verificationSignals: [
         "Meta revalida GET /api/meta/webhook com sucesso.",
         "Runtime logs mostram META_WEBHOOK_INBOUND_ACCEPTED apos novo evento.",
@@ -580,11 +738,16 @@ function buildReleaseEvidence(
       actionDomain,
       owner: inferActionOwner(actionDomain),
       completionType: durableProof.completionType,
+      proofBoundary: inferProofBoundaryFromCompletionType(durableProof.completionType),
+      partialEvidenceAvailable: true,
       title: "Confirmar convergencia duravel em ambiente real",
       why:
         durableSection.status === "fallback"
           ? "O runtime atual caiu para memory-fallback."
           : "A verificacao runtime duravel ainda nao foi provada com acesso administrativo real.",
+      nextAction:
+        "Validar a migracao, a funcao duravel e a readiness protegida com acesso administrativo real.",
+      proofRequired: [...durableProof.successSignals],
       successSignals: [
         `Migracao ${DURABLE_PROTECTION_EXPECTATIONS.migrationName} aplicada.`,
         "Readiness protegida com abuseProtection.details.runtime.mode = durable.",
@@ -608,8 +771,17 @@ function buildReleaseEvidence(
       actionDomain,
       owner: inferActionOwner(actionDomain),
       completionType: "partially_codified",
+      proofBoundary: inferProofBoundaryFromCompletionType("partially_codified"),
+      partialEvidenceAvailable: true,
       title: "Fechar lacunas de environment completeness antes da liberacao final",
       why: environmentSection.summary,
+      nextAction:
+        "Completar os envs obrigatorios do perfil alvo e reexecutar a verificacao de release.",
+      proofRequired: [
+        "profiles.release.satisfied = true.",
+        "profiles.full_durable.satisfied = true quando a promocao exigir prova duravel real.",
+        "Nenhum secret ou chave obrigatoria pendente no ambiente alvo."
+      ],
       successSignals: [
         "profiles.release.satisfied = true.",
         "profiles.full_durable.satisfied = true quando a promocao exigir prova duravel real.",
@@ -634,8 +806,16 @@ function buildReleaseEvidence(
         actionDomain === "external_provider" || actionDomain === "dashboard_manual"
           ? "external_manual"
           : "partially_codified",
+      proofBoundary: inferProofBoundaryFromCompletionType(
+        actionDomain === "external_provider" || actionDomain === "dashboard_manual"
+          ? "external_manual"
+          : "partially_codified"
+      ),
+      partialEvidenceAvailable: true,
       title: `Revalidar ${section.subsystem} no ambiente alvo`,
       why: section.summary,
+      nextAction: section.operatorAction,
+      proofRequired: section.verification.slice(0, 3),
       successSignals: section.verification.slice(0, 3)
     });
   }
@@ -645,11 +825,20 @@ function buildReleaseEvidence(
       category: "release",
       enforcementLevel: "release_blocker",
       blocksRelease: true,
-      actionDomain: "repo_code",
+      actionDomain: "release_coordination",
       owner: "release_manager",
       completionType: "partially_codified",
+      proofBoundary: inferProofBoundaryFromCompletionType("partially_codified"),
+      partialEvidenceAvailable: true,
       title: "Nao promover enquanto houver release blockers",
       why: "A verificacao atual encontrou bloqueios explicitos para o perfil selecionado.",
+      nextAction:
+        "Resolver os blockers, regenerar os artifacts de release e registrar a decisao humana de promocao.",
+      proofRequired: [
+        "blockers vazio no relatorio de release.",
+        "deployAllowed = true.",
+        "operator.releaseSafety.blockers vazio na readiness protegida."
+      ],
       successSignals: [
         "blockers vazio no relatorio de release.",
         "deployAllowed = true.",
@@ -664,6 +853,58 @@ function buildReleaseEvidence(
     warnings,
     durableProof
   );
+  const immediateAlerts = [...blockers, ...actionRequiredItems].map((section) => {
+    const actionDomain = inferActionDomain(section.subsystem, section.code);
+
+    return {
+      subsystem: section.subsystem,
+      level: section.enforcement.level,
+      code: section.code,
+      summary: section.summary,
+      operatorAction: section.operatorAction,
+      owner: inferActionOwner(actionDomain),
+      actionDomain,
+      proofBoundary: inferProofBoundaryForSection(actionDomain)
+    };
+  });
+  const reviewAlerts = warningItems.map((section) => {
+    const actionDomain = inferActionDomain(section.subsystem, section.code);
+
+    return {
+      subsystem: section.subsystem,
+      level: section.enforcement.level,
+      code: section.code,
+      summary: section.summary,
+      nextAction: section.operatorAction,
+      owner: inferActionOwner(actionDomain),
+      actionDomain,
+      proofBoundary: inferProofBoundaryForSection(actionDomain)
+    };
+  });
+  const topActions = [...blockers, ...actionRequiredItems]
+    .slice(0, 5)
+    .map((section) => {
+      const actionDomain = inferActionDomain(section.subsystem, section.code);
+
+      return {
+        subsystem: section.subsystem,
+        level: section.enforcement.level,
+        code: section.code,
+        owner: inferActionOwner(actionDomain),
+        actionDomain,
+        nextAction: section.operatorAction,
+        proofBoundary: inferProofBoundaryForSection(actionDomain)
+      };
+    });
+  const releaseHandoffSummaryLines = [
+    `Decision=${releaseDecision}`,
+    `Severity=${blockers.length > 0 ? "release_blocker" : actionRequiredItems.length > 0 ? "action_required" : warningItems.length > 0 ? "warning" : "info"}`,
+    `DeployAllowed=${blockers.length === 0 ? "yes" : "no"}`,
+    `DurableProof=${durableProof.state}`,
+    `RuntimeProofSatisfied=${runtimeProofSatisfied ? "yes" : "no"}`
+  ];
+  const handoffSchemaVersion = "phase9-handoff-2026-04-18" as const;
+  const artifactSetVersion = "phase9-release-handoff-v1" as const;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -678,31 +919,8 @@ function buildReleaseEvidence(
     durableProof,
     secretRotation,
     alertSummary: {
-      immediate: [...blockers, ...actionRequiredItems].map((section) => {
-        const actionDomain = inferActionDomain(section.subsystem, section.code);
-
-        return {
-          subsystem: section.subsystem,
-          level: section.enforcement.level,
-          code: section.code,
-          summary: section.summary,
-          operatorAction: section.operatorAction,
-          owner: inferActionOwner(actionDomain),
-          actionDomain
-        };
-      }),
-      review: warningItems.map((section) => {
-        const actionDomain = inferActionDomain(section.subsystem, section.code);
-
-        return {
-          subsystem: section.subsystem,
-          level: section.enforcement.level,
-          code: section.code,
-          summary: section.summary,
-          owner: inferActionOwner(actionDomain),
-          actionDomain
-        };
-      })
+      immediate: immediateAlerts,
+      review: reviewAlerts
     },
     releaseManagerSummary: {
       headline:
@@ -718,24 +936,142 @@ function buildReleaseEvidence(
       actionRequiredCount: actionRequiredItems.length,
       warningCount: warningItems.length,
       requiresHumanApproval: releaseDecision !== "approved",
-      topActions: [...blockers, ...actionRequiredItems]
-        .slice(0, 5)
-        .map((section) => {
-          const actionDomain = inferActionDomain(section.subsystem, section.code);
-
-          return {
-            subsystem: section.subsystem,
-            level: section.enforcement.level,
-            code: section.code,
-            owner: inferActionOwner(actionDomain),
-            actionDomain,
-            nextAction: section.operatorAction
-          };
-        }),
+      topActions,
       proofBoundary: {
         automated: evidenceBoundaries.automatedProof.length,
         inferred: evidenceBoundaries.inferredStatus.length,
         external: evidenceBoundaries.requiredExternalVerification.length
+      }
+    },
+    releaseHandoff: {
+      schemaVersion: handoffSchemaVersion,
+      artifactSetVersion,
+      releaseChannel: {
+        subject: `[backend-release] ${releaseDecision} (${blockers.length} blockers / ${actionRequiredItems.length} action-required)`,
+        decision: releaseDecision,
+        severity:
+          blockers.length > 0
+            ? "release_blocker"
+            : actionRequiredItems.length > 0
+              ? "action_required"
+              : warningItems.length > 0
+                ? "warning"
+                : "info",
+        requiresHumanApproval: releaseDecision !== "approved",
+        summaryLines: [
+          ...releaseHandoffSummaryLines,
+          `TopActionCount=${topActions.length}`,
+          `ManualFollowUpCount=${manualFollowUps.length}`
+        ],
+        blockers: blockers.map(
+          (section) =>
+            `${section.subsystem}:${section.code}:${section.enforcement.reason}`
+        ),
+        actionRequired: actionRequiredItems.map(
+          (section) =>
+            `${section.subsystem}:${section.code}:${section.operatorAction}`
+        ),
+        warnings: warningItems.map(
+          (section) =>
+            `${section.subsystem}:${section.code}:${section.summary}`
+        ),
+        manualFollowUps: manualFollowUps.map((item) => ({
+          title: item.title,
+          blocksRelease: item.blocksRelease,
+          owner: item.owner,
+          actionDomain: item.actionDomain,
+          completionType: item.completionType,
+          proofBoundary: item.proofBoundary,
+          nextAction: item.nextAction
+        }))
+      },
+      incidentChannel: {
+        title:
+          blockers.length > 0
+            ? "Backend release blocker requires escalation"
+            : actionRequiredItems.length > 0
+              ? "Backend action-required state needs release follow-up"
+              : "Backend release status summary",
+        severity:
+          blockers.length > 0
+            ? "release_blocker"
+            : actionRequiredItems.length > 0
+              ? "action_required"
+              : warningItems.length > 0
+                ? "warning"
+                : "info",
+        escalateNow: blockers.length > 0 || durableProof.state === "failed",
+        proofBoundary:
+          blockers.length > 0 || durableProof.state === "failed"
+            ? "external_manual"
+            : "inferred",
+        summaryLines: [
+          `ImmediateItems=${immediateAlerts.length}`,
+          `ReviewItems=${reviewAlerts.length}`,
+          `DurableProof=${durableProof.state}`,
+          `ReleaseDecision=${releaseDecision}`
+        ],
+        immediate: immediateAlerts.map((item) => ({
+          subsystem: item.subsystem,
+          level: item.level,
+          code: item.code,
+          owner: item.owner,
+          actionDomain: item.actionDomain,
+          nextAction: item.operatorAction,
+          proofBoundary: item.proofBoundary
+        })),
+        manualFollowUps: manualFollowUps
+          .filter((item) => item.blocksRelease || item.enforcementLevel !== "warning")
+          .map((item) => ({
+            title: item.title,
+            blocksRelease: item.blocksRelease,
+            owner: item.owner,
+            actionDomain: item.actionDomain,
+            proofBoundary: item.proofBoundary
+          }))
+      },
+      artifactManifest: {
+        schemaVersion: handoffSchemaVersion,
+        generatedAt: new Date().toISOString(),
+        recommendedReleaseArtifact: "handoff/release-channel-summary.md",
+        recommendedIncidentArtifact: "handoff/incident-escalation-summary.md",
+        artifacts: [
+          {
+            path: "backend-operations-report.json",
+            audience: "automation",
+            purpose: "Complete machine-readable backend verification report"
+          },
+          {
+            path: "backend-release-evidence.md",
+            audience: "operator",
+            purpose: "Detailed operator evidence with proof boundaries and follow-ups"
+          },
+          {
+            path: "backend-release-summary.md",
+            audience: "release_manager",
+            purpose: "Compact release-manager review summary"
+          },
+          {
+            path: "handoff/release-channel-summary.md",
+            audience: "release_manager",
+            purpose: "Paste-ready release handoff for external release channel"
+          },
+          {
+            path: "handoff/release-channel-summary.json",
+            audience: "automation",
+            purpose: "Structured release handoff payload for downstream glue"
+          },
+          {
+            path: "handoff/incident-escalation-summary.md",
+            audience: "incident_channel",
+            purpose: "Concise escalation summary for incident or blocker channel"
+          },
+          {
+            path: "handoff/incident-escalation-summary.json",
+            audience: "automation",
+            purpose: "Structured escalation payload for manual or scripted routing"
+          }
+        ]
       }
     }
   };
@@ -786,7 +1122,7 @@ export async function buildBackendOperationsVerificationReport(options?: {
   });
 
   return {
-    schemaVersion: "phase8-2026-04-18" as const,
+    schemaVersion: "phase9-2026-04-18" as const,
     profile,
     runtimeVerification,
     status: combineDiagnosticStatuses(Object.values(sections)),
@@ -833,7 +1169,7 @@ export function renderBackendReleaseEvidenceMarkdown(
   } else {
     for (const item of report.releaseEvidence.alertSummary.immediate) {
       lines.push(
-        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / ${item.summary} / Action: ${item.operatorAction}`
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / proofBoundary=${item.proofBoundary} / ${item.summary} / Action: ${item.operatorAction}`
       );
     }
   }
@@ -845,7 +1181,7 @@ export function renderBackendReleaseEvidenceMarkdown(
   } else {
     for (const item of report.releaseEvidence.alertSummary.review) {
       lines.push(
-        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / ${item.summary}`
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / proofBoundary=${item.proofBoundary} / ${item.summary} / Next: ${item.nextAction}`
       );
     }
   }
@@ -857,9 +1193,11 @@ export function renderBackendReleaseEvidenceMarkdown(
   } else {
     for (const followUp of report.releaseEvidence.manualFollowUps) {
       lines.push(
-        `- ${followUp.category}: ${followUp.title} / level=${followUp.enforcementLevel} / blocksRelease=${followUp.blocksRelease} / owner=${followUp.owner} / domain=${followUp.actionDomain} / completionType=${followUp.completionType}`
+        `- ${followUp.category}: ${followUp.title} / level=${followUp.enforcementLevel} / blocksRelease=${followUp.blocksRelease} / owner=${followUp.owner} / domain=${followUp.actionDomain} / completionType=${followUp.completionType} / proofBoundary=${followUp.proofBoundary} / partialEvidenceAvailable=${followUp.partialEvidenceAvailable}`
       );
       lines.push(`  Why: ${followUp.why}`);
+      lines.push(`  Next action: ${followUp.nextAction}`);
+      lines.push(`  Proof required: ${followUp.proofRequired.join(" | ")}`);
       lines.push(`  Success signals: ${followUp.successSignals.join(" | ")}`);
     }
   }
@@ -879,9 +1217,11 @@ export function renderBackendReleaseEvidenceMarkdown(
   lines.push("", "## Secret rotation support", "");
   for (const item of report.releaseEvidence.secretRotation) {
     lines.push(
-      `- ${item.name}: owner=${item.owner} / domain=${item.actionDomain} / completionType=${item.completionType}`
+      `- ${item.name}: owner=${item.owner} / domain=${item.actionDomain} / completionType=${item.completionType} / blocksReleaseUntilVerified=${item.blocksReleaseUntilVerified}`
     );
     lines.push(`  Env: ${item.envNames.join(", ")}`);
+    lines.push(`  Post-rotation: ${item.postRotationSteps.join(" | ")}`);
+    lines.push(`  Proof required: ${item.proofRequired.join(" | ")}`);
     lines.push(`  Verify: ${item.verificationSignals.join(" | ")}`);
   }
 
@@ -928,7 +1268,85 @@ export function renderBackendReleaseManagerSummaryMarkdown(
   } else {
     for (const item of summary.topActions) {
       lines.push(
-        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / next=${item.nextAction}`
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / proofBoundary=${item.proofBoundary} / next=${item.nextAction}`
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderBackendReleaseChannelSummaryMarkdown(
+  report: BackendOperationsVerificationReport
+) {
+  const handoff = report.releaseEvidence.releaseHandoff.releaseChannel;
+  const lines = [
+    "# Backend Release Channel Summary",
+    "",
+    `- Subject: ${handoff.subject}`,
+    `- Decision: ${handoff.decision}`,
+    `- Severity: ${handoff.severity}`,
+    `- Requires human approval: ${handoff.requiresHumanApproval ? "yes" : "no"}`,
+    "",
+    "## Summary lines",
+    "",
+    ...handoff.summaryLines.map((line) => `- ${line}`),
+    "",
+    "## Top follow-ups",
+    ""
+  ];
+
+  if (handoff.manualFollowUps.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of handoff.manualFollowUps.slice(0, 5)) {
+      lines.push(
+        `- ${item.title}: blocksRelease=${item.blocksRelease} / owner=${item.owner} / domain=${item.actionDomain} / completionType=${item.completionType} / proofBoundary=${item.proofBoundary} / next=${item.nextAction}`
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderBackendIncidentEscalationSummaryMarkdown(
+  report: BackendOperationsVerificationReport
+) {
+  const incident = report.releaseEvidence.releaseHandoff.incidentChannel;
+  const lines = [
+    "# Backend Incident Escalation Summary",
+    "",
+    `- Title: ${incident.title}`,
+    `- Severity: ${incident.severity}`,
+    `- Escalate now: ${incident.escalateNow ? "yes" : "no"}`,
+    `- Proof boundary: ${incident.proofBoundary}`,
+    "",
+    "## Summary lines",
+    "",
+    ...incident.summaryLines.map((line) => `- ${line}`),
+    "",
+    "## Immediate items",
+    ""
+  ];
+
+  if (incident.immediate.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of incident.immediate) {
+      lines.push(
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / proofBoundary=${item.proofBoundary} / next=${item.nextAction}`
+      );
+    }
+  }
+
+  lines.push("", "## Manual follow-ups", "");
+
+  if (incident.manualFollowUps.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of incident.manualFollowUps) {
+      lines.push(
+        `- ${item.title}: blocksRelease=${item.blocksRelease} / owner=${item.owner} / domain=${item.actionDomain} / proofBoundary=${item.proofBoundary}`
       );
     }
   }
@@ -984,7 +1402,7 @@ export function renderBackendOperationsVerificationReport(
   if (report.releaseEvidence.manualFollowUps.length > 0) {
     for (const item of report.releaseEvidence.manualFollowUps) {
       lines.push(
-        `- ${item.category}: ${item.title} :: ${item.why} :: owner=${item.owner} :: domain=${item.actionDomain}`
+        `- ${item.category}: ${item.title} :: ${item.why} :: owner=${item.owner} :: domain=${item.actionDomain} :: proofBoundary=${item.proofBoundary}`
       );
     }
   } else {

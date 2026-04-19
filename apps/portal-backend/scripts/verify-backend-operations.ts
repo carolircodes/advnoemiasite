@@ -4,6 +4,8 @@ import path from "node:path";
 
 import {
   buildBackendOperationsVerificationReport,
+  renderBackendIncidentEscalationSummaryMarkdown,
+  renderBackendReleaseChannelSummaryMarkdown,
   renderBackendReleaseEvidenceMarkdown,
   renderBackendReleaseManagerSummaryMarkdown,
   type BackendEnforcementProfile,
@@ -51,7 +53,9 @@ const report = await buildBackendOperationsVerificationReport({
 
 if (writeDir) {
   const resolvedDir = path.resolve(process.cwd(), writeDir);
+  const handoffDir = path.join(resolvedDir, "handoff");
   await mkdir(resolvedDir, { recursive: true });
+  await mkdir(handoffDir, { recursive: true });
   await writeFile(
     path.join(resolvedDir, "backend-operations-report.json"),
     renderBackendOperationsVerificationReport(report, "json"),
@@ -69,12 +73,46 @@ if (writeDir) {
   );
   await writeFile(
     path.join(resolvedDir, "backend-release-summary.json"),
-    `${JSON.stringify(report.releaseEvidence.releaseManagerSummary, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        schemaVersion: report.schemaVersion,
+        artifactType: "backend-release-summary",
+        generatedAt: report.releaseEvidence.generatedAt,
+        summary: report.releaseEvidence.releaseManagerSummary
+      },
+      null,
+      2
+    )}\n`,
     "utf8"
   );
   await writeFile(
     path.join(resolvedDir, "backend-release-summary.md"),
     renderBackendReleaseManagerSummaryMarkdown(report),
+    "utf8"
+  );
+  await writeFile(
+    path.join(handoffDir, "handoff-manifest.json"),
+    `${JSON.stringify(report.releaseEvidence.releaseHandoff.artifactManifest, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(handoffDir, "release-channel-summary.json"),
+    `${JSON.stringify(report.releaseEvidence.releaseHandoff.releaseChannel, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(handoffDir, "release-channel-summary.md"),
+    renderBackendReleaseChannelSummaryMarkdown(report),
+    "utf8"
+  );
+  await writeFile(
+    path.join(handoffDir, "incident-escalation-summary.json"),
+    `${JSON.stringify(report.releaseEvidence.releaseHandoff.incidentChannel, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(handoffDir, "incident-escalation-summary.md"),
+    renderBackendIncidentEscalationSummaryMarkdown(report),
     "utf8"
   );
 }

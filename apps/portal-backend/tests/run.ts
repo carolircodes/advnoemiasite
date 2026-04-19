@@ -9,5 +9,6 @@ import "./phase5-hardening.test.ts";
 import "./phase6-hardening.test.ts";
 import "./phase7-hardening.test.ts";
 import "./phase8-hardening.test.ts";
+import "./phase9-hardening.test.ts";
 import "./meta-messenger-audit.test.ts";
 import "./payment-pricing.test.ts";

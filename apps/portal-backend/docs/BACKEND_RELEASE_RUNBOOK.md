@@ -24,9 +24,14 @@ Arquivos esperados em `apps/portal-backend/.artifacts/operations/release`:
 - `backend-release-evidence.md`
 - `backend-release-summary.json`
 - `backend-release-summary.md`
+- `handoff/handoff-manifest.json`
+- `handoff/release-channel-summary.json`
+- `handoff/release-channel-summary.md`
+- `handoff/incident-escalation-summary.json`
+- `handoff/incident-escalation-summary.md`
 
 Use esses arquivos como prova repo-side da decisao de release.
-Use `backend-release-summary.md` como o resumo curto para release manager e `backend-release-evidence.md` como o detalhe operacional.
+Use `backend-release-summary.md` como o resumo curto para release manager, `backend-release-evidence.md` como o detalhe operacional, `handoff/release-channel-summary.md` como texto pronto para o canal externo de release e `handoff/incident-escalation-summary.md` como resumo curto para escalonamento manual.
 
 ## Post-deploy
 
@@ -35,6 +40,7 @@ Use `backend-release-summary.md` como o resumo curto para release manager e `bac
 - Confirmar `abuseProtection.details.runtime.mode = durable` quando a prova duravel for exigida.
 - Confirmar ausencia de blockers em `operator.releaseSafety.blockers`.
 - Revisar `operator.urgentActions` e `operator.alerts`.
+- Se houver blocker ou `action_required`, atualizar o handoff externo com o artifact mais recente, nao apenas com observacao verbal.
 
 ## Release blockers
 
@@ -58,16 +64,18 @@ Use `backend-release-summary.md` como o resumo curto para release manager e `bac
 - pagamento sem enforcement de assinatura
 - qualquer ambiente production-like sem prova duravel quando a release depende disso
 
+Quando isso acontecer, use `handoff/incident-escalation-summary.md` como o corpo curto do escalonamento e anexe `backend-release-evidence.md` apenas se o destinatario realmente precisar do detalhe tecnico completo.
+
 ## Secret rotation revalidation
 
 - `INTERNAL_API_SECRET`, `NOTIFICATIONS_WORKER_SECRET`, `CRON_SECRET`
-  Verificar readiness protegida, worker protegido e rejeicao do secret anterior.
+  Verificar readiness protegida, worker protegido, rejeicao do secret anterior e ausencia de blocker de perimeter no handoff atualizado.
 - `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET`
-  Verificar `GET /api/payment/webhook` com acesso protegido e ausencia de `payments_signature_not_enforced`.
+  Verificar `GET /api/payment/webhook` com acesso protegido, ausencia de `payments_signature_not_enforced` e prova listada em `proofRequired`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
-  Verificar `telegram.status = healthy` e sucesso do webhook protegido.
+  Verificar `telegram.status = healthy`, sucesso do webhook protegido e mensagem de teste sem falha de credencial.
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
-  Verificar callback GET da Meta, novo evento com `META_WEBHOOK_INBOUND_ACCEPTED` e envio outbound sem erro de token.
+  Verificar callback GET da Meta, novo evento com `META_WEBHOOK_INBOUND_ACCEPTED`, envio outbound sem erro de token e runtime logs do novo ciclo.
 
 ## External/manual proof still required
 
@@ -76,3 +84,4 @@ Use `backend-release-summary.md` como o resumo curto para release manager e `bac
 - confirmar a funcao `claim_rate_limit_bucket`
 - reexecutar readiness protegida ate o runtime sair de `memory-fallback`
 - validar segredos apos qualquer rotacao manual/external
+- encaminhar o handoff final para o canal real de release/incidente continua externo ao repo, mas agora deve usar os artifacts em `handoff/`

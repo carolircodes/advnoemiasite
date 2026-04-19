@@ -272,6 +272,16 @@ Artifacts de release gerados:
 - `backend-release-evidence.md`
 - `backend-release-summary.json`
 - `backend-release-summary.md`
+- `handoff/handoff-manifest.json`
+- `handoff/release-channel-summary.json`
+- `handoff/release-channel-summary.md`
+- `handoff/incident-escalation-summary.json`
+- `handoff/incident-escalation-summary.md`
+
+Use `handoff/release-channel-summary.md` como resumo pronto para o canal externo de release,
+`handoff/incident-escalation-summary.md` como texto curto para escalonamento manual,
+e `handoff/handoff-manifest.json` como indice schema-versioned para automacao simples ou
+checklists operacionais.
 
 O relatorio protegido em `GET /api/internal/readiness` agora tambem inclui `operator.releaseSafety`, com:
 

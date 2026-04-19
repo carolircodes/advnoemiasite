@@ -134,9 +134,15 @@ Revise os arquivos gerados em `apps/portal-backend/.artifacts/operations/release
 - `backend-release-evidence.md`
 - `backend-release-summary.json`
 - `backend-release-summary.md`
+- `handoff/handoff-manifest.json`
+- `handoff/release-channel-summary.json`
+- `handoff/release-channel-summary.md`
+- `handoff/incident-escalation-summary.json`
+- `handoff/incident-escalation-summary.md`
 
 Se o artifact listar `manualFollowUps`, trate-os como follow-up real e nao como nota decorativa.
 Use `backend-release-summary.md` para o resumo executivo da liberacao e `backend-release-evidence.md` para o detalhe tecnico.
+Use `handoff/release-channel-summary.md` para o texto curto do canal externo de release e `handoff/incident-escalation-summary.md` quando um blocker ou durable fallback precisar ser escalado sem copiar o relatorio inteiro.
 
 ## 7. Confirmar notificacoes e worker
 
@@ -186,16 +192,16 @@ Sinais de desvio:
 
 - rotacoes externas/manuais de secrets herdadas do fechamento anterior
 - aplicacao da migracao duravel em qualquer ambiente ainda nao convergido
-- integracao do checklist com observabilidade externa ou alertas, se desejado em fase futura
 - prova administrativa real da convergencia duravel enquanto o runtime ainda nao puder ser provado so por CI
+- encaminhamento final do resumo para Slack/email/ticket continua externo, mas agora usa os artifacts em `handoff/`
 
 ## 11. Revalidacao apos rotacao de secrets
 
 - `INTERNAL_API_SECRET`, `NOTIFICATIONS_WORKER_SECRET`, `CRON_SECRET`
-  Confirmar acesso com o novo secret e falha com o secret anterior.
+  Confirmar acesso com o novo secret, falha com o secret anterior e ausencia de blocker de perimeter em `handoff/release-channel-summary.md`.
 - `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET`
-  Confirmar webhook protegido e ausencia de blocker de assinatura.
+  Confirmar webhook protegido, ausencia de blocker de assinatura e prova de rotacao listada em `proofRequired`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
-  Confirmar readiness saudavel e webhook protegido funcional.
+  Confirmar readiness saudavel, webhook protegido funcional e mensagem de teste sem erro de credencial.
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
-  Confirmar verificacao GET da Meta, evento inbound real e envio outbound sem falha de credencial.
+  Confirmar verificacao GET da Meta, evento inbound real, envio outbound sem falha de credencial e runtime logs com o novo ciclo de autenticacao.

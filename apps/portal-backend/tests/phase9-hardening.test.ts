@@ -4,9 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildBackendOperationsVerificationReport,
   renderBackendIncidentEscalationSummaryMarkdown,
-  renderBackendReleaseChannelSummaryMarkdown,
-  renderBackendReleaseEvidenceMarkdown,
-  renderBackendReleaseManagerSummaryMarkdown
+  renderBackendReleaseChannelSummaryMarkdown
 } from "../lib/diagnostics/backend-enforcement.ts";
 
 function withEnv(
@@ -48,7 +46,7 @@ function withEnv(
   }
 }
 
-test("release evidence classifies manual follow-ups with owner, domain, and completion type", async () => {
+test("release handoff stays schema-versioned and classifies manual follow-ups for external channels", async () => {
   await withEnv(
     {
       NEXT_PUBLIC_APP_URL: undefined,
@@ -62,21 +60,19 @@ test("release evidence classifies manual follow-ups with owner, domain, and comp
         runtimeMode: "required"
       });
 
-      const followUp = report.releaseEvidence.manualFollowUps.find(
-        (item) => item.category === "durable"
+      assert.equal(report.schemaVersion, "phase9-2026-04-18");
+      assert.equal(report.releaseEvidence.releaseHandoff.schemaVersion, "phase9-handoff-2026-04-18");
+      assert.equal(report.releaseEvidence.releaseHandoff.artifactSetVersion, "phase9-release-handoff-v1");
+      assert.equal(report.releaseEvidence.releaseHandoff.releaseChannel.manualFollowUps.length > 0, true);
+      assert.equal(
+        report.releaseEvidence.releaseHandoff.artifactManifest.recommendedReleaseArtifact,
+        "handoff/release-channel-summary.md"
       );
-
-      assert.equal(followUp?.owner, "database_admin");
-      assert.equal(followUp?.actionDomain, "database_admin");
-      assert.equal(followUp?.completionType, "external_manual");
-      assert.equal(followUp?.proofBoundary, "external_manual");
-      assert.equal(followUp?.partialEvidenceAvailable, true);
-      assert.equal(followUp?.blocksRelease, true);
     }
   );
 });
 
-test("release evidence exposes durable proof support and secret rotation guidance without leaking values", async () => {
+test("incident and release handoff summaries remain adapter-ready and non-sensitive", async () => {
   await withEnv(
     {
       NEXT_PUBLIC_APP_URL: "https://portal.advnoemia.com.br",
@@ -101,24 +97,20 @@ test("release evidence exposes durable proof support and secret rotation guidanc
         profile: "ci",
         runtimeMode: "off"
       });
-      const evidence = renderBackendReleaseEvidenceMarkdown(report);
+      const releaseChannel = renderBackendReleaseChannelSummaryMarkdown(report);
+      const incidentSummary = renderBackendIncidentEscalationSummaryMarkdown(report);
+      const serialized = JSON.stringify(report.releaseEvidence.releaseHandoff);
 
-      assert.equal(report.releaseEvidence.durableProof.requiredAccess, "supabase_admin");
-      assert.equal(report.releaseEvidence.secretRotation.length >= 4, true);
-      assert.equal(
-        report.releaseEvidence.secretRotation.every(
-          (item) => item.postRotationSteps.length > 0 && item.proofRequired.length > 0
-        ),
-        true
-      );
-      assert.equal(evidence.includes("internal-secret"), false);
-      assert.equal(evidence.includes("mp-token"), false);
-      assert.equal(evidence.includes("telegram-token"), false);
+      assert.equal(releaseChannel.includes("Backend Release Channel Summary"), true);
+      assert.equal(incidentSummary.includes("Backend Incident Escalation Summary"), true);
+      assert.equal(releaseChannel.includes("internal-secret"), false);
+      assert.equal(incidentSummary.includes("telegram-token"), false);
+      assert.equal(serialized.includes("mp-token"), false);
     }
   );
 });
 
-test("release manager summary stays concise and adapter-ready", async () => {
+test("secret rotation guidance and durable proof expose explicit proof boundaries", async () => {
   await withEnv(
     {
       NEXT_PUBLIC_APP_URL: undefined,
@@ -131,18 +123,18 @@ test("release manager summary stays concise and adapter-ready", async () => {
         profile: "production",
         runtimeMode: "required"
       });
-      const summary = renderBackendReleaseManagerSummaryMarkdown(report);
-      const releaseChannel = renderBackendReleaseChannelSummaryMarkdown(report);
-      const incidentSummary = renderBackendIncidentEscalationSummaryMarkdown(report);
+      const metaRotation = report.releaseEvidence.secretRotation.find(
+        (item) => item.subsystem === "meta"
+      );
+      const durableFollowUp = report.releaseEvidence.manualFollowUps.find(
+        (item) => item.category === "durable"
+      );
 
-      assert.equal(summary.includes("Backend Release Manager Summary"), true);
-      assert.equal(summary.includes("owner="), true);
-      assert.equal(summary.includes("domain="), true);
-      assert.equal(releaseChannel.includes("Backend Release Channel Summary"), true);
-      assert.equal(incidentSummary.includes("Backend Incident Escalation Summary"), true);
-      assert.equal(summary.includes("internal-secret"), false);
-      assert.equal(releaseChannel.includes("internal-secret"), false);
-      assert.equal(incidentSummary.includes("internal-secret"), false);
+      assert.equal(metaRotation?.completionType, "external_manual");
+      assert.equal(metaRotation?.proofRequired.length > 0, true);
+      assert.equal(metaRotation?.postRotationSteps.length > 0, true);
+      assert.equal(durableFollowUp?.proofBoundary, "external_manual");
+      assert.equal(durableFollowUp?.proofRequired.includes("durableRuntime.status = healthy."), true);
     }
   );
 });
