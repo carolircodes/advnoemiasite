@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
+import { presentToken } from "@/app/internal/advogada/atendimento/presentation";
 import {
   InstitutionalStatCard,
   StrategicPanel
@@ -82,11 +83,11 @@ export default async function EcosystemPage() {
       highlights={[
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
         { label: "Oferta âncora", value: premiumJourney.anchorTitle },
-        { label: "Founders ativos", value: String(premiumJourney.activeFoundersCount) },
-        { label: "Engajados", value: String(premiumJourney.engagedFoundersCount) },
+        { label: "Fundadoras ativas", value: String(premiumJourney.activeFoundersCount) },
+        { label: "Fundadoras engajadas", value: String(premiumJourney.engagedFoundersCount) },
         { label: "Convites", value: String(premiumJourney.invitedFoundersCount) },
         { label: "Aceites", value: String(premiumJourney.acceptedInvitesCount) },
-        { label: "Waitlist", value: String(premiumJourney.waitlistCount) },
+        { label: "Lista de espera", value: String(premiumJourney.waitlistCount) },
         { label: "Reserva", value: String(premiumJourney.reservedInterestCount) },
         { label: "Fila qualificada", value: String(premiumJourney.waitlistQualifiedCount) },
         { label: "Interesse pago futuro", value: String(premiumJourney.paidInterestCount) },
@@ -137,7 +138,7 @@ export default async function EcosystemPage() {
           />
           <InstitutionalStatCard
             eyebrow="Base ativa"
-            title={`${premiumJourney.activeFoundersCount} founder(s) ativos`}
+            title={`${premiumJourney.activeFoundersCount} fundadora(s) ativas`}
             description="A comunidade fundadora já opera com grants, presença recorrente e trajetória viva dentro do portal."
             meta={`${premiumJourney.engagedFoundersCount} com engajamento real`}
             tone="success"
@@ -145,7 +146,7 @@ export default async function EcosystemPage() {
           <InstitutionalStatCard
             eyebrow="Entrada curada"
             title={`${premiumJourney.waitlistQualifiedCount} nomes em fila premium`}
-            description="Waitlist qualificada, reserva prioritária e convites passam a formar uma única leitura institucional de entrada."
+            description="Lista de espera qualificada, reserva prioritária e convites passam a formar uma única leitura institucional de entrada."
             meta={`${premiumJourney.invitedFoundersCount} convite(s) pendente(s)`}
             tone="warning"
           />
@@ -161,11 +162,11 @@ export default async function EcosystemPage() {
         <div className="grid three" style={{ marginTop: "20px" }}>
           <StrategicPanel
             eyebrow="Entrada"
-            title="Convite, reserva e waitlist em um mesmo fluxo"
+            title="Convite, reserva e lista de espera em um mesmo fluxo"
             description="A curadoria deixa de parecer fragmentada e passa a mostrar claramente como a jornada premium ganha densidade sem abrir aquisição massiva."
           >
             <div className="pill-row">
-              <span className="pill muted">{premiumJourney.waitlistCount} em waitlist qualificada</span>
+              <span className="pill muted">{premiumJourney.waitlistCount} em lista de espera qualificada</span>
               <span className="pill success">{premiumJourney.reservedInterestCount} em reserva prioritária</span>
               <span className="pill warning">{premiumJourney.acceptedInvitesCount} convite(s) aceito(s)</span>
             </div>
@@ -201,7 +202,11 @@ export default async function EcosystemPage() {
         title="Base detalhada da jornada fundadora"
         description="O detalhamento completo continua disponível abaixo para leitura profunda de grants, convites, progresso, retenção e densidade social."
       >
-        <div className="summary-grid compact">
+        <details className="rounded-[1.8rem] border border-[rgba(142,106,59,0.14)] bg-[rgba(252,250,246,0.88)] px-5 py-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[#173229]">
+            Abrir radiografia completa da jornada fundadora
+          </summary>
+          <div className="summary-grid compact" style={{ marginTop: "18px" }}>
           <div className="summary-card">
             <span>Oferta âncora</span>
             <strong>{premiumJourney.anchorTitle}</strong>
@@ -209,7 +214,7 @@ export default async function EcosystemPage() {
             <span className="pill warning">{premiumJourney.statusLabel}</span>
           </div>
           <div className="summary-card">
-            <span>Founders ativos</span>
+            <span>Fundadoras ativas</span>
             <strong>{premiumJourney.activeFoundersCount}</strong>
             <p>Perfis com acesso fundador ativo dentro da operacao gratuita e privada.</p>
             <span className="pill success">grant ativo</span>
@@ -221,7 +226,7 @@ export default async function EcosystemPage() {
             <span className="pill warning">convite</span>
           </div>
           <div className="summary-card">
-            <span>Waitlist qualificada</span>
+            <span>Lista de espera qualificada</span>
             <strong>{premiumJourney.waitlistCount}</strong>
             <p>Perfis em observacao curada para entrada futura, sem abrir aquisicao massiva.</p>
             <span className="pill muted">espera elegante</span>
@@ -235,7 +240,7 @@ export default async function EcosystemPage() {
           <div className="summary-card">
             <span>Fila premium total</span>
             <strong>{premiumJourney.waitlistQualifiedCount}</strong>
-            <p>Waitlist qualificada somada a reserva prioritaria para medir prontidao real.</p>
+            <p>Lista de espera qualificada somada Ã  reserva prioritÃ¡ria para medir prontidÃ£o real.</p>
             <span className="pill success">densidade</span>
           </div>
           <div className="summary-card">
@@ -305,7 +310,7 @@ export default async function EcosystemPage() {
             <span className="pill success">engajamento</span>
           </div>
           <div className="summary-card">
-            <span>Founders engajados</span>
+            <span>Fundadoras engajadas</span>
             <strong>{premiumJourney.engagedFoundersCount}</strong>
             <p>Perfis com sinais reais de retorno e presenca viva no ciclo atual.</p>
             <span className="pill success">ritmo</span>
@@ -325,7 +330,7 @@ export default async function EcosystemPage() {
           <div className="summary-card">
             <span>Risco de esfriamento</span>
             <strong>{premiumJourney.coolingRiskCount}</strong>
-            <p>Founders ativos sem sinais equivalentes de retorno no ciclo recente.</p>
+            <p>Fundadoras ativas sem sinais equivalentes de retorno no ciclo recente.</p>
             <span className="pill warning">atencao</span>
           </div>
           <div className="summary-card">
@@ -334,22 +339,23 @@ export default async function EcosystemPage() {
             <p>Score composto de retorno, conclusoes, reserva e atividade comunitaria.</p>
             <span className="pill success">peso social</span>
           </div>
-        </div>
-        <p className="empty-state" style={{ marginTop: "20px" }}>
-          {premiumJourney.summary}
-        </p>
+          </div>
+          <p className="empty-state" style={{ marginTop: "20px" }}>
+            {premiumJourney.summary}
+          </p>
+        </details>
       </SectionCard>
 
       <div className="grid two">
         <SectionCard
           title="Reserva Elegante E Paid Interest"
-          description="A Fase 12.9 formaliza a camada intermediaria entre interesse, waitlist, reserva prioritaria e convite sem monetizar agora."
+          description="A Fase 12.9 formaliza a camada intermediÃ¡ria entre interesse, lista de espera, reserva prioritÃ¡ria e convite sem monetizar agora."
         >
           <div className="summary-grid compact">
             <div className="summary-card">
               <span>Fila premium total</span>
               <strong>{premiumJourney.waitlistQualifiedCount}</strong>
-              <p>Waitlist qualificada somada a reserva prioritaria para medir prontidao sem abrir geral.</p>
+              <p>Lista de espera qualificada somada Ã  reserva prioritÃ¡ria para medir prontidÃ£o sem abrir geral.</p>
             </div>
             <div className="summary-card">
               <span>Paid interest</span>
@@ -397,8 +403,8 @@ export default async function EcosystemPage() {
             </div>
             <div className="summary-card">
               <span>Estados curatoriais</span>
-              <strong>{operations.entryPolicy.founderStates.join(" | ")}</strong>
-              <p>Convite, founder ativo, waitlist e deferred agora formam a malha oficial da operacao.</p>
+              <strong>{operations.entryPolicy.founderStates.map((state) => presentToken(state)).join(" | ")}</strong>
+              <p>Convite, fundadora ativa, lista de espera e deferimento agora formam a malha oficial da operaÃ§Ã£o.</p>
             </div>
           </div>
           <ul className="update-feed" style={{ marginTop: "20px" }}>

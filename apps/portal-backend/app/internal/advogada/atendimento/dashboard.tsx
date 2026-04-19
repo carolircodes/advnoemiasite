@@ -871,14 +871,14 @@ export function ConversationInboxDashboard({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-4xl">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6a3d]">
-              CRM Comercial | cockpit de conversão
+              Inbox premium | central de relacionamento
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#10261d]">
-              Operação comercial guiada por prioridade, risco e próxima ação
+              Conversas, handoff e próxima ação com leitura executiva
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#5e6e65]">
-              A central comercial agora organiza a fila viva por contexto, decisão e avanço
-              real, sem perder o histórico operacional de cada conversa.
+              Esta central organiza conversa, responsável, follow-up e contexto comercial sem
+              perder o histórico operacional nem competir com o CRM de conversão.
             </p>
           </div>
           <button
@@ -1003,9 +1003,9 @@ export function ConversationInboxDashboard({
       ) : null}
 
       <PanelCard
-        eyebrow="Recorte operacional"
-        title="Filtros da operação comercial"
-        description="Refine a fila por estágio, ownership, canal, prioridade e situação de pagamento sem perder a leitura executiva."
+        eyebrow="Recorte estratégico"
+        title="Filtros da central de relacionamento"
+        description="Refine a fila por estágio, responsável, canal, prioridade e situação de pagamento sem poluir a leitura principal."
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
           <input
@@ -1074,9 +1074,9 @@ export function ConversationInboxDashboard({
             onChange={(event) => setFilters((current) => ({ ...current, founderScope: event.target.value }))}
             className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
           >
-            <option value="all">Founder e waitlist</option>
-            <option value="founder">Somente founder</option>
-            <option value="waitlist">Somente waitlist</option>
+            <option value="all">Fundadora e lista de espera</option>
+            <option value="founder">Somente fundadora</option>
+            <option value="waitlist">Somente lista de espera</option>
           </select>
           <select
             value={filters.paymentState}
@@ -1094,7 +1094,7 @@ export function ConversationInboxDashboard({
         <PanelCard
           eyebrow="Fila comercial"
           title="Oportunidades em sequência"
-          description="Cada item destaca identidade, prioridade, ownership e risco sem transformar o funil em uma faixa de chips."
+          description="Cada item destaca identidade, prioridade, responsável e risco sem transformar o funil em uma faixa de chips."
         >
           <div className="max-h-[980px] overflow-y-auto pr-1">
             {loading && !payload?.threads.length ? (
@@ -1134,12 +1134,13 @@ export function ConversationInboxDashboard({
                     <div className="mt-3 flex flex-wrap gap-2">
                       <SignalBadge label={thread.channelLabel} tone={toneForChannel(thread.channel)} />
                       <SignalBadge label={presentToken(thread.priority)} tone={toneForPriority(thread.priority)} />
-                      <SignalBadge label={presentToken(thread.ownerMode)} tone={toneForOwner(thread.ownerMode)} />
                       <SignalBadge label={presentToken(thread.followUpStatus, "Sem follow-up")} tone={toneForFollowUp(thread.followUpStatus)} />
                       {thread.hot ? <SignalBadge label="Oportunidade quente" tone="rose" /> : null}
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[#6f7f77]">
-                      <span className="line-clamp-1">{thread.nextAction}</span>
+                      <span className="line-clamp-1">
+                        {presentToken(thread.ownerMode)} • {thread.nextAction}
+                      </span>
                       <span>{presentToken(thread.threadStatus)}</span>
                     </div>
                   </button>
@@ -1171,7 +1172,7 @@ export function ConversationInboxDashboard({
           >
             {selectedThread ? (
               <>
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <button
                     type="button"
                     onClick={() => void markThreadRead()}
@@ -1241,6 +1242,9 @@ export function ConversationInboxDashboard({
                   >
                     Encerrar conversa
                   </button>
+                  <div className="rounded-[1.25rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3 text-xs leading-6 text-[#6f7f77] xl:col-span-2">
+                    Responsável, fila, follow-up e handoff continuam rastreados aqui, mas o foco principal da decisão fica concentrado no cabeçalho executivo e na barra de decisão.
+                  </div>
                 </div>
 
                 <div className="mt-5 max-h-[520px] space-y-4 overflow-y-auto pr-1">
@@ -1286,7 +1290,7 @@ export function ConversationInboxDashboard({
                   />
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <p className="text-xs text-[#718179]">
-                      O histórico de canal, ownership e handoff é preservado nesta central.
+                      O histórico de canal, responsável e handoff é preservado nesta central.
                     </p>
                     <button
                       type="button"
@@ -1418,7 +1422,7 @@ export function ConversationInboxDashboard({
                   </div>
                 </details>
 
-                <details open className="rounded-[1.5rem] border border-[#e7dece] bg-[#fcfaf6] px-4 py-3">
+                <details className="rounded-[1.5rem] border border-[#e7dece] bg-[#fcfaf6] px-4 py-3">
                   <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Fechamento, agenda e pagamento</summary>
                   <div className="mt-4 grid gap-3">
                     <InfoPair
@@ -1476,12 +1480,12 @@ export function ConversationInboxDashboard({
                       }
                     />
                     <InfoPair
-                      label="Founder e comunidade"
+                      label="Fundadora e comunidade"
                       value={
                         <DetailList
                           items={[
-                            { label: "Founder", value: presentBoolean(selectedThread.context.founder.isFounder) },
-                            { label: "Waitlist", value: presentBoolean(selectedThread.context.founder.isWaitlist) },
+                            { label: "Fundadora", value: presentBoolean(selectedThread.context.founder.isFounder) },
+                            { label: "Lista de espera", value: presentBoolean(selectedThread.context.founder.isWaitlist) },
                             { label: "Comunidade", value: selectedThread.context.founder.communityStatus || "Sem vínculo" },
                             { label: "Acesso", value: selectedThread.context.founder.accessStatus || "Sem leitura" }
                           ]}
@@ -1567,7 +1571,7 @@ export function ConversationInboxDashboard({
                     items={[
                       { label: "IA conduzindo", value: payload?.metrics.aiControlledThreads || 0 },
                       { label: "Condução humana", value: payload?.metrics.humanControlledThreads || 0 },
-                      { label: "Founder e waitlist", value: payload?.metrics.founderOrWaitlistThreads || 0 },
+                      { label: "Fundadora e lista de espera", value: payload?.metrics.founderOrWaitlistThreads || 0 },
                       { label: "Primeira resposta média", value: payload?.metrics.firstResponseTimeMinutes ? `${payload.metrics.firstResponseTimeMinutes} min` : "n/d" },
                       { label: "Resposta humana média", value: payload?.metrics.humanResponseTimeMinutes ? `${payload.metrics.humanResponseTimeMinutes} min` : "n/d" },
                       { label: "Mensagens falhadas", value: payload?.metrics.failedMessagesCount || 0 }

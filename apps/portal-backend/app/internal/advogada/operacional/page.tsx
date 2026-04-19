@@ -17,6 +17,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { presentToken } from '@/app/internal/advogada/atendimento/presentation';
 
 interface OperationalContact {
   clientId: string;
@@ -708,8 +709,8 @@ export default function OperationalPanel() {
     });
   }
 
-  function formatStageLabel(stage: string) {
-    return stage.replaceAll('_', ' ');
+  function formatStageLabel(stage: string | null | undefined) {
+    return presentToken(stage, 'Sem leitura');
   }
 
   function getReadinessTone(
@@ -826,13 +827,13 @@ export default function OperationalPanel() {
       const result = await response.json();
 
       if (!result?.success) {
-        throw new Error(result?.error || 'Falha ao atualizar ownership.');
+        throw new Error(result?.error || 'Falha ao atualizar responsável comercial.');
       }
 
       await loadPanelData();
     } catch (error) {
       console.error('Error assigning owner:', error);
-      alert(error instanceof Error ? error.message : 'Falha ao atualizar ownership.');
+      alert(error instanceof Error ? error.message : 'Falha ao atualizar responsável comercial.');
     } finally {
       setActionLoading(null);
     }
@@ -886,7 +887,7 @@ export default function OperationalPanel() {
     }
 
     const state = window.prompt(
-      'Estado do follow-up comercial:\nnone | needs_return | waiting_client | waiting_team | scheduled | overdue | completed',
+      'Estado do follow-up comercial:\nnone = sem pendência | needs_return = retomar contato | waiting_client = aguardando cliente | waiting_team = aguardando equipe | scheduled = agendado | overdue = vencido | completed = concluído',
       contact.followUpState || 'needs_return'
     );
 
@@ -907,7 +908,7 @@ export default function OperationalPanel() {
       contact.nextStepDueAt || contact.nextFollowUpAt || ''
     );
     const waitingOn = window.prompt(
-      'Aguardando quem? client | team | none',
+      'Aguardando quem?\nclient = cliente | team = equipe | none = ninguém',
       contact.waitingOn || 'client'
     );
 
@@ -1539,7 +1540,7 @@ export default function OperationalPanel() {
                 <div className="mt-3 grid gap-3 lg:grid-cols-3">
                   <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
-                      Ownership comercial
+                      Responsável comercial
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
                       {contact.ownerName || 'Sem responsavel'}
@@ -1561,7 +1562,7 @@ export default function OperationalPanel() {
                       Follow-up real
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
-                      {contact.followUpState || contact.followUpStatus || 'none'}
+                      {presentToken(contact.followUpState || contact.followUpStatus, 'Sem pendência')}
                     </p>
                     <p className="mt-1 text-sm text-[#5d6d66]">
                       {contact.followUpReason || 'Sem motivo de follow-up registrado.'}
@@ -1602,7 +1603,7 @@ export default function OperationalPanel() {
                       {contact.waitingOn
                         ? `Aguardando ${contact.waitingOn}.`
                         : contact.blockingReason
-                          ? `Bloqueio ${formatStageLabel(contact.blockingReason)}.`
+                          ? `Bloqueio ${presentToken(contact.blockingReason, 'não classificado')}.`
                           : 'Sem bloqueio explicito registrado.'}
                     </p>
                   </div>
@@ -1624,7 +1625,7 @@ export default function OperationalPanel() {
                       Bloqueio e objecao
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
-                      {contact.blockingReason ? formatStageLabel(contact.blockingReason) : 'Sem trava dominante'}
+                      {contact.blockingReason ? presentToken(contact.blockingReason, 'Sem trava dominante') : 'Sem trava dominante'}
                     </p>
                     <p className="mt-1 text-sm text-[#5d6d66]">
                       {contact.objectionHint || 'Sem objecao dominante no momento.'}
@@ -1712,7 +1713,7 @@ export default function OperationalPanel() {
                       {contact.paymentLinkUrl
                         ? 'Link de pagamento registrado no trilho comercial.'
                         : contact.closingBlockReason
-                          ? `Bloqueio: ${formatStageLabel(contact.closingBlockReason)}`
+                          ? `Bloqueio: ${presentToken(contact.closingBlockReason, 'não classificado')}`
                           : 'Pagamento ainda nao iniciado.'}
                     </p>
                     {contact.paymentApprovedAt || contact.paymentPendingAt ? (
@@ -1886,7 +1887,7 @@ export default function OperationalPanel() {
                             ? `consulta ${contact.conversationState.consultationIntentLevel}`
                             : '',
                           contact.conversationState.closeOpportunityState
-                            ? `oportunidade ${contact.conversationState.closeOpportunityState}`
+                            ? `oportunidade ${presentToken(contact.conversationState.closeOpportunityState, 'em leitura').toLowerCase()}`
                             : ''
                         ]
                           .filter(Boolean)
@@ -2167,7 +2168,7 @@ export default function OperationalPanel() {
                     onClick={() => void assignCommercialOwner(contact)}
                   >
                     <Users className="mr-2 h-4 w-4" />
-                    Definir owner
+                    Definir responsável
                   </ActionButton>
 
                   <ActionButton
