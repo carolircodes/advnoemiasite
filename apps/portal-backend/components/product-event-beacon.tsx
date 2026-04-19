@@ -21,20 +21,17 @@ export function ProductEventBeacon({
   oncePerSession = false
 }: ProductEventBeaconProps) {
   const [isClient, setIsClient] = useState(false);
-  
-  // Aguardar hidratação completa antes de executar qualquer código client-side
+
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    // Só executar após hidratação e se estiver no client-side
     if (!isClient || typeof window === "undefined") {
       return;
     }
 
     try {
-      console.log("[ProductEventBeacon] useEffect executado no client-side");
       const input = {
         eventKey,
         eventGroup,
@@ -48,11 +45,12 @@ export function ProductEventBeacon({
 
       trackProductEvent(input);
     } catch (error) {
-      console.error("[ProductEventBeacon] Erro ao rastrear evento:", error);
-      // Não quebrar a aplicação se tracking falhar
+      console.warn("[product-event-beacon] tracking_failed", {
+        eventKey,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }, [isClient, eventGroup, eventKey, oncePerSession, payload]);
 
-  // Não renderizar nada durante SSR/hidratação
   return null;
 }

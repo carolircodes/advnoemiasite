@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
@@ -7,6 +6,11 @@ import {
   consumeDurableRateLimit
 } from "../../../../lib/http/durable-abuse-protection";
 import { getClientIp, parseJsonBody } from "../../../../lib/http/request-guards";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "../../../../lib/observability/request-observability";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import { recordProductEvent } from "../../../../lib/services/public-intake";
 
@@ -27,6 +31,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const observation = startRequestObservation(request);
   const rateLimit = await consumeDurableRateLimit({
     bucket: "public-events",
     key: `${getClientIp(request)}:${request.headers.get("x-product-session-id") || "anon"}`,
@@ -35,7 +40,12 @@ export async function POST(request: Request) {
   });
 
   if (!rateLimit.ok) {
-    const response = NextResponse.json(
+    logObservedRequest("warn", "PUBLIC_EVENT_RATE_LIMITED", observation, {
+      limiter: "public-events"
+    });
+
+    const response = createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error: "public_event_rate_limited"
@@ -55,6 +65,7 @@ export async function POST(request: Request) {
     });
 
     if (!parsedBody.ok) {
+      logObservedRequest("warn", "PUBLIC_EVENT_INVALID_BODY", observation);
       return withPublicApiCors(request, parsedBody.response);
     }
 
@@ -81,7 +92,13 @@ export async function POST(request: Request) {
       profileId
     });
 
-    const res = NextResponse.json(
+    logObservedRequest("info", "PUBLIC_EVENT_RECORDED", observation, {
+      eventKey: parsedBody.data.eventKey,
+      eventGroup: parsedBody.data.eventGroup || null
+    });
+
+    const res = createObservedJsonResponse(
+      observation,
       {
         ok: true,
         eventId: result.id
@@ -92,8 +109,11 @@ export async function POST(request: Request) {
       }
     );
     return withPublicApiCors(request, res);
-  } catch {
-    const res = NextResponse.json(
+  } catch (error) {
+    logObservedRequest("error", "PUBLIC_EVENT_FAILED", observation, {}, error);
+
+    const res = createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error: "Nao foi possivel registrar o evento agora."

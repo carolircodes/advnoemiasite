@@ -11,6 +11,7 @@
     "operations:verify:release": "npm run operations:verify:release --workspace portal-backend",
     "operations:evidence:ci": "npm run operations:evidence:ci --workspace portal-backend",
     "operations:evidence:release": "npm run operations:evidence:release --workspace portal-backend",
+    "smoke:phase10": "npm run smoke:phase10 --workspace portal-backend",
     "typecheck": "npm run typecheck --workspace portal-backend",
     "test": "npm run test --workspace portal-backend",
     "start": "npm run start --workspace portal-backend",

@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-
 import { extractErrorMessage } from "../../../../lib/http/api-response";
 import {
   buildDurableRateLimitHeaders,
@@ -8,6 +6,11 @@ import {
 import { getClientIp } from "../../../../lib/http/request-guards";
 import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
 import { submitPublicTriage } from "../../../../lib/services/public-intake";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "../../../../lib/observability/request-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +20,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const observation = startRequestObservation(request);
   const rateLimit = await consumeDurableRateLimit({
     bucket: "public-triage",
     key: getClientIp(request) || "unknown",
@@ -25,7 +29,12 @@ export async function POST(request: Request) {
   });
 
   if (!rateLimit.ok) {
-    const res = NextResponse.json(
+    logObservedRequest("warn", "PUBLIC_TRIAGE_RATE_LIMITED", observation, {
+      limiter: "public-triage"
+    });
+
+    const res = createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error: "triage_rate_limited"
@@ -55,7 +64,16 @@ export async function POST(request: Request) {
       ipAddress: getClientIp(request)
     });
 
-    const res = NextResponse.json(
+    logObservedRequest("info", "PUBLIC_TRIAGE_ACCEPTED", observation, {
+      sourcePath:
+        typeof payload?.sourcePath === "string" && payload.sourcePath
+          ? payload.sourcePath
+          : "/triagem",
+      sessionId: sessionId || null
+    });
+
+    const res = createObservedJsonResponse(
+      observation,
       {
         ok: true,
         intakeRequestId: result.id
@@ -67,11 +85,18 @@ export async function POST(request: Request) {
     );
     return withPublicApiCors(request, res);
   } catch (error) {
-    console.warn("[public.triage] Request rejected", {
-      error: extractErrorMessage(error, "Nao foi possivel receber a triagem agora.")
-    });
+    logObservedRequest(
+      "warn",
+      "PUBLIC_TRIAGE_REJECTED",
+      observation,
+      {
+        reason: extractErrorMessage(error, "Nao foi possivel receber a triagem agora.")
+      },
+      error
+    );
 
-    const res = NextResponse.json(
+    const res = createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error: "Nao foi possivel receber a triagem agora."

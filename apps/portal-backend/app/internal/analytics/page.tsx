@@ -1,455 +1,372 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
+
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 
-// Tipos para os dados do dashboard
-interface AnalyticsMetrics {
-  totalLeads: number;
-  qualifiedLeads: number;
-  scheduledAppointments: number;
-  conversions: number;
-  conversionRate: number;
-  averageResponseTime: number;
-}
+type AnalyticsPeriod = "today" | "7days" | "30days";
 
-interface FunnelData {
-  stage: string;
-  count: number;
-  dropRate: number;
-}
-
-interface SourcePerformance {
-  source: string;
-  leads: number;
-  qualified: number;
-  scheduled: number;
-  converted: number;
-  conversionRate: number;
-}
-
-interface TopicPerformance {
-  topic: string;
-  leads: number;
-  conversions: number;
-  conversionRate: number;
-}
-
-interface CampaignPerformance {
-  campaign: string;
-  leads: number;
-  conversions: number;
-  conversionRate: number;
-}
-
-interface ContentPerformance {
-  contentId: string;
-  leadsGenerated: number;
-  conversions: number;
-  conversionRate: number;
-}
-
-interface AnalyticsResponse {
-  metrics: AnalyticsMetrics;
-  funnel: FunnelData[];
-  sources: SourcePerformance[];
-  topics: TopicPerformance[];
-  campaigns: CampaignPerformance[];
-  content: ContentPerformance[];
-  period: string;
+type AnalyticsResponse = {
+  ok: boolean;
+  metrics: {
+    totalLeads: number;
+    qualifiedLeads: number;
+    scheduledAppointments: number;
+    conversions: number;
+    conversionRate: number;
+    averageResponseTimeHours: number;
+    strategicContentViews: number;
+    ctaClicks: number;
+    automationFailures: number;
+  };
+  funnel: Array<{
+    stage: string;
+    count: number;
+    dropRate: number;
+  }>;
+  sources: Array<{
+    source: string;
+    leads: number;
+    qualified: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  channels: Array<{
+    channel: string;
+    leads: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  topics: Array<{
+    topic: string;
+    leads: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  campaigns: Array<{
+    campaign: string;
+    leads: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  content: Array<{
+    contentId: string;
+    views: number;
+    ctaClicks: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  automation: {
+    failedDispatches: number;
+    failedNotifications: number;
+  };
+  period: AnalyticsPeriod;
   generatedAt: string;
+};
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("pt-BR").format(value);
 }
 
-export default function AnalyticsDashboard() {
+function formatPercentage(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function getTone(value: number, high: number, medium: number) {
+  if (value >= high) {
+    return "success";
+  }
+
+  if (value >= medium) {
+    return "warning";
+  }
+
+  return "critical";
+}
+
+export default function InternalAnalyticsPage() {
+  const [period, setPeriod] = useState<AnalyticsPeriod>("7days");
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [period, setPeriod] = useState<'today' | '7days' | '30days'>('7days');
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchAnalytics();
+    let cancelled = false;
+
+    async function loadAnalytics() {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await fetch(`/api/analytics/acquisition?period=${period}`, {
+          cache: "no-store"
+        });
+        const result = (await response.json().catch(() => null)) as AnalyticsResponse | null;
+
+        if (!response.ok || !result?.ok) {
+          throw new Error("Nao foi possivel carregar os indicadores agora.");
+        }
+
+        if (!cancelled) {
+          setData(result);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Nao foi possivel carregar os indicadores agora."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadAnalytics();
+
+    return () => {
+      cancelled = true;
+    };
   }, [period]);
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`/api/analytics/acquisition?period=${period}`);
-      
-      if (!response.ok) {
-        throw new Error('Erro ao buscar dados');
-      }
-
-      const analyticsData = await response.json();
-      setData(analyticsData);
-      
-      console.log('ANALYTICS_VIEW_LOADED', {
-        period,
-        totalLeads: analyticsData.metrics?.totalLeads,
-        conversionRate: analyticsData.metrics?.conversionRate
-      });
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
-      setError(errorMessage);
-      console.error('Analytics fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatNumber = (num: number): string => {
-    return new Intl.NumberFormat('pt-BR').format(num);
-  };
-
-  const formatPercentage = (num: number): string => {
-    return `${num.toFixed(1)}%`;
-  };
-
-  const formatDropRate = (rate: number): string => {
-    if (rate === 0) return '';
-    return `-${rate.toFixed(1)}%`;
-  };
-
-  const getConversionRateColor = (rate: number): string => {
-    if (rate >= 20) return 'text-green-600';
-    if (rate >= 10) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getDropRateColor = (rate: number): string => {
-    if (rate <= 20) return 'text-green-600';
-    if (rate <= 40) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-6xl mb-4">!</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Erro ao carregar dados</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={fetchAnalytics}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return null;
-  }
-
   return (
-    <>
+    <div className="portal-root">
       <ProductEventBeacon
         eventKey="analytics_page_loaded"
         eventGroup="analytics"
-        payload={{ period }}
+        payload={{ period, surface: "internal_analytics" }}
       />
-      
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard de Aquisição</h1>
-                <p className="text-sm text-gray-600">Análise de performance e conversão</p>
-              </div>
-              
-              {/* Período Selector */}
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-700">Período:</label>
-                <select
-                  value={period}
-                  onChange={(e) => setPeriod(e.target.value as any)}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="today">Hoje</option>
-                  <option value="7days">7 dias</option>
-                  <option value="30days">30 dias</option>
-                </select>
-              </div>
-            </div>
-          </div>
+
+      <section className="panel">
+        <div className="section-head">
+          <h2>Analytics de aquisicao</h2>
+          <p>
+            Leitura operacional do funil real, desempenho editorial, canais de entrada e
+            falhas de automacao a partir das tabelas consolidadas do backend.
+          </p>
         </div>
+        <div className="form-actions">
+          <select value={period} onChange={(event) => setPeriod(event.currentTarget.value as AnalyticsPeriod)}>
+            <option value="today">Hoje</option>
+            <option value="7days">7 dias</option>
+            <option value="30days">30 dias</option>
+          </select>
+          {data ? (
+            <span className="tag soft">
+              Atualizado em {new Date(data.generatedAt).toLocaleString("pt-BR")}
+            </span>
+          ) : null}
+        </div>
+      </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-600">Total Leads</div>
-              <div className="text-2xl font-bold text-gray-900">{formatNumber(data.metrics.totalLeads)}</div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-600">Qualificados</div>
-              <div className="text-2xl font-bold text-blue-600">{formatNumber(data.metrics.qualifiedLeads)}</div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-600">Agendados</div>
-              <div className="text-2xl font-bold text-yellow-600">{formatNumber(data.metrics.scheduledAppointments)}</div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-600">Convertidos</div>
-              <div className="text-2xl font-bold text-green-600">{formatNumber(data.metrics.conversions)}</div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-600">Taxa Conv.</div>
-              <div className={`text-2xl font-bold ${getConversionRateColor(data.metrics.conversionRate)}`}>
-                {formatPercentage(data.metrics.conversionRate)}
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-600">Tempo Médio</div>
-              <div className="text-2xl font-bold text-purple-600">
-                {data.metrics.averageResponseTime > 0 ? `${data.metrics.averageResponseTime}h` : 'N/A'}
-              </div>
-            </div>
+      {loading ? (
+        <section className="panel skeleton-card">
+          <div className="skeleton-stack">
+            <span className="skeleton-line" />
+            <span className="skeleton-line short" />
+            <span className="skeleton-line" />
           </div>
+        </section>
+      ) : null}
 
-          {/* Funnel */}
-          <div className="bg-white rounded-lg shadow mb-8">
-            <div className="px-6 py-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Funil de Conversão</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {data.funnel.map((stage, index) => (
-                  <div key={index} className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">{formatNumber(stage.count)}</div>
-                    <div className="text-sm text-gray-600">{stage.stage}</div>
-                    {stage.dropRate > 0 && (
-                      <div className={`text-sm mt-1 ${getDropRateColor(stage.dropRate)}`}>
-                        {formatDropRate(stage.dropRate)}
-                      </div>
-                    )}
+      {error ? <div className="error-notice">{error}</div> : null}
+
+      {data ? (
+        <>
+          <section className="operational-band">
+            <article className="operational-band-card neutral">
+              <span>Leads</span>
+              <strong>{formatNumber(data.metrics.totalLeads)}</strong>
+              <p>Total de triagens e capturas persistidas no periodo.</p>
+            </article>
+            <article
+              className={`operational-band-card ${getTone(
+                data.metrics.conversionRate,
+                15,
+                7
+              )}`}
+            >
+              <span>Conversao</span>
+              <strong>{formatPercentage(data.metrics.conversionRate)}</strong>
+              <p>Percentual de leads convertidos em relacao ao total recebido.</p>
+            </article>
+            <article className="operational-band-card warning">
+              <span>Conteudo estrategico</span>
+              <strong>{formatNumber(data.metrics.strategicContentViews)}</strong>
+              <p>Visualizacoes relevantes de artigos em subpasta.</p>
+            </article>
+            <article
+              className={`operational-band-card ${
+                data.metrics.automationFailures > 0 ? "critical" : "success"
+              }`}
+            >
+              <span>Falhas de automacao</span>
+              <strong>{formatNumber(data.metrics.automationFailures)}</strong>
+              <p>Dispatches e notificacoes que exigem leitura operacional.</p>
+            </article>
+          </section>
+
+          <section className="grid two">
+            <article className="panel">
+              <div className="section-head">
+                <h2>Funil consolidado</h2>
+                <p>Da visita relevante ate a conversao real, sem depender das tabelas legadas.</p>
+              </div>
+              <div className="operations-list">
+                {data.funnel.map((stage) => (
+                  <div key={stage.stage} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>{stage.stage}</strong>
+                      <span className="operation-kind">{formatNumber(stage.count)}</span>
+                    </div>
+                    <div className="operation-footer">
+                      <span>Drop-off</span>
+                      <span>{stage.dropRate ? `-${stage.dropRate.toFixed(1)}%` : "Base"}</span>
+                    </div>
                   </div>
                 ))}
               </div>
-              
-              {/* Visual Funnel */}
-              <div className="mt-8 space-y-2">
-                {data.funnel.map((stage, index) => {
-                  const maxWidth = 100;
-                  const width = data.funnel[0].count > 0 
-                    ? (stage.count / data.funnel[0].count) * maxWidth 
-                    : 0;
-                  
-                  return (
-                    <div key={index} className="relative">
-                      <div className="flex items-center">
-                        <div className="w-24 text-sm text-gray-600">{stage.stage}</div>
-                        <div className="flex-1 mx-4">
-                          <div 
-                            className="bg-blue-500 text-white text-center py-2 rounded"
-                            style={{ width: `${width}%` }}
-                          >
-                            {formatNumber(stage.count)}
-                          </div>
-                        </div>
-                        <div className="w-16 text-right">
-                          {stage.dropRate > 0 && (
-                            <span className={`text-sm ${getDropRateColor(stage.dropRate)}`}>
-                              {formatDropRate(stage.dropRate)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+            </article>
+
+            <article className="panel">
+              <div className="section-head">
+                <h2>Saude operacional</h2>
+                <p>Indicadores de atendimento, resposta e automacao para suporte diario da operacao.</p>
+              </div>
+              <div className="summary-grid compact">
+                <div className="summary-card">
+                  <span>Qualificados</span>
+                  <strong>{formatNumber(data.metrics.qualifiedLeads)}</strong>
+                  <p>Leads que ja sairam do estado inicial e exigem sequencia comercial.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Agendamentos</span>
+                  <strong>{formatNumber(data.metrics.scheduledAppointments)}</strong>
+                  <p>Consultas e compromissos com status operacional relevante.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Tempo medio</span>
+                  <strong>
+                    {data.metrics.averageResponseTimeHours
+                      ? `${data.metrics.averageResponseTimeHours}h`
+                      : "N/D"}
+                  </strong>
+                  <p>Tempo medio entre triagem recebida e primeira revisao registrada.</p>
+                </div>
+                <div className="summary-card">
+                  <span>CTAs clicados</span>
+                  <strong>{formatNumber(data.metrics.ctaClicks)}</strong>
+                  <p>Cliques em atendimento, triagem e canal de contato.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Dispatches falhos</span>
+                  <strong>{formatNumber(data.automation.failedDispatches)}</strong>
+                  <p>Tentativas de automacao que falharam antes da entrega final.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Notificacoes falhas</span>
+                  <strong>{formatNumber(data.automation.failedNotifications)}</strong>
+                  <p>Entregas que exigem leitura manual ou reprocessamento.</p>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section className="grid two">
+            <article className="panel">
+              <div className="section-head">
+                <h2>Origens e canais</h2>
+                <p>Volume por origem principal e por canal operacional de entrada.</p>
+              </div>
+              <div className="operations-list">
+                {data.sources.slice(0, 6).map((source) => (
+                  <div key={source.source} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>{source.source}</strong>
+                      <span className="operation-kind">{formatNumber(source.leads)} leads</span>
                     </div>
-                  );
-                })}
+                    <div className="operation-footer">
+                      <span>{formatNumber(source.conversions)} conversoes</span>
+                      <span>{formatPercentage(source.conversionRate)}</span>
+                    </div>
+                  </div>
+                ))}
+                {data.channels.slice(0, 6).map((channel) => (
+                  <div key={channel.channel} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>Canal: {channel.channel}</strong>
+                      <span className="operation-kind">{formatNumber(channel.leads)} leads</span>
+                    </div>
+                    <div className="operation-footer">
+                      <span>{formatNumber(channel.conversions)} conversoes</span>
+                      <span>{formatPercentage(channel.conversionRate)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
+            </article>
 
-          {/* Performance Tables */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Sources */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Performance por Origem</h2>
+            <article className="panel">
+              <div className="section-head">
+                <h2>Temas e campanhas</h2>
+                <p>Leitura pratica para prioridades editoriais, campanhas e demanda juridica.</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origem</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qualif.</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Agend.</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Conv.</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Taxa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.sources.map((source, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {source.source}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(source.leads)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(source.qualified)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(source.scheduled)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(source.converted)}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${getConversionRateColor(source.conversionRate)}`}>
-                          {formatPercentage(source.conversionRate)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="operations-list">
+                {data.topics.slice(0, 5).map((topic) => (
+                  <div key={topic.topic} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>{topic.topic}</strong>
+                      <span className="operation-kind">{formatNumber(topic.leads)} leads</span>
+                    </div>
+                    <div className="operation-footer">
+                      <span>{formatNumber(topic.conversions)} conversoes</span>
+                      <span>{formatPercentage(topic.conversionRate)}</span>
+                    </div>
+                  </div>
+                ))}
+                {data.campaigns.slice(0, 5).map((campaign) => (
+                  <div key={campaign.campaign} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>Campanha: {campaign.campaign}</strong>
+                      <span className="operation-kind">{formatNumber(campaign.leads)} leads</span>
+                    </div>
+                    <div className="operation-footer">
+                      <span>{formatNumber(campaign.conversions)} conversoes</span>
+                      <span>{formatPercentage(campaign.conversionRate)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            </article>
+          </section>
 
-            {/* Topics */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Performance por Tema</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tema</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Conversões</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Taxa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.topics.map((topic, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {topic.topic}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(topic.leads)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(topic.conversions)}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${getConversionRateColor(topic.conversionRate)}`}>
-                          {formatPercentage(topic.conversionRate)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <section className="panel">
+            <div className="section-head">
+              <h2>Conteudos com melhor tracao</h2>
+              <p>
+                Visao editorial-operacional dos artigos que mais puxam leitura, CTA e conversao.
+              </p>
             </div>
-
-            {/* Campaigns */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Performance por Campanha</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campanha</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Conversões</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Taxa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.campaigns.map((campaign, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {campaign.campaign}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(campaign.leads)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(campaign.conversions)}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${getConversionRateColor(campaign.conversionRate)}`}>
-                          {formatPercentage(campaign.conversionRate)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="article-index-grid">
+              {data.content.slice(0, 6).map((content) => (
+                <article key={content.contentId} className="article-card editorial-card">
+                  <div className="article-card-meta">
+                    <span className="tag soft">views {formatNumber(content.views)}</span>
+                    <span className="tag soft">cta {formatNumber(content.ctaClicks)}</span>
+                  </div>
+                  <strong>{content.contentId}</strong>
+                  <p>
+                    {formatNumber(content.conversions)} conversoes registradas com taxa de{" "}
+                    {formatPercentage(content.conversionRate)}.
+                  </p>
+                </article>
+              ))}
             </div>
-
-            {/* Content */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Top Conteúdos</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conteúdo</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Conversões</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Taxa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.content.map((content, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {content.contentId}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(content.leadsGenerated)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatNumber(content.conversions)}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${getConversionRateColor(content.conversionRate)}`}>
-                          {formatPercentage(content.conversionRate)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Info */}
-          <div className="mt-8 text-center text-sm text-gray-500">
-            Dados atualizados em {new Date(data.generatedAt).toLocaleString('pt-BR')}
-          </div>
-        </div>
-      </div>
-    </>
+          </section>
+        </>
+      ) : null}
+    </div>
   );
 }

@@ -295,6 +295,50 @@ Checklist detalhado:
 - [`docs/BACKEND_OPERATOR_CHECKLIST.md`](docs/BACKEND_OPERATOR_CHECKLIST.md)
 - [`docs/BACKEND_RELEASE_RUNBOOK.md`](docs/BACKEND_RELEASE_RUNBOOK.md)
 
+### Consolidacao final da Fase 10
+
+Esta etapa passou a fechar o core operacional em quatro frentes praticas:
+
+- observabilidade de request para rotas publicas e analiticas criticas com `x-request-id`, `x-correlation-id` e `server-timing`
+- taxonomia central de eventos de aquisicao em `lib/analytics/funnel-events.ts`
+- analytics operacional consolidado em `/api/analytics/acquisition` e `/internal/analytics`
+- biblioteca editorial real em subpasta `app/artigos/*`, com sitemap, robots, canonical e schema de artigo
+
+Smoke local rapido da Fase 10:
+
+```powershell
+npm run smoke:phase10
+```
+
+Esse smoke valida:
+
+- catalogo editorial em subpasta
+- extracao de conteudo dos artigos
+- taxonomia central de eventos do funil
+
+Superficies novas ou consolidadas desta fase:
+
+- `GET /artigos`
+- `GET /artigos/[slug]`
+- `GET /robots.txt`
+- `GET /sitemap.xml`
+- `GET /api/analytics/acquisition`
+
+Tracking consolidado do funil:
+
+- page views relevantes
+- visualizacao de conteudo estrategico
+- clique em CTA de atendimento
+- clique em CTA de triagem
+- clique de WhatsApp/canal
+- triagem iniciada
+- triagem enviada
+- lead criado
+- lead qualificado
+- agendamento iniciado e concluido
+
+Todos esses eventos passam a compartilhar nomenclatura, payload normalizado, origem/medium/campaign/topic/contentId e mascaramento de chaves sensiveis.
+
 O worker de notificacoes:
 
 - processa itens `pending` e `failed` disponiveis no horario atual

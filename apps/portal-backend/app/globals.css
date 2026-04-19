@@ -1216,6 +1216,95 @@ body:not(.auth-page) .field-full textarea {
   line-height: 1.6;
 }
 
+.article-index-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.article-card.editorial-card,
+.editorial-article {
+  display: grid;
+  gap: 16px;
+}
+
+.article-card.editorial-card {
+  padding: 22px;
+  border: 1px solid rgba(14, 31, 27, 0.08);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 244, 238, 0.92)),
+    var(--surface);
+}
+
+.article-card.editorial-card strong {
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.article-card.editorial-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.68;
+}
+
+.article-card-meta,
+.breadcrumb-row,
+.article-related-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.breadcrumb-row {
+  align-items: center;
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.editorial-layout {
+  align-items: start;
+}
+
+.editorial-prose {
+  display: grid;
+  gap: 18px;
+}
+
+.editorial-prose p,
+.editorial-prose li {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.82;
+}
+
+.editorial-prose h2 {
+  margin: 16px 0 0;
+  font-size: clamp(1.45rem, 3vw, 2.1rem);
+  letter-spacing: -0.03em;
+}
+
+.editorial-prose ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.editorial-prose .highlight-box {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid rgba(142, 106, 59, 0.14);
+  border-radius: 22px;
+  background: rgba(248, 244, 238, 0.82);
+}
+
+.editorial-prose .highlight-box strong {
+  font-size: 1.08rem;
+}
+
 .legal-copy {
   display: grid;
   gap: 16px;
@@ -1389,6 +1478,7 @@ body:not(.auth-page) .field-full textarea {
   .shortcut-grid,
   .summary-grid,
   .summary-grid.compact,
+  .article-index-grid,
   .client-directory-meta,
   .client-ops-grid,
   .client-directory-actions {
@@ -1453,6 +1543,7 @@ body:not(.auth-page) .field-full textarea {
   .shortcut-grid,
   .summary-grid,
   .summary-grid.compact,
+  .article-index-grid,
   .client-directory-meta,
   .client-ops-grid,
   .client-directory-actions {

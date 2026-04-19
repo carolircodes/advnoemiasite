@@ -2,12 +2,11 @@ import "server-only";
 
 import { z } from "zod";
 
+import { normalizeProductEventInput } from "../analytics/funnel-events";
 import { assertStaffActor } from "../auth/guards";
 import {
   caseAreaLabels,
   intakeRequestStatusLabels,
-  publicIntakeStages,
-  publicIntakeUrgencies,
   publicIntakeUrgencyLabels,
   submitLegacySiteTriageSchema,
   submitPublicTriageSchema,
@@ -213,18 +212,18 @@ function normalizePublicTriageInput(
 
 export async function recordProductEvent(rawInput: ProductEventInput) {
   const input = recordProductEventSchema.parse(rawInput);
-  // const input = recordProductEventSchema.parse(rawInput); // Schema não definido, pulando validação
+  const normalized = normalizeProductEventInput(input);
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("product_events")
     .insert({
-      event_key: input.eventKey,
-      event_group: input.eventGroup,
-      page_path: input.pagePath || null,
-      session_id: input.sessionId || null,
-      intake_request_id: input.intakeRequestId || null,
+      event_key: normalized.eventKey,
+      event_group: normalized.eventGroup,
+      page_path: normalized.pagePath || null,
+      session_id: normalized.sessionId || null,
+      intake_request_id: normalized.intakeRequestId || null,
       profile_id: input.profileId || null,
-      payload: input.payload || {}
+      payload: normalized.payload || {}
     })
     .select("id,event_key,event_group")
     .single();

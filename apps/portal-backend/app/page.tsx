@@ -6,6 +6,7 @@ import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
 import { TriageForm } from "@/components/triage-form";
+import { getFeaturedArticles } from "@/lib/site/article-content";
 import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
 import {
   appendEntryContextToPath,
@@ -63,6 +64,8 @@ export default async function HomePage({
   const triagemHref = appendEntryContextToPath("/#triagem-inicial", entryContext);
   const funcionamentoHref = appendEntryContextToPath("/#como-funciona", entryContext);
   const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
+  const articleIndexHref = appendEntryContextToPath("/artigos", entryContext);
+  const featuredArticles = getFeaturedArticles(3);
   const suggestedPrompts = [
     "Meu caso parece urgente. Como voce pode me orientar agora?",
     "Quero entender se vale marcar uma consulta e qual seria o melhor proximo passo.",
@@ -313,6 +316,71 @@ export default async function HomePage({
               <strong>Portal entra como continuidade</strong>
               <p>Documentos, agenda e acompanhamento aparecem depois, como camada de relacao, nao como distracao no primeiro contato.</p>
             </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Conteudo editorial ja integrado ao funil"
+          description="Os artigos agora vivem em subpasta dentro da aplicacao, com tracking coerente, interlinking estrategico e CTA direto para triagem."
+        >
+          <ProductEventBeacon
+            eventKey="strategic_content_list_viewed"
+            eventGroup="content"
+            payload={{ entryPoint: "home_featured_articles", ...entryContextPayload }}
+            oncePerSession
+          />
+          <div className="article-index-grid">
+            {featuredArticles.map((article) => (
+              <article key={article.slug} className="article-card editorial-card">
+                <div className="article-card-meta">
+                  <span className="tag soft">{article.categoryLabel}</span>
+                  <span className="tag soft">{article.readingMinutes} min</span>
+                </div>
+                <strong>{article.title}</strong>
+                <p>{article.excerpt}</p>
+                <div className="form-actions">
+                  <TrackedLink
+                    href={appendEntryContextToPath(`/artigos/${article.slug}`, entryContext)}
+                    className="button secondary"
+                    eventKey="strategic_content_cta_clicked"
+                    trackingPayload={{
+                      contentId: article.slug,
+                      topic: article.topic,
+                      location: "home_featured_articles",
+                      ...entryContextPayload
+                    }}
+                  >
+                    Ler artigo
+                  </TrackedLink>
+                  <TrackedLink
+                    href={appendEntryContextToPath(
+                      `/#triagem-inicial?tema=${article.topic}&content_id=${article.slug}`,
+                      entryContext
+                    )}
+                    className="button"
+                    eventKey="cta_start_triage_clicked"
+                    trackingPayload={{
+                      contentId: article.slug,
+                      topic: article.topic,
+                      location: "home_featured_articles",
+                      ...entryContextPayload
+                    }}
+                  >
+                    Ir para a triagem
+                  </TrackedLink>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="form-actions">
+            <TrackedLink
+              href={articleIndexHref}
+              className="button secondary"
+              eventKey="strategic_content_cta_clicked"
+              trackingPayload={{ location: "home_article_index", ...entryContextPayload }}
+            >
+              Ver biblioteca completa
+            </TrackedLink>
           </div>
         </SectionCard>
 

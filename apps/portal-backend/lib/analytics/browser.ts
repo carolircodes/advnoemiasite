@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  buildBrowserEventPayload,
+  normalizeProductEventInput
+} from "./funnel-events";
+
 const SESSION_STORAGE_KEY = "portal_product_session_id";
 const SESSION_FLAG_PREFIX = "portal_product_flag:";
 
@@ -18,30 +23,60 @@ function createSessionId() {
   return `session-${Date.now()}`;
 }
 
+function canUseStorage(storage: Storage) {
+  try {
+    const testKey = "__portal_analytics_storage__";
+    storage.setItem(testKey, "1");
+    storage.removeItem(testKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getProductSessionId() {
   if (typeof window === "undefined") {
     return "";
   }
 
-  try {
-    // Verificar se localStorage está disponível
-    const testKey = "__test__";
-    window.localStorage.setItem(testKey, "test");
-    window.localStorage.removeItem(testKey);
-    
-    const existingSessionId = window.localStorage.getItem(SESSION_STORAGE_KEY);
-
-    if (existingSessionId) {
-      return existingSessionId;
-    }
-
-    const nextSessionId = createSessionId();
-    window.localStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
-    return nextSessionId;
-  } catch (error) {
-    console.warn("[Analytics] localStorage não disponível, usando session ID temporário");
+  if (!canUseStorage(window.localStorage)) {
     return createSessionId();
   }
+
+  const existingSessionId = window.localStorage.getItem(SESSION_STORAGE_KEY);
+
+  if (existingSessionId) {
+    return existingSessionId;
+  }
+
+  const nextSessionId = createSessionId();
+  window.localStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
+  return nextSessionId;
+}
+
+function buildRequestBody(input: ProductEventPayload) {
+  const pagePath = input.pagePath || window.location.pathname;
+  const normalized = normalizeProductEventInput({
+    eventKey: input.eventKey,
+    eventGroup: input.eventGroup,
+    pagePath,
+    sessionId: getProductSessionId(),
+    payload: buildBrowserEventPayload({
+      payload: input.payload,
+      pagePath,
+      pageTitle: document.title,
+      referrer: document.referrer || undefined,
+      searchParams: new URLSearchParams(window.location.search)
+    })
+  });
+
+  return JSON.stringify({
+    eventKey: normalized.eventKey,
+    eventGroup: normalized.eventGroup,
+    pagePath: normalized.pagePath,
+    sessionId: normalized.sessionId,
+    payload: normalized.payload
+  });
 }
 
 export function trackProductEvent(input: ProductEventPayload) {
@@ -49,13 +84,11 @@ export function trackProductEvent(input: ProductEventPayload) {
     return;
   }
 
-  const body = JSON.stringify({
-    eventKey: input.eventKey,
-    eventGroup: input.eventGroup || "conversion",
-    pagePath: input.pagePath || window.location.pathname,
-    sessionId: getProductSessionId(),
-    payload: input.payload || {}
-  });
+  const body = buildRequestBody(input);
+  const requestId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `evt-${Date.now()}`;
 
   if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
     navigator.sendBeacon(
@@ -68,7 +101,9 @@ export function trackProductEvent(input: ProductEventPayload) {
   void fetch("/api/public/events", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+      "x-product-session-id": getProductSessionId()
     },
     body
   }).catch(() => undefined);
@@ -79,22 +114,17 @@ export function trackProductEventOncePerSession(input: ProductEventPayload) {
     return;
   }
 
-  const flagKey = `${SESSION_FLAG_PREFIX}${input.eventKey}`;
-
-  try {
-    // Verificar se sessionStorage está disponível
-    const testKey = "__test__";
-    window.sessionStorage.setItem(testKey, "test");
-    window.sessionStorage.removeItem(testKey);
-    
-    if (window.sessionStorage.getItem(flagKey)) {
-      return;
-    }
-
-    window.sessionStorage.setItem(flagKey, "1");
-  } catch (error) {
-    console.warn("[Analytics] sessionStorage não disponível, tracking mesmo assim");
+  if (!canUseStorage(window.sessionStorage)) {
+    trackProductEvent(input);
+    return;
   }
 
+  const flagKey = `${SESSION_FLAG_PREFIX}${input.eventKey}`;
+
+  if (window.sessionStorage.getItem(flagKey)) {
+    return;
+  }
+
+  window.sessionStorage.setItem(flagKey, "1");
   trackProductEvent(input);
 }

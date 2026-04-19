@@ -1,9 +1,11 @@
 import type { MetadataRoute } from "next";
 
 import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
+import { getAllArticles } from "@/lib/site/article-content";
 
 const publicRoutes = [
   "",
+  "/artigos",
   "/politica-de-privacidade",
   "/exclusao-de-dados",
   "/termos-de-uso"
@@ -12,11 +14,22 @@ const publicRoutes = [
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = new URL(PUBLIC_SITE_BASE_URL);
   const now = new Date();
-
-  return publicRoutes.map((route) => ({
-    url: new URL(route || "/", baseUrl).toString(),
-    lastModified: now,
-    changeFrequency: route === "" ? "weekly" : "monthly",
-    priority: route === "" ? 1 : 0.6
+  const articleEntries: MetadataRoute.Sitemap = getAllArticles().map((article) => ({
+    url: new URL(`/artigos/${article.slug}`, baseUrl).toString(),
+    lastModified: new Date(article.updatedAt),
+    changeFrequency: "monthly" as const,
+    priority: 0.82
   }));
+
+  const staticEntries: MetadataRoute.Sitemap = publicRoutes.map((route) => ({
+      url: new URL(route || "/", baseUrl).toString(),
+      lastModified: now,
+      changeFrequency: route === "" ? "weekly" : route === "/artigos" ? "weekly" : "monthly",
+      priority: route === "" ? 1 : route === "/artigos" ? 0.9 : 0.6
+    }));
+
+  return [
+    ...staticEntries,
+    ...articleEntries
+  ];
 }
