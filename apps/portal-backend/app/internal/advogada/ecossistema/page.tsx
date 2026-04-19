@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beacon";
+import {
+  InstitutionalStatCard,
+  StrategicPanel
+} from "@/components/portal/module-primitives";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
@@ -20,6 +24,19 @@ function toneClass(tone: "success" | "warning" | "muted" | "critical") {
       return "pill critical";
     default:
       return "pill muted";
+  }
+}
+
+function toneLabel(tone: "success" | "warning" | "muted" | "critical") {
+  switch (tone) {
+    case "success":
+      return "Consolidação";
+    case "warning":
+      return "Ponto de atenção";
+    case "critical":
+      return "Risco estrutural";
+    default:
+      return "Leitura de apoio";
   }
 }
 
@@ -107,8 +124,82 @@ export default async function EcosystemPage() {
       />
 
       <SectionCard
-        title="Primeira jornada premium ativa"
-        description="A âncora inicial do ecossistema agora opera como comunidade fundadora gratuita, privada e curada, com grants, onboarding, trilha e comunidade conectados."
+        title="Leitura executiva da jornada fundadora"
+        description="O ecossistema agora abre com uma camada curada: base ativa, entrada premium, progresso percebido e risco de esfriamento aparecem antes do detalhamento completo."
+      >
+        <div className="summary-grid compact">
+          <InstitutionalStatCard
+            eyebrow="Oferta âncora"
+            title={premiumJourney.anchorTitle}
+            description={premiumJourney.anchorSubtitle}
+            meta={premiumJourney.statusLabel}
+            tone="accent"
+          />
+          <InstitutionalStatCard
+            eyebrow="Base ativa"
+            title={`${premiumJourney.activeFoundersCount} founder(s) ativos`}
+            description="A comunidade fundadora já opera com grants, presença recorrente e trajetória viva dentro do portal."
+            meta={`${premiumJourney.engagedFoundersCount} com engajamento real`}
+            tone="success"
+          />
+          <InstitutionalStatCard
+            eyebrow="Entrada curada"
+            title={`${premiumJourney.waitlistQualifiedCount} nomes em fila premium`}
+            description="Waitlist qualificada, reserva prioritária e convites passam a formar uma única leitura institucional de entrada."
+            meta={`${premiumJourney.invitedFoundersCount} convite(s) pendente(s)`}
+            tone="warning"
+          />
+          <InstitutionalStatCard
+            eyebrow="Risco e retenção"
+            title={`${premiumJourney.coolingRiskCount} ponto(s) de atenção`}
+            description="Retenção, progresso e esfriamento ficam lado a lado para orientar quando reforçar onboarding, conteúdo e comunidade."
+            meta={`${premiumJourney.retentionSignalCount} sinal(is) de continuidade`}
+            tone={premiumJourney.coolingRiskCount > 0 ? "warning" : "success"}
+          />
+        </div>
+
+        <div className="grid three" style={{ marginTop: "20px" }}>
+          <StrategicPanel
+            eyebrow="Entrada"
+            title="Convite, reserva e waitlist em um mesmo fluxo"
+            description="A curadoria deixa de parecer fragmentada e passa a mostrar claramente como a jornada premium ganha densidade sem abrir aquisição massiva."
+          >
+            <div className="pill-row">
+              <span className="pill muted">{premiumJourney.waitlistCount} em waitlist qualificada</span>
+              <span className="pill success">{premiumJourney.reservedInterestCount} em reserva prioritária</span>
+              <span className="pill warning">{premiumJourney.acceptedInvitesCount} convite(s) aceito(s)</span>
+            </div>
+          </StrategicPanel>
+
+          <StrategicPanel
+            eyebrow="Engajamento"
+            title="Prova de valor percebido"
+            description="Conclusão de conteúdo, progresso médio e densidade social passam a sustentar a leitura de maturidade da comunidade."
+          >
+            <div className="pill-row">
+              <span className="pill success">{premiumJourney.completedContentCount} conteúdo(s) concluído(s)</span>
+              <span className="pill muted">{premiumJourney.averageProgressPercent}% de progresso médio</span>
+              <span className="pill muted">{premiumJourney.socialDensityScore} de densidade social</span>
+            </div>
+          </StrategicPanel>
+
+          <StrategicPanel
+            eyebrow="Motor editorial"
+            title="Desejo, origem e prontidão futura"
+            description="Site, artigos e paid interest aparecem como camada de desejo, sem precipitar a monetização nem poluir o cockpit principal."
+          >
+            <div className="pill-row">
+              <span className="pill success">{premiumJourney.editorialOriginCount} sinal(is) editorial(is)</span>
+              <span className="pill muted">{premiumJourney.siteOriginCount} vindo(s) do site</span>
+              <span className="pill warning">{premiumJourney.paidInterestCount} de interesse pago futuro</span>
+            </div>
+          </StrategicPanel>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Base detalhada da jornada fundadora"
+        description="O detalhamento completo continua disponível abaixo para leitura profunda de grants, convites, progresso, retenção e densidade social."
       >
         <div className="summary-grid compact">
           <div className="summary-card">
@@ -445,7 +536,7 @@ export default async function EcosystemPage() {
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
                 <p>{item.detail}</p>
-                <span className={toneClass(item.tone)}>{item.tone}</span>
+                <span className={toneClass(item.tone)}>{toneLabel(item.tone)}</span>
               </div>
             ))}
           </div>
@@ -482,7 +573,7 @@ export default async function EcosystemPage() {
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
                 <p>{item.detail}</p>
-                <span className={toneClass(item.tone)}>{item.tone}</span>
+                <span className={toneClass(item.tone)}>{toneLabel(item.tone)}</span>
               </div>
             ))}
           </div>
@@ -603,7 +694,7 @@ export default async function EcosystemPage() {
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
                 <p>{item.detail}</p>
-                <span className={toneClass(item.tone)}>{item.tone}</span>
+                <span className={toneClass(item.tone)}>{toneLabel(item.tone)}</span>
               </div>
             ))}
           </div>
@@ -661,7 +752,7 @@ export default async function EcosystemPage() {
               <span>{item.label}</span>
               <strong>{item.value}</strong>
               <p>{item.detail}</p>
-              <span className={toneClass(item.tone)}>{item.tone}</span>
+              <span className={toneClass(item.tone)}>{toneLabel(item.tone)}</span>
             </div>
           ))}
         </div>

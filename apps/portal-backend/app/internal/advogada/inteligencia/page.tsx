@@ -1,6 +1,10 @@
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import {
+  InstitutionalStatCard,
+  StrategicPanel
+} from "@/components/portal/module-primitives";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
@@ -22,6 +26,34 @@ function formatRate(value: number | null) {
   return `${value.toFixed(1)}%`;
 }
 
+function formatPaymentStatus(status: string) {
+  switch (status) {
+    case "approved":
+      return "Receita confirmada";
+    case "pending":
+      return "Pagamento em andamento";
+    case "failed":
+      return "Tentativa sem aprovação";
+    case "abandoned":
+      return "Checkout interrompido";
+    default:
+      return "Status financeiro em leitura";
+  }
+}
+
+function formatOfferKind(kind: string) {
+  switch (kind) {
+    case "main":
+      return "Oferta principal";
+    case "premium":
+      return "Camada premium";
+    case "continuity":
+      return "Continuidade";
+    default:
+      return "Oferta ativa";
+  }
+}
+
 export default async function IntelligencePage({
   searchParams
 }: {
@@ -32,12 +64,44 @@ export default async function IntelligencePage({
   const selectedDays = Number.parseInt(getStringParam(params.days, "30"), 10);
   const intelligence = await getBusinessIntelligenceOverview(selectedDays);
   const revenue = await getRevenueIntelligenceOverview(selectedDays);
+  const executiveSignals = [
+    {
+      eyebrow: "Receita confirmada",
+      title: `R$ ${revenue.summary.revenueConfirmed.toFixed(2)}`,
+      description:
+        "Valor já convertido em receita real dentro da janela analisada, sem depender de leitura manual de checkout.",
+      meta: `${revenue.summary.approvedCount} pagamento(s) aprovado(s)`,
+      tone: "success" as const
+    },
+    {
+      eyebrow: "Gargalo monetizável",
+      title: `${revenue.summary.paymentFollowUpNeeded} follow-up(s) de pagamento`,
+      description:
+        "Mostra onde a receita já foi oferecida, mas ainda depende de retomada humana ou framing adicional para fechar.",
+      meta:
+        revenue.summary.paymentFollowUpNeeded > 0
+          ? "Pede ação comercial"
+          : "Sem travas dominantes",
+      tone:
+        revenue.summary.paymentFollowUpNeeded > 0
+          ? ("warning" as const)
+          : ("default" as const)
+    },
+    {
+      eyebrow: "Conversão núcleo",
+      title: formatRate(intelligence.summary.triageToClientRate),
+      description:
+        "Conecta triagem enviada, cadastro interno e ativação real do portal para mostrar se a operação está convertendo com consistência.",
+      meta: `${intelligence.days} dias em análise`,
+      tone: "accent" as const
+    }
+  ];
 
   return (
     <AppFrame
-      eyebrow="Inteligencia do produto"
-      title="Leitura executiva de funil, receita e growth."
-      description="Esta visao junta conversao, operacao, receita e uso real do portal para mostrar onde o fluxo avanca, onde trava e o que merece decisao executiva."
+      eyebrow="Inteligência do produto"
+      title="Leitura executiva de funil, receita e crescimento."
+      description="Esta visão junta conversão, operação, receita e uso real do portal para mostrar onde o fluxo avança, onde trava e o que merece decisão executiva."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -64,6 +128,24 @@ export default async function IntelligencePage({
         { href: "/noemia", label: "Abrir Noemia", tone: "secondary" }
       ]}
     >
+      <SectionCard
+        title="Leitura executiva da inteligência"
+        description="O módulo passa a abrir com uma camada decisória clara: receita confirmada, travas monetizáveis e conversão núcleo aparecem antes do detalhamento analítico."
+      >
+        <div className="grid three">
+          {executiveSignals.map((signal) => (
+            <InstitutionalStatCard
+              key={signal.eyebrow}
+              eyebrow={signal.eyebrow}
+              title={signal.title}
+              description={signal.description}
+              meta={signal.meta}
+              tone={signal.tone}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
       <SectionCard
         title="Arquitetura de receita do imperio"
         description="A monetizacao agora fica organizada por camadas: o que e nuclear, o que entra agora, o que expande depois e o que merece identidade propria no futuro."
@@ -180,7 +262,7 @@ export default async function IntelligencePage({
                       <strong>{item.label}</strong>
                       <span className="item-meta">{item.layerLabel}</span>
                     </div>
-                    <span className="tag soft">{item.kind}</span>
+                    <span className="tag soft">{formatOfferKind(item.kind)}</span>
                   </div>
                   <div className="pill-row">
                     <span className="pill muted">{item.presented} oferta(s)</span>
@@ -294,7 +376,7 @@ export default async function IntelligencePage({
                       <strong>{payment.offerLabel}</strong>
                       <span className="item-meta">{payment.pathLabel}</span>
                     </div>
-                    <span className="tag soft">{payment.status}</span>
+                    <span className="tag soft">{formatPaymentStatus(payment.status)}</span>
                   </div>
                   <div className="pill-row">
                     <span className="pill muted">{payment.amountLabel}</span>
@@ -372,6 +454,54 @@ export default async function IntelligencePage({
       </div>
 
       <div className="grid two">
+        <SectionCard
+          title="Foco executivo do período"
+          description="Esta síntese separa o que é crescimento real, o que é leitura de produto e o que já virou risco operacional."
+        >
+          <div className="grid three">
+            <StrategicPanel
+              eyebrow="Growth"
+              title="Fluxo de entrada e ativação"
+              description="A triagem só tem valor estratégico quando avança até cliente e ativa o portal sem perda de contexto."
+            >
+              <div className="pill-row">
+                <span className="pill muted">
+                  Triagem → cliente: {formatRate(intelligence.summary.triageToClientRate)}
+                </span>
+                <span className="pill muted">
+                  Ativação: {formatRate(intelligence.summary.portalActivationRate)}
+                </span>
+              </div>
+            </StrategicPanel>
+
+            <StrategicPanel
+              eyebrow="Receita"
+              title="Dinheiro em formação"
+              description="A camada financeira fica mais legível quando separa receita confirmada de checkouts que ainda podem esfriar."
+            >
+              <div className="pill-row">
+                <span className="pill success">
+                  Confirmada: R$ {revenue.summary.revenueConfirmed.toFixed(2)}
+                </span>
+                <span className="pill warning">
+                  Em formação: R$ {revenue.summary.revenueInFormation.toFixed(2)}
+                </span>
+              </div>
+            </StrategicPanel>
+
+            <StrategicPanel
+              eyebrow="Automação"
+              title="Fila preventiva em operação"
+              description="Mostra quando lembretes e alertas já estão protegendo a operação antes que o gargalo apareça no cockpit principal."
+            >
+              <div className="pill-row">
+                <span className="pill muted">{intelligence.automation.dispatches} disparo(s)</span>
+                <span className="pill muted">{intelligence.automation.pendingQueue} na fila</span>
+              </div>
+            </StrategicPanel>
+          </div>
+        </SectionCard>
+
         <SectionCard
           title="Onde o interesse esta chegando"
           description="Areas que mais entram na triagem para ajudar na leitura comercial e operacional."

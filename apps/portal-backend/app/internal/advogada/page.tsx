@@ -599,9 +599,9 @@ export default async function InternalLawyerPage({
 
   return (
     <AppFrame
-      eyebrow="Painel da advogada"
-      title={`Cockpit executivo do escritorio para ${profile.full_name}.`}
-      description="Esta e a leitura central de comando do workspace. Aqui entram prioridades do dia, triagens, agenda, receita, gargalos e proximo passo sem competir com inbox, CRM ou inteligencia."
+      eyebrow="Painel executivo"
+      title={`Cockpit institucional da operação para ${profile.full_name}.`}
+      description="Esta é a leitura central de comando do escritório. Aqui entram prioridades do dia, agenda, monetização, gargalos e próximos passos sem competir com inbox, CRM ou inteligência."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -626,7 +626,7 @@ export default async function InternalLawyerPage({
         { label: "Aguardando equipe", value: String(operationalSummary.waitingTeamCount) }
       ]}
       actions={[
-        { href: "#central-prioridades", label: "Fila do dia", tone: "secondary" },
+        { href: "#central-prioridades", label: "Prioridades do dia", tone: "secondary" },
         { href: "#gestao-casos", label: "Central de casos", tone: "secondary" },
         { href: "#cadastro-cliente", label: "Cadastrar cliente" },
         { href: "#noemia-operacional", label: "Usar Noemia", tone: "secondary" }
@@ -636,8 +636,8 @@ export default async function InternalLawyerPage({
       {success ? <div className="success-notice">{success}</div> : null}
 
       <SectionCard
-        title="Command center do imperio"
-        description="Radar executivo do dia com hierarquia clara: o que pede acao agora, o que trava a operacao, onde existe resultado hoje e qual camada deve ser aberta em seguida."
+        title="Centro executivo da operação"
+        description="Radar institucional do dia com hierarquia clara: o que pede ação agora, o que trava a operação, onde existe resultado hoje e qual camada deve ser aberta em seguida."
       >
         <div className="notice">{cockpitProjection.focusHeadline}</div>
 
@@ -796,8 +796,8 @@ export default async function InternalLawyerPage({
 
       <SectionCard
         id="camadas-command-center"
-        title="Camadas centrais do command center"
-        description="Agenda, entradas, receita e gargalos agora aparecem como camadas do mesmo cerebro executivo, em vez de modulos separados competindo por atencao."
+        title="Camadas centrais do painel"
+        description="Agenda, entradas, receita e gargalos agora aparecem como camadas do mesmo cérebro executivo, em vez de módulos separados competindo por atenção."
       >
         <div className="summary-grid compact">
           <div className="summary-card">

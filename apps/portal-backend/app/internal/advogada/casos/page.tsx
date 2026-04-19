@@ -1,6 +1,10 @@
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import {
+  InstitutionalStatCard,
+  StrategicPanel
+} from "@/components/portal/module-primitives";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
@@ -211,6 +215,44 @@ export default async function InternalCasesPage({
       meta: nextCaseSignal?.timingLabel || "Operacao estavel agora"
     }
   ];
+  const executiveSignals = [
+    {
+      eyebrow: "Caso em foco",
+      title: focusCase?.title || "Carteira sem caso dominante agora",
+      description: focusCase
+        ? `${focusCase.clientName} concentra a maior prioridade desta leitura com status ${focusCase.statusLabel.toLowerCase()}.`
+        : "A central continua preparada para destacar o caso que puxar a fila assim que houver nova prioridade.",
+      meta: focusCase?.priorityLabel || "Sem urgência dominante",
+      tone:
+        focusCase?.priority === "urgente"
+          ? ("warning" as const)
+          : focusCase?.priority === "alta"
+            ? ("accent" as const)
+            : ("default" as const)
+    },
+    {
+      eyebrow: "Janela de reentrada",
+      title:
+        staleCount > 0
+          ? `${staleCount} caso(s) pedem releitura`
+          : "Carteira sem envelhecimento crítico",
+      description:
+        staleCount > 0
+          ? "Os itens mais antigos já estão visíveis para evitar silêncio operacional, retorno tardio ou perda de contexto."
+          : "O ritmo recente da carteira está saudável e sem volumes relevantes parados há muitos dias.",
+      meta: staleCount > 0 ? "Revisar hoje" : "Operação estável",
+      tone: staleCount > 0 ? ("warning" as const) : ("success" as const)
+    },
+    {
+      eyebrow: "Próximo movimento",
+      title: nextCaseSignal?.title || "Sem passo obrigatório imediato",
+      description:
+        nextCaseSignal?.description ||
+        "A fila de casos não aponta um bloqueio dominante neste instante, então a leitura pode seguir pelo caso em foco.",
+      meta: nextCaseSignal?.timingLabel || "Monitoramento",
+      tone: nextCaseSignal ? ("accent" as const) : ("default" as const)
+    }
+  ];
 
   return (
     <AppFrame
@@ -256,8 +298,26 @@ export default async function InternalCasesPage({
       {error ? <div className="error-notice">{error}</div> : null}
 
       <SectionCard
+        title="Mesa executiva da carteira"
+        description="Antes dos filtros, a central deixa claro qual caso puxa a fila, onde existe risco de silêncio operacional e qual reentrada merece decisão primeiro."
+      >
+        <div className="grid three">
+          {executiveSignals.map((signal) => (
+            <InstitutionalStatCard
+              key={signal.eyebrow}
+              eyebrow={signal.eyebrow}
+              title={signal.title}
+              description={signal.description}
+              meta={signal.meta}
+              tone={signal.tone}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="Busca e recorte da central"
-        description="Refine a carteira para entrar no caso certo com menos leitura manual e mais contexto operacional."
+        description="Os filtros continuam completos, mas agora entram depois da leitura executiva para a equipe começar pela prioridade certa e não por tentativa e erro."
       >
         <form className="stack">
           <div className="fields">
@@ -336,14 +396,16 @@ export default async function InternalCasesPage({
         title="Leitura executiva da carteira"
         description="Este resumo cruza foco atual, ultimo movimento e proxima acao para a central de casos funcionar como eixo real da operacao."
       >
-        <div className="summary-grid compact">
+        <div className="grid three">
           {executiveCaseGuidance.map((item) => (
-            <div key={item.label} className="summary-card">
-              <span>{item.label}</span>
-              <strong>{item.title}</strong>
-              <p>{item.detail}</p>
+            <StrategicPanel
+              key={item.label}
+              eyebrow={item.label}
+              title={item.title}
+              description={item.detail}
+            >
               <span className="item-meta">{item.meta}</span>
-            </div>
+            </StrategicPanel>
           ))}
         </div>
       </SectionCard>
@@ -455,7 +517,7 @@ export default async function InternalCasesPage({
 
         <SectionCard
           title="Fila operacional de casos"
-          description="Itens que pedem status, retorno ou novo movimento agora entram aqui sem entupir o dashboard."
+          description="A lateral passa a concentrar o que exige retorno, atualização de status ou retomada imediata, sem ocupar o mesmo protagonismo da carteira principal."
         >
           {operationalCaseQueue.length ? (
             <ul className="update-feed compact">

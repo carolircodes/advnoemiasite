@@ -4,15 +4,36 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Activity,
+  AlertTriangle,
   Bot,
+  CalendarClock,
+  CircleDollarSign,
   Clock3,
   Flame,
   MessageSquareText,
+  NotebookPen,
   RefreshCw,
   Send,
   ShieldCheck,
-  UserRound
+  UserRound,
+  Workflow
 } from "lucide-react";
+
+import {
+  DecisionTile,
+  DetailList,
+  InfoPair,
+  MetricTile,
+  PanelCard,
+  SignalBadge
+} from "@/components/crm/commercial-primitives";
+
+import {
+  presentBoolean,
+  presentChannelOrigin,
+  presentMaybeId,
+  presentToken
+} from "./presentation";
 
 type Metrics = {
   totalOpenThreads: number;
@@ -358,143 +379,15 @@ function formatDateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
-function toneForPriority(priority: string) {
-  if (priority === "high") {
-    return "border-[#f3c4b6] bg-[#fff3ee] text-[#8a3e1f]";
+function formatCurrency(value: number | null | undefined) {
+  if (typeof value !== "number") {
+    return "Não informado";
   }
 
-  if (priority === "medium") {
-    return "border-[#e9d9a9] bg-[#fff9ea] text-[#8b6611]";
-  }
-
-  return "border-[#d9e2db] bg-[#f5f8f4] text-[#446054]";
-}
-
-function toneForOwner(mode: string) {
-  if (mode === "human") {
-    return "border-[#d6d1ef] bg-[#f5f2ff] text-[#5a4aa0]";
-  }
-
-  if (mode === "hybrid") {
-    return "border-[#d9d2c5] bg-[#f7f3ec] text-[#6f5d47]";
-  }
-
-  return "border-[#cde0f4] bg-[#eef6ff] text-[#22588e]";
-}
-
-function toneForChannel(channel: string) {
-  if (channel === "instagram") {
-    return "border-[#f0c7db] bg-[#fff2f7] text-[#8d3f66]";
-  }
-
-  if (channel === "whatsapp") {
-    return "border-[#cfe5d3] bg-[#effaf1] text-[#2f6c45]";
-  }
-
-  if (channel === "telegram") {
-    return "border-[#cfe0ef] bg-[#eef6ff] text-[#2f5e85]";
-  }
-
-  if (channel === "site") {
-    return "border-[#d9d0be] bg-[#f8f3ea] text-[#6b5a3d]";
-  }
-
-  return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
-}
-
-function toneForSurface(surface: string) {
-  if (surface === "public_comment") {
-    return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
-  }
-
-  if (surface === "telegram_group") {
-    return "border-[#d4deee] bg-[#f2f7ff] text-[#31597d]";
-  }
-
-  if (surface === "telegram_private") {
-    return "border-[#cfe6ef] bg-[#edf9fb] text-[#22606f]";
-  }
-
-  if (surface === "site_chat") {
-    return "border-[#ddd4c3] bg-[#faf6ef] text-[#6a5840]";
-  }
-
-  if (surface === "direct_message") {
-    return "border-[#d5deef] bg-[#f1f6ff] text-[#36598a]";
-  }
-
-  return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
-}
-
-function toneForFollowUp(status: string) {
-  if (status === "overdue") {
-    return "border-[#f3c4b6] bg-[#fff3ee] text-[#8a3e1f]";
-  }
-
-  if (status === "due" || status === "pending") {
-    return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
-  }
-
-  if (status === "resolved" || status === "converted") {
-    return "border-[#d9e2db] bg-[#f5f8f4] text-[#446054]";
-  }
-
-  return "border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]";
-}
-
-function toneForIdentity(status: string) {
-  if (status === "pending") {
-    return "border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]";
-  }
-
-  if (status === "provisional") {
-    return "border-[#d7d1ef] bg-[#f5f2ff] text-[#5a4aa0]";
-  }
-
-  return "border-[#d9e2db] bg-[#f5f8f4] text-[#446054]";
-}
-
-function MetricCard({
-  label,
-  value,
-  icon
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.08)]">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-[#66756c]">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-[#10261d]">{value}</p>
-        </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f7f2e8] text-[#7b6034]">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Chip({
-  children,
-  className
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium",
-        className
-      )}
-    >
-      {children}
-    </span>
-  );
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format(value);
 }
 
 function formatMissingSchemaEntries(missing: ApiErrorPayload["missing"]) {
@@ -502,15 +395,13 @@ function formatMissingSchemaEntries(missing: ApiErrorPayload["missing"]) {
     return "Sem detalhes adicionais do drift.";
   }
 
-  return missing
-    .map((entry) => `${entry.table}(${entry.columns.join(", ")})`)
-    .join("; ");
+  return missing.map((entry) => `${entry.table}(${entry.columns.join(", ")})`).join("; ");
 }
 
 function buildInboxLoadError(payload: ApiErrorPayload) {
   if (payload.code === "schema_incompatible") {
     return (
-      "Inbox em saneamento estrutural: o ambiente atual ainda nao concluiu o schema " +
+      "Inbox em saneamento estrutural: o ambiente atual ainda não concluiu o schema " +
       `${payload.schemaVersion || "phase 13"} exigido pela fila conversacional. ` +
       `Itens ausentes: ${formatMissingSchemaEntries(payload.missing)}.`
     );
@@ -521,26 +412,147 @@ function buildInboxLoadError(payload: ApiErrorPayload) {
 
 function buildEmptyStateMessage(filters: Filters) {
   if (filters.channel === "whatsapp") {
-    return "Nenhuma thread de WhatsApp corresponde aos filtros atuais.";
+    return "Nenhuma conversa de WhatsApp corresponde aos filtros atuais.";
   }
 
   if (filters.channel === "instagram") {
-    return "Nenhuma thread de Instagram corresponde aos filtros atuais.";
+    return "Nenhuma conversa de Instagram corresponde aos filtros atuais.";
   }
 
   if (filters.channel === "telegram") {
-    return "Nenhuma thread conversacional de Telegram corresponde aos filtros atuais.";
+    return "Nenhuma conversa de Telegram corresponde aos filtros atuais.";
   }
 
   if (filters.channel === "site") {
-    return "Nenhuma thread de Site Chat corresponde aos filtros atuais.";
+    return "Nenhuma conversa do site corresponde aos filtros atuais.";
   }
 
   if (filters.inboxMode === "needs_human") {
-    return "Nenhuma thread precisa de atendimento humano com os filtros atuais.";
+    return "Nenhuma oportunidade pede atuação humana com os filtros atuais.";
   }
 
   return "Nenhuma conversa encontrada para os filtros atuais.";
+}
+
+function toneForPriority(priority: string) {
+  if (priority === "high") return "rose";
+  if (priority === "medium") return "gold";
+  return "green";
+}
+
+function toneForOwner(mode: string) {
+  if (mode === "human") return "plum";
+  if (mode === "hybrid") return "gold";
+  return "blue";
+}
+
+function toneForFollowUp(status: string) {
+  if (status === "overdue") return "rose";
+  if (status === "due" || status === "pending") return "gold";
+  if (status === "resolved" || status === "converted") return "green";
+  return "neutral";
+}
+
+function toneForRisk(hasRisk: boolean) {
+  return hasRisk ? "rose" : "green";
+}
+
+function toneForOpportunity(state: string | null | undefined) {
+  if (state === "closing" || state === "hot") return "gold";
+  if (state === "warm") return "plum";
+  return "neutral";
+}
+
+function toneForChannel(channel: string) {
+  if (channel === "instagram") return "plum";
+  if (channel === "whatsapp") return "green";
+  if (channel === "telegram") return "blue";
+  if (channel === "site") return "gold";
+  return "neutral";
+}
+
+function messageSurfaceLabel(surface: ThreadDetail["messages"][number]["surface"]) {
+  if (surface === "public_comment") return "Comentário";
+  if (surface === "direct_message") return "Mensagem direta";
+  if (surface === "telegram_private") return "Telegram privado";
+  if (surface === "telegram_group") return "Telegram grupo";
+  if (surface === "site_chat") return "Site";
+  return "Sistema";
+}
+
+function senderLabel(sender: ThreadDetail["messages"][number]["senderType"]) {
+  if (sender === "contact") return "Contato";
+  if (sender === "human") return "Equipe";
+  if (sender === "ai") return "IA";
+  return "Sistema";
+}
+
+function messageStatusLabel(value: string) {
+  return presentToken(value, "Sem status");
+}
+
+function noteKindLabel(value: string) {
+  return presentToken(value, "Nota interna");
+}
+
+function buildExecutiveSnapshot(thread: ThreadDetail | null) {
+  if (!thread) {
+    return null;
+  }
+
+  const officialNextAction =
+    thread.context.commercial.closingRecommendedActionLabel ||
+    thread.context.commercial.recommendedActionLabel ||
+    thread.context.operational.nextSuggestedAction ||
+    "Revisão manual";
+
+  const officialNextActionDetail =
+    thread.context.commercial.closingRecommendedActionDetail ||
+    thread.context.commercial.recommendedActionDetail ||
+    thread.context.commercial.closingNextStep ||
+    thread.context.commercial.nextStep ||
+    thread.context.operational.nextSuggestedActionDetail ||
+    thread.thread.nextAction;
+
+  const blockingReason =
+    thread.context.commercial.closingBlockReason ||
+    thread.context.commercial.blockingReason ||
+    thread.context.commercial.followUpReason ||
+    thread.context.operational.handoffReason ||
+    null;
+
+  const followUpLabel =
+    thread.context.commercial.recommendedFollowUpWindow ||
+    (thread.context.operational.followUpDueAt
+      ? `Até ${formatDateTime(thread.context.operational.followUpDueAt)}`
+      : "Sem janela definida");
+
+  return {
+    title: thread.context.person.name,
+    stage: presentToken(thread.context.commercial.conversionStage || thread.context.lead.stage, "Em leitura"),
+    temperature: thread.thread.hot
+      ? "Quente"
+      : presentToken(thread.context.lead.temperature || thread.context.commercial.opportunityState, "Em leitura"),
+    priority: presentToken(thread.thread.priority, "Prioridade moderada"),
+    owner: thread.thread.assignedTo.name || presentToken(thread.thread.ownerMode, "Sem responsável"),
+    source: presentChannelOrigin(
+      thread.context.origin.sourceLabel ||
+        thread.context.social.sourceLabel ||
+        thread.context.lead.sourceChannel ||
+        thread.thread.channelLabel
+    ),
+    officialNextAction,
+    officialNextActionDetail,
+    followUpLabel,
+    readiness: presentToken(thread.context.commercial.consultationReadiness, "Sem leitura"),
+    risk: blockingReason ? presentToken(blockingReason, "Risco não classificado") : "Sem trava dominante",
+    opportunity: presentToken(thread.context.commercial.opportunityState, "Monitorar"),
+    recommendation:
+      thread.context.commercial.consultationRecommendationReason ||
+      thread.context.commercial.conversionSignal ||
+      "Leitura comercial sem recomendação complementar.",
+    hasRisk: Boolean(blockingReason)
+  };
 }
 
 export function ConversationInboxDashboard({
@@ -592,44 +604,28 @@ export function ConversationInboxDashboard({
     const allowedPaymentState = new Set(["all", "pending", "approved"]);
 
     const search = searchParams.get("search");
-    if (search) {
-      nextFilters.search = search;
-    }
+    if (search) nextFilters.search = search;
 
     const status = searchParams.get("status");
-    if (status && allowedStatus.has(status)) {
-      nextFilters.status = status;
-    }
+    if (status && allowedStatus.has(status)) nextFilters.status = status;
 
     const channel = searchParams.get("channel");
-    if (channel && allowedChannels.has(channel)) {
-      nextFilters.channel = channel;
-    }
+    if (channel && allowedChannels.has(channel)) nextFilters.channel = channel;
 
     const waitingFor = searchParams.get("waitingFor");
-    if (waitingFor && allowedWaitingFor.has(waitingFor)) {
-      nextFilters.waitingFor = waitingFor;
-    }
+    if (waitingFor && allowedWaitingFor.has(waitingFor)) nextFilters.waitingFor = waitingFor;
 
     const priority = searchParams.get("priority");
-    if (priority && allowedPriority.has(priority)) {
-      nextFilters.priority = priority;
-    }
+    if (priority && allowedPriority.has(priority)) nextFilters.priority = priority;
 
     const inboxMode = searchParams.get("inboxMode");
-    if (inboxMode && allowedInboxMode.has(inboxMode)) {
-      nextFilters.inboxMode = inboxMode;
-    }
+    if (inboxMode && allowedInboxMode.has(inboxMode)) nextFilters.inboxMode = inboxMode;
 
     const founderScope = searchParams.get("founderScope");
-    if (founderScope && allowedFounderScope.has(founderScope)) {
-      nextFilters.founderScope = founderScope;
-    }
+    if (founderScope && allowedFounderScope.has(founderScope)) nextFilters.founderScope = founderScope;
 
     const paymentState = searchParams.get("paymentState");
-    if (paymentState && allowedPaymentState.has(paymentState)) {
-      nextFilters.paymentState = paymentState;
-    }
+    if (paymentState && allowedPaymentState.has(paymentState)) nextFilters.paymentState = paymentState;
 
     return nextFilters;
   }, [searchParams]);
@@ -659,9 +655,11 @@ export function ConversationInboxDashboard({
         params.set(key, value);
       }
     });
+
     if (selectedThreadId) {
       params.set("selectedThreadId", selectedThreadId);
     }
+
     return params.toString();
   }, [filters, selectedThreadId]);
 
@@ -698,9 +696,7 @@ export function ConversationInboxDashboard({
   }, [queryString]);
 
   async function markThreadRead() {
-    if (!selectedThreadId) {
-      return;
-    }
+    if (!selectedThreadId) return;
 
     setSending(true);
     setError(null);
@@ -719,10 +715,7 @@ export function ConversationInboxDashboard({
       });
 
       const json = await response.json();
-
-      if (!response.ok) {
-        throw new Error(json.error || "Falha ao atualizar a thread.");
-      }
+      if (!response.ok) throw new Error(json.error || "Falha ao atualizar a thread.");
 
       await loadInbox();
     } catch (updateError) {
@@ -732,10 +725,8 @@ export function ConversationInboxDashboard({
     }
   }
 
-  async function updateThreadState(payload: Record<string, unknown>) {
-    if (!selectedThreadId) {
-      return;
-    }
+  async function updateThreadState(nextPayload: Record<string, unknown>) {
+    if (!selectedThreadId) return;
 
     setSending(true);
     setError(null);
@@ -747,14 +738,12 @@ export function ConversationInboxDashboard({
         body: JSON.stringify({
           action: "updateThreadState",
           threadId: selectedThreadId,
-          ...payload
+          ...nextPayload
         })
       });
 
       const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error || "Falha ao atualizar ownership da thread.");
-      }
+      if (!response.ok) throw new Error(json.error || "Falha ao atualizar a thread.");
 
       await loadInbox();
     } catch (updateError) {
@@ -764,10 +753,8 @@ export function ConversationInboxDashboard({
     }
   }
 
-async function sendHumanReply() {
-    if (!selectedThreadId || !composer.trim()) {
-      return;
-    }
+  async function sendHumanReply() {
+    if (!selectedThreadId || !composer.trim()) return;
 
     setSending(true);
     setError(null);
@@ -784,10 +771,7 @@ async function sendHumanReply() {
       });
 
       const json = await response.json();
-
-      if (!response.ok) {
-        throw new Error(json.error || "Falha ao enviar resposta humana.");
-      }
+      if (!response.ok) throw new Error(json.error || "Falha ao enviar resposta humana.");
 
       setComposer("");
       await loadInbox();
@@ -799,9 +783,7 @@ async function sendHumanReply() {
   }
 
   async function scheduleFollowUp(status: "due" | "overdue" | "resolved") {
-    if (!selectedThreadId) {
-      return;
-    }
+    if (!selectedThreadId) return;
 
     const dueAt =
       status === "resolved"
@@ -814,17 +796,15 @@ async function sendHumanReply() {
       waitingFor: status === "resolved" ? "client" : "human",
       nextActionHint:
         status === "resolved"
-          ? "Follow-up tratado. Agora a thread aguarda retorno do cliente."
+          ? "Follow-up tratado. Agora a conversa aguarda retorno do cliente."
           : status === "overdue"
             ? "Follow-up vencido. Priorizar contato humano ainda hoje."
-            : "Follow-up marcado para a fila do dia."
+            : "Follow-up marcado para a rotina do dia."
     });
   }
 
   async function addThreadNote() {
-    if (!selectedThreadId || !noteComposer.trim()) {
-      return;
-    }
+    if (!selectedThreadId || !noteComposer.trim()) return;
 
     setSending(true);
     setError(null);
@@ -842,9 +822,7 @@ async function sendHumanReply() {
       });
 
       const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error || "Falha ao registrar nota interna.");
-      }
+      if (!response.ok) throw new Error(json.error || "Falha ao registrar nota interna.");
 
       setNoteComposer("");
       await loadInbox();
@@ -856,22 +834,51 @@ async function sendHumanReply() {
   }
 
   const selectedThread = payload?.selectedThread || null;
-  const hasThreadList = Boolean(payload?.threads.length);
+  const executive = buildExecutiveSnapshot(selectedThread);
+
+  const executiveMetrics = payload
+    ? [
+        {
+          label: "Conversas abertas",
+          value: payload.metrics.totalOpenThreads,
+          helper: "Base viva do funil comercial.",
+          icon: <MessageSquareText className="h-5 w-5" />
+        },
+        {
+          label: "Pedindo atuação humana",
+          value: payload.metrics.waitingHumanCount,
+          helper: "Prioridade direta da equipe.",
+          icon: <UserRound className="h-5 w-5" />
+        },
+        {
+          label: "Oportunidades quentes",
+          value: payload.metrics.hotThreads,
+          helper: "Conversas com maior chance de avanço.",
+          icon: <Flame className="h-5 w-5" />
+        },
+        {
+          label: "Pagamento em aberto",
+          value: payload.metrics.paymentPendingThreads,
+          helper: "Decisões comerciais ainda não concluídas.",
+          icon: <CircleDollarSign className="h-5 w-5" />
+        }
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-[#ddd2bf] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.9),_rgba(243,236,224,0.96))] px-6 py-6 shadow-[0_18px_50px_rgba(16,38,29,0.08)]">
+      <section className="rounded-[2rem] border border-[#ddd2bf] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_rgba(243,236,224,0.97))] px-6 py-6 shadow-[0_18px_50px_rgba(16,38,29,0.08)]">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
+          <div className="max-w-4xl">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6a3d]">
-              Fase 13 | Inbox conversacional
+              CRM Comercial | cockpit de conversão
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#10261d]">
-              Central conversacional da NoemIA
+              Operação comercial guiada por prioridade, risco e próxima ação
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#5e6e65]">
-              Esta superficie opera apenas a fila viva de conversas. Telegram editorial e
-              distribuicao ficaram fora do contrato central da inbox nesta fase de saneamento.
+              A central comercial agora organiza a fila viva por contexto, decisão e avanço
+              real, sem perder o histórico operacional de cada conversa.
             </p>
           </div>
           <button
@@ -883,14 +890,111 @@ async function sendHumanReply() {
             Atualizar leitura
           </button>
         </div>
+
+        {executive ? (
+          <div className="mt-6 grid gap-4 xl:grid-cols-[1.35fr_0.95fr]">
+            <div className="rounded-[1.8rem] border border-[rgba(142,106,59,0.14)] bg-[#fffdf9] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">
+                    Cabeçalho executivo
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#10261d]">
+                    {executive.title}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#61716a]">
+                    {executive.recommendation}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <SignalBadge label={executive.stage} tone="gold" />
+                  <SignalBadge
+                    label={executive.temperature}
+                    tone={selectedThread?.thread.hot ? "rose" : toneForOpportunity(selectedThread?.context.commercial.opportunityState)}
+                  />
+                  <SignalBadge label={executive.priority} tone={toneForPriority(selectedThread?.thread.priority || "low")} />
+                  <SignalBadge label={executive.source} tone={toneForChannel(selectedThread?.thread.channel || "portal")} />
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <InfoPair label="Responsável comercial" value={executive.owner} valueClassName="font-semibold text-[#10261d]" />
+                <InfoPair label="Prontidão para consulta" value={executive.readiness} />
+                <InfoPair label="Risco dominante" value={executive.risk} />
+                <InfoPair label="Janela de oportunidade" value={executive.opportunity} />
+              </div>
+            </div>
+
+            <div className="rounded-[1.8rem] border border-[rgba(19,37,31,0.1)] bg-[#13251f] p-5 text-white shadow-[0_16px_44px_rgba(16,38,29,0.18)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#d8bc87]">
+                Barra de decisão
+              </p>
+              <p className="mt-3 text-lg font-semibold tracking-[-0.02em]">
+                {executive.officialNextAction}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#d4ddd7]">{executive.officialNextActionDetail}</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[1.4rem] border border-[rgba(216,188,135,0.18)] bg-[rgba(255,255,255,0.04)] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#d8bc87]">
+                    Follow-up oficial
+                  </p>
+                  <p className="mt-2 text-sm text-white">{executive.followUpLabel}</p>
+                </div>
+                <div className="rounded-[1.4rem] border border-[rgba(216,188,135,0.18)] bg-[rgba(255,255,255,0.04)] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#d8bc87]">
+                    Macrostatus
+                  </p>
+                  <p className="mt-2 text-sm text-white">
+                    {presentToken(selectedThread?.thread.threadStatus, "Em leitura")} •{" "}
+                    {presentToken(selectedThread?.thread.waitingFor, "Sem fila")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Threads abertas" value={payload?.metrics.totalOpenThreads || 0} icon={<MessageSquareText className="h-5 w-5" />} />
-        <MetricCard label="Aguardando humano" value={payload?.metrics.waitingHumanCount || 0} icon={<UserRound className="h-5 w-5" />} />
-        <MetricCard label="Handoffs ativos" value={payload?.metrics.handoffCount || 0} icon={<ShieldCheck className="h-5 w-5" />} />
-        <MetricCard label="Threads quentes" value={payload?.metrics.hotThreads || 0} icon={<Flame className="h-5 w-5" />} />
+        {executiveMetrics.map((item) => (
+          <MetricTile key={item.label} {...item} />
+        ))}
       </section>
+
+      {executive ? (
+        <section className="grid gap-4 xl:grid-cols-4">
+          <DecisionTile
+            label="Próxima ação"
+            title={executive.officialNextAction}
+            description={executive.officialNextActionDetail}
+            tone="gold"
+          />
+          <DecisionTile
+            label="Follow-up real"
+            title={presentToken(selectedThread?.context.commercial.followUpState || selectedThread?.context.operational.followUpStatus, "Sem follow-up")}
+            description={executive.followUpLabel}
+            tone={toneForFollowUp(selectedThread?.context.operational.followUpStatus || "none")}
+          />
+          <DecisionTile
+            label="Consulta e avanço"
+            title={presentToken(selectedThread?.context.commercial.consultationRecommendationState, "Manter em preparo")}
+            description={
+              selectedThread?.context.commercial.consultationRecommendationReason ||
+              "A leitura comercial ainda não encontrou uma recomendação de avanço adicional."
+            }
+            tone="green"
+          />
+          <DecisionTile
+            label="Risco e objeção"
+            title={executive.risk}
+            description={
+              selectedThread?.context.commercial.objectionHint ||
+              selectedThread?.context.commercial.advancementReason ||
+              "Sem objeção dominante registrada nesta conversa."
+            }
+            tone={toneForRisk(executive.hasRisk)}
+          />
+        </section>
+      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-[#f1c7bd] bg-[#fff3ef] px-4 py-3 text-sm leading-6 text-[#8a3e1f]">
@@ -898,84 +1002,11 @@ async function sendHumanReply() {
         </div>
       ) : null}
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, inboxMode: "needs_human", waitingFor: "human" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Fila do dia</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Aguardando humano</p>
-          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.waitingHumanCount || 0} threads pedindo comando manual.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, inboxMode: "hot" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Prioridade</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Quentes</p>
-          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.hotThreads || 0} conversas com maior peso operacional.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, paymentState: "pending" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Receita</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Pagamento pendente</p>
-          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.paymentPendingThreads || 0} threads com decisao comercial em aberto.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, channel: "instagram" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Instagram</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">DMs e sinais sociais</p>
-          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.instagramVolume || 0} threads Instagram na central.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, channel: "site" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Site Chat</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Leads em tempo real</p>
-          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.siteVolume || 0} threads do site na central.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, channel: "telegram" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Telegram</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Somente threads conversacionais</p>
-          <p className="mt-1 text-sm text-[#67786f]">
-            {payload?.metrics.telegramVolume || 0} threads privadas ou de grupo dentro da fila viva.
-          </p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...current, founderScope: "founder" }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Ecossistema</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Founder e waitlist</p>
-          <p className="mt-1 text-sm text-[#67786f]">{payload?.metrics.founderOrWaitlistThreads || 0} conversas ligadas ao circulo premium.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilters((current) => ({ ...initialFilters }))}
-          className="rounded-3xl border border-[#ddd5c7] bg-white px-5 py-4 text-left shadow-[0_8px_22px_rgba(16,38,29,0.05)] transition hover:border-[#b28b54]"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Reset</p>
-          <p className="mt-2 text-lg font-semibold text-[#10261d]">Visao completa</p>
-          <p className="mt-1 text-sm text-[#67786f]">Volta para a leitura integral da central operacional.</p>
-        </button>
-      </section>
-
-      <section className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
+      <PanelCard
+        eyebrow="Recorte operacional"
+        title="Filtros da operação comercial"
+        description="Refine a fila por estágio, ownership, canal, prioridade e situação de pagamento sem perder a leitura executiva."
+      >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
           <input
             value={filters.search}
@@ -988,11 +1019,11 @@ async function sendHumanReply() {
             onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
             className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
           >
-            <option value="all">Todos os status</option>
-            <option value="waiting_human">Aguardando humano</option>
-            <option value="waiting_client">Aguardando cliente</option>
-            <option value="handoff">Em handoff</option>
-            <option value="ai_active">IA ativa</option>
+            <option value="all">Todos os macrostatus</option>
+            <option value="waiting_human">Aguardando atuação humana</option>
+            <option value="waiting_client">Aguardando retorno do cliente</option>
+            <option value="handoff">Em transição</option>
+            <option value="ai_active">IA conduzindo</option>
           </select>
           <select
             value={filters.channel}
@@ -1002,7 +1033,7 @@ async function sendHumanReply() {
             <option value="all">Todos os canais</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="instagram">Instagram</option>
-            <option value="site">Site Chat</option>
+            <option value="site">Site</option>
             <option value="telegram">Telegram</option>
           </select>
           <select
@@ -1013,7 +1044,7 @@ async function sendHumanReply() {
             <option value="all">Todas as filas</option>
             <option value="human">Fila humana</option>
             <option value="client">Fila cliente</option>
-            <option value="ai">Fila IA</option>
+            <option value="ai">Fila da IA</option>
           </select>
           <select
             value={filters.priority}
@@ -1022,7 +1053,7 @@ async function sendHumanReply() {
           >
             <option value="all">Todas as prioridades</option>
             <option value="high">Alta</option>
-            <option value="medium">Media</option>
+            <option value="medium">Moderada</option>
             <option value="low">Baixa</option>
           </select>
           <select
@@ -1030,8 +1061,8 @@ async function sendHumanReply() {
             onChange={(event) => setFilters((current) => ({ ...current, inboxMode: event.target.value }))}
             className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-4 py-3 text-sm text-[#10261d] outline-none"
           >
-            <option value="all">Modo completo</option>
-            <option value="needs_human">Precisa de humano</option>
+            <option value="all">Visão completa</option>
+            <option value="needs_human">Precisa de atuação humana</option>
             <option value="customer_turn">Esperando cliente</option>
             <option value="ai_control">IA no comando</option>
             <option value="hot">Somente quentes</option>
@@ -1057,203 +1088,124 @@ async function sendHumanReply() {
             <option value="approved">Pagamento aprovado</option>
           </select>
         </div>
-      </section>
+      </PanelCard>
 
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_1.25fr_0.95fr]">
-        <div className="rounded-3xl border border-[#ddd5c7] bg-white shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-          <div className="border-b border-[#ece3d4] px-5 py-4">
-            <h2 className="text-lg font-semibold text-[#10261d]">Fila viva</h2>
-            <p className="mt-1 text-sm text-[#6b7b72]">
-              Conversas reais, priorizadas por densidade, handoff e continuidade.
-            </p>
-          </div>
-          <div className="max-h-[760px] overflow-y-auto px-3 py-3">
-            {loading && !hasThreadList ? (
-              <div className="px-3 py-10 text-sm text-[#6b7b72]">Carregando threads...</div>
+      <section className="grid gap-5 xl:grid-cols-[0.92fr_1.2fr_0.96fr]">
+        <PanelCard
+          eyebrow="Fila comercial"
+          title="Oportunidades em sequência"
+          description="Cada item destaca identidade, prioridade, ownership e risco sem transformar o funil em uma faixa de chips."
+        >
+          <div className="max-h-[980px] overflow-y-auto pr-1">
+            {loading && !payload?.threads.length ? (
+              <div className="py-10 text-sm text-[#6b7b72]">Carregando conversas...</div>
             ) : payload?.threads.length ? (
-              payload.threads.map((thread) => (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => setSelectedThreadId(thread.id)}
-                  className={cx(
-                    "mb-2 w-full rounded-3xl border px-4 py-4 text-left transition",
-                    selectedThreadId === thread.id
-                      ? "border-[#b28b54] bg-[#fbf6ed] shadow-[0_10px_20px_rgba(178,139,84,0.12)]"
-                      : "border-[#ece3d4] bg-[#fffdfa] hover:border-[#d4c0a0]"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-[#10261d]">{thread.displayName}</p>
-                        {thread.identityStatus !== "resolved" ? (
-                          <Chip className={toneForIdentity(thread.identityStatus)}>
-                            {thread.identityStatusLabel}
-                          </Chip>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-xs text-[#6c7b73]">{thread.contactLabel}</p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[#8a6a3d]">
-                        {thread.identitySourceLabel}
-                      </p>
-                    </div>
-                    {thread.unreadCount > 0 ? (
-                      <span className="rounded-full bg-[#10261d] px-2.5 py-1 text-xs font-semibold text-white">
-                        {thread.unreadCount}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#4b5d55]">{thread.preview}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Chip className={toneForChannel(thread.channel)}>{thread.channelLabel}</Chip>
-                    <Chip
-                      className={toneForSurface(
-                        thread.threadOriginType === "comment"
-                          ? "public_comment"
-                          : thread.threadOriginType === "site_chat"
-                            ? "site_chat"
-                            : "direct_message"
-                      )}
-                    >
-                      {thread.threadOriginLabel}
-                    </Chip>
-                    <Chip className={toneForPriority(thread.priority)}>{thread.priority}</Chip>
-                    <Chip className={toneForOwner(thread.ownerMode)}>{thread.ownerMode}</Chip>
-                    {thread.followUpStatus !== "none" ? (
-                      <Chip className={toneForFollowUp(thread.followUpStatus)}>
-                        follow-up {thread.followUpStatus}
-                      </Chip>
-                    ) : null}
-                    {thread.hot ? <Chip className="border-[#f3c4b6] bg-[#fff2ec] text-[#8a3e1f]">quente</Chip> : null}
-                    {thread.hasFounderContext ? <Chip className="border-[#d7cbee] bg-[#f7f3ff] text-[#5b4c99]">founder</Chip> : null}
-                    {thread.hasPaymentPending ? <Chip className="border-[#ead8a8] bg-[#fff9eb] text-[#8a6914]">pagamento</Chip> : null}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-[#76857d]">
-                    <span>{thread.idleMinutes ? `${thread.idleMinutes} min parada • ` : ""}{thread.nextAction}</span>
-                    <span>{formatDateTime(thread.lastMessageAt)}</span>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div className="px-3 py-10 text-sm text-[#6b7b72]">
-                {buildEmptyStateMessage(filters)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-[#ddd5c7] bg-white shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-          <div className="border-b border-[#ece3d4] px-5 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold text-[#10261d]">Thread operacional</h2>
-              {selectedThread ? (
-                <>
-                  <Chip className={toneForPriority(selectedThread.thread.priority)}>
-                    prioridade {selectedThread.thread.priority}
-                  </Chip>
-                  <Chip className={toneForChannel(selectedThread.thread.channel)}>
-                    {selectedThread.thread.channelLabel}
-                  </Chip>
-                  <Chip
-                    className={toneForSurface(
-                      selectedThread.thread.threadOriginType === "comment"
-                        ? "public_comment"
-                        : selectedThread.thread.threadOriginType === "site_chat"
-                          ? "site_chat"
-                          : "direct_message"
-                    )}
-                  >
-                    {selectedThread.thread.threadOriginLabel}
-                  </Chip>
-                  <Chip className={toneForOwner(selectedThread.thread.ownerMode)}>
-                    ownership {selectedThread.thread.ownerMode}
-                  </Chip>
-                  <Chip className="border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]">
-                    fila {selectedThread.thread.waitingFor}
-                  </Chip>
-                  <Chip className="border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]">
-                    thread {selectedThread.thread.threadStatus}
-                  </Chip>
-                </>
-              ) : null}
-            </div>
-            {selectedThread ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[#4e6057]">
-                <span className="font-semibold text-[#10261d]">{selectedThread.context.person.name}</span>
-                <Chip className={toneForIdentity(selectedThread.context.person.identityStatus)}>
-                  {selectedThread.context.person.identityStatusLabel}
-                </Chip>
-                <span>{selectedThread.thread.contactLabel}</span>
-              </div>
-            ) : null}
-          </div>
-
-          {selectedThread ? (
-            <>
-              <div className="max-h-[520px] space-y-4 overflow-y-auto px-5 py-5">
-                {selectedThread.messages.map((message) => (
-                  <div
-                    key={message.id}
+              <div className="space-y-3">
+                {payload.threads.map((thread) => (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() => setSelectedThreadId(thread.id)}
                     className={cx(
-                      "max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-6 shadow-sm",
-                      message.direction === "outbound"
-                        ? "ml-auto bg-[#10261d] text-white"
-                        : "bg-[#f7f2e8] text-[#24372f]"
+                      "w-full rounded-[1.7rem] border px-4 py-4 text-left transition",
+                      selectedThreadId === thread.id
+                        ? "border-[#b28b54] bg-[#fbf6ed] shadow-[0_12px_24px_rgba(178,139,84,0.12)]"
+                        : "border-[#ece3d4] bg-[#fffdfa] hover:border-[#d4c0a0]"
                     )}
                   >
-                    <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] opacity-75">
-                      <span>{message.senderType}</span>
-                      <span>
-                        {message.surface === "public_comment"
-                          ? "comentario"
-                          : message.surface === "direct_message"
-                            ? "dm"
-                            : message.surface === "telegram_private"
-                              ? "telegram privado"
-                              : message.surface === "telegram_group"
-                                ? "telegram grupo"
-                                : message.surface === "site_chat"
-                                  ? "site"
-                                  : "sistema"}
-                      </span>
-                      <span>{message.sendStatus}</span>
-                      <span>{formatDateTime(message.createdAt)}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-[#10261d]">{thread.displayName}</p>
+                          {thread.unreadCount > 0 ? (
+                            <SignalBadge label={`${thread.unreadCount} não lidas`} tone="blue" />
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-xs text-[#6c7b73]">{thread.contactLabel}</p>
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#4b5d55]">{thread.preview}</p>
+                      </div>
+                      <div className="text-right text-xs text-[#7a897f]">
+                        <p>{formatDateTime(thread.lastMessageAt)}</p>
+                        <p className="mt-1">
+                          {thread.idleMinutes ? `${thread.idleMinutes} min sem avanço` : "Leitura recente"}
+                        </p>
+                      </div>
                     </div>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    {message.socialOrigin ? (
-                      <p className="mt-2 text-[11px] uppercase tracking-[0.16em] opacity-70">
-                        origem {message.socialOrigin}
-                      </p>
-                    ) : null}
-                    {message.errorMessage ? (
-                      <p className="mt-2 text-xs text-[#ffd1c2]">{message.errorMessage}</p>
-                    ) : null}
-                  </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <SignalBadge label={thread.channelLabel} tone={toneForChannel(thread.channel)} />
+                      <SignalBadge label={presentToken(thread.priority)} tone={toneForPriority(thread.priority)} />
+                      <SignalBadge label={presentToken(thread.ownerMode)} tone={toneForOwner(thread.ownerMode)} />
+                      <SignalBadge label={presentToken(thread.followUpStatus, "Sem follow-up")} tone={toneForFollowUp(thread.followUpStatus)} />
+                      {thread.hot ? <SignalBadge label="Oportunidade quente" tone="rose" /> : null}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[#6f7f77]">
+                      <span className="line-clamp-1">{thread.nextAction}</span>
+                      <span>{presentToken(thread.threadStatus)}</span>
+                    </div>
+                  </button>
                 ))}
               </div>
+            ) : (
+              <div className="py-10 text-sm text-[#6b7b72]">{buildEmptyStateMessage(filters)}</div>
+            )}
+          </div>
+        </PanelCard>
 
-              <div className="border-t border-[#ece3d4] bg-[#fcfaf6] px-5 py-4">
-                <div className="mb-3 flex flex-wrap gap-2">
+        <div className="space-y-5">
+          <PanelCard
+            eyebrow="Thread ativa"
+            title={selectedThread ? "Conversa e condução comercial" : "Condução da conversa"}
+            description={
+              selectedThread
+                ? "A área principal concentra o histórico vivo e as ações prioritárias do relacionamento."
+                : "Selecione uma conversa para abrir o histórico, responder e decidir a próxima ação."
+            }
+            actions={
+              selectedThread ? (
+                <>
+                  <SignalBadge label={presentToken(selectedThread.thread.threadStatus)} tone="slate" />
+                  <SignalBadge label={presentToken(selectedThread.thread.waitingFor)} tone="neutral" />
+                </>
+              ) : null
+            }
+          >
+            {selectedThread ? (
+              <>
+                <div className="grid gap-3 md:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => void markThreadRead()}
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Marcar como lida e assumir fila
+                    Assumir e marcar como lida
                   </button>
                   <button
                     type="button"
-                    onClick={() => void updateThreadState({ ownerMode: "human", waitingFor: "human", threadStatus: "waiting_human", handoffState: "active" })}
+                    onClick={() =>
+                      void updateThreadState({
+                        ownerMode: "human",
+                        waitingFor: "human",
+                        threadStatus: "waiting_human",
+                        handoffState: "active"
+                      })
+                    }
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Assumir como humano
+                    Colocar sob cuidado humano
                   </button>
                   <button
                     type="button"
-                    onClick={() => void updateThreadState({ ownerMode: "ai", waitingFor: "ai", threadStatus: "ai_active", handoffState: "resolved", aiEnabled: true })}
+                    onClick={() =>
+                      void updateThreadState({
+                        ownerMode: "ai",
+                        waitingFor: "ai",
+                        threadStatus: "ai_active",
+                        handoffState: "resolved",
+                        aiEnabled: true
+                      })
+                    }
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
@@ -1265,7 +1217,7 @@ async function sendHumanReply() {
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Marcar follow-up
+                    Programar follow-up
                   </button>
                   <button
                     type="button"
@@ -1273,298 +1225,111 @@ async function sendHumanReply() {
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Venceu hoje
+                    Marcar como vencido hoje
                   </button>
                   <button
                     type="button"
-                    onClick={() => void updateThreadState({ threadStatus: "closed", waitingFor: "none", followUpStatus: "resolved" })}
+                    onClick={() =>
+                      void updateThreadState({
+                        threadStatus: "closed",
+                        waitingFor: "none",
+                        followUpStatus: "resolved"
+                      })
+                    }
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Fechar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void updateThreadState({ threadStatus: "waiting_human", waitingFor: "human" })}
-                    disabled={sending}
-                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
-                  >
-                    Reabrir
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void updateThreadState({ threadStatus: "archived", waitingFor: "none" })}
-                    disabled={sending}
-                    className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
-                  >
-                    Arquivar
+                    Encerrar conversa
                   </button>
                 </div>
-                <textarea
-                  value={composer}
-                  onChange={(event) => setComposer(event.target.value)}
-                  placeholder="Responder manualmente pelo painel com continuidade premium no canal certo."
-                  rows={5}
-                  className="w-full rounded-[1.6rem] border border-[#d8cfbf] bg-white px-4 py-4 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
-                />
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-xs text-[#718179]">
-                    WhatsApp, Instagram, Site Chat e Telegram operam com historico interno, ownership e handoff preservados nesta central.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void sendHumanReply()}
-                    disabled={sending || !composer.trim()}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#10261d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#18362a] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Send className="h-4 w-4" />
-                    Responder
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="px-5 py-10 text-sm text-[#6b7b72]">
-              Selecione uma thread para abrir o historico real e operar o handoff.
-            </div>
-          )}
-        </div>
 
-        <div className="space-y-5">
-          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-            <h2 className="text-lg font-semibold text-[#10261d]">Contexto lateral</h2>
-            {selectedThread ? (
-              <div className="mt-4 space-y-4 text-sm text-[#4e6057]">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Pessoa</p>
-                  <p className="mt-2 font-medium text-[#10261d]">{selectedThread.context.person.name}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Chip className={toneForIdentity(selectedThread.context.person.identityStatus)}>
-                      {selectedThread.context.person.identityStatusLabel}
-                    </Chip>
-                    <Chip className="border-[#d8d2c4] bg-[#f7f3eb] text-[#4a5a52]">
-                      {selectedThread.context.person.identitySourceLabel}
-                    </Chip>
-                  </div>
-                  <p>{selectedThread.context.person.phone || "Telefone nao identificado"}</p>
-                  <p>{selectedThread.context.person.email || "Email nao identificado"}</p>
+                <div className="mt-5 max-h-[520px] space-y-4 overflow-y-auto pr-1">
+                  {selectedThread.messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={cx(
+                        "max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-6 shadow-sm",
+                        message.direction === "outbound"
+                          ? "ml-auto bg-[#10261d] text-white"
+                          : "bg-[#f7f2e8] text-[#24372f]"
+                      )}
+                    >
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em] opacity-75">
+                        <span>{senderLabel(message.senderType)}</span>
+                        <span>{messageSurfaceLabel(message.surface)}</span>
+                        <span>{messageStatusLabel(message.sendStatus)}</span>
+                        <span>{formatDateTime(message.createdAt)}</span>
+                      </div>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.socialOrigin ? (
+                        <p className="mt-2 text-[11px] uppercase tracking-[0.14em] opacity-70">
+                          Origem {message.socialOrigin}
+                        </p>
+                      ) : null}
+                      {message.errorMessage ? (
+                        <p className="mt-2 text-xs text-[#ffd1c2]">{message.errorMessage}</p>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Lead e consulta</p>
-                  <p>Stage: {selectedThread.context.lead.stage || "Nao classificado"}</p>
-                  <p>Temperatura: {selectedThread.context.lead.temperature || "Nao lida"}</p>
-                  <p>Consulta: {selectedThread.context.operational.consultationStage || "Nao sinalizada"}</p>
-                  <p>Intento atual: {selectedThread.context.lead.currentIntent || "Sem leitura"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">CRM comercial conectado</p>
-                  <p>Cliente: {selectedThread.context.commercial.clientId || "thread ainda sem cliente vinculado"}</p>
-                  <p>Pipeline: {selectedThread.context.commercial.pipelineId || "nao materializado"}</p>
-                  <p>Owner: {selectedThread.thread.assignedTo.name || "sem owner comercial"}</p>
-                  <p>Follow-up: {selectedThread.context.commercial.followUpState || "none"}</p>
-                  <p>Motivo: {selectedThread.context.commercial.followUpReason || "sem motivo registrado"}</p>
-                  <p>Prontidao: {selectedThread.context.commercial.consultationReadiness || "sem leitura"}</p>
-                  <p>Estagio de conversao: {selectedThread.context.commercial.conversionStage || "sem estagio"}</p>
-                  <p>Acao recomendada: {selectedThread.context.commercial.recommendedActionLabel || "sem recomendacao"}</p>
-                  <p>Bloqueio: {selectedThread.context.commercial.blockingReason || "sem trava dominante"}</p>
-                  <p>Oportunidade: {selectedThread.context.commercial.opportunityState || "monitor"}</p>
-                  <p>Proximo passo: {selectedThread.context.commercial.nextStep || "nao definido"}</p>
-                  <p>Aguardando: {selectedThread.context.commercial.waitingOn || "nenhum bloqueio explicito"}</p>
-                  <p>Canal vinculado: {selectedThread.context.commercial.clientChannelId || "sem client_channel materializado"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Fechamento premium</p>
-                  <p>Estado: {selectedThread.context.commercial.closingState || "open"}</p>
-                  <p>Proposta: {selectedThread.context.commercial.consultationOfferState || "not_offered"}</p>
-                  <p>Agenda: {selectedThread.context.commercial.schedulingState || "not_started"}</p>
-                  <p>Pagamento: {selectedThread.context.commercial.paymentState || "not_started"}</p>
-                  <p>Acao de fechamento: {selectedThread.context.commercial.closingRecommendedActionLabel || "sem acao"}</p>
-                  <p>Bloqueio de fechamento: {selectedThread.context.commercial.closingBlockReason || "sem bloqueio dominante"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Origem e navegacao</p>
-                  <p>Canal de entrada: {selectedThread.context.origin.sourceLabel || selectedThread.context.social.sourceLabel || "sem leitura"}</p>
-                  <p>Pagina: {selectedThread.context.origin.pagePath || "nao identificada"}</p>
-                  <p>Artigo: {selectedThread.context.origin.articleTitle || selectedThread.context.social.contentLabel || "nao identificado"}</p>
-                  <p>CTA: {selectedThread.context.origin.ctaLabel || "nao identificado"}</p>
-                  <p>Campanha: {selectedThread.context.origin.campaignLabel || selectedThread.context.social.campaignLabel || "organico"}</p>
-                  <p>Topico: {selectedThread.context.origin.topicLabel || selectedThread.context.social.topicLabel || "geral"}</p>
-                  <p>Visitor stage: {selectedThread.context.origin.visitorStage || "anonimo"}</p>
-                </div>
-                {selectedThread.thread.channel === "telegram" ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Telegram</p>
-                    <p>Superficie: {selectedThread.context.telegram.surface || "unknown"}</p>
-                    <p>Grupo: {selectedThread.context.telegram.groupTitle || "nao aplicavel"}</p>
-                    <p>Username: {selectedThread.context.telegram.username || "nao identificado"}</p>
-                    <p>Relevancia: {selectedThread.context.telegram.relevance || "operacao privada"}</p>
-                    <p>
-                      Movimento para privado:{" "}
-                      {selectedThread.context.telegram.shouldMoveToPrivate ? "sim" : "nao"}
-                    </p>
-                  </div>
-                ) : null}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Founder e comunidade</p>
-                  <p>Founder: {selectedThread.context.founder.isFounder ? "sim" : "nao"}</p>
-                  <p>Waitlist: {selectedThread.context.founder.isWaitlist ? "sim" : "nao"}</p>
-                  <p>Comunidade: {selectedThread.context.founder.communityStatus || "sem vinculo"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Pagamento e agenda</p>
-                  <p>Pagamentos pendentes: {selectedThread.context.payment.pendingCount}</p>
-                  <p>Status mais recente: {selectedThread.context.payment.latestStatus || "sem pagamento"}</p>
-                  <p>Proximo compromisso: {formatDateTime(selectedThread.context.agenda.nextAppointmentAt)}</p>
-                  <p>Pagamento comercial: {selectedThread.context.commercial.paymentState || "not_started"}</p>
-                  <p>Horario comercial: {selectedThread.context.commercial.schedulingSuggestedAt ? formatDateTime(selectedThread.context.commercial.schedulingSuggestedAt) : "sem horario sugerido"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Appointment formal</p>
-                  <p>Estado: {selectedThread.context.commercial.appointmentState || "not_created"}</p>
-                  <p>
-                    Appointment:{" "}
-                    {selectedThread.context.commercial.consultationAppointmentId
-                      ? selectedThread.context.commercial.consultationAppointmentId.slice(0, 8)
-                      : "ainda nao criado"}
+
+                <div className="mt-5 rounded-[1.7rem] border border-[#ebe1d2] bg-[#fcfaf6] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">
+                    Resposta humana
                   </p>
-                  <p>
-                    Caso:{" "}
-                    {selectedThread.context.commercial.consultationCaseId
-                      ? selectedThread.context.commercial.consultationCaseId.slice(0, 8)
-                      : "sem caso formal"}
-                  </p>
-                  <p>
-                    Confirmacao:{" "}
-                    {selectedThread.context.commercial.appointmentConfirmedAt
-                      ? formatDateTime(selectedThread.context.commercial.appointmentConfirmedAt)
-                      : selectedThread.context.commercial.consultationPreconfirmedAt
-                        ? `preconfirmada em ${formatDateTime(selectedThread.context.commercial.consultationPreconfirmedAt)}`
-                        : "sem confirmacao formal"}
-                  </p>
+                  <textarea
+                    value={composer}
+                    onChange={(event) => setComposer(event.target.value)}
+                    placeholder="Responder manualmente com continuidade premium, clareza comercial e próximo passo nítido."
+                    rows={5}
+                    className="mt-3 w-full rounded-[1.4rem] border border-[#d8cfbf] bg-white px-4 py-4 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
+                  />
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs text-[#718179]">
+                      O histórico de canal, ownership e handoff é preservado nesta central.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void sendHumanReply()}
+                      disabled={sending || !composer.trim()}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#10261d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#18362a] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Send className="h-4 w-4" />
+                      Enviar resposta
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Follow-up e risco</p>
-                  <p>Estado: {selectedThread.context.operational.followUpStatus || "none"}</p>
-                  <p>Prazo: {formatDateTime(selectedThread.context.operational.followUpDueAt)}</p>
-                  <p>Leitura comercial: {selectedThread.context.commercial.followUpState || "none"}</p>
-                  <p>Thread parada: {selectedThread.thread.idleMinutes ? `${selectedThread.thread.idleMinutes} min` : "sem leitura"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Proxima acao</p>
-                  <p className="font-medium text-[#10261d]">
-                    {selectedThread.context.commercial.closingRecommendedActionLabel ||
-                      selectedThread.context.commercial.recommendedActionLabel ||
-                      selectedThread.context.operational.nextSuggestedAction ||
-                      "Revisar manualmente"}
-                  </p>
-                  <p>
-                    {selectedThread.context.commercial.closingRecommendedActionDetail ||
-                      selectedThread.context.commercial.recommendedActionDetail ||
-                      selectedThread.context.commercial.closingNextStep ||
-                      selectedThread.context.commercial.nextStep ||
-                      selectedThread.context.operational.nextSuggestedActionDetail ||
-                      selectedThread.thread.nextAction}
-                  </p>
-                </div>
-                {selectedThread.context.commercial.consultationRecommendationReason ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Consulta</p>
-                    <p className="font-medium text-[#10261d]">
-                      {selectedThread.context.commercial.consultationRecommendationState || "hold"}
-                    </p>
-                    <p>{selectedThread.context.commercial.consultationRecommendationReason}</p>
-                  </div>
-                ) : null}
-                {selectedThread.context.commercial.latestNoteBody ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Ultima nota comercial</p>
-                    <p className="font-medium text-[#10261d]">{selectedThread.context.commercial.latestNoteBody}</p>
-                    <p>{formatDateTime(selectedThread.context.commercial.latestNoteAt)}</p>
-                  </div>
-                ) : null}
-                {selectedThread.context.commercial.consultationSuggestedCopy ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Copy sugerida</p>
-                    <p className="font-medium text-[#10261d]">
-                      {selectedThread.context.commercial.consultationSuggestedCopy}
-                    </p>
-                    <p>
-                      Follow-up sugerido: {selectedThread.context.commercial.recommendedFollowUpWindow || "sem janela"}
-                    </p>
-                  </div>
-                ) : null}
-                {selectedThread.context.commercial.closingCopySuggestion ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Copy de fechamento</p>
-                    <p className="font-medium text-[#10261d]">
-                      {selectedThread.context.commercial.closingCopySuggestion}
-                    </p>
-                    <p>
-                      Proximo passo: {selectedThread.context.commercial.closingNextStep || "sem proximo passo definido"}
-                    </p>
-                  </div>
-                ) : null}
-                {selectedThread.context.commercial.consultationConfirmationSource ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Fonte da confirmacao</p>
-                    <p className="font-medium text-[#10261d]">
-                      {selectedThread.context.commercial.consultationConfirmationSource}
-                    </p>
-                    <p>
-                      Appointment: {selectedThread.context.commercial.appointmentState || "not_created"} •
-                      pagamento {selectedThread.context.commercial.paymentState || "not_started"}
-                    </p>
-                  </div>
-                ) : null}
-                {selectedThread.context.social.commentText ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Comentario de origem</p>
-                    <p className="font-medium text-[#10261d]">{selectedThread.context.social.commentText}</p>
-                    <p>
-                      Decisao: {selectedThread.context.social.publicCommentDecision || "sem politica"} •
-                      transicao {selectedThread.context.social.directTransitionStatus || "n/a"}
-                    </p>
-                  </div>
-                ) : null}
-                {selectedThread.context.origin.referrer || selectedThread.context.origin.utmSource ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">Aquisicao</p>
-                    <p>Referrer: {selectedThread.context.origin.referrer || "direto"}</p>
-                    <p>
-                      UTM: {selectedThread.context.origin.utmSource || "n/a"} /{" "}
-                      {selectedThread.context.origin.utmMedium || "n/a"} /{" "}
-                      {selectedThread.context.origin.utmCampaign || "n/a"}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
+              </>
             ) : (
-              <p className="mt-4 text-sm text-[#6b7b72]">
-                A lateral da thread mostra lead, origem social, pagamento, founder, agenda e proxima acao.
-              </p>
+              <div className="py-10 text-sm text-[#6b7b72]">
+                Selecione uma conversa para abrir o histórico real e conduzir o relacionamento.
+              </div>
             )}
-          </div>
+          </PanelCard>
 
-          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-            <h2 className="text-lg font-semibold text-[#10261d]">Memoria operacional</h2>
+          <PanelCard
+            eyebrow="Memória comercial"
+            title="Notas internas"
+            description="Registre contexto, próxima ação e observações sensíveis sem disputar atenção com a leitura principal."
+          >
             {selectedThread ? (
               <>
-                <div className="mt-4 flex gap-2">
+                <div className="flex gap-2">
                   <select
                     value={noteKind}
                     onChange={(event) => setNoteKind(event.target.value)}
                     className="rounded-2xl border border-[#d9d0c2] bg-[#fbf8f2] px-3 py-2 text-sm text-[#10261d] outline-none"
                   >
                     <option value="operational">Nota operacional</option>
-                    <option value="next_action">Proxima acao</option>
+                    <option value="next_action">Próxima ação</option>
                     <option value="context">Contexto</option>
-                    <option value="sensitive">Sensivel</option>
+                    <option value="sensitive">Sensível</option>
                   </select>
                 </div>
                 <textarea
                   value={noteComposer}
                   onChange={(event) => setNoteComposer(event.target.value)}
-                  placeholder="Registrar observacao interna, contexto ou proxima acao."
+                  placeholder="Registrar memória comercial, travas, contexto ou recomendação executiva."
                   rows={4}
                   className="mt-3 w-full rounded-[1.4rem] border border-[#d8cfbf] bg-[#fcfaf6] px-4 py-3 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
                 />
@@ -1579,10 +1344,10 @@ async function sendHumanReply() {
                 <div className="mt-4 space-y-3">
                   {selectedThread.notes.length ? (
                     selectedThread.notes.map((note) => (
-                      <div key={note.id} className="rounded-2xl border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
-                        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">
-                          <span>{note.kind}</span>
-                          {note.isSensitive ? <span>sensivel</span> : null}
+                      <div key={note.id} className="rounded-[1.4rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-[#8a6a3d]">
+                          <span>{noteKindLabel(note.kind)}</span>
+                          {note.isSensitive ? <span>Sensível</span> : null}
                           <span>{formatDateTime(note.createdAt)}</span>
                         </div>
                         <p className="mt-2 text-sm text-[#20342b]">{note.body}</p>
@@ -1590,26 +1355,192 @@ async function sendHumanReply() {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-[#6b7b72]">Ainda nao existem notas internas registradas nesta thread.</p>
+                    <p className="text-sm text-[#6b7b72]">Ainda não existem notas internas registradas nesta conversa.</p>
                   )}
                 </div>
               </>
             ) : (
-              <p className="mt-4 text-sm text-[#6b7b72]">
-                As notas internas guardam memoria operacional, proxima acao e contexto sensivel.
+              <p className="text-sm text-[#6b7b72]">
+                As notas internas preservam a memória comercial e a intenção da equipe.
               </p>
             )}
-          </div>
+          </PanelCard>
+        </div>
 
-          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-            <h2 className="text-lg font-semibold text-[#10261d]">Rastro operacional</h2>
+        <div className="space-y-5">
+          <PanelCard
+            eyebrow="Leitura executiva"
+            title="Contexto da oportunidade"
+            description="A lateral agora separa o que é decisão comercial, o que é apoio e o que é metadado técnico."
+          >
+            {selectedThread ? (
+              <div className="space-y-4">
+                <div className="grid gap-3">
+                  <InfoPair label="Pessoa" value={selectedThread.context.person.name} valueClassName="font-semibold text-[#10261d]" />
+                  <InfoPair
+                    label="Leitura comercial"
+                    value={
+                      <div className="flex flex-wrap gap-2">
+                        <SignalBadge label={presentToken(selectedThread.context.commercial.conversionStage, "Sem estágio")} tone="gold" />
+                        <SignalBadge label={presentToken(selectedThread.context.commercial.consultationReadiness, "Sem leitura")} tone="green" />
+                        <SignalBadge label={presentToken(selectedThread.context.commercial.opportunityState, "Monitorar")} tone={toneForOpportunity(selectedThread.context.commercial.opportunityState)} />
+                      </div>
+                    }
+                  />
+                </div>
+
+                <details open className="rounded-[1.5rem] border border-[#e7dece] bg-[#fcfaf6] px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Camada de decisão comercial</summary>
+                  <div className="mt-4 space-y-3">
+                    <InfoPair label="Próxima ação oficial" value={executive?.officialNextAction || "Revisão manual"} />
+                    <InfoPair
+                      label="Detalhe da condução"
+                      value={executive?.officialNextActionDetail || "Sem detalhamento adicional"}
+                    />
+                    <InfoPair
+                      label="Follow-up real"
+                      value={`${presentToken(selectedThread.context.commercial.followUpState || selectedThread.context.operational.followUpStatus, "Sem follow-up")} • ${executive?.followUpLabel || "Sem janela"}`}
+                    />
+                    <InfoPair
+                      label="Bloqueio e objeção"
+                      value={
+                        selectedThread.context.commercial.objectionHint ||
+                        presentToken(selectedThread.context.commercial.blockingReason, "Sem trava dominante")
+                      }
+                    />
+                    <InfoPair
+                      label="Recomendação de consulta"
+                      value={
+                        selectedThread.context.commercial.consultationRecommendationReason ||
+                        presentToken(selectedThread.context.commercial.consultationRecommendationState, "Manter em preparo")
+                      }
+                    />
+                  </div>
+                </details>
+
+                <details open className="rounded-[1.5rem] border border-[#e7dece] bg-[#fcfaf6] px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Fechamento, agenda e pagamento</summary>
+                  <div className="mt-4 grid gap-3">
+                    <InfoPair
+                      label="Fechamento premium"
+                      value={
+                        <DetailList
+                          items={[
+                            { label: "Estado", value: presentToken(selectedThread.context.commercial.closingState, "Em aberto") },
+                            { label: "Proposta", value: presentToken(selectedThread.context.commercial.consultationOfferState, "Proposta ainda não apresentada") },
+                            { label: "Agenda", value: presentToken(selectedThread.context.commercial.schedulingState, "Ainda não iniciado") },
+                            { label: "Pagamento", value: presentToken(selectedThread.context.commercial.paymentState, "Ainda não iniciado") }
+                          ]}
+                        />
+                      }
+                    />
+                    <InfoPair
+                      label="Pagamento e appointment"
+                      value={
+                        <DetailList
+                          items={[
+                            { label: "Pagamentos pendentes", value: selectedThread.context.payment.pendingCount },
+                            { label: "Valor mais recente", value: formatCurrency(selectedThread.context.payment.latestAmount) },
+                            { label: "Status mais recente", value: presentToken(selectedThread.context.payment.latestStatus, "Sem pagamento") },
+                            { label: "Appointment", value: presentToken(selectedThread.context.commercial.appointmentState, "Ainda não criado") },
+                            { label: "Próximo compromisso", value: formatDateTime(selectedThread.context.agenda.nextAppointmentAt) }
+                          ]}
+                        />
+                      }
+                    />
+                  </div>
+                </details>
+
+                <details className="rounded-[1.5rem] border border-[#e7dece] bg-[#fcfaf6] px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Origem, navegação e ecossistema</summary>
+                  <div className="mt-4 grid gap-3">
+                    <InfoPair
+                      label="Origem"
+                      value={
+                        <DetailList
+                          items={[
+                            {
+                              label: "Canal de entrada",
+                              value: presentChannelOrigin(
+                                selectedThread.context.origin.sourceLabel ||
+                                  selectedThread.context.social.sourceLabel ||
+                                  selectedThread.context.lead.sourceChannel
+                              )
+                            },
+                            { label: "Página", value: selectedThread.context.origin.pagePath || "Não identificada" },
+                            { label: "Artigo ou conteúdo", value: selectedThread.context.origin.articleTitle || selectedThread.context.social.contentLabel || "Não identificado" },
+                            { label: "CTA", value: selectedThread.context.origin.ctaLabel || "Não identificado" },
+                            { label: "Campanha", value: selectedThread.context.origin.campaignLabel || selectedThread.context.social.campaignLabel || "Orgânico" }
+                          ]}
+                        />
+                      }
+                    />
+                    <InfoPair
+                      label="Founder e comunidade"
+                      value={
+                        <DetailList
+                          items={[
+                            { label: "Founder", value: presentBoolean(selectedThread.context.founder.isFounder) },
+                            { label: "Waitlist", value: presentBoolean(selectedThread.context.founder.isWaitlist) },
+                            { label: "Comunidade", value: selectedThread.context.founder.communityStatus || "Sem vínculo" },
+                            { label: "Acesso", value: selectedThread.context.founder.accessStatus || "Sem leitura" }
+                          ]}
+                        />
+                      }
+                    />
+                    {selectedThread.thread.channel === "telegram" ? (
+                      <InfoPair
+                        label="Telegram"
+                        value={
+                          <DetailList
+                            items={[
+                              { label: "Superfície", value: presentToken(selectedThread.context.telegram.surface, "Não classificada") },
+                              { label: "Grupo", value: selectedThread.context.telegram.groupTitle || "Não aplicável" },
+                              { label: "Usuário", value: selectedThread.context.telegram.username || "Não identificado" },
+                              { label: "Mover para privado", value: presentBoolean(selectedThread.context.telegram.shouldMoveToPrivate) }
+                            ]}
+                          />
+                        }
+                      />
+                    ) : null}
+                  </div>
+                </details>
+
+                <details className="rounded-[1.5rem] border border-[#e7dece] bg-[#fcfaf6] px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Metadados e vínculos técnicos</summary>
+                  <div className="mt-4">
+                    <DetailList
+                      items={[
+                        { label: "Cliente", value: presentMaybeId(selectedThread.context.commercial.clientId, "Conversa ainda sem cliente vinculado") },
+                        { label: "Pipeline", value: presentMaybeId(selectedThread.context.commercial.pipelineId, "Ainda não materializado") },
+                        { label: "Canal vinculado", value: presentMaybeId(selectedThread.context.commercial.clientChannelId, "Sem vínculo materializado") },
+                        { label: "Caso formal", value: presentMaybeId(selectedThread.context.commercial.consultationCaseId, "Sem caso formal") },
+                        { label: "Appointment", value: presentMaybeId(selectedThread.context.commercial.consultationAppointmentId, "Ainda não criado") },
+                        { label: "Sessão", value: presentMaybeId(selectedThread.context.origin.sessionId, "Não identificada") }
+                      ]}
+                    />
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <p className="text-sm text-[#6b7b72]">
+                A lateral executiva concentra decisão comercial, fechamento e origem da oportunidade.
+              </p>
+            )}
+          </PanelCard>
+
+          <PanelCard
+            eyebrow="Rastro"
+            title="Histórico relevante"
+            description="Eventos de handoff, leitura e operação aparecem com menor peso visual, mas continuam acessíveis."
+          >
             {selectedThread?.events.length ? (
-              <div className="mt-4 space-y-3">
+              <div className="space-y-3">
                 {selectedThread.events.map((event) => (
-                  <div key={event.id} className="rounded-2xl border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[#8a6a3d]">
+                  <div key={event.id} className="rounded-[1.4rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-[#8a6a3d]">
                       <Clock3 className="h-3.5 w-3.5" />
-                      <span>{event.actorType}</span>
+                      <span>{presentToken(event.actorType, "Operação")}</span>
                       <span>{formatDateTime(event.createdAt)}</span>
                     </div>
                     <p className="mt-2 text-sm text-[#20342b]">{event.summary}</p>
@@ -1617,113 +1548,69 @@ async function sendHumanReply() {
                 ))}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-[#6b7b72]">
-                Eventos de handoff, leitura e resposta humana passam a ficar visiveis aqui.
+              <p className="text-sm text-[#6b7b72]">
+                Eventos de handoff, leitura e resposta humana ficam visíveis aqui quando existirem.
               </p>
             )}
-          </div>
+          </PanelCard>
 
-          <div className="rounded-3xl border border-[#ddd5c7] bg-white p-5 shadow-[0_10px_26px_rgba(16,38,29,0.06)]">
-            <h2 className="text-lg font-semibold text-[#10261d]">Leitura executiva</h2>
-            <div className="mt-4 space-y-3 text-sm text-[#4e6057]">
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Bot className="h-4 w-4" /> Threads com IA</span>
-                <strong>{payload?.metrics.aiControlledThreads || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Founder e waitlist</span>
-                <strong>{payload?.metrics.founderOrWaitlistThreads || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Pagamento pendente</span>
-                <strong>{payload?.metrics.paymentPendingThreads || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Threads humanas</span>
-                <strong>{payload?.metrics.humanControlledThreads || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> 1a resposta media</span>
-                <strong>{payload?.metrics.firstResponseTimeMinutes ? `${payload.metrics.firstResponseTimeMinutes} min` : "n/d"}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Resposta humana media</span>
-                <strong>{payload?.metrics.humanResponseTimeMinutes ? `${payload.metrics.humanResponseTimeMinutes} min` : "n/d"}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume WhatsApp</span>
-                <strong>{payload?.metrics.whatsappVolume || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume Instagram</span>
-                <strong>{payload?.metrics.instagramVolume || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume Site</span>
-                <strong>{payload?.metrics.siteVolume || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-4 w-4" /> Volume Telegram</span>
-                <strong>{payload?.metrics.telegramVolume || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> DMs / comentarios</span>
-                <strong>{`${payload?.metrics.instagramDmVolume || 0} / ${payload?.metrics.instagramCommentSignals || 0}`}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Telegram privado / grupo</span>
-                <strong>{`${payload?.metrics.telegramPrivateVolume || 0} / ${payload?.metrics.telegramGroupSignals || 0}`}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human Site</span>
-                <strong>{payload?.metrics.siteWaitingHumanCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Handoff Site</span>
-                <strong>{payload?.metrics.siteHandoffCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Site quente / qualificado</span>
-                <strong>{`${payload?.metrics.siteHotThreads || 0} / ${payload?.metrics.siteQualifiedThreads || 0}`}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up Site</span>
-                <strong>{payload?.metrics.siteFollowUpPendingCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human IG</span>
-                <strong>{payload?.metrics.instagramWaitingHumanCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Handoff IG</span>
-                <strong>{payload?.metrics.instagramHandoffCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up social</span>
-                <strong>{payload?.metrics.instagramFollowUpPendingCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" /> Waiting human Telegram</span>
-                <strong>{payload?.metrics.telegramWaitingHumanCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Handoff Telegram</span>
-                <strong>{payload?.metrics.telegramHandoffCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> Follow-up Telegram</span>
-                <strong>{payload?.metrics.telegramFollowUpPendingCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Mensagens falhadas</span>
-                <strong>{payload?.metrics.failedMessagesCount || 0}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#f7f2e8] px-4 py-3">
-                <span className="inline-flex items-center gap-2"><Activity className="h-4 w-4" /> Entregues / lidas</span>
-                <strong>{`${payload?.metrics.deliveredMessagesCount || 0} / ${payload?.metrics.readMessagesCount || 0}`}</strong>
-              </div>
+          <PanelCard
+            eyebrow="Pulso da operação"
+            title="Indicadores consolidados"
+            description="Os números continuam disponíveis, mas agora entram em grupos executivos e breakdowns recolhíveis."
+          >
+            <div className="space-y-3">
+              <InfoPair
+                label="Leitura executiva"
+                value={
+                  <DetailList
+                    items={[
+                      { label: "IA conduzindo", value: payload?.metrics.aiControlledThreads || 0 },
+                      { label: "Condução humana", value: payload?.metrics.humanControlledThreads || 0 },
+                      { label: "Founder e waitlist", value: payload?.metrics.founderOrWaitlistThreads || 0 },
+                      { label: "Primeira resposta média", value: payload?.metrics.firstResponseTimeMinutes ? `${payload.metrics.firstResponseTimeMinutes} min` : "n/d" },
+                      { label: "Resposta humana média", value: payload?.metrics.humanResponseTimeMinutes ? `${payload.metrics.humanResponseTimeMinutes} min` : "n/d" },
+                      { label: "Mensagens falhadas", value: payload?.metrics.failedMessagesCount || 0 }
+                    ]}
+                  />
+                }
+              />
+              <details className="rounded-[1.4rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Breakdown por canal</summary>
+                <div className="mt-4">
+                  <DetailList
+                    items={[
+                      { label: "WhatsApp", value: payload?.metrics.whatsappVolume || 0 },
+                      { label: "Instagram", value: payload?.metrics.instagramVolume || 0 },
+                      { label: "Site", value: payload?.metrics.siteVolume || 0 },
+                      { label: "Telegram", value: payload?.metrics.telegramVolume || 0 },
+                      { label: "Instagram DM / comentário", value: `${payload?.metrics.instagramDmVolume || 0} / ${payload?.metrics.instagramCommentSignals || 0}` },
+                      { label: "Telegram privado / grupo", value: `${payload?.metrics.telegramPrivateVolume || 0} / ${payload?.metrics.telegramGroupSignals || 0}` }
+                    ]}
+                  />
+                </div>
+              </details>
+              <details className="rounded-[1.4rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">Breakdown de fila e follow-up</summary>
+                <div className="mt-4">
+                  <DetailList
+                    items={[
+                      { label: "Aguardando humano no site", value: payload?.metrics.siteWaitingHumanCount || 0 },
+                      { label: "Handoff no site", value: payload?.metrics.siteHandoffCount || 0 },
+                      { label: "Site quente / qualificado", value: `${payload?.metrics.siteHotThreads || 0} / ${payload?.metrics.siteQualifiedThreads || 0}` },
+                      { label: "Follow-up do site", value: payload?.metrics.siteFollowUpPendingCount || 0 },
+                      { label: "Aguardando humano no Instagram", value: payload?.metrics.instagramWaitingHumanCount || 0 },
+                      { label: "Handoff no Instagram", value: payload?.metrics.instagramHandoffCount || 0 },
+                      { label: "Follow-up social", value: payload?.metrics.instagramFollowUpPendingCount || 0 },
+                      { label: "Aguardando humano no Telegram", value: payload?.metrics.telegramWaitingHumanCount || 0 },
+                      { label: "Handoff no Telegram", value: payload?.metrics.telegramHandoffCount || 0 },
+                      { label: "Follow-up no Telegram", value: payload?.metrics.telegramFollowUpPendingCount || 0 }
+                    ]}
+                  />
+                </div>
+              </details>
             </div>
-          </div>
+          </PanelCard>
         </div>
       </section>
     </div>
