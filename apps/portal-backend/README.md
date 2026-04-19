@@ -265,6 +265,14 @@ Modos de enforcement:
 - `npm run operations:verify:release`: modo mais estrito para promocao production-like, bloqueando runtime duravel nao provado ou fallback critico
 - `npm run operations:evidence:release`: gera evidence local em arquivo para anexar ao workflow de liberacao
 
+Artifacts de release gerados:
+
+- `backend-operations-report.json`
+- `backend-operations-summary.txt`
+- `backend-release-evidence.md`
+- `backend-release-summary.json`
+- `backend-release-summary.md`
+
 O relatorio protegido em `GET /api/internal/readiness` agora tambem inclui `operator.releaseSafety`, com:
 
 - `enforcementLevel`

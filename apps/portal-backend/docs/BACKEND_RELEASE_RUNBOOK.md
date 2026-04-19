@@ -22,8 +22,11 @@ Arquivos esperados em `apps/portal-backend/.artifacts/operations/release`:
 - `backend-operations-report.json`
 - `backend-operations-summary.txt`
 - `backend-release-evidence.md`
+- `backend-release-summary.json`
+- `backend-release-summary.md`
 
 Use esses arquivos como prova repo-side da decisao de release.
+Use `backend-release-summary.md` como o resumo curto para release manager e `backend-release-evidence.md` como o detalhe operacional.
 
 ## Post-deploy
 
@@ -54,6 +57,17 @@ Use esses arquivos como prova repo-side da decisao de release.
 - worker com `staleProcessing` ou `terminalFailures`
 - pagamento sem enforcement de assinatura
 - qualquer ambiente production-like sem prova duravel quando a release depende disso
+
+## Secret rotation revalidation
+
+- `INTERNAL_API_SECRET`, `NOTIFICATIONS_WORKER_SECRET`, `CRON_SECRET`
+  Verificar readiness protegida, worker protegido e rejeicao do secret anterior.
+- `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET`
+  Verificar `GET /api/payment/webhook` com acesso protegido e ausencia de `payments_signature_not_enforced`.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
+  Verificar `telegram.status = healthy` e sucesso do webhook protegido.
+- `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
+  Verificar callback GET da Meta, novo evento com `META_WEBHOOK_INBOUND_ACCEPTED` e envio outbound sem erro de token.
 
 ## External/manual proof still required
 

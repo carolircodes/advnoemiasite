@@ -134,10 +134,11 @@ test("operations verification json exposes release evidence for downstream autom
       });
       const parsed = JSON.parse(renderBackendOperationsVerificationReport(report, "json"));
 
-      assert.equal(parsed.schemaVersion, "phase7-2026-04-18");
+      assert.equal(parsed.schemaVersion, "phase8-2026-04-18");
       assert.equal(typeof parsed.releaseEvidence.blockerCount, "number");
       assert.equal(Array.isArray(parsed.releaseEvidence.manualFollowUps), true);
       assert.equal(Array.isArray(parsed.releaseEvidence.alertSummary.immediate), true);
+      assert.equal(typeof parsed.releaseEvidence.releaseManagerSummary.headline, "string");
       assert.equal(JSON.stringify(parsed).includes("internal-secret"), false);
     }
   );

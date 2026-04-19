@@ -132,8 +132,11 @@ Revise os arquivos gerados em `apps/portal-backend/.artifacts/operations/release
 - `backend-operations-report.json`
 - `backend-operations-summary.txt`
 - `backend-release-evidence.md`
+- `backend-release-summary.json`
+- `backend-release-summary.md`
 
 Se o artifact listar `manualFollowUps`, trate-os como follow-up real e nao como nota decorativa.
+Use `backend-release-summary.md` para o resumo executivo da liberacao e `backend-release-evidence.md` para o detalhe tecnico.
 
 ## 7. Confirmar notificacoes e worker
 
@@ -185,3 +188,14 @@ Sinais de desvio:
 - aplicacao da migracao duravel em qualquer ambiente ainda nao convergido
 - integracao do checklist com observabilidade externa ou alertas, se desejado em fase futura
 - prova administrativa real da convergencia duravel enquanto o runtime ainda nao puder ser provado so por CI
+
+## 11. Revalidacao apos rotacao de secrets
+
+- `INTERNAL_API_SECRET`, `NOTIFICATIONS_WORKER_SECRET`, `CRON_SECRET`
+  Confirmar acesso com o novo secret e falha com o secret anterior.
+- `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET`
+  Confirmar webhook protegido e ausencia de blocker de assinatura.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
+  Confirmar readiness saudavel e webhook protegido funcional.
+- `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
+  Confirmar verificacao GET da Meta, evento inbound real e envio outbound sem falha de credencial.

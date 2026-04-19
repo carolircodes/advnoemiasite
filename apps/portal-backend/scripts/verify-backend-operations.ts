@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   buildBackendOperationsVerificationReport,
   renderBackendReleaseEvidenceMarkdown,
+  renderBackendReleaseManagerSummaryMarkdown,
   type BackendEnforcementProfile,
   renderBackendOperationsVerificationReport,
   type BackendRuntimeVerificationMode
@@ -64,6 +65,16 @@ if (writeDir) {
   await writeFile(
     path.join(resolvedDir, "backend-release-evidence.md"),
     renderBackendReleaseEvidenceMarkdown(report),
+    "utf8"
+  );
+  await writeFile(
+    path.join(resolvedDir, "backend-release-summary.json"),
+    `${JSON.stringify(report.releaseEvidence.releaseManagerSummary, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(resolvedDir, "backend-release-summary.md"),
+    renderBackendReleaseManagerSummaryMarkdown(report),
     "utf8"
   );
 }

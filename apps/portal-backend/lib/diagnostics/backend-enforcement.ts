@@ -19,6 +19,21 @@ export type BackendEnforcementLevel =
   | "warning"
   | "action_required"
   | "release_blocker";
+export type BackendActionDomain =
+  | "repo_code"
+  | "env_config"
+  | "external_provider"
+  | "database_admin"
+  | "dashboard_manual";
+export type BackendActionOwner =
+  | "release_manager"
+  | "platform_operator"
+  | "provider_operator"
+  | "database_admin";
+export type BackendCompletionType =
+  | "automated_evidence"
+  | "partially_codified"
+  | "external_manual";
 
 export type BackendSectionAssessment = {
   subsystem: string;
@@ -35,8 +50,20 @@ export type BackendSectionAssessment = {
   };
 };
 
+type ReleaseEvidenceManualFollowUp = {
+  category: "durable" | "environment" | "subsystem" | "release";
+  enforcementLevel: BackendEnforcementLevel;
+  blocksRelease: boolean;
+  actionDomain: BackendActionDomain;
+  owner: BackendActionOwner;
+  completionType: BackendCompletionType;
+  title: string;
+  why: string;
+  successSignals: string[];
+};
+
 export type BackendOperationsVerificationReport = {
-  schemaVersion: "phase7-2026-04-18";
+  schemaVersion: "phase8-2026-04-18";
   profile: BackendEnforcementProfile;
   runtimeVerification: {
     mode: BackendRuntimeVerificationMode;
@@ -67,11 +94,30 @@ export type BackendOperationsVerificationReport = {
       | "approved_with_warnings"
       | "manual_follow_up_required"
       | "blocked";
-    manualFollowUps: Array<{
-      category: "durable" | "environment" | "subsystem" | "release";
-      title: string;
-      why: string;
+    manualFollowUps: ReleaseEvidenceManualFollowUp[];
+    evidenceBoundaries: {
+      automatedProof: string[];
+      inferredStatus: string[];
+      requiredExternalVerification: string[];
+    };
+    durableProof: {
+      state: "complete" | "pending" | "failed";
+      completionType: BackendCompletionType;
+      requiredAccess: "supabase_admin" | "none";
+      automatedSignals: string[];
+      manualSteps: string[];
       successSignals: string[];
+      failureSignals: string[];
+    };
+    secretRotation: Array<{
+      name: string;
+      subsystem: "perimeter" | "payments" | "telegram" | "meta";
+      actionDomain: BackendActionDomain;
+      owner: BackendActionOwner;
+      completionType: BackendCompletionType;
+      envNames: string[];
+      verificationSignals: string[];
+      followUp: string;
     }>;
     alertSummary: {
       immediate: Array<{
@@ -80,202 +126,245 @@ export type BackendOperationsVerificationReport = {
         code: string;
         summary: string;
         operatorAction: string;
+        owner: BackendActionOwner;
+        actionDomain: BackendActionDomain;
       }>;
       review: Array<{
         subsystem: string;
         level: BackendEnforcementLevel;
         code: string;
         summary: string;
+        owner: BackendActionOwner;
+        actionDomain: BackendActionDomain;
       }>;
+    };
+    releaseManagerSummary: {
+      headline: string;
+      decision:
+        | "approved"
+        | "approved_with_warnings"
+        | "manual_follow_up_required"
+        | "blocked";
+      blockerCount: number;
+      actionRequiredCount: number;
+      warningCount: number;
+      requiresHumanApproval: boolean;
+      topActions: Array<{
+        subsystem: string;
+        level: BackendEnforcementLevel;
+        code: string;
+        owner: BackendActionOwner;
+        actionDomain: BackendActionDomain;
+        nextAction: string;
+      }>;
+      proofBoundary: {
+        automated: number;
+        inferred: number;
+        external: number;
+      };
     };
   };
 };
 
 export type BackendOperationsVerificationFormat = "json" | "text";
 
-function buildReleaseEvidence(
-  sections: BackendSectionAssessment[],
-  blockers: BackendSectionAssessment[],
-  warnings: BackendSectionAssessment[],
-  runtimeVerification: BackendOperationsVerificationReport["runtimeVerification"]
-): BackendOperationsVerificationReport["releaseEvidence"] {
-  const actionRequiredItems = warnings.filter(
-    (section) => section.enforcement.level === "action_required"
-  );
-  const warningItems = warnings.filter(
-    (section) => section.enforcement.level === "warning"
-  );
-  const durableSection = sections.find((section) => section.subsystem === "durableRuntime");
-  const durableConvergence =
-    durableSection?.status === "healthy"
-      ? "verified"
-      : durableSection?.status === "fallback"
-        ? "fallback"
-        : "unverified";
-  const runtimeProofSatisfied =
-    runtimeVerification.mode !== "required" ||
-    (runtimeVerification.attempted &&
-      runtimeVerification.available &&
-      durableConvergence === "verified");
-  const releaseDecision =
-    blockers.length > 0
-      ? "blocked"
-      : actionRequiredItems.length > 0 || !runtimeProofSatisfied
-        ? "manual_follow_up_required"
-        : warningItems.length > 0
-          ? "approved_with_warnings"
-          : "approved";
-
-  const manualFollowUps: BackendOperationsVerificationReport["releaseEvidence"]["manualFollowUps"] = [];
-
-  if (durableSection && durableConvergence !== "verified") {
-    manualFollowUps.push({
-      category: "durable",
-      title: "Confirmar convergencia duravel em ambiente real",
-      why:
-        durableSection.status === "fallback"
-          ? "O runtime atual caiu para memory-fallback."
-          : "A verificacao runtime duravel ainda nao foi provada com acesso administrativo real.",
-      successSignals: [
-        `Migracao ${DURABLE_PROTECTION_EXPECTATIONS.migrationName} aplicada.`,
-        "Readiness protegida com abuseProtection.details.runtime.mode = durable.",
-        "Nenhum flow critico listado como fallback-only em abuseProtection.details.flows."
-      ]
-    });
-  }
-
-  const environmentSection = sections.find(
-    (section) => section.subsystem === "environmentCompleteness"
-  );
-  if (environmentSection && environmentSection.status !== "healthy") {
-    manualFollowUps.push({
-      category: "environment",
-      title: "Fechar lacunas de environment completeness antes da liberacao final",
-      why: environmentSection.summary,
-      successSignals: [
-        "profiles.release.satisfied = true.",
-        "profiles.full_durable.satisfied = true quando a promocao exigir prova duravel real.",
-        "Nenhum secret ou chave obrigatoria pendente no ambiente alvo."
-      ]
-    });
-  }
-
-  for (const section of actionRequiredItems.filter(
-    (item) =>
-      item.subsystem !== "environmentCompleteness" &&
-      item.subsystem !== "durableRuntime"
-  )) {
-    manualFollowUps.push({
-      category: "subsystem",
-      title: `Revalidar ${section.subsystem} no ambiente alvo`,
-      why: section.summary,
-      successSignals: section.verification.slice(0, 3)
-    });
-  }
-
-  if (blockers.length > 0) {
-    manualFollowUps.push({
-      category: "release",
-      title: "Nao promover enquanto houver release blockers",
-      why: "A verificacao atual encontrou bloqueios explicitos para o perfil selecionado.",
-      successSignals: [
-        "blockers vazio no relatorio de release.",
-        "deployAllowed = true.",
-        "operator.releaseSafety.blockers vazio na readiness protegida."
-      ]
-    });
-  }
-
-  return {
-    generatedAt: new Date().toISOString(),
-    blockerCount: blockers.length,
-    actionRequiredCount: actionRequiredItems.length,
-    warningCount: warningItems.length,
-    runtimeProofSatisfied,
-    durableConvergence,
-    releaseDecision,
-    manualFollowUps,
-    alertSummary: {
-      immediate: [...blockers, ...actionRequiredItems].map((section) => ({
-        subsystem: section.subsystem,
-        level: section.enforcement.level,
-        code: section.code,
-        summary: section.summary,
-        operatorAction: section.operatorAction
-      })),
-      review: warningItems.map((section) => ({
-        subsystem: section.subsystem,
-        level: section.enforcement.level,
-        code: section.code,
-        summary: section.summary
-      }))
-    }
-  };
-}
-
-export function renderBackendReleaseEvidenceMarkdown(
-  report: BackendOperationsVerificationReport
-) {
-  const lines = [
-    "# Backend Release Evidence",
-    "",
-    `- Generated at: ${report.releaseEvidence.generatedAt}`,
-    `- Profile: ${report.profile}`,
-    `- Aggregate status: ${report.status}`,
-    `- Enforcement level: ${report.enforcementLevel}`,
-    `- Deploy allowed: ${report.deployAllowed ? "yes" : "no"}`,
-    `- Release decision: ${report.releaseEvidence.releaseDecision}`,
-    `- Durable convergence: ${report.releaseEvidence.durableConvergence}`,
-    `- Runtime proof satisfied: ${report.releaseEvidence.runtimeProofSatisfied ? "yes" : "no"}`,
-    "",
-    "## Immediate attention",
-    ""
-  ];
-
-  if (report.releaseEvidence.alertSummary.immediate.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const item of report.releaseEvidence.alertSummary.immediate) {
-      lines.push(
-        `- ${item.subsystem}: ${item.level} / ${item.code} / ${item.summary} / Action: ${item.operatorAction}`
-      );
-    }
-  }
-
-  lines.push("", "## Review items", "");
-
-  if (report.releaseEvidence.alertSummary.review.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const item of report.releaseEvidence.alertSummary.review) {
-      lines.push(`- ${item.subsystem}: ${item.level} / ${item.code} / ${item.summary}`);
-    }
-  }
-
-  lines.push("", "## Manual follow-up", "");
-
-  if (report.releaseEvidence.manualFollowUps.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const followUp of report.releaseEvidence.manualFollowUps) {
-      lines.push(`- ${followUp.category}: ${followUp.title}`);
-      lines.push(`  Why: ${followUp.why}`);
-      lines.push(`  Success signals: ${followUp.successSignals.join(" | ")}`);
-    }
-  }
-
-  lines.push("", "## Protected readiness", "");
-  lines.push(
-    `- ${report.protectedReadiness.path} with ${report.protectedReadiness.access}`
-  );
-
-  return `${lines.join("\n")}\n`;
-}
-
 type SectionContext = {
   profile: BackendEnforcementProfile;
   runtimeVerification: BackendOperationsVerificationReport["runtimeVerification"];
 };
+
+function inferActionDomain(
+  subsystem: string,
+  code: string
+): BackendActionDomain {
+  if (subsystem === "durableRuntime" || subsystem === "durableExpectations") {
+    return "database_admin";
+  }
+
+  if (
+    subsystem === "environmentCompleteness" ||
+    subsystem === "deployment" ||
+    subsystem === "platform" ||
+    subsystem === "perimeter" ||
+    subsystem === "notifications"
+  ) {
+    return "env_config";
+  }
+
+  if (subsystem === "payments" || subsystem === "telegram" || subsystem === "meta") {
+    return "external_provider";
+  }
+
+  if (code.includes("host_misaligned")) {
+    return "dashboard_manual";
+  }
+
+  return "repo_code";
+}
+
+function inferActionOwner(actionDomain: BackendActionDomain): BackendActionOwner {
+  switch (actionDomain) {
+    case "database_admin":
+      return "database_admin";
+    case "external_provider":
+    case "dashboard_manual":
+      return "provider_operator";
+    case "env_config":
+      return "platform_operator";
+    case "repo_code":
+    default:
+      return "release_manager";
+  }
+}
+
+function durableStateToEnforcementLevel(
+  state: BackendOperationsVerificationReport["releaseEvidence"]["durableProof"]["state"]
+): BackendEnforcementLevel {
+  switch (state) {
+    case "complete":
+      return "info";
+    case "failed":
+      return "release_blocker";
+    case "pending":
+    default:
+      return "action_required";
+  }
+}
+
+function buildDurableProofSupport(
+  durableSection: BackendSectionAssessment | undefined,
+  runtimeVerification: BackendOperationsVerificationReport["runtimeVerification"]
+): BackendOperationsVerificationReport["releaseEvidence"]["durableProof"] {
+  const state =
+    durableSection?.status === "healthy" &&
+    runtimeVerification.attempted &&
+    runtimeVerification.available
+      ? "complete"
+      : durableSection?.status === "fallback"
+        ? "failed"
+        : "pending";
+
+  return {
+    state,
+    completionType: state === "complete" ? "automated_evidence" : "external_manual",
+    requiredAccess: state === "complete" ? "none" : "supabase_admin",
+    automatedSignals: [
+      `runtimeVerification.mode=${runtimeVerification.mode}`,
+      `runtimeVerification.attempted=${runtimeVerification.attempted}`,
+      `runtimeVerification.available=${runtimeVerification.available}`,
+      `durableSection.code=${durableSection?.code || "durable_runtime_not_available"}`
+    ],
+    manualSteps: [
+      `Confirmar migracao ${DURABLE_PROTECTION_EXPECTATIONS.migrationName}.`,
+      `Confirmar tabelas ${DURABLE_PROTECTION_EXPECTATIONS.requiredTables.join(" e ")}.`,
+      `Confirmar funcao ${DURABLE_PROTECTION_EXPECTATIONS.requiredFunction}.`,
+      "Reexecutar a readiness protegida e verificar abuseProtection.details.runtime.mode.",
+      "Conferir coverage dos flows em abuseProtection.details.flows."
+    ],
+    successSignals: [
+      "abuseProtection.details.runtime.mode = durable.",
+      "durableRuntime.status = healthy.",
+      "Nenhum flow critico em memory-fallback ou unavailable."
+    ],
+    failureSignals: [
+      "abuseProtection.details.runtime.mode = memory-fallback.",
+      "durable_runtime_verification_unavailable.",
+      "Tabelas ou funcao duravel ausentes no ambiente alvo."
+    ]
+  };
+}
+
+function buildSecretRotationGuidance(): BackendOperationsVerificationReport["releaseEvidence"]["secretRotation"] {
+  return [
+    {
+      name: "Internal perimeter secrets",
+      subsystem: "perimeter",
+      actionDomain: "env_config",
+      owner: "platform_operator",
+      completionType: "partially_codified",
+      envNames: ["INTERNAL_API_SECRET", "NOTIFICATIONS_WORKER_SECRET", "CRON_SECRET"],
+      verificationSignals: [
+        "Novo secret acessa /api/internal/readiness e o worker protegido.",
+        "Chamadas sem secret ou com secret antigo falham.",
+        "operations:verify:release deixa de sinalizar perimeter_internal_guards_missing."
+      ],
+      followUp:
+        "Rotacao e externa/manual, mas a revalidacao pode ser feita com readiness protegida e testes de acesso."
+    },
+    {
+      name: "Mercado Pago webhook and access credentials",
+      subsystem: "payments",
+      actionDomain: "external_provider",
+      owner: "provider_operator",
+      completionType: "partially_codified",
+      envNames: ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET"],
+      verificationSignals: [
+        "payments_signature_not_enforced ausente.",
+        "GET /api/payment/webhook com acesso protegido mostra signature.enforced = true.",
+        "Fluxo de pagamento ou webhook de teste retorna sem falha de assinatura."
+      ],
+      followUp:
+        "A troca do segredo ocorre fora do repo; a prova final depende do dashboard/provider."
+    },
+    {
+      name: "Telegram bot and webhook secret",
+      subsystem: "telegram",
+      actionDomain: "external_provider",
+      owner: "provider_operator",
+      completionType: "partially_codified",
+      envNames: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET"],
+      verificationSignals: [
+        "telegram.status = healthy na readiness protegida.",
+        "Webhook do Telegram aceita o novo secret e rejeita o anterior.",
+        "Distribuicao protegida continua funcional."
+      ],
+      followUp:
+        "Rotacao exige ajuste externo no provedor e revalidacao do webhook."
+    },
+    {
+      name: "Meta webhook and page credentials",
+      subsystem: "meta",
+      actionDomain: "dashboard_manual",
+      owner: "provider_operator",
+      completionType: "external_manual",
+      envNames: ["META_VERIFY_TOKEN", "META_APP_SECRET", "FACEBOOK_PAGE_ACCESS_TOKEN"],
+      verificationSignals: [
+        "Meta revalida GET /api/meta/webhook com sucesso.",
+        "Runtime logs mostram META_WEBHOOK_INBOUND_ACCEPTED apos novo evento.",
+        "Envio outbound deixa de retornar facebook_access_token_missing ou falhas de assinatura."
+      ],
+      followUp:
+        "A ultima milha depende do dashboard da Meta e de um evento real do canal."
+    }
+  ];
+}
+
+function buildEvidenceBoundaries(
+  runtimeVerification: BackendOperationsVerificationReport["runtimeVerification"],
+  blockers: BackendSectionAssessment[],
+  warnings: BackendSectionAssessment[],
+  durableProof: BackendOperationsVerificationReport["releaseEvidence"]["durableProof"]
+) {
+  return {
+    automatedProof: [
+      "Classificacao de release/blocker baseada no report gerado em repo.",
+      "Snapshot de environment completeness e sections criticas.",
+      "Evidence artifact persistido em JSON, texto e markdown."
+    ],
+    inferredStatus: [
+      `Runtime verification mode ${runtimeVerification.mode} com attempted=${runtimeVerification.attempted}.`,
+      `Warnings ativos: ${warnings.length}.`,
+      `Blockers ativos: ${blockers.length}.`
+    ],
+    requiredExternalVerification:
+      durableProof.requiredAccess === "supabase_admin"
+        ? [
+            "Acesso administrativo real ao Supabase para prova de convergencia duravel.",
+            "Dashboards/provedores externos para rotacao e webhook validation quando aplicavel."
+          ]
+        : ["Revalidacao externa somente quando houver mudanca de provider ou rotacao de segredo."]
+  };
+}
 
 function buildDurableRuntimeSection(
   durableProtection: Awaited<ReturnType<typeof getDurableProtectionStatus>>
@@ -446,6 +535,212 @@ export function summarizeBackendEnforcement(
   };
 }
 
+function buildReleaseEvidence(
+  sections: BackendSectionAssessment[],
+  blockers: BackendSectionAssessment[],
+  warnings: BackendSectionAssessment[],
+  runtimeVerification: BackendOperationsVerificationReport["runtimeVerification"]
+): BackendOperationsVerificationReport["releaseEvidence"] {
+  const actionRequiredItems = warnings.filter(
+    (section) => section.enforcement.level === "action_required"
+  );
+  const warningItems = warnings.filter(
+    (section) => section.enforcement.level === "warning"
+  );
+  const durableSection = sections.find((section) => section.subsystem === "durableRuntime");
+  const durableConvergence =
+    durableSection?.status === "healthy"
+      ? "verified"
+      : durableSection?.status === "fallback"
+        ? "fallback"
+        : "unverified";
+  const runtimeProofSatisfied =
+    runtimeVerification.mode !== "required" ||
+    (runtimeVerification.attempted &&
+      runtimeVerification.available &&
+      durableConvergence === "verified");
+  const releaseDecision =
+    blockers.length > 0
+      ? "blocked"
+      : actionRequiredItems.length > 0 || !runtimeProofSatisfied
+        ? "manual_follow_up_required"
+        : warningItems.length > 0
+          ? "approved_with_warnings"
+          : "approved";
+  const durableProof = buildDurableProofSupport(durableSection, runtimeVerification);
+  const secretRotation = buildSecretRotationGuidance();
+  const manualFollowUps: ReleaseEvidenceManualFollowUp[] = [];
+
+  if (durableSection && durableConvergence !== "verified") {
+    const actionDomain = inferActionDomain("durableRuntime", durableSection.code);
+    manualFollowUps.push({
+      category: "durable",
+      enforcementLevel: durableStateToEnforcementLevel(durableProof.state),
+      blocksRelease: durableProof.state !== "complete" && runtimeVerification.mode === "required",
+      actionDomain,
+      owner: inferActionOwner(actionDomain),
+      completionType: durableProof.completionType,
+      title: "Confirmar convergencia duravel em ambiente real",
+      why:
+        durableSection.status === "fallback"
+          ? "O runtime atual caiu para memory-fallback."
+          : "A verificacao runtime duravel ainda nao foi provada com acesso administrativo real.",
+      successSignals: [
+        `Migracao ${DURABLE_PROTECTION_EXPECTATIONS.migrationName} aplicada.`,
+        "Readiness protegida com abuseProtection.details.runtime.mode = durable.",
+        "Nenhum flow critico listado como fallback-only em abuseProtection.details.flows."
+      ]
+    });
+  }
+
+  const environmentSection = sections.find(
+    (section) => section.subsystem === "environmentCompleteness"
+  );
+  if (environmentSection && environmentSection.status !== "healthy") {
+    const actionDomain = inferActionDomain(
+      environmentSection.subsystem,
+      environmentSection.code
+    );
+    manualFollowUps.push({
+      category: "environment",
+      enforcementLevel: environmentSection.enforcement.level,
+      blocksRelease: environmentSection.enforcement.level === "release_blocker",
+      actionDomain,
+      owner: inferActionOwner(actionDomain),
+      completionType: "partially_codified",
+      title: "Fechar lacunas de environment completeness antes da liberacao final",
+      why: environmentSection.summary,
+      successSignals: [
+        "profiles.release.satisfied = true.",
+        "profiles.full_durable.satisfied = true quando a promocao exigir prova duravel real.",
+        "Nenhum secret ou chave obrigatoria pendente no ambiente alvo."
+      ]
+    });
+  }
+
+  for (const section of actionRequiredItems.filter(
+    (item) =>
+      item.subsystem !== "environmentCompleteness" &&
+      item.subsystem !== "durableRuntime"
+  )) {
+    const actionDomain = inferActionDomain(section.subsystem, section.code);
+    manualFollowUps.push({
+      category: "subsystem",
+      enforcementLevel: section.enforcement.level,
+      blocksRelease: section.enforcement.level === "release_blocker",
+      actionDomain,
+      owner: inferActionOwner(actionDomain),
+      completionType:
+        actionDomain === "external_provider" || actionDomain === "dashboard_manual"
+          ? "external_manual"
+          : "partially_codified",
+      title: `Revalidar ${section.subsystem} no ambiente alvo`,
+      why: section.summary,
+      successSignals: section.verification.slice(0, 3)
+    });
+  }
+
+  if (blockers.length > 0) {
+    manualFollowUps.push({
+      category: "release",
+      enforcementLevel: "release_blocker",
+      blocksRelease: true,
+      actionDomain: "repo_code",
+      owner: "release_manager",
+      completionType: "partially_codified",
+      title: "Nao promover enquanto houver release blockers",
+      why: "A verificacao atual encontrou bloqueios explicitos para o perfil selecionado.",
+      successSignals: [
+        "blockers vazio no relatorio de release.",
+        "deployAllowed = true.",
+        "operator.releaseSafety.blockers vazio na readiness protegida."
+      ]
+    });
+  }
+
+  const evidenceBoundaries = buildEvidenceBoundaries(
+    runtimeVerification,
+    blockers,
+    warnings,
+    durableProof
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    blockerCount: blockers.length,
+    actionRequiredCount: actionRequiredItems.length,
+    warningCount: warningItems.length,
+    runtimeProofSatisfied,
+    durableConvergence,
+    releaseDecision,
+    manualFollowUps,
+    evidenceBoundaries,
+    durableProof,
+    secretRotation,
+    alertSummary: {
+      immediate: [...blockers, ...actionRequiredItems].map((section) => {
+        const actionDomain = inferActionDomain(section.subsystem, section.code);
+
+        return {
+          subsystem: section.subsystem,
+          level: section.enforcement.level,
+          code: section.code,
+          summary: section.summary,
+          operatorAction: section.operatorAction,
+          owner: inferActionOwner(actionDomain),
+          actionDomain
+        };
+      }),
+      review: warningItems.map((section) => {
+        const actionDomain = inferActionDomain(section.subsystem, section.code);
+
+        return {
+          subsystem: section.subsystem,
+          level: section.enforcement.level,
+          code: section.code,
+          summary: section.summary,
+          owner: inferActionOwner(actionDomain),
+          actionDomain
+        };
+      })
+    },
+    releaseManagerSummary: {
+      headline:
+        releaseDecision === "blocked"
+          ? "Backend release blocked pending operational follow-up."
+          : releaseDecision === "manual_follow_up_required"
+            ? "Backend release requires conscious manual follow-up."
+            : releaseDecision === "approved_with_warnings"
+              ? "Backend release approved with tracked warnings."
+              : "Backend release approved by current evidence.",
+      decision: releaseDecision,
+      blockerCount: blockers.length,
+      actionRequiredCount: actionRequiredItems.length,
+      warningCount: warningItems.length,
+      requiresHumanApproval: releaseDecision !== "approved",
+      topActions: [...blockers, ...actionRequiredItems]
+        .slice(0, 5)
+        .map((section) => {
+          const actionDomain = inferActionDomain(section.subsystem, section.code);
+
+          return {
+            subsystem: section.subsystem,
+            level: section.enforcement.level,
+            code: section.code,
+            owner: inferActionOwner(actionDomain),
+            actionDomain,
+            nextAction: section.operatorAction
+          };
+        }),
+      proofBoundary: {
+        automated: evidenceBoundaries.automatedProof.length,
+        inferred: evidenceBoundaries.inferredStatus.length,
+        external: evidenceBoundaries.requiredExternalVerification.length
+      }
+    }
+  };
+}
+
 export async function buildBackendOperationsVerificationReport(options?: {
   profile?: BackendEnforcementProfile;
   runtimeMode?: BackendRuntimeVerificationMode;
@@ -491,7 +786,7 @@ export async function buildBackendOperationsVerificationReport(options?: {
   });
 
   return {
-    schemaVersion: "phase7-2026-04-18" as const,
+    schemaVersion: "phase8-2026-04-18" as const,
     profile,
     runtimeVerification,
     status: combineDiagnosticStatuses(Object.values(sections)),
@@ -512,6 +807,133 @@ export async function buildBackendOperationsVerificationReport(options?: {
       runtimeVerification
     )
   };
+}
+
+export function renderBackendReleaseEvidenceMarkdown(
+  report: BackendOperationsVerificationReport
+) {
+  const lines = [
+    "# Backend Release Evidence",
+    "",
+    `- Generated at: ${report.releaseEvidence.generatedAt}`,
+    `- Profile: ${report.profile}`,
+    `- Aggregate status: ${report.status}`,
+    `- Enforcement level: ${report.enforcementLevel}`,
+    `- Deploy allowed: ${report.deployAllowed ? "yes" : "no"}`,
+    `- Release decision: ${report.releaseEvidence.releaseDecision}`,
+    `- Durable convergence: ${report.releaseEvidence.durableConvergence}`,
+    `- Runtime proof satisfied: ${report.releaseEvidence.runtimeProofSatisfied ? "yes" : "no"}`,
+    "",
+    "## Immediate attention",
+    ""
+  ];
+
+  if (report.releaseEvidence.alertSummary.immediate.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of report.releaseEvidence.alertSummary.immediate) {
+      lines.push(
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / ${item.summary} / Action: ${item.operatorAction}`
+      );
+    }
+  }
+
+  lines.push("", "## Review items", "");
+
+  if (report.releaseEvidence.alertSummary.review.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of report.releaseEvidence.alertSummary.review) {
+      lines.push(
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / ${item.summary}`
+      );
+    }
+  }
+
+  lines.push("", "## Manual follow-up", "");
+
+  if (report.releaseEvidence.manualFollowUps.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const followUp of report.releaseEvidence.manualFollowUps) {
+      lines.push(
+        `- ${followUp.category}: ${followUp.title} / level=${followUp.enforcementLevel} / blocksRelease=${followUp.blocksRelease} / owner=${followUp.owner} / domain=${followUp.actionDomain} / completionType=${followUp.completionType}`
+      );
+      lines.push(`  Why: ${followUp.why}`);
+      lines.push(`  Success signals: ${followUp.successSignals.join(" | ")}`);
+    }
+  }
+
+  lines.push("", "## Durable proof support", "");
+  lines.push(
+    `- state=${report.releaseEvidence.durableProof.state} / completionType=${report.releaseEvidence.durableProof.completionType} / requiredAccess=${report.releaseEvidence.durableProof.requiredAccess}`
+  );
+  lines.push(
+    `- Automated signals: ${report.releaseEvidence.durableProof.automatedSignals.join(" | ")}`
+  );
+  lines.push(`- Manual steps: ${report.releaseEvidence.durableProof.manualSteps.join(" | ")}`);
+  lines.push(
+    `- Success signals: ${report.releaseEvidence.durableProof.successSignals.join(" | ")}`
+  );
+
+  lines.push("", "## Secret rotation support", "");
+  for (const item of report.releaseEvidence.secretRotation) {
+    lines.push(
+      `- ${item.name}: owner=${item.owner} / domain=${item.actionDomain} / completionType=${item.completionType}`
+    );
+    lines.push(`  Env: ${item.envNames.join(", ")}`);
+    lines.push(`  Verify: ${item.verificationSignals.join(" | ")}`);
+  }
+
+  lines.push("", "## Evidence boundary", "");
+  lines.push(
+    `- Automated: ${report.releaseEvidence.evidenceBoundaries.automatedProof.join(" | ")}`
+  );
+  lines.push(
+    `- Inferred: ${report.releaseEvidence.evidenceBoundaries.inferredStatus.join(" | ")}`
+  );
+  lines.push(
+    `- External/manual: ${report.releaseEvidence.evidenceBoundaries.requiredExternalVerification.join(" | ")}`
+  );
+
+  lines.push("", "## Protected readiness", "");
+  lines.push(
+    `- ${report.protectedReadiness.path} with ${report.protectedReadiness.access}`
+  );
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderBackendReleaseManagerSummaryMarkdown(
+  report: BackendOperationsVerificationReport
+) {
+  const summary = report.releaseEvidence.releaseManagerSummary;
+  const lines = [
+    "# Backend Release Manager Summary",
+    "",
+    `- Headline: ${summary.headline}`,
+    `- Decision: ${summary.decision}`,
+    `- Requires human approval: ${summary.requiresHumanApproval ? "yes" : "no"}`,
+    `- Blockers: ${summary.blockerCount}`,
+    `- Action required: ${summary.actionRequiredCount}`,
+    `- Warnings: ${summary.warningCount}`,
+    `- Evidence boundary: automated=${summary.proofBoundary.automated} / inferred=${summary.proofBoundary.inferred} / external=${summary.proofBoundary.external}`,
+    "",
+    "## Top actions",
+    ""
+  ];
+
+  if (summary.topActions.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of summary.topActions) {
+      lines.push(
+        `- ${item.subsystem}: ${item.level} / ${item.code} / owner=${item.owner} / domain=${item.actionDomain} / next=${item.nextAction}`
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
 }
 
 export function renderBackendOperationsVerificationReport(
@@ -561,7 +983,9 @@ export function renderBackendOperationsVerificationReport(
   lines.push("Manual follow-up:");
   if (report.releaseEvidence.manualFollowUps.length > 0) {
     for (const item of report.releaseEvidence.manualFollowUps) {
-      lines.push(`- ${item.category}: ${item.title} :: ${item.why}`);
+      lines.push(
+        `- ${item.category}: ${item.title} :: ${item.why} :: owner=${item.owner} :: domain=${item.actionDomain}`
+      );
     }
   } else {
     lines.push("- none");

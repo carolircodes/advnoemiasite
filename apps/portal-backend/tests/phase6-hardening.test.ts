@@ -163,7 +163,7 @@ test("operations verify json output stays machine-readable and non-sensitive", a
       const parsed = JSON.parse(rendered);
       const serialized = JSON.stringify(parsed);
 
-      assert.equal(parsed.schemaVersion, "phase7-2026-04-18");
+      assert.equal(parsed.schemaVersion, "phase8-2026-04-18");
       assert.equal(parsed.profile, "ci");
       assert.equal(typeof parsed.deployAllowed, "boolean");
       assert.equal(Array.isArray(parsed.sections), true);
