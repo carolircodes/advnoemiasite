@@ -1,68 +1,78 @@
 # Checklist técnico — produção (apex + `portal.advnoemia.com.br`)
 
-Use este guia quando o **site institucional** estiver em `https://advnoemia.com.br` (e opcionalmente `https://www.advnoemia.com.br`) e o **portal Next.js** em `https://portal.advnoemia.com.br`.
-
----
+Use este guia quando o site institucional estiver em `https://advnoemia.com.br` e o portal Next.js em `https://portal.advnoemia.com.br`.
 
 ## 1. DNS e TLS
 
-- [ ] Registo `A` / `CNAME` de `portal.advnoemia.com.br` aponta para a hospedagem do Next (Cloudflare Pages, Vercel, Fly.io, etc.).
-- [ ] Certificado TLS válido no subdomínio do portal.
-- [ ] (Opcional) Redirecionar `www.advnoemia.com.br` → `advnoemia.com.br` ou o inverso, de forma consistente.
+- [ ] `portal.advnoemia.com.br` aponta para o projeto Vercel `advnoemiaportal`
+- [ ] certificado TLS válido no subdomínio do portal
+- [ ] `advnoemia.com.br` e `www.advnoemia.com.br` continuam apontando para o projeto do site, não para o portal
 
-## 2. Variáveis de ambiente (portal / Next)
+## 2. Variáveis de ambiente do portal
 
-Definir no painel do deploy do **portal** (não no site estático):
+Definir no projeto Vercel do portal, nunca no projeto do site:
 
-- [ ] `NEXT_PUBLIC_APP_URL=https://portal.advnoemia.com.br` (sem barra final).
-- [ ] `NEXT_PUBLIC_PUBLIC_SITE_URL=https://advnoemia.com.br` (URL canónica do marketing; usada em links “Site institucional” e na lista CORS).
-- [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (ou alias documentados no `.env.example`).
-- [ ] `INVITE_REDIRECT_URL=https://portal.advnoemia.com.br/auth/callback` (ou equivalente alinhado ao projeto).
-- [ ] `PASSWORD_RESET_REDIRECT_URL=https://portal.advnoemia.com.br/auth/callback`.
-- [ ] Demais variáveis de e-mail/worker conforme `apps/portal-backend/.env.example`.
+- [ ] `NEXT_PUBLIC_APP_URL=https://portal.advnoemia.com.br`
+- [ ] `NEXT_PUBLIC_PUBLIC_SITE_URL=https://advnoemia.com.br`
+- [ ] `NEXT_PUBLIC_SUPABASE_URL`
+- [ ] `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- [ ] `SUPABASE_SECRET_KEY`
+- [ ] `INVITE_REDIRECT_URL=https://portal.advnoemia.com.br/auth/callback`
+- [ ] `PASSWORD_RESET_REDIRECT_URL=https://portal.advnoemia.com.br/auth/callback`
+- [ ] `CRON_SECRET`
+- [ ] variáveis de e-mail e worker conforme `.env.example`
 
-Opcional:
+## 3. Supabase Auth
 
-- [ ] `CORS_ALLOWED_ORIGINS` — origens extra para `POST`/`OPTIONS` em `/api/public/triage` e `/api/public/events` (pré-visualizações, staging).
+- [ ] `Site URL` coerente com `https://portal.advnoemia.com.br`
+- [ ] `Redirect URLs` incluindo `/auth/callback`
+- [ ] templates de invite e recovery apontando para o host do portal
 
-## 3. Supabase (Auth)
+## 4. Build do portal na Vercel
 
-No dashboard do projeto Supabase:
+Projeto correto: `advnoemiaportal`
 
-- [ ] **Site URL** coerente com o portal (ex.: `https://portal.advnoemia.com.br`).
-- [ ] **Redirect URLs** incluem:
-  - `https://portal.advnoemia.com.br/auth/callback`
-  - `https://portal.advnoemia.com.br/auth/**` (ou paths exatos de reset/primeiro acesso que o projeto usar).
-- [ ] Templates de convite/recovery apontam para o mesmo host do portal.
+- [ ] Root Directory = `apps/portal-backend`
+- [ ] Production Branch = `main`
+- [ ] Framework Preset = `Next.js`
+- [ ] Install Command = `npm install`
+- [ ] Build Command = `npm run build`
+- [ ] Output Directory = `.next`
+- [ ] Ignored Build Step desabilitado ou vazio
+- [ ] path filters incluindo `apps/portal-backend/**`
 
-## 4. CORS (site estático → portal)
+## 5. Cron compatível com Hobby
 
-O apex chama `https://portal.advnoemia.com.br/api/public/triage` e `.../events`.
+O cron versionado do portal está em `apps/portal-backend/vercel.json`.
 
-- [ ] Confirmar que `NEXT_PUBLIC_PUBLIC_SITE_URL` coincide com o `Origin` do browser (ex.: `https://advnoemia.com.br`; incluir `www` se for usado).
-- [ ] Se usar domínio de preview (Pages.dev), adicionar em `CORS_ALLOWED_ORIGINS`.
+- [ ] schedule atual = `0 12 * * *`
+- [ ] rota acionada = `/api/cron/notifications`
+- [ ] não existe cron subdiário ativo no dashboard da Vercel
 
-Implementação: `lib/http/cors-public.ts` + `OPTIONS`/`POST` em `app/api/public/triage` e `app/api/public/events`.
+Regra operacional:
 
-## 5. Site estático (apex)
-
-- [ ] Ficheiro `_redirects` na raiz do deploy estático com redirecionamentos para o host do portal (já versionado no repositório).
-- [ ] Links de “Área do cliente” e rodapé usam URLs absolutas `https://portal.advnoemia.com.br/...` (não `/portal/login` no mesmo host).
-- [ ] `assets/js/contact-capture.js` usa `getPortalApiOrigin()` (produção → portal; `localhost` → mesma origem para dev).
-- [ ] Não existem ficheiros HTML em `/portal/*` no deploy estático que substituam rotas da app.
+- no plano Hobby, não usar cron mais de 1x por dia
+- se a operação exigir frequência maior, promover `advnoemiaportal` para Pro antes de alterar o schedule
 
 ## 6. Verificações pós-deploy
 
-- [ ] `GET https://portal.advnoemia.com.br/api/health` → JSON `{ "ok": true, ... }`.
-- [ ] `GET https://portal.advnoemia.com.br/portal/login` → formulário de login.
-- [ ] A partir do site no apex: submeter triagem de teste e ver registo em `intake_requests` (ou resposta 201 da API).
-- [ ] Login de cliente/advogada em staging antes de produção.
-- [ ] Cookies de sessão: domínio `portal.advnoemia.com.br` (não esperar cookie de sessão no apex).
+- [ ] `GET https://portal.advnoemia.com.br/api/health` retorna `{ "ok": true }`
+- [ ] `https://portal.advnoemia.com.br/portal/login` abre corretamente
+- [ ] o shell interno mostra `Release do portal <sha>`
+- [ ] o SHA exibido bate com o commit implantado no projeto `advnoemiaportal`
+- [ ] triagem pública e login seguem funcionando
 
-## 7. Cookies e privacidade
+## 7. Se o site deployar e o portal não
 
-- [ ] Política de cookies / avisos se usar analytics no marketing que falem com o portal (se aplicável).
+Verificar nesta ordem:
 
----
+1. o commit apareceu em `advnoemiaportal`
+2. `Root Directory = apps/portal-backend`
+3. não existe `Ignored Build Step`
+4. os path filters incluem `apps/portal-backend/**`
+5. não existe cron incompatível com Hobby bloqueando o projeto
 
-Documentação de produto e arquitetura: [`PORTAL_PRODUCT.md`](PORTAL_PRODUCT.md).
+Fonte complementar:
+
+- [`../../../docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md`](../../../docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md)
+- [`../../../docs/VERCEL_PORTAL_PROJECT_OPERATIONS.md`](../../../docs/VERCEL_PORTAL_PROJECT_OPERATIONS.md)

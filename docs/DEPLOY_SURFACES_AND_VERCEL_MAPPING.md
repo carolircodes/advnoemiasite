@@ -37,12 +37,13 @@ Conclusão: o portal não está deixando de refletir mudanças por erro de front
 
 - Root Directory: `apps/portal-backend`
 - Framework Preset: `Next.js`
-- Build Command: `npm run build`
 - Install Command: `npm install`
+- Build Command: `npm run build`
 - Output Directory: `.next`
 - Production Branch: `main`
 - Ignored Build Step: vazio ou desabilitado
 - Monorepo path filters: precisam incluir `apps/portal-backend/**`
+- Cron compatível com Hobby: no máximo 1x por dia
 
 ### Projeto `advnoemiasite`
 
@@ -66,6 +67,16 @@ Validação operacional:
 2. abrir `portal.advnoemia.com.br`
 3. confirmar no topo do portal o selo `Release do portal`
 4. verificar se o SHA exibido bate com o commit publicado
+
+## Política de cron do portal
+
+O cron do portal fica em `apps/portal-backend/vercel.json` e agora está em frequência diária compatível com o plano Hobby.
+
+- schedule atual: `0 12 * * *`
+- rota acionada: `/api/cron/notifications`
+- proteção esperada: `Authorization: Bearer <CRON_SECRET>`
+
+Se a operação voltar a exigir processamento subdiário, a ação correta não é recolocar `*/5 * * * *` no repositório. A ação correta é promover o projeto `advnoemiaportal` para Pro e só então aumentar a cadência.
 
 ## Como evitar novos desvios
 

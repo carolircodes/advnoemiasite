@@ -10,7 +10,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Endpoint acionado pelo Vercel Cron Jobs a cada 5 minutos.
+ * Endpoint acionado pelo Vercel Cron Jobs.
+ *
+ * No plano Hobby da Vercel o cron precisa ser no maximo diario, por isso o
+ * schedule versionado do portal roda 1x ao dia e nao bloqueia novos deploys.
+ * Se a operacao exigir frequencia maior, o projeto `advnoemiaportal` precisa
+ * ser promovido para Pro antes de restaurar uma cadencia subdiaria.
  *
  * Em producao: Vercel envia `Authorization: Bearer <CRON_SECRET>`.
  * Em desenvolvimento local: o fallback sem segredo so e aceito em localhost.
