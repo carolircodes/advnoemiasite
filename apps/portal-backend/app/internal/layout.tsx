@@ -27,12 +27,12 @@ export default function InternalLayout({ children }: LayoutProps) {
   }, [currentPath]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="internal-shell">
       <Sidebar currentPath={currentPath} />
 
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-40 bg-[rgba(10,16,13,0.46)] backdrop-blur-[2px] lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
@@ -43,7 +43,7 @@ export default function InternalLayout({ children }: LayoutProps) {
         onClose={() => setMobileMenuOpen(false)}
       />
 
-      <div className="lg:pl-64">
+      <div className="lg:pl-[296px]">
         <Topbar
           title={currentPage.title}
           subtitle={currentPage.subtitle}

@@ -45,26 +45,26 @@ export default async function EcosystemPage() {
   return (
     <AppFrame
       eyebrow="Ecossistema"
-      title="Expansao premium, recorrencia e comunidade."
-      description="Esta area existe para separar o juridico do que pertence ao ecossistema premium. Aqui entram catalogo, recorrencia, acesso, conteudo, comunidade e retencao sem contaminar o cockpit principal."
+      title="Expansão premium, recorrência e comunidade."
+      description="Esta área existe para separar o jurídico do que pertence ao ecossistema premium. Aqui entram catálogo, recorrência, acesso, conteúdo, comunidade e retenção sem contaminar o cockpit principal."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
           fullName={profile.full_name}
           email={profile.email}
           workspaceLabel="Fase 12 ativa"
-          workspaceHint="Sessao interna protegida para modelar catalogo, planos, acesso, conteudo premium, comunidade e recorrencia."
+          workspaceHint="Sessão interna protegida para modelar catálogo, planos, acesso, conteúdo premium, comunidade e recorrência."
         />
       }
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
-        { href: "/internal/advogada/inteligencia", label: "Inteligencia" },
+        { href: "/internal/advogada/inteligencia", label: "Inteligência" },
         { href: "/internal/advogada/operacional", label: "CRM" },
         { href: buildInternalEcosystemHref(), label: "Ecossistema", active: true }
       ]}
       highlights={[
         { label: "Arquitetura", value: `${overview.architecture.length} camadas` },
-        { label: "Oferta ancora", value: premiumJourney.anchorTitle },
+        { label: "Oferta âncora", value: premiumJourney.anchorTitle },
         { label: "Founders ativos", value: String(premiumJourney.activeFoundersCount) },
         { label: "Engajados", value: String(premiumJourney.engagedFoundersCount) },
         { label: "Convites", value: String(premiumJourney.invitedFoundersCount) },
@@ -72,7 +72,7 @@ export default async function EcosystemPage() {
         { label: "Waitlist", value: String(premiumJourney.waitlistCount) },
         { label: "Reserva", value: String(premiumJourney.reservedInterestCount) },
         { label: "Fila qualificada", value: String(premiumJourney.waitlistQualifiedCount) },
-        { label: "Paid interest", value: String(premiumJourney.paidInterestCount) },
+        { label: "Interesse pago futuro", value: String(premiumJourney.paidInterestCount) },
         { label: "Telemetria", value: overview.telemetrySummary[0]?.value || "0" }
       ]}
       actions={[
@@ -85,7 +85,7 @@ export default async function EcosystemPage() {
         },
         {
           href: "#catalogo-premium",
-          label: "Abrir catalogo",
+          label: "Abrir catálogo",
           tone: "secondary",
           trackingEventKey: "product_selected",
           trackingEventGroup: "ecosystem",
@@ -108,11 +108,11 @@ export default async function EcosystemPage() {
 
       <SectionCard
         title="Primeira jornada premium ativa"
-        description="A ancora inicial do ecossistema agora opera como comunidade fundadora gratuita, privada e curada, com grants, onboarding, trilha e comunidade conectados."
+        description="A âncora inicial do ecossistema agora opera como comunidade fundadora gratuita, privada e curada, com grants, onboarding, trilha e comunidade conectados."
       >
         <div className="summary-grid compact">
           <div className="summary-card">
-            <span>Oferta ancora</span>
+            <span>Oferta âncora</span>
             <strong>{premiumJourney.anchorTitle}</strong>
             <p>{premiumJourney.anchorSubtitle}</p>
             <span className="pill warning">{premiumJourney.statusLabel}</span>

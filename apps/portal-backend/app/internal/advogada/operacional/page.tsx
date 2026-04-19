@@ -1189,18 +1189,18 @@ export default function OperationalPanel() {
       </div>
 
       <PanelSection
-        title="CRM comercial do escritorio"
-        description="Esta superficie existe para follow-up, consulta, prioridade comercial e travas de conversao. Conversas em tempo real ficam na Inbox; leitura executiva ampla fica no Painel."
+        title="CRM comercial do escritório"
+        description="Esta superfície existe para follow-up, consulta, prioridade comercial e travas de conversão. Conversas em tempo real ficam na Inbox; a leitura executiva ampla permanece no Painel."
       >
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Papel oficial</p>
             <p className="mt-2 text-sm text-[#4f6158]">
-              Organizar fila comercial, follow-up, consulta e proximo passo de conversao.
+              Organizar fila comercial, follow-up, consulta e próximo passo de conversão.
             </p>
           </div>
           <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Nao e inbox</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Não é inbox</p>
             <p className="mt-2 text-sm text-[#4f6158]">
               Threads, resposta humana e handoff operacional agora pertencem a Atendimento.
             </p>
@@ -1208,7 +1208,7 @@ export default function OperationalPanel() {
           <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Uso ideal</p>
             <p className="mt-2 text-sm text-[#4f6158]">
-              Entrar aqui para decidir quem converter, quem cobrar retorno e quem esta travado.
+              Entrar aqui para decidir quem converter, quem cobrar retorno e quem está travado.
             </p>
           </div>
         </div>
@@ -1229,7 +1229,7 @@ export default function OperationalPanel() {
             tone="orange"
           />
           <MetricCard
-            label="Prontas para acao humana"
+            label="Prontas para ação humana"
             value={metrics.humanHandoffReady}
             icon={<Target className="h-6 w-6" />}
             tone="red"
@@ -1268,13 +1268,13 @@ export default function OperationalPanel() {
 
       <PanelSection
         title="Prioridades do dia"
-        description="A fila separa o que pede acao imediata, follow-up comercial, revisao de travamento e simples acompanhamento."
+        description="A fila separa o que pede ação imediata, follow-up comercial, revisão de travamento e simples acompanhamento."
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
             {
               key: 'needs_attention' as const,
-              label: 'Exige atencao agora',
+              label: 'Exige atenção agora',
               count: queueSummary.needs_attention.length,
               note: queueSummary.needs_attention[0]?.fullName || 'Nenhum item critico neste momento.',
             },
@@ -1312,15 +1312,15 @@ export default function OperationalPanel() {
       </PanelSection>
 
       <PanelSection
-        title="Automacoes comerciais seguras"
-        description="A fila abaixo mostra onde a maquina pode ajudar com seguranca, sem disparo cego e com estado auditavel por item."
+        title="Automações comerciais seguras"
+        description="A fila abaixo mostra onde a máquina pode ajudar com segurança, sem disparo cego e com estado auditável por item."
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
             { key: 'eligible', label: 'Prontas para fila', value: automationSummary.eligible },
-            { key: 'queued', label: 'Ja enfileiradas', value: automationSummary.queued },
+            { key: 'queued', label: 'Já enfileiradas', value: automationSummary.queued },
             { key: 'cooldown', label: 'Em cooldown', value: automationSummary.cooldown },
-            { key: 'idle', label: 'Sem automacao', value: automationSummary.idle },
+            { key: 'idle', label: 'Sem automação', value: automationSummary.idle },
           ].map((item) => (
             <div key={item.key} className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
               <p className="text-sm text-[#6a7a73]">{item.label}</p>

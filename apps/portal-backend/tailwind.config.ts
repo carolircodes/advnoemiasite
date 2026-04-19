@@ -29,10 +29,11 @@ const config: Config = {
         "border-lighter": "#ddd6ca",
       },
       fontFamily: {
-        "sans": ["system-ui", "-apple-system", "sans-serif"],
-        "serif": ["Georgia", "Times New Roman", "serif"],
+        "sans": ["'Avenir Next'", "'Segoe UI'", "ui-sans-serif", "system-ui", "sans-serif"],
+        "serif": ["'Iowan Old Style'", "'Palatino Linotype'", "'Book Antiqua'", "Georgia", "serif"],
       },
       borderRadius: {
+        "lg": "18px",
         "xl": "32px",
         "2xl": "24px",
         "3xl": "20px",
@@ -41,6 +42,8 @@ const config: Config = {
         "card": "0 20px 60px rgba(16, 38, 29, 0.06)",
         "card-light": "0 20px 60px rgba(16, 38, 29, 0.05)",
         "button": "0 12px 30px rgba(142, 106, 59, 0.25)",
+        "luxury": "0 28px 70px rgba(16, 38, 29, 0.12)",
+        "inner-glow": "inset 0 1px 0 rgba(255, 255, 255, 0.65)",
       },
       spacing: {
         "18": "4.5rem",

@@ -10,13 +10,13 @@ export default async function InternalLawyerChannelsPage() {
 
   return (
     <AppFrame
-      eyebrow="Distribuicao e canais"
-      title="Launcher por canal e separacao entre inbox e distribuicao."
-      description="Esta camada existe como apoio operacional para abrir a Inbox oficial no recorte certo e deixar claro que distribuicao editorial nao e a mesma coisa que conversas 1:1."
+      eyebrow="Distribuição e canais"
+      title="Distribuição por canal com leitura clara entre origem, inbox e operação."
+      description="Esta camada existe como apoio operacional para abrir a Inbox oficial no recorte certo e deixar claro que distribuição editorial não é a mesma coisa que conversas 1:1."
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
         { href: "/internal/advogada/atendimento", label: "Inbox" },
-        { href: "/internal/advogada/canais", label: "Distribuicao", active: true }
+        { href: "/internal/advogada/canais", label: "Distribuição", active: true }
       ]}
       utilityContent={
         <PortalSessionBanner
@@ -28,25 +28,25 @@ export default async function InternalLawyerChannelsPage() {
     >
       <SectionCard
         title="Inbox oficial"
-        description="A operacao real de threads, handoff, notas internas e resposta humana vive em Atendimento. Esta pagina nao e uma inbox paralela."
+        description="A operação real de threads, handoff, notas internas e resposta humana vive em Atendimento. Esta página não é uma inbox paralela."
       >
         <div className="grid two">
           <Link className="route-card" href="/internal/advogada/atendimento">
             <span className="shortcut-kicker">Inbox</span>
             <strong>Abrir atendimento multicanal</strong>
-            <span>Visao geral com fila, contexto, mensagens, follow-up e memoria operacional.</span>
+            <span>Visão geral com fila, contexto, mensagens, follow-up e memória operacional.</span>
           </Link>
           <Link className="route-card" href="/internal/advogada/operacional">
             <span className="shortcut-kicker">CRM</span>
             <strong>Abrir CRM comercial</strong>
-            <span>Retome follow-up, conversao, consulta em vista e travas comerciais fora da inbox.</span>
+            <span>Retome follow-up, conversão, consulta em vista e travas comerciais fora da inbox.</span>
           </Link>
         </div>
       </SectionCard>
 
       <SectionCard
         title="Caminhos por canal"
-        description="Esses atalhos deixam explicito o fluxo para abrir conversas reais por origem."
+        description="Esses atalhos deixam explícito o fluxo para abrir conversas reais por origem."
       >
         <div className="grid three">
           <Link className="route-card" href="/internal/advogada/atendimento?channel=whatsapp">
@@ -61,15 +61,15 @@ export default async function InternalLawyerChannelsPage() {
           </Link>
           <Link className="route-card" href="/internal/advogada/atendimento?inboxMode=needs_human&waitingFor=human">
             <span className="shortcut-kicker">Handoff</span>
-            <strong>Fila humana prioritaria</strong>
+            <strong>Fila humana prioritária</strong>
             <span>Abra diretamente a fila que pede atendimento humano e continuidade manual.</span>
           </Link>
         </div>
       </SectionCard>
 
       <SectionCard
-        title="Separacao estrutural desta fase"
-        description="A inbox conversacional deixou de carregar a distribuicao editorial do Telegram como parte obrigatoria da leitura."
+        title="Separação estrutural desta fase"
+        description="A inbox conversacional deixou de carregar a distribuição editorial do Telegram como parte obrigatória da leitura."
       >
         <div className="grid two">
           <article className="route-card">
@@ -78,7 +78,7 @@ export default async function InternalLawyerChannelsPage() {
             <span>Agora fica restrita ao contrato de threads, mensagens, contexto, handoff e notas internas.</span>
           </article>
           <article className="route-card">
-            <span className="shortcut-kicker">Telegram distribution</span>
+            <span className="shortcut-kicker">Distribuição Telegram</span>
             <strong>/api/internal/telegram/distribution</strong>
             <span>A camada editorial e broadcast continua existindo, mas fora do contrato central da inbox multicanal.</span>
           </article>

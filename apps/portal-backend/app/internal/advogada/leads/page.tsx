@@ -1,94 +1,106 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AppFrame } from "@/components/app-frame";
-import { SectionCard } from "@/components/section-card";
-import { PortalSessionBanner } from "@/components/portal-session-banner";
-import { 
-  Lead, 
-  Conversation, 
-  VisualConfig, 
-  AreaConfig, 
-  MetricCardProps, 
-  StatusBadgeProps, 
-  LeadTableRowProps 
-} from "./types";
-import { PrioridadesDoDia } from "./prioridades";
+import {
+  ArrowUpRight,
+  CalendarDays,
+  CircleAlert,
+  Eye,
+  Flame,
+  FolderClock,
+  PhoneCall,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  X
+} from "lucide-react";
 
-// Configurações de visual
+import { AppFrame } from "@/components/app-frame";
+import { Badge } from "@/components/ui";
+import { PortalSessionBanner } from "@/components/portal-session-banner";
+import { SectionCard } from "@/components/section-card";
+
+import { PrioridadesDoDia } from "./prioridades";
+import type { AreaConfig, Lead, VisualConfig } from "./types";
+
 const legalAreaConfig: Record<string, AreaConfig> = {
   previdenciario: {
     label: "Previdenciário",
-    color: "#8B5CF6",
-    bgColor: "#F3E8FF",
-    icon: "🛡️"
+    color: "#8e6a3b",
+    bgColor: "#f7edda",
+    icon: "Prev"
   },
   bancario: {
     label: "Bancário",
-    color: "#3B82F6", 
-    bgColor: "#EFF6FF",
-    icon: "🏦"
+    color: "#295d45",
+    bgColor: "#ebf4ef",
+    icon: "Banc"
   },
   familia: {
     label: "Família",
-    color: "#EC4899",
-    bgColor: "#FDF2F8", 
-    icon: "👨‍👩‍👧‍👦"
+    color: "#7b5c31",
+    bgColor: "#f8efe1",
+    icon: "Fam"
   },
   geral: {
     label: "Geral",
-    color: "#6B7280",
-    bgColor: "#F9FAFB",
-    icon: "⚖️"
+    color: "#465851",
+    bgColor: "#eff3f1",
+    icon: "Jur"
   }
 };
 
 const leadStatusConfig: Record<string, VisualConfig> = {
-  frio: { label: "Frio", color: "#9CA3AF", bgColor: "#F9FAFB" },
-  curioso: { label: "Curioso", color: "#F59E0B", bgColor: "#FEF3C7" },
-  interessado: { label: "Interessado", color: "#3B82F6", bgColor: "#EFF6FF" },
-  quente: { label: "Quente", color: "#EF4444", bgColor: "#FEE2E2" },
-  pronto_para_agendar: { label: "Pronto para Agendar", color: "#10B981", bgColor: "#D1FAE5" },
-  cliente_ativo: { label: "Cliente Ativo", color: "#059669", bgColor: "#D1FAE5" },
-  sem_aderencia: { label: "Sem Aderência", color: "#6B7280", bgColor: "#F9FAFB" }
+  frio: { label: "Frio", color: "#5b6a63", bgColor: "#eff3f1" },
+  curioso: { label: "Curioso", color: "#8a5d0d", bgColor: "#fff4e3" },
+  interessado: { label: "Interessado", color: "#7b5c31", bgColor: "#f8efe1" },
+  quente: { label: "Quente", color: "#8e433b", bgColor: "#fff0ee" },
+  pronto_para_agendar: {
+    label: "Pronto para agendar",
+    color: "#295d45",
+    bgColor: "#ebf4ef"
+  },
+  cliente_ativo: { label: "Cliente ativo", color: "#295d45", bgColor: "#ebf4ef" },
+  sem_aderencia: { label: "Sem aderência", color: "#5b6a63", bgColor: "#eff3f1" }
 };
 
 const urgencyConfig: Record<string, VisualConfig> = {
-  baixa: { label: "Baixa", color: "#10B981", bgColor: "#D1FAE5" },
-  media: { label: "Média", color: "#F59E0B", bgColor: "#FEF3C7" },
-  alta: { label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" }
+  baixa: { label: "Baixa", color: "#295d45", bgColor: "#ebf4ef" },
+  media: { label: "Média", color: "#8a5d0d", bgColor: "#fff4e3" },
+  alta: { label: "Alta", color: "#8e433b", bgColor: "#fff0ee" }
 };
 
 const operationalStatusConfig: Record<string, VisualConfig> = {
-  new: { label: "Novo", color: "#6B7280", bgColor: "#F9FAFB" },
-  viewed: { label: "Visualizado", color: "#3B82F6", bgColor: "#EFF6FF" },
-  in_progress: { label: "Em Atendimento", color: "#F59E0B", bgColor: "#FEF3C7" },
-  scheduled: { label: "Agendado", color: "#8B5CF6", bgColor: "#F3E8FF" },
-  converted: { label: "Convertido", color: "#10B981", bgColor: "#D1FAE5" },
-  closed: { label: "Encerrado", color: "#6B7280", bgColor: "#F9FAFB" }
+  new: { label: "Novo", color: "#5b6a63", bgColor: "#eff3f1" },
+  viewed: { label: "Em leitura", color: "#7b5c31", bgColor: "#f8efe1" },
+  in_progress: { label: "Em atendimento", color: "#8a5d0d", bgColor: "#fff4e3" },
+  scheduled: { label: "Consulta agendada", color: "#295d45", bgColor: "#ebf4ef" },
+  converted: { label: "Convertido", color: "#295d45", bgColor: "#ebf4ef" },
+  closed: { label: "Encerrado", color: "#5b6a63", bgColor: "#eff3f1" }
 };
 
 const funnelStageConfig: Record<string, VisualConfig> = {
-  contato_inicial: { label: "Contato Inicial", color: "#9CA3AF", bgColor: "#F9FAFB" },
-  qualificacao: { label: "Qualificação", color: "#F59E0B", bgColor: "#FEF3C7" },
-  triagem: { label: "Triagem", color: "#3B82F6", bgColor: "#EFF6FF" },
-  interesse: { label: "Interesse", color: "#8B5CF6", bgColor: "#F3E8FF" },
-  agendamento: { label: "Agendamento", color: "#EF4444", bgColor: "#FEE2E2" },
-  cliente: { label: "Cliente", color: "#059669", bgColor: "#D1FAE5" }
+  contato_inicial: { label: "Contato inicial", color: "#5b6a63", bgColor: "#eff3f1" },
+  qualificacao: { label: "Qualificação", color: "#8a5d0d", bgColor: "#fff4e3" },
+  triagem: { label: "Triagem", color: "#7b5c31", bgColor: "#f8efe1" },
+  interesse: { label: "Interesse", color: "#8e6a3b", bgColor: "#f7edda" },
+  agendamento: { label: "Agendamento", color: "#295d45", bgColor: "#ebf4ef" },
+  cliente: { label: "Cliente", color: "#295d45", bgColor: "#ebf4ef" }
 };
 
 const fallbackAreaConfig: AreaConfig = {
-  label: "Nao classificado",
-  color: "#6B7280",
-  bgColor: "#F3F4F6",
-  icon: "?"
+  label: "Não classificado",
+  color: "#5b6a63",
+  bgColor: "#eff3f1",
+  icon: "N/C"
 };
 
 const fallbackVisualConfig: VisualConfig = {
-  label: "Nao classificado",
-  color: "#6B7280",
-  bgColor: "#F3F4F6"
+  label: "Não classificado",
+  color: "#5b6a63",
+  bgColor: "#eff3f1"
 };
 
 const legalAreaAliases: Record<string, Lead["legal_area"]> = {
@@ -172,7 +184,7 @@ function normalizeLeadRecord(raw: Partial<Lead> & Record<string, unknown>): Lead
     last_message:
       typeof raw.last_message === "string" && raw.last_message.trim()
         ? raw.last_message
-        : "Sem ultima mensagem registrada.",
+        : "Sem última mensagem registrada.",
     last_response:
       typeof raw.last_response === "string" && raw.last_response.trim()
         ? raw.last_response
@@ -182,11 +194,11 @@ function normalizeLeadRecord(raw: Partial<Lead> & Record<string, unknown>): Lead
     summary:
       typeof raw.summary === "string" && raw.summary.trim()
         ? raw.summary
-        : "Resumo indisponivel para este lead.",
+        : "Resumo indisponível para este lead.",
     suggested_action:
       typeof raw.suggested_action === "string" && raw.suggested_action.trim()
         ? raw.suggested_action
-        : "Revisar lead manualmente e definir o proximo passo.",
+        : "Revisar o lead manualmente e definir o próximo passo.",
     first_contact_at:
       typeof raw.first_contact_at === "string" && raw.first_contact_at.trim()
         ? raw.first_contact_at
@@ -221,115 +233,66 @@ function getVisualConfig(source: Record<string, VisualConfig>, value: string) {
   return source[value] || fallbackVisualConfig;
 }
 
-// Componentes de UI Premium
-function MetricCard({ title, value, subtitle, color, icon, trend }: MetricCardProps) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-          <p className="text-3xl font-bold" style={{ color }}>{value}</p>
-          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
-          {trend && (
-            <div className="flex items-center mt-2">
-              <span className={`text-xs font-medium ${trend.value > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {trend.value > 0 ? '↑' : '↓'} {Math.abs(trend.value)}%
-              </span>
-              <span className="text-xs text-gray-500 ml-1">{trend.label}</span>
-            </div>
-          )}
-        </div>
-        <div className="text-3xl opacity-80">{icon}</div>
-      </div>
-    </div>
-  );
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  });
 }
 
-function StatusBadge({ config }: StatusBadgeProps) {
+function StatusPill({
+  config,
+  className = ""
+}: {
+  config: VisualConfig;
+  className?: string;
+}) {
   return (
     <span
-      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
-      style={{ backgroundColor: config.bgColor, color: config.color }}
+      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${className}`}
+      style={{
+        color: config.color,
+        backgroundColor: config.bgColor,
+        borderColor: `${config.color}22`
+      }}
     >
       {config.label}
     </span>
   );
 }
 
-function LeadTableRow({ lead, onSelect }: LeadTableRowProps) {
-  const areaConfig = getAreaConfig(lead.legal_area);
-  const statusConfig = getVisualConfig(leadStatusConfig, lead.lead_status);
-  const urgencyStyle = getVisualConfig(urgencyConfig, lead.urgency);
-  const funnelConfig = getVisualConfig(funnelStageConfig, lead.funnel_stage);
-  const operationalConfig = getVisualConfig(operationalStatusConfig, lead.operational_status);
-
+function MetricHighlight({
+  title,
+  value,
+  detail,
+  icon
+}: {
+  title: string;
+  value: number;
+  detail: string;
+  icon: React.ReactNode;
+}) {
   return (
-    <tr 
-      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-      onClick={() => onSelect(lead)}
-    >
-      <td className="px-6 py-4">
-        <div className="flex items-center">
-          <div className="text-2xl mr-3">{areaConfig.icon}</div>
-          <div>
-            <div className="font-medium text-gray-900">
-              {lead.username || `@${lead.platform_user_id}`}
-            </div>
-            <div className="text-sm text-gray-500">ID: {lead.platform_user_id}</div>
-          </div>
+    <article className="premium-surface p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8e6a3b]">
+            {title}
+          </p>
+          <p className="mt-3 font-serif text-4xl font-semibold text-[#13251f]">{value}</p>
+          <p className="mt-2 text-sm leading-6 text-[#5b6a63]">{detail}</p>
         </div>
-      </td>
-      <td className="px-6 py-4">
-        <StatusBadge config={areaConfig} />
-      </td>
-      <td className="px-6 py-4">
-        <StatusBadge config={statusConfig} />
-      </td>
-      <td className="px-6 py-4">
-        <StatusBadge config={funnelConfig} />
-      </td>
-      <td className="px-6 py-4">
-        <StatusBadge config={urgencyStyle} />
-      </td>
-      <td className="px-6 py-4">
-        <StatusBadge config={operationalConfig} />
-      </td>
-      <td className="px-6 py-4">
-        <div className="max-w-xs">
-          <p className="text-sm text-gray-900 truncate">{lead.last_message}</p>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(142,106,59,0.12)] bg-[rgba(249,241,226,0.9)] text-[#8e6a3b]">
+          {icon}
         </div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="text-sm text-gray-900">
-          {new Date(lead.last_contact_at).toLocaleDateString('pt-BR')}
-        </div>
-        <div className="text-xs text-gray-500">
-          {new Date(lead.last_contact_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium text-gray-900">{lead.conversation_count}</span>
-          {lead.wants_human && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-              🙋 Quer humano
-            </span>
-          )}
-          {lead.should_schedule && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-              📅 Agendar
-            </span>
-          )}
-        </div>
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
 
 export default function LeadsDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -340,110 +303,107 @@ export default function LeadsDashboard() {
     operational_status: ""
   });
 
-  // Métricas calculadas
-  const metrics = {
-    total: leads.length,
-    quentes: leads.filter(l => l.lead_status === "quente").length,
-    prontosParaAgendar: leads.filter(l => l.lead_status === "pronto_para_agendar").length,
-    urgentes: leads.filter(l => l.urgency === "alta").length,
-    novosHoje: leads.filter(l => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return new Date(l.created_at) >= today && l.operational_status === "new";
-    }).length,
-    emAtendimento: leads.filter(l => l.operational_status === "in_progress").length,
-    agendados: leads.filter(l => l.operational_status === "scheduled").length,
-    convertidos: leads.filter(l => l.operational_status === "converted").length
-  };
+  const metrics = useMemo(
+    () => ({
+      total: leads.length,
+      quentes: leads.filter((lead) => lead.lead_status === "quente").length,
+      prontosParaAgendar: leads.filter((lead) => lead.lead_status === "pronto_para_agendar").length,
+      urgentes: leads.filter((lead) => lead.urgency === "alta").length,
+      novosHoje: leads.filter((lead) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return new Date(lead.created_at) >= today && lead.operational_status === "new";
+      }).length,
+      emAtendimento: leads.filter((lead) => lead.operational_status === "in_progress").length,
+      agendados: leads.filter((lead) => lead.operational_status === "scheduled").length,
+      convertidos: leads.filter((lead) => lead.operational_status === "converted").length
+    }),
+    [leads]
+  );
 
-  // Leads filtrados
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = !searchTerm || 
-      (lead.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       lead.platform_user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       lead.last_message.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesFilters = 
-      (!filters.legal_area || lead.legal_area === filters.legal_area) &&
-      (!filters.urgency || lead.urgency === filters.urgency) &&
-      (!filters.lead_status || lead.lead_status === filters.lead_status) &&
-      (!filters.funnel_stage || lead.funnel_stage === filters.funnel_stage) &&
-      (!filters.operational_status || lead.operational_status === filters.operational_status);
-
-    return matchesSearch && matchesFilters;
-  });
-
-  // Atualizar status do lead
-  async function updateLeadStatus(leadId: string, newStatus: Lead['operational_status']) {
-    try {
-      const response = await fetch('/api/internal/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, operational_status: newStatus })
-      });
-
-      if (response.ok) {
-        // Atualizar lead localmente
-        setLeads(prevLeads => 
-          prevLeads.map(lead => 
-            lead.id === leadId 
-              ? { ...lead, operational_status: newStatus, updated_at: new Date().toISOString() }
-              : lead
-          )
+  const filteredLeads = useMemo(() => {
+    return leads.filter((lead) => {
+      const matchesSearch =
+        !searchTerm ||
+        !!(
+          lead.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.platform_user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.last_message.toLowerCase().includes(searchTerm.toLowerCase())
         );
-        
-        // Fechar modal se convertido ou encerrado
-        if (newStatus === 'converted' || newStatus === 'closed') {
-          setSelectedLead(null);
-        }
-        
-        console.log(`✅ Lead ${leadId} atualizado para ${newStatus}`);
+
+      const matchesFilters =
+        (!filters.legal_area || lead.legal_area === filters.legal_area) &&
+        (!filters.urgency || lead.urgency === filters.urgency) &&
+        (!filters.lead_status || lead.lead_status === filters.lead_status) &&
+        (!filters.funnel_stage || lead.funnel_stage === filters.funnel_stage) &&
+        (!filters.operational_status || lead.operational_status === filters.operational_status);
+
+      return matchesSearch && matchesFilters;
+    });
+  }, [filters, leads, searchTerm]);
+
+  async function loadData() {
+    try {
+      const leadsResponse = await fetch("/api/internal/leads");
+
+      if (leadsResponse.ok) {
+        const leadsData = await leadsResponse.json();
+        setLeads(Array.isArray(leadsData) ? leadsData.map(normalizeLeadRecord) : []);
       } else {
-        console.error('❌ Falha ao atualizar lead:', await response.text());
+        setLeads([]);
       }
     } catch (error) {
-      console.error('❌ Erro ao atualizar lead:', error);
+      console.error("Erro ao carregar leads:", error);
+      setLeads([]);
+    } finally {
+      setLoading(false);
     }
   }
 
-// Carregar dados
   useEffect(() => {
-    async function loadData() {
-      try {
-        // Carregar leads
-        const leadsResponse = await fetch('/api/internal/leads');
-        if (leadsResponse.ok) {
-          const leadsData = await leadsResponse.json();
-          setLeads(Array.isArray(leadsData) ? leadsData.map(normalizeLeadRecord) : []);
-        }
+    void loadData();
+  }, []);
 
-        // Carregar conversas se houver lead selecionado
-        if (selectedLead) {
-          const convResponse = await fetch(`/api/internal/leads/${selectedLead.platform_user_id}/conversations`);
-          if (convResponse.ok) {
-            const convData = await convResponse.json();
-            setConversations(convData);
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      } finally {
-        setLoading(false);
+  async function updateLeadStatus(leadId: string, newStatus: Lead["operational_status"]) {
+    try {
+      const response = await fetch("/api/internal/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, operational_status: newStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
-    }
 
-    loadData();
-  }, [selectedLead]);
+      setLeads((current) =>
+        current.map((lead) =>
+          lead.id === leadId
+            ? { ...lead, operational_status: newStatus, updated_at: new Date().toISOString() }
+            : lead
+        )
+      );
+
+      if (newStatus === "converted" || newStatus === "closed") {
+        setSelectedLead(null);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar lead:", error);
+    }
+  }
 
   if (loading) {
     return (
       <AppFrame
-        eyebrow="Historico comercial"
-        title="Historico de leads da NoemIA"
-        description="Leitura de apoio para leads antigos, classificacao e consulta de contexto comercial."
+        eyebrow="Histórico comercial"
+        title="Leitura histórica dos leads em andamento."
+        description="Carregando o acervo comercial para apoiar triagem, contexto e retomada."
       >
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="premium-surface flex min-h-[260px] items-center justify-center p-10">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="h-12 w-12 animate-spin rounded-full border-2 border-[rgba(142,106,59,0.22)] border-t-[#8e6a3b]" />
+            <p className="text-sm text-[#5b6a63]">Preparando a leitura histórica do comercial.</p>
+          </div>
         </div>
       </AppFrame>
     );
@@ -451,414 +411,534 @@ export default function LeadsDashboard() {
 
   return (
     <AppFrame
-      eyebrow="Historico comercial"
-      title="Leads e triagem em modo legado."
-      description="Esta rota continua acessivel para apoio e leitura historica, mas o fluxo principal do escritorio agora vive no Painel, na Inbox e no CRM comercial."
+      eyebrow="Histórico comercial"
+      title="Histórico de leads com leitura executiva e continuidade operacional."
+      description="Esta rota permanece como acervo comercial de apoio. O fluxo principal segue concentrado no Painel, na Inbox e no CRM Comercial, enquanto aqui ficam o legado, a classificação e a retomada contextual."
+      utilityContent={
+        <PortalSessionBanner
+          role="advogada"
+          fullName="Advogada Noemia"
+          email="noemia@advnoemia.com.br"
+          workspaceLabel="Histórico comercial"
+          workspaceHint="Camada de apoio para leitura histórica, classificação e retomada de contexto."
+        />
+      }
+      navigation={[
+        { href: "/internal/advogada", label: "Painel" },
+        { href: "/internal/advogada/operacional", label: "CRM Comercial" },
+        { href: "/internal/advogada/leads", label: "Histórico de Leads", active: true }
+      ]}
+      highlights={[
+        { label: "Leads no acervo", value: String(metrics.total) },
+        { label: "Prioridade alta", value: String(metrics.urgentes) },
+        { label: "Prontos para consulta", value: String(metrics.prontosParaAgendar) },
+        { label: "Convertidos", value: String(metrics.convertidos) }
+      ]}
+      actions={[
+        { href: "/internal/advogada/operacional", label: "Abrir CRM Comercial" },
+        { href: "/internal/advogada#triagens-recebidas", label: "Voltar às triagens", tone: "secondary" }
+      ]}
     >
-      <PortalSessionBanner
-        role="advogada"
-        fullName="Advogada Noemia"
-        email="noemia@advnoemia.com.br"
-      />
-      
-      <div className="space-y-8">
-        <SectionCard
-          title="Hub oficial da operacao"
-          description="Use esta rota como apoio historico. A conducao principal dos leads e da triagem agora acontece nas superficies oficiais do workspace."
-        >
-          <div className="grid two">
-            <Link className="route-card" href="/internal/advogada/operacional">
-              <span className="shortcut-kicker">Fluxo principal</span>
-              <strong>Abrir painel operacional</strong>
-              <span>Continue follow-up, consulta, contato assistido e sinais de prioridade na superficie premium consolidada.</span>
-            </Link>
-            <Link className="route-card" href="/internal/advogada#triagens-recebidas">
-              <span className="shortcut-kicker">Entrada do atendimento</span>
-              <strong>Voltar para triagens recebidas</strong>
-              <span>Revise a origem do atendimento e converta para operacao humana sem separar contexto e proximo passo.</span>
-            </Link>
+      <SectionCard
+        title="Posicionamento desta rota"
+        description="O histórico foi reposicionado como camada de apoio premium: menos ruído, mais contexto, melhor hierarquia e ligação direta com os hubs oficiais."
+      >
+        <div className="dashboard-grid dashboard-grid--three">
+          <Link className="route-card" href="/internal/advogada/operacional">
+            <span className="shortcut-kicker">Fluxo principal</span>
+            <strong>Abrir CRM Comercial</strong>
+            <span>
+              Continue follow-up, consulta, contato assistido e prioridade comercial no workspace principal.
+            </span>
+          </Link>
+          <Link className="route-card" href="/internal/advogada#triagens-recebidas">
+            <span className="shortcut-kicker">Entrada oficial</span>
+            <strong>Voltar às triagens recebidas</strong>
+            <span>
+              Reabra a leitura de origem, urgência e conversão sem separar contexto e próximo passo.
+            </span>
+          </Link>
+          <div className="route-card">
+            <span className="shortcut-kicker">Governança</span>
+            <strong>Acervo qualificado</strong>
+            <span>
+              O histórico agora serve para consulta, classificação e retomada, sem competir com a operação do dia.
+            </span>
           </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Encadeamento oficial do escritorio"
-          description="Esta cadeia resume como a entrada comercial deve evoluir daqui em diante, sem troca de mundo entre lead, triagem, cliente, caso e acompanhamento."
-        >
-          <div className="funnel-grid">
-            <article className="funnel-card">
-              <span>Lead</span>
-              <strong>Interesse captado</strong>
-              <small>Origem, urgencia, mensagem e sinal comercial inicial.</small>
-              <em>Use esta rota para leitura historica e classificacao.</em>
-            </article>
-            <article className="funnel-card">
-              <span>Triagem</span>
-              <strong>Entrada organizada</strong>
-              <small>O contexto deixa de ser conversa solta e vira triagem com direcao.</small>
-              <em>Fila oficial em triagens recebidas no painel principal.</em>
-            </article>
-            <article className="funnel-card">
-              <span>Cliente</span>
-              <strong>Conversao operacional</strong>
-              <small>Quando a equipe assume, o atendimento ganha ficha, contexto e proximos passos.</small>
-              <em>A ficha do cliente vira o hub do relacionamento.</em>
-            </article>
-            <article className="funnel-card">
-              <span>Caso</span>
-              <strong>Conducao estruturada</strong>
-              <small>O trabalho juridico passa a ser acompanhado em status, timeline, agenda e documentos.</small>
-              <em>A central de casos vira o eixo da operacao.</em>
-            </article>
-          </div>
-        </SectionCard>
-
-        {/* Prioridades do Dia */}
-        <PrioridadesDoDia leads={leads} />
-
-        {/* Métricas Operacionais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard
-            title="Novos Hoje"
-            value={metrics.novosHoje}
-            subtitle="Leads novos hoje"
-            color="#6B7280"
-            icon="🆕"
-          />
-          <MetricCard
-            title="Em Atendimento"
-            value={metrics.emAtendimento}
-            subtitle="Atendimento ativo"
-            color="#F59E0B"
-            icon="🔄"
-          />
-          <MetricCard
-            title="Agendados"
-            value={metrics.agendados}
-            subtitle="Consulta marcada"
-            color="#8B5CF6"
-            icon="📅"
-          />
-          <MetricCard
-            title="Convertidos"
-            value={metrics.convertidos}
-            subtitle="Clientes conquistados"
-            color="#10B981"
-            icon="🎯"
-          />
         </div>
+      </SectionCard>
 
-        {/* Métricas de Qualidade */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard
-            title="Total de Leads"
-            value={metrics.total}
-            subtitle="Todos os períodos"
-            color="#8B5CF6"
-            icon="👥"
-          />
-          <MetricCard
-            title="Leads Quentes"
-            value={metrics.quentes}
-            subtitle="Alta conversão"
-            color="#EF4444"
-            icon="🔥"
-          />
-          <MetricCard
-            title="Prontos para Agendar"
-            value={metrics.prontosParaAgendar}
-            subtitle="Ação imediata"
-            color="#10B981"
-            icon="📅"
-          />
-          <MetricCard
-            title="Urgentes"
-            value={metrics.urgentes}
-            subtitle="Atenção prioritária"
-            color="#F59E0B"
-            icon="⚡"
-          />
-        </div>
+      <PrioridadesDoDia leads={leads} />
 
-        {/* Filtros e Busca */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="lg:col-span-2">
+      <div className="dashboard-grid dashboard-grid--four">
+        <MetricHighlight
+          title="Novos hoje"
+          value={metrics.novosHoje}
+          detail="Entradas novas que ainda exigem primeira leitura ou qualificação."
+          icon={<Sparkles className="h-5 w-5" />}
+        />
+        <MetricHighlight
+          title="Em atendimento"
+          value={metrics.emAtendimento}
+          detail="Leads já assumidos pelo time comercial ou pela equipe jurídica."
+          icon={<Eye className="h-5 w-5" />}
+        />
+        <MetricHighlight
+          title="Consulta pronta"
+          value={metrics.prontosParaAgendar}
+          detail="Oportunidades maduras para convite, agenda e fechamento."
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
+        <MetricHighlight
+          title="Leads quentes"
+          value={metrics.quentes}
+          detail="Entradas com maior temperatura e potencial de conversão."
+          icon={<Flame className="h-5 w-5" />}
+        />
+      </div>
+
+      <SectionCard
+        title="Filtro, leitura e retomada"
+        description="Busque por nome, mensagem, urgência, etapa do funil ou status operacional para reduzir a densidade do acervo e focar no que importa."
+      >
+        <div className="dashboard-grid dashboard-grid--four">
+          <label className="dashboard-grid gap-2 md:col-span-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+              Busca rápida
+            </span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e6a3b]" />
               <input
                 type="text"
-                placeholder="Buscar por nome, ID ou mensagem..."
+                placeholder="Buscar por nome, identificador ou mensagem"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="premium-input pl-11"
               />
             </div>
+          </label>
+
+          <label className="dashboard-grid gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">Área</span>
             <select
               value={filters.legal_area}
-              onChange={(e) => setFilters({...filters, legal_area: e.target.value})}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              onChange={(event) => setFilters({ ...filters, legal_area: event.target.value })}
+              className="premium-select"
             >
-              <option value="">Todas as Áreas</option>
+              <option value="">Todas</option>
               {Object.entries(legalAreaConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
               ))}
             </select>
+          </label>
+
+          <label className="dashboard-grid gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">Urgência</span>
             <select
               value={filters.urgency}
-              onChange={(e) => setFilters({...filters, urgency: e.target.value})}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              onChange={(event) => setFilters({ ...filters, urgency: event.target.value })}
+              className="premium-select"
             >
-              <option value="">Todas Urgências</option>
+              <option value="">Todas</option>
               {Object.entries(urgencyConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
               ))}
             </select>
+          </label>
+
+          <label className="dashboard-grid gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">Status do lead</span>
             <select
               value={filters.lead_status}
-              onChange={(e) => setFilters({...filters, lead_status: e.target.value})}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              onChange={(event) => setFilters({ ...filters, lead_status: event.target.value })}
+              className="premium-select"
             >
-              <option value="">Todos Status</option>
+              <option value="">Todos</option>
               {Object.entries(leadStatusConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
               ))}
             </select>
+          </label>
+
+          <label className="dashboard-grid gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">Etapa</span>
             <select
               value={filters.funnel_stage}
-              onChange={(e) => setFilters({...filters, funnel_stage: e.target.value})}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              onChange={(event) => setFilters({ ...filters, funnel_stage: event.target.value })}
+              className="premium-select"
             >
-              <option value="">Todas Etapas</option>
+              <option value="">Todas</option>
               {Object.entries(funnelStageConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
               ))}
             </select>
+          </label>
+
+          <label className="dashboard-grid gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">Situação operacional</span>
             <select
               value={filters.operational_status}
-              onChange={(e) => setFilters({...filters, operational_status: e.target.value})}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              onChange={(event) =>
+                setFilters({ ...filters, operational_status: event.target.value })
+              }
+              className="premium-select"
             >
-              <option value="">Todos Status</option>
+              <option value="">Todas</option>
               {Object.entries(operationalStatusConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
               ))}
             </select>
-          </div>
+          </label>
         </div>
+      </SectionCard>
 
-        {/* Tabela de Leads */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Leads ({filteredLeads.length})
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lead
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Área
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Funil
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Urgência
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Operacional
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Última Mensagem
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contato
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Interações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLeads.map((lead) => (
-                  <LeadTableRow
-                    key={lead.id}
-                    lead={lead}
-                    onSelect={setSelectedLead}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <SectionCard
+        title={`Leads disponíveis (${filteredLeads.length})`}
+        description="Tabela histórica consolidada com menos ruído visual, melhor leitura de status e acesso rápido ao contexto de cada lead."
+      >
+        {filteredLeads.length ? (
+          <div className="premium-surface overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="premium-table">
+                <thead>
+                  <tr>
+                    <th>Lead</th>
+                    <th>Área</th>
+                    <th>Status</th>
+                    <th>Funil</th>
+                    <th>Urgência</th>
+                    <th>Operação</th>
+                    <th>Última mensagem</th>
+                    <th>Contato</th>
+                    <th>Interações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLeads.map((lead) => {
+                    const area = getAreaConfig(lead.legal_area);
 
-        {/* Modal de Detalhes do Lead */}
-        {selectedLead && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Detalhes do Lead
-                  </h2>
-                  <button
-                    onClick={() => setSelectedLead(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
+                    return (
+                      <tr
+                        key={lead.id}
+                        className="cursor-pointer transition-colors"
+                        onClick={() => setSelectedLead(lead)}
+                      >
+                        <td>
+                          <div className="flex min-w-[220px] items-start gap-3">
+                            <div
+                              className="flex h-11 w-11 items-center justify-center rounded-2xl text-xs font-semibold uppercase tracking-[0.08em]"
+                              style={{ backgroundColor: area.bgColor, color: area.color }}
+                            >
+                              {area.icon}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-[#13251f]">
+                                {lead.username || `@${lead.platform_user_id}`}
+                              </div>
+                              <div className="mt-1 text-sm text-[#5b6a63]">
+                                Identificador {lead.platform_user_id}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <StatusPill config={area} />
+                        </td>
+                        <td>
+                          <StatusPill config={getVisualConfig(leadStatusConfig, lead.lead_status)} />
+                        </td>
+                        <td>
+                          <StatusPill
+                            config={getVisualConfig(funnelStageConfig, lead.funnel_stage)}
+                          />
+                        </td>
+                        <td>
+                          <StatusPill config={getVisualConfig(urgencyConfig, lead.urgency)} />
+                        </td>
+                        <td>
+                          <StatusPill
+                            config={getVisualConfig(
+                              operationalStatusConfig,
+                              lead.operational_status
+                            )}
+                          />
+                        </td>
+                        <td>
+                          <div className="max-w-[280px] text-sm leading-6 text-[#32433d]">
+                            {lead.last_message}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="text-sm text-[#32433d]">{formatDateTime(lead.last_contact_at)}</div>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">{lead.conversation_count} interações</Badge>
+                            {lead.wants_human ? <Badge variant="warning">Quer humano</Badge> : null}
+                            {lead.should_schedule ? (
+                              <Badge variant="success">Sinal de agenda</Badge>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="premium-empty">
+            Nenhum lead corresponde aos filtros aplicados. Ajuste a busca ou limpe os filtros para
+            reabrir o acervo completo.
+          </div>
+        )}
+      </SectionCard>
+
+      {selectedLead ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(10,16,13,0.55)] p-4 backdrop-blur-[3px]">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-[rgba(142,106,59,0.16)] bg-[rgba(255,252,247,0.98)] shadow-[0_30px_80px_rgba(0,0,0,0.22)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[rgba(142,106,59,0.1)] px-6 py-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                  Leitura detalhada do lead
+                </p>
+                <h2 className="mt-2 font-serif text-3xl font-semibold text-[#13251f]">
+                  {selectedLead.username || `@${selectedLead.platform_user_id}`}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5b6a63]">
+                  A ficha detalhada consolida histórico, sinal comercial e próximos movimentos sem
+                  obrigar troca de contexto.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="rounded-2xl border border-[rgba(142,106,59,0.14)] bg-white/85 p-3 text-[#13251f] transition hover:bg-[#f8f1e4]"
+                aria-label="Fechar detalhes do lead"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6 px-6 py-6">
+              <div className="dashboard-grid dashboard-grid--three">
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Situação atual
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <StatusPill config={getAreaConfig(selectedLead.legal_area)} />
+                    <StatusPill
+                      config={getVisualConfig(leadStatusConfig, selectedLead.lead_status)}
+                    />
+                    <StatusPill config={getVisualConfig(urgencyConfig, selectedLead.urgency)} />
+                    <StatusPill
+                      config={getVisualConfig(
+                        operationalStatusConfig,
+                        selectedLead.operational_status
+                      )}
+                    />
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm leading-6 text-[#32433d]">
+                    <div>
+                      <strong>Funil:</strong>{" "}
+                      {getVisualConfig(funnelStageConfig, selectedLead.funnel_stage).label}
+                    </div>
+                    <div>
+                      <strong>Primeiro contato:</strong> {formatDateTime(selectedLead.first_contact_at)}
+                    </div>
+                    <div>
+                      <strong>Último contato:</strong> {formatDateTime(selectedLead.last_contact_at)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Indicadores comerciais
+                  </p>
+                  <div className="mt-4 space-y-3 text-sm leading-6 text-[#32433d]">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Interações registradas</span>
+                      <Badge variant="secondary">{selectedLead.conversation_count}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Precisa de contato humano</span>
+                      <Badge variant={selectedLead.wants_human ? "warning" : "default"}>
+                        {selectedLead.wants_human ? "Sim" : "Não"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Pronto para agendamento</span>
+                      <Badge variant={selectedLead.should_schedule ? "success" : "default"}>
+                        {selectedLead.should_schedule ? "Sim" : "Não"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Próximo movimento
+                  </p>
+                  <p className="mt-4 text-sm leading-7 text-[#32433d]">
+                    {selectedLead.suggested_action}
+                  </p>
+                  <div className="mt-4 rounded-2xl border border-[rgba(142,106,59,0.12)] bg-[rgba(249,241,226,0.7)] p-4 text-sm leading-6 text-[#5b6a63]">
+                    Esta recomendação funciona como leitura de apoio. A decisão final continua sob
+                    condução humana.
+                  </div>
                 </div>
               </div>
-              
-              <div className="p-6 space-y-6">
-                {/* Informações Principais */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações do Lead</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Nome/Username:</span>
-                        <span className="font-medium">{selectedLead.username || `@${selectedLead.platform_user_id}`}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">ID do Usuário:</span>
-                        <span className="font-medium">{selectedLead.platform_user_id}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Área Jurídica:</span>
-                        <StatusBadge config={getAreaConfig(selectedLead.legal_area)} />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Status:</span>
-                        <StatusBadge config={getVisualConfig(leadStatusConfig, selectedLead.lead_status)} />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Funil:</span>
-                        <StatusBadge config={getVisualConfig(funnelStageConfig, selectedLead.funnel_stage)} />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Urgência:</span>
-                        <StatusBadge config={getVisualConfig(urgencyConfig, selectedLead.urgency)} />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Indicadores</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Quer Atendimento Humano:</span>
-                        <span className={`font-medium ${selectedLead.wants_human ? 'text-green-600' : 'text-gray-600'}`}>
-                          {selectedLead.wants_human ? 'Sim' : 'Não'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Deve Agendar:</span>
-                        <span className={`font-medium ${selectedLead.should_schedule ? 'text-green-600' : 'text-gray-600'}`}>
-                          {selectedLead.should_schedule ? 'Sim' : 'Não'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total de Interações:</span>
-                        <span className="font-medium">{selectedLead.conversation_count}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Primeiro Contato:</span>
-                        <span className="font-medium">
-                          {new Date(selectedLead.first_contact_at).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Último Contato:</span>
-                        <span className="font-medium">
-                          {new Date(selectedLead.last_contact_at).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                    </div>
+
+              <div className="dashboard-grid dashboard-grid--two">
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Resumo
+                  </p>
+                  <p className="mt-4 text-sm leading-7 text-[#32433d]">{selectedLead.summary}</p>
+                </div>
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Última resposta registrada
+                  </p>
+                  <p className="mt-4 text-sm leading-7 text-[#32433d]">{selectedLead.last_response}</p>
+                </div>
+              </div>
+
+              <div className="premium-surface p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                  Última mensagem do lead
+                </p>
+                <p className="mt-4 text-sm leading-7 text-[#32433d]">{selectedLead.last_message}</p>
+              </div>
+
+              <div className="dashboard-grid dashboard-grid--two">
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Ações operacionais
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      onClick={() => void updateLeadStatus(selectedLead.id, "viewed")}
+                      className="button secondary"
+                    >
+                      Marcar em leitura
+                    </button>
+                    <button
+                      onClick={() => void updateLeadStatus(selectedLead.id, "in_progress")}
+                      className="button secondary"
+                    >
+                      Iniciar atendimento
+                    </button>
+                    <button
+                      onClick={() => void updateLeadStatus(selectedLead.id, "scheduled")}
+                      className="button secondary"
+                    >
+                      Registrar agenda
+                    </button>
+                    <button
+                      onClick={() => void updateLeadStatus(selectedLead.id, "converted")}
+                      className="button"
+                    >
+                      Converter em cliente
+                    </button>
+                    <button
+                      onClick={() => void updateLeadStatus(selectedLead.id, "closed")}
+                      className="button secondary"
+                    >
+                      Encerrar lead
+                    </button>
                   </div>
                 </div>
 
-                {/* Resumo e Ação Sugerida */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Análise da IA</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Resumo</h4>
-                      <p className="text-gray-700 text-sm">{selectedLead.summary}</p>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-4">
-                      <h4 className="font-medium text-blue-900 mb-2">Ação Sugerida</h4>
-                      <p className="text-blue-700 text-sm">{selectedLead.suggested_action}</p>
-                    </div>
+                <div className="premium-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                    Continuidade externa
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <a
+                      href={`https://wa.me/5511999999999?text=Olá, vim pelo sistema sobre o lead @${selectedLead.username || selectedLead.platform_user_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="button secondary"
+                    >
+                      <PhoneCall className="mr-2 h-4 w-4" />
+                      Abrir WhatsApp
+                    </a>
+                    <Link href="/internal/advogada/operacional" className="button secondary">
+                      <ArrowUpRight className="mr-2 h-4 w-4" />
+                      Ir para o CRM Comercial
+                    </Link>
                   </div>
-                </div>
-
-                {/* Últimas Mensagens */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Últimas Interações</h3>
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Última Mensagem do Cliente</h4>
-                      <p className="text-gray-700">{selectedLead.last_message}</p>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg p-4">
-                      <h4 className="font-medium text-purple-900 mb-2">Última Resposta da IA</h4>
-                      <p className="text-purple-700">{selectedLead.last_response}</p>
-                    </div>
+                  <div className="mt-4 rounded-2xl border border-[rgba(41,93,69,0.14)] bg-[rgba(235,244,239,0.8)] p-4 text-sm leading-6 text-[#295d45]">
+                    Use o CRM Comercial para follow-up assistido, proposta de consulta e fechamento.
                   </div>
-                </div>
-
-                {/* Ações Operacionais */}
-                <div className="flex flex-wrap gap-4">
-                  <button
-                    onClick={() => updateLeadStatus(selectedLead.id, 'viewed')}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    👁️ Marcar como Visualizado
-                  </button>
-                  <button
-                    onClick={() => updateLeadStatus(selectedLead.id, 'in_progress')}
-                    className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                  >
-                    � Iniciar Atendimento
-                  </button>
-                  <button
-                    onClick={() => updateLeadStatus(selectedLead.id, 'scheduled')}
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                  >
-                    📅 Marcar como Agendado
-                  </button>
-                  <button
-                    onClick={() => updateLeadStatus(selectedLead.id, 'converted')}
-                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    🎯 Marcar como Convertido
-                  </button>
-                  <button
-                    onClick={() => updateLeadStatus(selectedLead.id, 'closed')}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    ✖️ Encerrar Lead
-                  </button>
-                  <a
-                    href={`https://wa.me/5511999999999?text=Olá, vim pelo sistema sobre o lead @${selectedLead.username || selectedLead.platform_user_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    📱 Abrir WhatsApp
-                  </a>
                 </div>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
+
+      <SectionCard
+        title="Leitura de governança"
+        description="Este histórico agora ajuda a responder o que merece retomada, o que já virou cliente e onde ainda existe oportunidade sem direção."
+      >
+        <div className="dashboard-grid dashboard-grid--three">
+          <div className="summary-card">
+            <span>Leads urgentes</span>
+            <strong>{metrics.urgentes}</strong>
+            <p>Precisam de leitura rápida, contato humano ou decisão de prioridade.</p>
+            <Badge variant="warning">Atenção imediata</Badge>
+          </div>
+          <div className="summary-card">
+            <span>Conversões já consolidadas</span>
+            <strong>{metrics.convertidos}</strong>
+            <p>Mostra o quanto do acervo já avançou para cliente e deixou de ser só histórico.</p>
+            <Badge variant="success">Valor realizado</Badge>
+          </div>
+          <div className="summary-card">
+            <span>Acervo em observação</span>
+            <strong>{Math.max(metrics.total - metrics.convertidos, 0)}</strong>
+            <p>Leads que ainda podem pedir classificação, nutrição, agenda ou encerramento formal.</p>
+            <Badge variant="secondary">Leitura de apoio</Badge>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Conexão com o fluxo principal"
+        description="O histórico não concorre mais com a operação. Ele orienta a retomada e devolve a execução para o módulo certo."
+      >
+        <div className="dashboard-grid dashboard-grid--three">
+          <div className="notice-card">
+            <strong>Quando existe intenção comercial</strong>
+            <p>Leve o contato para o CRM Comercial e siga com proposta, agenda, pagamento e fechamento.</p>
+            <span>CRM Comercial</span>
+          </div>
+          <div className="notice-card">
+            <strong>Quando a origem importa</strong>
+            <p>Volte ao Painel para cruzar triagem, origem, urgência e conversão com visão executiva.</p>
+            <span>Painel principal</span>
+          </div>
+          <div className="notice-card">
+            <strong>Quando o lead virou cliente</strong>
+            <p>A continuidade correta passa para casos, agenda, documentos e acompanhamento jurídico.</p>
+            <span>Operação jurídica</span>
+          </div>
+        </div>
+      </SectionCard>
     </AppFrame>
   );
 }

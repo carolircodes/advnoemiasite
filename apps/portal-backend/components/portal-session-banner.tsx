@@ -3,8 +3,8 @@ import { logoutAction } from "../lib/auth/actions";
 import type { PortalRole } from "../lib/domain/portal";
 
 const roleLabels: Record<PortalRole, string> = {
-  admin: "Administracao interna",
-  advogada: "Area interna",
+  admin: "Administração interna",
+  advogada: "Área interna",
   cliente: "Portal do cliente"
 };
 
@@ -27,8 +27,8 @@ export function PortalSessionBanner({
   const hint =
     workspaceHint ||
     (role === "cliente"
-      ? "Sessao autenticada para acompanhar o proprio atendimento."
-      : "Sessao protegida para operacao interna do escritorio.");
+      ? "Sessão autenticada para acompanhar o próprio atendimento."
+      : "Sessão protegida para operação interna do escritório.");
 
   return (
     <div className="session-strip">
@@ -41,7 +41,7 @@ export function PortalSessionBanner({
       </div>
       <form action={logoutAction} className="session-action">
         <FormSubmitButton tone="secondary" pendingLabel="Saindo do portal...">
-          Encerrar sessao
+          Encerrar sessão
         </FormSubmitButton>
       </form>
     </div>

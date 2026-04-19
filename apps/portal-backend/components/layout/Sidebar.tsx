@@ -4,6 +4,7 @@ import {
   Bot,
   Brain,
   Calendar,
+  ChevronRight,
   FileText,
   FolderOpen,
   LayoutDashboard,
@@ -43,47 +44,60 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
   const isActive = (href: string) => isInternalWorkspacePathActive(currentPath, href);
 
   const sidebarClasses = isMobile
-    ? `fixed inset-y-0 left-0 w-72 max-w-[calc(100vw-1rem)] bg-[#0f172a] text-white z-50 transform transition-transform duration-300 shadow-2xl ${
+    ? `fixed inset-y-0 left-0 w-80 max-w-[calc(100vw-1rem)] z-50 transform transition-transform duration-300 ${
         onClose ? 'translate-x-0' : '-translate-x-full'
       }`
-    : 'fixed left-0 top-0 h-screen w-64 bg-[#0f172a] text-white z-50';
+    : 'fixed left-0 top-0 h-screen w-[296px]';
 
   return (
-    <div className={sidebarClasses}>
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 border-b border-[#1e293b] p-6">
+    <aside className={sidebarClasses}>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[rgba(142,106,59,0.12)] bg-[linear-gradient(180deg,#0f241d_0%,#143128_46%,#1d3c31_100%)] text-white shadow-[20px_0_60px_rgba(10,20,16,0.18)]">
+        <div className="shrink-0 border-b border-white/10 p-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#8e6a3b] to-[#6f512c] rounded-xl flex items-center justify-center font-bold text-lg">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#c4a165] via-[#8e6a3b] to-[#6f512c] font-serif text-xl font-semibold text-[#fff7ea] shadow-[0_16px_32px_rgba(0,0,0,0.22)]">
                 N
               </div>
               <div>
-                <h1 className="font-bold text-lg">NoemIA</h1>
-                <p className="text-xs text-[#94a3b8]">Workspace interno</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d5bc8f]">
+                  ADVNOEMIA
+                </p>
+                <h1 className="font-serif text-xl font-semibold text-[#fff8ee]">NoemIA</h1>
+                <p className="text-xs text-[#b9c8c2]">Workspace interno premium</p>
               </div>
             </div>
             {isMobile && onClose ? (
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-[#1e293b] transition-colors"
+                className="rounded-xl border border-white/10 bg-white/5 p-2 transition-colors hover:bg-white/10"
+                aria-label="Fechar menu"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             ) : null}
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-[rgba(212,188,143,0.18)] bg-[rgba(255,248,234,0.06)] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d5bc8f]">
+              Camada institucional
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#d9e2de]">
+              Navegação organizada por prioridade operacional, contexto e continuidade entre módulos.
+            </p>
           </div>
         </div>
 
         <nav
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-10"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 pb-10"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          <div className="space-y-6">
+          <div className="space-y-7">
             {internalWorkspaceMenuSections.map((section) => (
               <div key={section.id}>
-                <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                <p className="px-4 pb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#aebeb8]">
                   {section.label}
                 </p>
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {section.items.map((item) => {
                     const Icon = iconById[item.id as keyof typeof iconById] || Settings;
                     const active = isActive(item.href);
@@ -93,14 +107,34 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
                         <a
                           href={item.href}
                           onClick={() => (isMobile && onClose ? onClose() : undefined)}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                          className={`group flex items-center gap-3 rounded-[22px] border px-4 py-3.5 transition-all duration-200 ${
                             active
-                              ? 'bg-[#8e6a3b] text-white border-l-4 border-[#f5efe2]'
-                              : 'text-[#94a3b8] hover:bg-[#1e293b] hover:text-white'
+                              ? 'border-[rgba(212,188,143,0.2)] bg-[linear-gradient(135deg,rgba(196,161,101,0.28),rgba(142,106,59,0.18))] text-white shadow-[0_16px_32px_rgba(0,0,0,0.16)]'
+                              : 'border-transparent text-[#d4dfdb] hover:border-white/10 hover:bg-white/5 hover:text-white'
                           }`}
                         >
-                          <Icon className="w-5 h-5" />
-                          <span className="font-medium">{item.label}</span>
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${
+                              active
+                                ? 'border-[rgba(255,248,234,0.18)] bg-[rgba(255,248,234,0.14)]'
+                                : 'border-white/10 bg-white/5'
+                            }`}
+                          >
+                            <Icon className="h-[18px] w-[18px]" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium">{item.label}</div>
+                            <div className="mt-1 line-clamp-2 text-xs leading-5 text-[#b7c5c0] group-hover:text-[#deebe6]">
+                              {item.subtitle}
+                            </div>
+                          </div>
+                          <ChevronRight
+                            className={`h-4 w-4 transition-transform ${
+                              active
+                                ? 'translate-x-0 text-[#f2e4c7]'
+                                : 'text-[#8da09a] group-hover:translate-x-0.5 group-hover:text-[#deebe6]'
+                            }`}
+                          />
                         </a>
                       </li>
                     );
@@ -111,10 +145,16 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
           </div>
         </nav>
 
-        <div className="shrink-0 border-t border-[#1e293b] p-4">
-          <div className="text-xs text-[#64748b]">© 2026 NoemIA</div>
+        <div className="shrink-0 border-t border-white/10 p-4">
+          <div className="rounded-[22px] border border-[rgba(212,188,143,0.14)] bg-[rgba(255,248,234,0.05)] p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d5bc8f]">
+              Escritório
+            </div>
+            <div className="mt-2 text-sm text-[#e7efec]">Noemia Paixão Advocacia</div>
+            <div className="mt-1 text-xs text-[#9db0a9]">© 2026 NoemIA. Operação institucional.</div>
+          </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

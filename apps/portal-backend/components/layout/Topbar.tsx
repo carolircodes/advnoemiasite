@@ -1,6 +1,6 @@
 'use client';
 
-import { Menu } from 'lucide-react';
+import { Bell, Menu, Search, ShieldCheck } from 'lucide-react';
 
 interface TopbarProps {
   title: string;
@@ -10,38 +10,57 @@ interface TopbarProps {
   userRole?: string;
 }
 
-export function Topbar({ 
-  title, 
-  subtitle, 
+export function Topbar({
+  title,
+  subtitle,
   onMenuClick,
   userName = 'Advogada',
   userRole = 'Noemia Paixão'
 }: TopbarProps) {
   return (
-    <div className="h-16 bg-white border-b border-[#e2e8f0] flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        {onMenuClick && (
-          <button
-            onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-        <div>
-          <h1 className="text-xl font-semibold text-[#10261d]">{title}</h1>
-          {subtitle && <p className="text-sm text-[#64748b]">{subtitle}</p>}
-        </div>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-sm font-medium text-[#10261d]">{userName}</p>
-            <p className="text-xs text-[#64748b]">{userRole}</p>
+    <div className="sticky top-0 z-30 border-b border-[rgba(142,106,59,0.12)] bg-[rgba(252,247,240,0.84)] px-4 py-4 backdrop-blur xl:px-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          {onMenuClick && (
+            <button
+              onClick={onMenuClick}
+              className="rounded-2xl border border-[rgba(142,106,59,0.14)] bg-white/80 p-3 text-[#13251f] transition-colors hover:bg-[#f8f1e4] lg:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
+          <div className="min-w-0">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[rgba(142,106,59,0.12)] bg-[rgba(249,241,226,0.9)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Operação interna protegida
+            </div>
+            <h1 className="font-serif text-[1.7rem] font-semibold leading-none tracking-[-0.03em] text-[#13251f]">
+              {title}
+            </h1>
+            {subtitle ? (
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5b6a63]">{subtitle}</p>
+            ) : null}
           </div>
-          <div className="w-10 h-10 bg-gradient-to-br from-[#8e6a3b] to-[#6f512c] rounded-full flex items-center justify-center text-white font-semibold">
-            {userName.charAt(0).toUpperCase()}{userRole.charAt(0).toUpperCase()}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+          <div className="hidden min-w-[280px] items-center gap-3 rounded-full border border-[rgba(142,106,59,0.12)] bg-white/75 px-4 py-3 text-sm text-[#5b6a63] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] md:flex">
+            <Search className="h-4 w-4 text-[#8e6a3b]" />
+            Busca rápida, páginas e atalhos do workspace
+          </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[rgba(142,106,59,0.12)] bg-white/85 text-[#8e6a3b]">
+            <Bell className="h-4 w-4" />
+          </div>
+          <div className="flex items-center gap-3 rounded-[24px] border border-[rgba(142,106,59,0.12)] bg-white/88 px-3 py-2 shadow-[0_10px_24px_rgba(16,38,29,0.06)]">
+            <div className="text-right">
+              <p className="text-sm font-semibold text-[#13251f]">{userName}</p>
+              <p className="text-xs uppercase tracking-[0.08em] text-[#7b5c31]">{userRole}</p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8e6a3b] to-[#6f512c] text-sm font-semibold text-white shadow-[0_12px_26px_rgba(111,81,44,0.26)]">
+              {userName.charAt(0).toUpperCase()}
+              {userRole.charAt(0).toUpperCase()}
+            </div>
           </div>
         </div>
       </div>

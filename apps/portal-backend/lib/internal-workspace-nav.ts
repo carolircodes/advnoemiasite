@@ -19,7 +19,7 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "painel",
     label: "Painel",
     href: "/internal/advogada",
-    subtitle: "Cockpit executivo do escritorio e command center oficial",
+    subtitle: "Visão executiva do escritório e centro oficial de operação",
     section: "primary",
     showInSidebar: true
   },
@@ -27,7 +27,7 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "atendimento",
     label: "Inbox",
     href: "/internal/advogada/atendimento",
-    subtitle: "Inbox conversacional oficial com threads, handoff e contexto",
+    subtitle: "Inbox conversacional com histórico, handoff e contexto operacional",
     section: "primary",
     showInSidebar: true
   },
@@ -35,7 +35,7 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "casos",
     label: "Casos",
     href: "/internal/advogada/casos",
-    subtitle: "Operacao juridica ativa de casos, etapas e acompanhamento",
+    subtitle: "Operação jurídica ativa de casos, etapas e acompanhamento",
     section: "primary",
     showInSidebar: true
   },
@@ -43,7 +43,7 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "agenda",
     label: "Agenda",
     href: "/internal/advogada/agenda",
-    subtitle: "Agenda real do escritorio, com compromissos e consultas",
+    subtitle: "Agenda real do escritório, com compromissos e consultas",
     section: "primary",
     showInSidebar: true
   },
@@ -51,15 +51,15 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "documentos",
     label: "Documentos",
     href: "/internal/advogada/documentos",
-    subtitle: "Documentos reais e pedidos documentais do escritorio",
+    subtitle: "Documentos reais e solicitações documentais do escritório",
     section: "primary",
     showInSidebar: true
   },
   {
     id: "inteligencia",
-    label: "Inteligencia",
+    label: "Inteligência",
     href: "/internal/advogada/inteligencia",
-    subtitle: "Leitura executiva de BI, receita, growth e telemetria",
+    subtitle: "Leitura executiva de BI, receita, crescimento e telemetria",
     section: "primary",
     showInSidebar: true
   },
@@ -67,7 +67,7 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "ecossistema",
     label: "Ecossistema",
     href: "/internal/advogada/ecossistema",
-    subtitle: "Expansao premium, recorrencia, comunidade e camada estrategica",
+    subtitle: "Expansão premium, recorrência, comunidade e camada estratégica",
     section: "primary",
     showInSidebar: true
   },
@@ -75,52 +75,52 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
     id: "operacional",
     label: "CRM Comercial",
     href: "/internal/advogada/operacional",
-    subtitle: "Fila comercial, follow-up, consulta e prioridade de conversao",
+    subtitle: "Fila comercial, follow-up, consulta e prioridade de conversão",
     section: "support",
     showInSidebar: true
   },
   {
     id: "canais",
-    label: "Distribuicao",
+    label: "Distribuição",
     href: "/internal/advogada/canais",
-    subtitle: "Launcher por canal e separacao entre inbox e distribuicao",
+    subtitle: "Distribuição por canal com separação clara entre inbox e origem",
     section: "support",
     showInSidebar: true
   },
   {
     id: "leads",
-    label: "Historico de Leads",
+    label: "Histórico de Leads",
     href: "/internal/advogada/leads",
-    subtitle: "Leitura historica, apoio e legado comercial",
+    subtitle: "Leitura histórica, apoio e legado comercial",
     section: "history",
     showInSidebar: true
   },
   {
     id: "acquisition",
-    label: "Aquisicao",
+    label: "Aquisição",
     href: "/internal/advogada/acquisition",
-    subtitle: "Leitura de aquisicao e origem de demanda fora do menu nobre",
+    subtitle: "Leitura de aquisição e origem de demanda fora do menu principal",
     section: "insight"
   },
   {
     id: "performance",
     label: "Performance",
     href: "/internal/advogada/performance",
-    subtitle: "Dashboard paralelo de performance preservado fora do topo",
+    subtitle: "Painel auxiliar de performance preservado fora do topo",
     section: "insight"
   },
   {
     id: "configuracoes",
-    label: "Configuracoes",
+    label: "Configurações",
     href: "/internal/advogada/configuracoes",
-    subtitle: "Alias temporario para outra camada do workspace",
+    subtitle: "Alias temporário para outra camada do workspace",
     section: "hidden"
   },
   {
     id: "automacoes",
-    label: "Automacoes",
+    label: "Automações",
     href: "/internal/advogada/automacoes",
-    subtitle: "Alias temporario para inteligencia",
+    subtitle: "Alias temporário para inteligência",
     section: "hidden"
   }
 ];
@@ -128,7 +128,7 @@ export const internalWorkspaceNavItems: InternalWorkspaceNavItem[] = [
 export const internalWorkspaceMenuSections = [
   {
     id: "primary",
-    label: "Nucleo principal",
+    label: "Núcleo principal",
     items: internalWorkspaceNavItems.filter(
       (item) => item.showInSidebar && item.section === "primary"
     )
@@ -142,7 +142,7 @@ export const internalWorkspaceMenuSections = [
   },
   {
     id: "history",
-    label: "Historico e legado",
+    label: "Histórico e legado",
     items: internalWorkspaceNavItems.filter(
       (item) => item.showInSidebar && item.section === "history"
     )

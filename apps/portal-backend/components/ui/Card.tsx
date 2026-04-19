@@ -23,7 +23,7 @@ interface CardContentProps {
 export function Card({ children, className }: CardProps) {
   return (
     <div className={cn(
-      "bg-white rounded-2xl border border-[#e2e8f0] shadow-sm",
+      "rounded-[28px] border border-[rgba(142,106,59,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,244,238,0.94))] shadow-[0_18px_40px_rgba(16,38,29,0.08)]",
       className
     )}>
       {children}
@@ -34,12 +34,12 @@ export function Card({ children, className }: CardProps) {
 export function CardHeader({ title, description, action, className }: CardHeaderProps) {
   return (
     <div className={cn(
-      "flex flex-col gap-2 border-b border-[#f1f5f9] bg-[#fafbfc] p-6 md:flex-row md:items-center md:justify-between",
+      "flex flex-col gap-3 border-b border-[rgba(142,106,59,0.1)] bg-[rgba(248,244,236,0.76)] p-6 md:flex-row md:items-center md:justify-between",
       className
     )}>
       <div>
-        <h3 className="text-lg font-semibold text-[#10261d]">{title}</h3>
-        {description && <p className="mt-1 text-sm text-[#64748b]">{description}</p>}
+        <h3 className="font-serif text-xl font-semibold text-[#13251f]">{title}</h3>
+        {description && <p className="mt-1 text-sm leading-6 text-[#5b6a63]">{description}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>
