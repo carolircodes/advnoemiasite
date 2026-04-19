@@ -1,10 +1,19 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const releaseSha =
+  process.env.NEXT_PUBLIC_PORTAL_RELEASE_LABEL ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+  process.env.GIT_COMMIT_SHA?.slice(0, 7) ||
+  "local";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true
+  },
+  env: {
+    NEXT_PUBLIC_PORTAL_RELEASE_LABEL: releaseSha
   },
   outputFileTracingRoot: path.join(__dirname, "../.."),
   async redirects() {

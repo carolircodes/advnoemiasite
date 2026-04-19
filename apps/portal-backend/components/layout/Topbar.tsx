@@ -17,6 +17,8 @@ export function Topbar({
   userName = 'Advogada',
   userRole = 'Noemia Paixão'
 }: TopbarProps) {
+  const releaseLabel = process.env.NEXT_PUBLIC_PORTAL_RELEASE_LABEL || 'local';
+
   return (
     <div className="sticky top-0 z-30 border-b border-[rgba(142,106,59,0.12)] bg-[rgba(252,247,240,0.84)] px-4 py-4 backdrop-blur xl:px-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -31,9 +33,15 @@ export function Topbar({
             </button>
           )}
           <div className="min-w-0">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[rgba(142,106,59,0.12)] bg-[rgba(249,241,226,0.9)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Operação interna protegida
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(142,106,59,0.12)] bg-[rgba(249,241,226,0.9)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Operação interna protegida
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(19,37,31,0.1)] bg-white/78 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#516158]">
+                Release do portal
+                <span className="font-semibold text-[#13251f]">{releaseLabel}</span>
+              </div>
             </div>
             <h1 className="font-serif text-[1.7rem] font-semibold leading-none tracking-[-0.03em] text-[#13251f]">
               {title}

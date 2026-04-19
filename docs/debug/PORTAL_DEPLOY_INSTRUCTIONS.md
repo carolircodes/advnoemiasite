@@ -1,59 +1,66 @@
-# CONFIGURAÇÃO DE DEPLOY - ARQUITETURA CORRIGIDA
+# Configuração de Deploy do Portal
 
-## ARQUITETURA FINAL
-- **Domínio Principal**: `advnoemia.com.br` → Site estático (index.html)
-- **Portal/Subdomínio**: `portal.advnoemia.com.br` → App Next.js (apps/portal-backend)
+## Arquitetura correta
 
-## CONFIGURAÇÃO VERCEL
+- `advnoemia.com.br` e `www.advnoemia.com.br`: site institucional publicado pelo projeto Vercel `advnoemiasite`
+- `portal.advnoemia.com.br`: portal operacional publicado pelo projeto Vercel `advnoemiaportal`
 
-### 1. DOMÍNIO PRINCIPAL (advnoemia.com.br)
-- **Framework**: Static Site (nenhum)
-- **Build Command**: Não necessário
-- **Output Directory**: Public root (.)
-- **Entrada**: index.html
-- **APIs**: Mantidas via rewrites em vercel.json
+## Mapeamento correto do repositório
 
-### 2. PORTAL (portal.advnoemia.com.br)
-- **Framework**: Next.js
-- **Build Command**: `npm run build` (em apps/portal-backend)
-- **Output Directory**: `.next`
-- **Root Directory**: `apps/portal-backend`
+- site principal: raiz do repositório
+- portal: `apps/portal-backend`
 
-## PASSOS PARA CONFIGURAR NO VERCEL
+## Configuração correta na Vercel
 
-### DOMÍNIO PRINCIPAL:
-1. Criar projeto "advnoemia-site"
-2. Apontar para repositório principal
-3. Framework: Other / Static Site
-4. Build Settings: Deixar em branco
-5. Adicionar domínio: advnoemia.com.br
+### Projeto `advnoemiaportal`
 
-### PORTAL:
-1. Criar projeto "advnoemia-portal"
-2. Apontar para mesmo repositório
-3. Root Directory: apps/portal-backend
-4. Framework: Next.js
-5. Adicionar domínio: portal.advnoemia.com.br
+- Root Directory: `apps/portal-backend`
+- Framework Preset: `Next.js`
+- Build Command: `npm run build`
+- Output Directory: `.next`
+- Install Command: `npm install`
+- Production Branch: `main`
 
-## VARIÁVEIS DE AMBIENTE
+### Projeto `advnoemiasite`
 
-### Portal (apps/portal-backend):
-- NEXT_PUBLIC_SUPABASE_URL
-- NEXT_PUBLIC_SUPABASE_ANON_KEY
-- SUPABASE_SERVICE_ROLE_KEY
-- META_VERIFY_TOKEN
-- META_APP_SECRET
-- WHATSAPP_VERIFY_TOKEN
-- WHATSAPP_APP_SECRET
-- WHATSAPP_ACCESS_TOKEN
-- WHATSAPP_PHONE_NUMBER_ID
-- OPENAI_API_KEY
+- Root Directory: `.`
+- Deve continuar responsável apenas pelo site principal e pelos ativos da raiz
 
-### Site Principal:
-- Nenhuma (estático)
+## Checklist de correção no dashboard da Vercel
 
-## RESULTADO ESPERADO
-- advnoemia.com.br → Site institucional original
-- portal.advnoemia.com.br → Portal/clientes com NoêmIA
-- APIs funcionando em ambos os domínios
-- Separação clara de responsabilidades
+No projeto `advnoemiaportal`, revisar:
+
+1. `Settings > General`
+   - confirmar `Root Directory = apps/portal-backend`
+   - confirmar `Production Branch = main`
+2. `Settings > Build and Deployment`
+   - confirmar `Framework Preset = Next.js`
+   - confirmar `Build Command = npm run build`
+   - confirmar `Output Directory = .next`
+   - remover qualquer `Ignored Build Step` que ignore commits do portal
+3. `Settings > Git`
+   - confirmar que o projeto continua conectado ao repositório `carolircodes/advnoemiasite`
+   - revisar filtros de monorepo/path filters para incluir `apps/portal-backend/**`
+4. `Domains`
+   - confirmar `portal.advnoemia.com.br` ligado ao projeto `advnoemiaportal`
+
+## Validação visual do deploy
+
+O portal passou a exibir no topo um selo discreto `Release do portal <sha>`.
+
+Esse valor usa:
+
+- `NEXT_PUBLIC_PORTAL_RELEASE_LABEL`, se definido manualmente
+- ou o `VERCEL_GIT_COMMIT_SHA` truncado no build
+
+Após o deploy:
+
+1. abrir `portal.advnoemia.com.br`
+2. localizar o selo `Release do portal`
+3. confirmar que o SHA exibido corresponde ao commit implantado
+
+## Fonte de verdade
+
+Para operação diária, usar:
+
+- [`docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md`](../DEPLOY_SURFACES_AND_VERCEL_MAPPING.md)
