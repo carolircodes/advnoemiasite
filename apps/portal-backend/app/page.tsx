@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppFrame } from "@/components/app-frame";
+import { ContextualConversionPanel } from "@/components/contextual-conversion-panel";
 import { NoemiaAssistant } from "@/components/noemia-assistant";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
@@ -147,6 +148,29 @@ export default async function HomePage({
             <strong>Consulta, documentos e portal quando fizer sentido</strong>
           </div>
         </div>
+
+        <SectionCard
+          title="Camada de conversao contextual"
+          description="A Fase 11 conecta tema, origem e intencao para puxar cada visitante para o proximo passo mais coerente."
+        >
+          <div className="grid two">
+            <ContextualConversionPanel
+              surface="home"
+              topic={entryContext.tema || "atendimento-juridico"}
+              contentStage="consideration"
+              primaryHref={triagemHref}
+              secondaryHref={atendimentoHref}
+              location="home_contextual_cro"
+            />
+            <div className="summary-card">
+              <span>O que ja entra no CRM</span>
+              <strong>Origem, tema, score, prontidao e canal preferido</strong>
+              <p>
+                A triagem passa a classificar temperatura, intencao e melhor proximo passo para a operacao nao tratar todo lead como igual.
+              </p>
+            </div>
+          </div>
+        </SectionCard>
 
         <div className="grid two">
           <SectionCard

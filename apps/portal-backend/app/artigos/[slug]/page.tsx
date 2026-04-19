@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppFrame } from "@/components/app-frame";
+import { ContextualConversionPanel } from "@/components/contextual-conversion-panel";
 import { NoemiaAssistant } from "@/components/noemia-assistant";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
@@ -10,7 +11,10 @@ import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
 import {
   getAllArticles,
   getArticleBySlug,
-  getArticleContentBySlug
+  getArticleContentBySlug,
+  getNextBestArticles,
+  getRelatedArticles,
+  getTopicHubs
 } from "@/lib/site/article-content";
 
 type ArticlePageProps = {
@@ -64,10 +68,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
-  const relatedArticles = getAllArticles()
-    .filter((candidate) => candidate.slug !== article.slug && candidate.topic === article.topic)
-    .slice(0, 3);
-
+  const relatedArticles = getRelatedArticles(article);
+  const nextBestArticles = getNextBestArticles(article);
+  const topicHub = getTopicHubs().find((hub) => hub.topic === article.topic) || null;
   const canonicalUrl = `${PUBLIC_SITE_BASE_URL}/artigos/${article.slug}`;
   const articleSchema = {
     "@context": "https://schema.org",
@@ -120,7 +123,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           contentId: article.slug,
           topic: article.topic,
           articleSlug: article.slug,
-          articleTitle: article.title
+          articleTitle: article.title,
+          contentStage: article.funnelStage
         }}
         oncePerSession
       />
@@ -145,17 +149,18 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           { label: "Leitura", value: `${article.readingMinutes} min` },
           { label: "Publicado", value: new Date(article.publishedAt).toLocaleDateString("pt-BR") },
           { label: "Atualizado", value: new Date(article.updatedAt).toLocaleDateString("pt-BR") },
-          { label: "Canonical", value: `/artigos/${article.slug}` }
+          { label: "Cluster", value: article.funnelStage === "decision" ? "Fundo de funil" : "Meio de funil" }
         ]}
         actions={[
           {
-            href: `/#triagem-inicial?origem=artigo&tema=${article.topic}&content_id=${article.slug}`,
+            href: `/#triagem-inicial?origem=artigo&tema=${article.topic}&content_id=${article.slug}&content_stage=${article.funnelStage}`,
             label: "Iniciar triagem",
             trackingEventKey: "cta_start_triage_clicked",
             trackingPayload: {
               contentId: article.slug,
               topic: article.topic,
-              location: "article_hero"
+              location: "article_hero",
+              contentStage: article.funnelStage
             }
           },
           {
@@ -166,7 +171,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             trackingPayload: {
               contentId: article.slug,
               topic: article.topic,
-              location: "article_hero"
+              location: "article_hero",
+              contentStage: article.funnelStage
             }
           }
         ]}
@@ -199,20 +205,31 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 className="editorial-prose"
                 dangerouslySetInnerHTML={{ __html: article.contentHtml }}
               />
+              <ContextualConversionPanel
+                surface="article"
+                topic={article.topic}
+                contentId={article.slug}
+                contentStage={article.funnelStage}
+                primaryHref={`/#triagem-inicial?origem=artigo&tema=${article.topic}&content_id=${article.slug}&content_stage=${article.funnelStage}`}
+                secondaryHref="/#atendimento"
+                location="article_mid_panel"
+                compact
+              />
               <div className="cta-strip">
                 <strong>Se esse contexto parece com o seu caso, o melhor passo agora e organizar a triagem.</strong>
                 <p>
-                  A equipe recebe o contexto com mais clareza, reduz ruído e acelera a primeira leitura jurídica.
+                  A equipe recebe o contexto com mais clareza, reduz ruido e acelera a primeira leitura juridica.
                 </p>
                 <div className="form-actions">
                   <TrackedLink
-                    href={`/#triagem-inicial?origem=artigo&tema=${article.topic}&content_id=${article.slug}`}
+                    href={`/#triagem-inicial?origem=artigo&tema=${article.topic}&content_id=${article.slug}&content_stage=${article.funnelStage}`}
                     className="button"
                     eventKey="strategic_content_cta_clicked"
                     trackingPayload={{
                       contentId: article.slug,
                       topic: article.topic,
-                      location: "article_bottom"
+                      location: "article_bottom",
+                      contentStage: article.funnelStage
                     }}
                   >
                     Enviar caso para triagem
@@ -222,9 +239,32 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             </article>
 
             <div className="stack">
+              {topicHub ? (
+                <SectionCard
+                  title={topicHub.title}
+                  description={topicHub.description}
+                >
+                  <p>{topicHub.strategicAngle}</p>
+                  <div className="form-actions">
+                    <TrackedLink
+                      href={`/artigos/tema/${topicHub.slug}`}
+                      className="button secondary"
+                      eventKey="article_hub_cta_clicked"
+                      trackingPayload={{
+                        topic: article.topic,
+                        contentId: article.slug,
+                        location: "article_topic_hub"
+                      }}
+                    >
+                      Abrir hub do tema
+                    </TrackedLink>
+                  </div>
+                </SectionCard>
+              ) : null}
+
               <SectionCard
-                title="Próximo passo recomendado"
-                description="Use a NoemIA como concierge para esclarecer dúvidas antes da triagem."
+                title="Proximo passo recomendado"
+                description="Use a NoemIA como concierge para esclarecer duvidas antes da triagem."
               >
                 <NoemiaAssistant
                   audience="visitor"
@@ -243,7 +283,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
               <SectionCard
                 title="Artigos relacionados"
-                description="Interlinking estrategico para aprofundar temas vizinhos sem criar paginas órfãs."
+                description="Interlinking estrategico para aprofundar temas vizinhos sem criar paginas orfas."
               >
                 <div className="article-related-list">
                   {relatedArticles.map((related) => (
@@ -265,6 +305,33 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   ))}
                 </div>
               </SectionCard>
+
+              {nextBestArticles.length ? (
+                <SectionCard
+                  title="Proxima leitura recomendada"
+                  description="Conteudos que tendem a empurrar este assunto para mais criterio e mais intencao."
+                >
+                  <div className="article-related-list">
+                    {nextBestArticles.map((nextArticle) => (
+                      <TrackedLink
+                        key={nextArticle.slug}
+                        href={`/artigos/${nextArticle.slug}`}
+                        className="route-card"
+                        eventKey="strategic_content_cta_clicked"
+                        trackingPayload={{
+                          contentId: nextArticle.slug,
+                          topic: nextArticle.topic,
+                          location: "article_next_best"
+                        }}
+                      >
+                        <span className="shortcut-kicker">{nextArticle.categoryLabel}</span>
+                        <strong>{nextArticle.title}</strong>
+                        <span>{nextArticle.excerpt}</span>
+                      </TrackedLink>
+                    ))}
+                  </div>
+                </SectionCard>
+              ) : null}
             </div>
           </div>
         </SectionCard>

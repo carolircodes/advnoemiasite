@@ -337,6 +337,29 @@ Tracking consolidado do funil:
 - lead qualificado
 - agendamento iniciado e concluido
 
+### Camada de growth da Fase 11
+
+Esta etapa colocou growth, CRO e RevOps por cima da consolidacao anterior sem recriar o core:
+
+- score e temperatura de lead persistidos no intake
+- CTA contextual com experimentacao leve por sessao
+- hubs tematicos em `app/artigos/tema/[topic]/page.tsx`
+- dashboard interno com score, prontidao e variantes
+- painel operacional com score, lifecycle e SLA sugerido
+
+Smoke local rapido da Fase 11:
+
+```powershell
+npm run smoke:phase11
+```
+
+Esse smoke valida:
+
+- hubs editoriais por tema
+- heuristica de lead score
+- atribuicao deterministica de experimento
+- eventos de experimentacao centralizados
+
 Todos esses eventos passam a compartilhar nomenclatura, payload normalizado, origem/medium/campaign/topic/contentId e mascaramento de chaves sensiveis.
 
 O worker de notificacoes:

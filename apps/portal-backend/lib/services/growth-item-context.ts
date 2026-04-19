@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   intakeRequestStatusLabels,
+  publicIntakeReadinessLabels,
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels
 } from "../domain/portal";
@@ -49,6 +50,12 @@ export type IntakeContext = {
   currentStageLabel: string;
   urgencyLevel: string;
   urgencyLabel: string;
+  readinessLevel?: string;
+  readinessLabel?: string;
+  leadScore: number;
+  leadTemperature: string;
+  lifecycleStage: string;
+  recommendedActionLabel?: string;
   submittedAt: string;
 };
 
@@ -140,6 +147,9 @@ function buildSummaryLines(context: {
     lines.push(
       `${context.intakeContext.statusLabel} | ${context.intakeContext.currentStageLabel}`
     );
+    lines.push(
+      `Score ${context.intakeContext.leadScore} | ${context.intakeContext.leadTemperature}`
+    );
   }
 
   if (context.pendingDocumentsCount > 0) {
@@ -180,7 +190,7 @@ export async function getGrowthContextByItems(seeds: OperationalGrowthSeed[]) {
     intakeIds.length
       ? supabase
           .from("intake_requests")
-          .select("id,status,current_stage,urgency_level,submitted_at")
+          .select("id,status,current_stage,urgency_level,readiness_level,lead_score,lead_temperature,lifecycle_stage,metadata,submitted_at")
           .in("id", intakeIds)
       : Promise.resolve({ data: [], error: null }),
     intakeIds.length
@@ -352,6 +362,19 @@ export async function getGrowthContextByItems(seeds: OperationalGrowthSeed[]) {
             publicIntakeUrgencyLabels[
               intakeRecord.urgency_level as keyof typeof publicIntakeUrgencyLabels
             ] || intakeRecord.urgency_level,
+          readinessLevel: intakeRecord.readiness_level,
+          readinessLabel: intakeRecord.readiness_level
+            ? publicIntakeReadinessLabels[
+                intakeRecord.readiness_level as keyof typeof publicIntakeReadinessLabels
+              ] || intakeRecord.readiness_level
+            : undefined,
+          leadScore: Number(intakeRecord.lead_score || 0),
+          leadTemperature: intakeRecord.lead_temperature || "cold",
+          lifecycleStage: intakeRecord.lifecycle_stage || "new_inquiry",
+          recommendedActionLabel:
+            typeof intakeRecord.metadata?.["recommendedActionLabel"] === "string"
+              ? String(intakeRecord.metadata?.["recommendedActionLabel"])
+              : undefined,
           submittedAt: intakeRecord.submitted_at
         }
       : null;
@@ -400,6 +423,14 @@ export async function getGrowthContextByItems(seeds: OperationalGrowthSeed[]) {
         key: "intake-incomplete",
         label: "Triagem ainda sem fechamento",
         detail: `${intakeContext.currentStageLabel} e ${intakeContext.statusLabel.toLowerCase()} ainda pedem continuidade.`
+      });
+    }
+
+    if (intakeContext && ["hot", "urgent"].includes(intakeContext.leadTemperature)) {
+      funnelLossSignals.push({
+        key: "high-intent",
+        label: "Lead com alta intencao declarada",
+        detail: `Score ${intakeContext.leadScore} e lifecycle ${intakeContext.lifecycleStage} pedem resposta comercial mais curta.`
       });
     }
 

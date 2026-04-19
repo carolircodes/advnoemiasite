@@ -42,6 +42,13 @@ export const publicContactPeriods = [
   "noite",
   "horario-comercial"
 ] as const;
+export const publicContactChannels = ["whatsapp", "telefone", "email"] as const;
+export const publicIntakeReadinessLevels = [
+  "explorando",
+  "comparando",
+  "pronto-para-agendar",
+  "urgencia-imediata"
+] as const;
 export const intakeRequestStatuses = [
   "new",
   "in_review",
@@ -136,6 +143,8 @@ export type CasePriority = (typeof casePriorities)[number];
 export type PublicIntakeUrgency = (typeof publicIntakeUrgencies)[number];
 export type PublicIntakeStage = (typeof publicIntakeStages)[number];
 export type PublicContactPeriod = (typeof publicContactPeriods)[number];
+export type PublicContactChannel = (typeof publicContactChannels)[number];
+export type PublicIntakeReadinessLevel = (typeof publicIntakeReadinessLevels)[number];
 export type IntakeRequestStatus = (typeof intakeRequestStatuses)[number];
 export type PortalEventType = (typeof portalEventTypes)[number];
 export type AppointmentLifecycleEventType = (typeof appointmentLifecycleEventTypes)[number];
@@ -200,6 +209,17 @@ export const publicContactPeriodLabels: Record<PublicContactPeriod, string> = {
   tarde: "Tarde",
   noite: "Noite",
   "horario-comercial": "Horario comercial"
+};
+export const publicContactChannelLabels: Record<PublicContactChannel, string> = {
+  whatsapp: "WhatsApp",
+  telefone: "Ligacao",
+  email: "E-mail"
+};
+export const publicIntakeReadinessLabels: Record<PublicIntakeReadinessLevel, string> = {
+  explorando: "Ainda estou entendendo o caminho",
+  comparando: "Estou comparando alternativas com criterio",
+  "pronto-para-agendar": "Ja faz sentido falar sobre consulta",
+  "urgencia-imediata": "Preciso de retorno com mais rapidez"
 };
 export const intakeRequestStatusLabels: Record<IntakeRequestStatus, string> = {
   new: "Nova",
@@ -370,6 +390,20 @@ export const submitPublicTriageSchema = z.object({
   preferredContactPeriod: z.enum(publicContactPeriods, {
     errorMap: () => ({ message: "Selecione o melhor horario para contato." })
   }),
+  preferredContactChannel: z.enum(publicContactChannels, {
+    errorMap: () => ({ message: "Selecione o canal preferido para o primeiro retorno." })
+  }),
+  stateCode: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(2, "Informe a sigla do estado com 2 caracteres.")
+    .optional()
+    .default(""),
+  readinessLevel: z.enum(publicIntakeReadinessLevels, {
+    errorMap: () => ({ message: "Selecione o momento comercial mais proximo da sua realidade." })
+  }),
+  appointmentInterest: z.coerce.boolean().default(false),
   caseSummary: z
     .string()
     .trim()
@@ -386,7 +420,14 @@ export const submitPublicTriageSchema = z.object({
       page: z.string().trim().max(300).optional().default(""),
       theme: z.string().trim().max(120).optional().default(""),
       campaign: z.string().trim().max(120).optional().default(""),
-      video: z.string().trim().max(120).optional().default("")
+      video: z.string().trim().max(120).optional().default(""),
+      contentId: z.string().trim().max(160).optional().default(""),
+      contentStage: z
+        .enum(["awareness", "consideration", "decision"])
+        .optional(),
+      returnVisitor: z.coerce.boolean().optional().default(false),
+      experimentId: z.string().trim().max(120).optional().default(""),
+      variantId: z.string().trim().max(120).optional().default("")
     })
     .optional()
 });

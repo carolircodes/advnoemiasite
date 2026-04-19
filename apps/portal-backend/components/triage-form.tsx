@@ -1,22 +1,26 @@
 "use client";
 
-import { useState, useTransition, type ChangeEvent } from "react";
+import { useMemo, useState, useTransition, type ChangeEvent } from "react";
 
-import {
-  caseAreaLabels,
-  caseAreas,
-  publicContactPeriodLabels,
-  publicContactPeriods,
-  publicIntakeStageLabels,
-  publicIntakeStages,
-  publicIntakeUrgencies,
-  publicIntakeUrgencyLabels
-} from "../lib/domain/portal";
 import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
 import {
   getProductSessionId,
   trackProductEventOncePerSession
 } from "../lib/analytics/browser";
+import {
+  caseAreaLabels,
+  caseAreas,
+  publicContactChannelLabels,
+  publicContactChannels,
+  publicContactPeriodLabels,
+  publicContactPeriods,
+  publicIntakeReadinessLabels,
+  publicIntakeReadinessLevels,
+  publicIntakeStageLabels,
+  publicIntakeStages,
+  publicIntakeUrgencies,
+  publicIntakeUrgencyLabels
+} from "../lib/domain/portal";
 import {
   appendEntryContextToPath,
   getEntryContextPayload,
@@ -29,10 +33,14 @@ type TriageFormState = {
   email: string;
   phone: string;
   city: string;
+  stateCode: string;
   caseArea: string;
   currentStage: string;
   urgencyLevel: string;
   preferredContactPeriod: string;
+  preferredContactChannel: string;
+  readinessLevel: string;
+  appointmentInterest: boolean;
   caseSummary: string;
   consentAccepted: boolean;
   website: string;
@@ -43,10 +51,14 @@ const initialState: TriageFormState = {
   email: "",
   phone: "",
   city: "",
+  stateCode: "",
   caseArea: "previdenciario",
   currentStage: "ainda-nao-iniciei",
   urgencyLevel: "moderada",
   preferredContactPeriod: "horario-comercial",
+  preferredContactChannel: "whatsapp",
+  readinessLevel: "explorando",
+  appointmentInterest: false,
   caseSummary: "",
   consentAccepted: false,
   website: ""
@@ -54,16 +66,16 @@ const initialState: TriageFormState = {
 
 const steps = [
   {
-    title: "Seus dados",
-    description: "Informacoes de contato para a equipe confirmar o retorno."
+    title: "Contato e contexto",
+    description: "O minimo necessario para o time saber quem chegou e de onde veio."
   },
   {
-    title: "Seu momento",
-    description: "Entender urgencia, area e fase atual do atendimento."
+    title: "Urgencia e intencao",
+    description: "Qualificar momento, temperatura e melhor proximo passo."
   },
   {
-    title: "Contexto do caso",
-    description: "Resumo objetivo para acelerar a primeira analise."
+    title: "Resumo do caso",
+    description: "Organizar o caso com criterio antes do handoff para a equipe."
   }
 ] as const;
 
@@ -83,8 +95,8 @@ function validateStep(state: TriageFormState, stepIndex: number) {
   }
 
   if (stepIndex === 2) {
-    if (state.caseSummary.trim().length < 30) {
-      return "Descreva em poucas linhas o que aconteceu e o que voce precisa.";
+    if (state.caseSummary.trim().length < 40) {
+      return "Descreva com um pouco mais de contexto o que aconteceu e o que voce precisa.";
     }
 
     if (!state.consentAccepted) {
@@ -102,20 +114,33 @@ type TriageFormProps = {
 
 export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
   const initialCaseArea = resolveEntryCaseArea(entryContext) || initialState.caseArea;
-  const baseState = {
-    ...initialState,
-    caseArea: initialCaseArea
-  };
   const entryPath = sourcePath || appendEntryContextToPath("/triagem", entryContext);
   const entryContextPayload = getEntryContextPayload(entryContext);
   const homeHref = appendEntryContextToPath("/", entryContext);
   const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
-  const [state, setState] = useState<TriageFormState>(() => baseState);
+  const [state, setState] = useState<TriageFormState>(() => ({
+    ...initialState,
+    caseArea: initialCaseArea
+  }));
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<null | { intakeRequestId: string }>(null);
   const [isPending, startTransition] = useTransition();
   const [hasTrackedStart, setHasTrackedStart] = useState(false);
+
+  const contextualPrompt = useMemo(() => {
+    switch (state.caseArea) {
+      case "previdenciario":
+        return "Explique se houve negativa, revisao, desconto indevido ou duvida sobre beneficio.";
+      case "consumidor_bancario":
+        return "Conte se houve desconto, consignado, negativacao, cobranca ou outro problema bancario.";
+      case "familia":
+        return "Explique o contexto principal, como divorcio, guarda, pensao ou reorganizacao familiar.";
+      case "civil":
+      default:
+        return "Resuma o conflito, contrato, notificacao ou situacao civil que motivou a busca.";
+    }
+  }, [state.caseArea]);
 
   function updateField<Key extends keyof TriageFormState>(
     key: Key,
@@ -155,6 +180,7 @@ export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
         pagePath: entryPath,
         payload: {
           step: "contact-finished",
+          preferredContactChannel: state.preferredContactChannel,
           ...entryContextPayload
         }
       });
@@ -190,9 +216,21 @@ export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
           captureMetadata: {
             source: entryContext?.origem || "portal-triagem",
             page: entryPath,
-            theme: entryContext?.tema || "",
+            theme: entryContext?.tema || state.caseArea,
             campaign: entryContext?.campanha || "",
-            video: entryContext?.video || ""
+            video: entryContext?.video || "",
+            contentId: entryContext?.content_id || "",
+            contentStage:
+              entryContext?.content_stage === "awareness" ||
+              entryContext?.content_stage === "consideration" ||
+              entryContext?.content_stage === "decision"
+                ? entryContext.content_stage
+                : undefined,
+            experimentId: entryContext?.experimento || "",
+            variantId: entryContext?.variante || "",
+            returnVisitor:
+              typeof window !== "undefined" &&
+              window.sessionStorage.getItem("portal_product_returning_visitor") === "1"
           }
         })
       });
@@ -210,7 +248,10 @@ export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
       setSuccess({
         intakeRequestId: result.intakeRequestId
       });
-      setState(baseState);
+      setState({
+        ...initialState,
+        caseArea: initialCaseArea
+      });
       setStepIndex(0);
     });
   }
@@ -224,12 +265,12 @@ export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
         <div className="panel inset-panel">
           <div className="section-head">
             <h2>O que acontece agora</h2>
-            <p>Seu envio ja entrou na fila interna do escritorio com identificacao real.</p>
+            <p>Seu envio ja entrou na fila interna do escritorio com score, temperatura e contexto de origem.</p>
           </div>
           <ul className="timeline">
-            <li>1. A equipe revisa a triagem e organiza a melhor forma de retorno.</li>
-            <li>2. Se o atendimento seguir, o cadastro interno e o convite do portal sao preparados.</li>
-            <li>3. No primeiro acesso, voce define sua senha e passa a acompanhar documentos, agenda e atualizacoes.</li>
+            <li>1. A triagem entra com classificacao de urgencia, intencao e melhor proximo passo.</li>
+            <li>2. A equipe revisa o contexto e decide retorno, consulta ou continuidade operacional.</li>
+            <li>3. Se o atendimento seguir, o cadastro interno e o convite do portal sao preparados.</li>
           </ul>
           <div className="notice">
             Referencia interna desta triagem: <span className="code">{success.intakeRequestId}</span>
@@ -266,127 +307,171 @@ export function TriageForm({ entryContext, sourcePath }: TriageFormProps) {
 
       {error ? <div className="error-notice">{error}</div> : null}
 
-      <div className="stack">
-        {stepIndex === 0 ? (
-          <div className="fields">
-            <div className="field-full">
-              <label htmlFor="fullName">Nome completo</label>
-              <input id="fullName" name="fullName" value={state.fullName} onChange={handleInputChange} />
-            </div>
-            <div className="field">
-              <label htmlFor="email">E-mail</label>
-              <input id="email" name="email" type="email" value={state.email} onChange={handleInputChange} />
-            </div>
-            <div className="field">
-              <label htmlFor="phone">WhatsApp ou telefone</label>
-              <input id="phone" name="phone" type="tel" value={state.phone} onChange={handleInputChange} />
-            </div>
-            <div className="field-full">
-              <label htmlFor="city">Cidade/UF</label>
-              <input
-                id="city"
-                name="city"
-                type="text"
-                value={state.city}
-                onChange={handleInputChange}
-                placeholder="Opcional, mas ajuda no direcionamento inicial"
-              />
-            </div>
-            <div className="field-full triage-honeypot" aria-hidden="true">
-              <label htmlFor="website">Nao preencha este campo</label>
-              <input id="website" name="website" value={state.website} onChange={handleInputChange} tabIndex={-1} />
-            </div>
+      {stepIndex === 0 ? (
+        <div className="fields">
+          <div className="field-full">
+            <label htmlFor="fullName">Nome completo</label>
+            <input id="fullName" name="fullName" value={state.fullName} onChange={handleInputChange} />
           </div>
-        ) : null}
+          <div className="field">
+            <label htmlFor="email">E-mail</label>
+            <input id="email" name="email" type="email" value={state.email} onChange={handleInputChange} />
+          </div>
+          <div className="field">
+            <label htmlFor="phone">WhatsApp ou telefone</label>
+            <input id="phone" name="phone" type="tel" value={state.phone} onChange={handleInputChange} />
+          </div>
+          <div className="field">
+            <label htmlFor="city">Cidade</label>
+            <input id="city" name="city" type="text" value={state.city} onChange={handleInputChange} />
+          </div>
+          <div className="field">
+            <label htmlFor="stateCode">UF</label>
+            <input
+              id="stateCode"
+              name="stateCode"
+              type="text"
+              maxLength={2}
+              value={state.stateCode}
+              onChange={handleInputChange}
+              placeholder="Ex.: CE"
+            />
+          </div>
+          <div className="field-full">
+            <label htmlFor="preferredContactChannel">Canal preferido para o primeiro retorno</label>
+            <select
+              id="preferredContactChannel"
+              name="preferredContactChannel"
+              value={state.preferredContactChannel}
+              onChange={handleInputChange}
+            >
+              {publicContactChannels.map((channel) => (
+                <option key={channel} value={channel}>
+                  {publicContactChannelLabels[channel]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field-full triage-honeypot" aria-hidden="true">
+            <label htmlFor="website">Nao preencha este campo</label>
+            <input id="website" name="website" value={state.website} onChange={handleInputChange} tabIndex={-1} />
+          </div>
+        </div>
+      ) : null}
 
-        {stepIndex === 1 ? (
-          <div className="fields">
-            <div className="field-full">
-              <label htmlFor="caseArea">Area principal do atendimento</label>
-              <select id="caseArea" name="caseArea" value={state.caseArea} onChange={handleInputChange}>
-                {caseAreas.map((area) => (
-                  <option key={area} value={area}>
-                    {caseAreaLabels[area]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field-full">
-              <label htmlFor="currentStage">Qual descreve melhor seu momento atual?</label>
-              <select
-                id="currentStage"
-                name="currentStage"
-                value={state.currentStage}
-                onChange={handleInputChange}
-              >
-                {publicIntakeStages.map((stage) => (
-                  <option key={stage} value={stage}>
-                    {publicIntakeStageLabels[stage]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="urgencyLevel">Nivel de urgencia</label>
-              <select
-                id="urgencyLevel"
-                name="urgencyLevel"
-                value={state.urgencyLevel}
-                onChange={handleInputChange}
-              >
-                {publicIntakeUrgencies.map((urgency) => (
-                  <option key={urgency} value={urgency}>
-                    {publicIntakeUrgencyLabels[urgency]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="preferredContactPeriod">Melhor horario para contato</label>
-              <select
-                id="preferredContactPeriod"
-                name="preferredContactPeriod"
-                value={state.preferredContactPeriod}
-                onChange={handleInputChange}
-              >
-                {publicContactPeriods.map((period) => (
-                  <option key={period} value={period}>
-                    {publicContactPeriodLabels[period]}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {stepIndex === 1 ? (
+        <div className="fields">
+          <div className="field-full">
+            <label htmlFor="caseArea">Tema juridico principal</label>
+            <select id="caseArea" name="caseArea" value={state.caseArea} onChange={handleInputChange}>
+              {caseAreas.map((area) => (
+                <option key={area} value={area}>
+                  {caseAreaLabels[area]}
+                </option>
+              ))}
+            </select>
           </div>
-        ) : null}
+          <div className="field-full">
+            <label htmlFor="currentStage">Qual descreve melhor seu momento atual?</label>
+            <select
+              id="currentStage"
+              name="currentStage"
+              value={state.currentStage}
+              onChange={handleInputChange}
+            >
+              {publicIntakeStages.map((stage) => (
+                <option key={stage} value={stage}>
+                  {publicIntakeStageLabels[stage]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="urgencyLevel">Nivel de urgencia</label>
+            <select
+              id="urgencyLevel"
+              name="urgencyLevel"
+              value={state.urgencyLevel}
+              onChange={handleInputChange}
+            >
+              {publicIntakeUrgencies.map((urgency) => (
+                <option key={urgency} value={urgency}>
+                  {publicIntakeUrgencyLabels[urgency]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="preferredContactPeriod">Melhor horario para contato</label>
+            <select
+              id="preferredContactPeriod"
+              name="preferredContactPeriod"
+              value={state.preferredContactPeriod}
+              onChange={handleInputChange}
+            >
+              {publicContactPeriods.map((period) => (
+                <option key={period} value={period}>
+                  {publicContactPeriodLabels[period]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field-full">
+            <label htmlFor="readinessLevel">Qual destas frases mais parece com voce agora?</label>
+            <select
+              id="readinessLevel"
+              name="readinessLevel"
+              value={state.readinessLevel}
+              onChange={handleInputChange}
+            >
+              {publicIntakeReadinessLevels.map((level) => (
+                <option key={level} value={level}>
+                  {publicIntakeReadinessLabels[level]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="checkbox-row field-full" htmlFor="appointmentInterest">
+            <input
+              id="appointmentInterest"
+              name="appointmentInterest"
+              type="checkbox"
+              checked={state.appointmentInterest}
+              onChange={handleInputChange}
+            />
+            Ja quero que a equipe considere avancar para consulta ou agendamento, se fizer sentido.
+          </label>
+        </div>
+      ) : null}
 
-        {stepIndex === 2 ? (
-          <div className="stack">
-            <div className="field-full">
-              <label htmlFor="caseSummary">Explique em poucas linhas o que aconteceu</label>
-              <textarea
-                id="caseSummary"
-                name="caseSummary"
-                value={state.caseSummary}
-                onChange={handleInputChange}
-                placeholder="Conte o contexto principal, o que voce ja recebeu de resposta e o que espera resolver."
-              />
-            </div>
-            <label className="checkbox-row" htmlFor="consentAccepted">
-              <input
-                id="consentAccepted"
-                name="consentAccepted"
-                type="checkbox"
-                checked={state.consentAccepted}
-                onChange={handleInputChange}
-              />
-              Autorizo o envio destas informacoes para analise inicial e contato da equipe.
-            </label>
-            <div className="notice">
-              Depois do envio, a equipe revisa a triagem, organiza o retorno e, se o atendimento seguir, prepara o cadastro e o convite do portal.
-            </div>
+      {stepIndex === 2 ? (
+        <div className="stack">
+          <div className="notice">{contextualPrompt}</div>
+          <div className="field-full">
+            <label htmlFor="caseSummary">Explique em poucas linhas o que aconteceu</label>
+            <textarea
+              id="caseSummary"
+              name="caseSummary"
+              value={state.caseSummary}
+              onChange={handleInputChange}
+              placeholder="Conte o contexto principal, o que ja recebeu de resposta, o que preocupa agora e o que espera resolver."
+            />
           </div>
-        ) : null}
-      </div>
+          <label className="checkbox-row" htmlFor="consentAccepted">
+            <input
+              id="consentAccepted"
+              name="consentAccepted"
+              type="checkbox"
+              checked={state.consentAccepted}
+              onChange={handleInputChange}
+            />
+            Autorizo o envio destas informacoes para analise inicial e contato da equipe.
+          </label>
+          <div className="notice">
+            Depois do envio, o escritorio recebe score, urgencia, canal preferido, tema e contexto resumido para priorizar o retorno.
+          </div>
+        </div>
+      ) : null}
 
       <div className="form-actions">
         {stepIndex > 0 ? (

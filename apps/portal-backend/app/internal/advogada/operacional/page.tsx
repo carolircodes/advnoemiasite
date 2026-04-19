@@ -28,6 +28,13 @@ interface OperationalContact {
   isClient: boolean;
   pipelineStage: string;
   leadTemperature: string;
+  leadScore: number;
+  leadScoreBand: string;
+  lifecycleStage: string;
+  lifecycleDetail?: string;
+  readinessLabel?: string;
+  scoreExplanation: string[];
+  operationalSlaHours: number;
   areaInterest?: string;
   sourceChannel: string;
   followUpStatus?: string;
@@ -1484,6 +1491,10 @@ export default function OperationalPanel() {
                       </StatusChip>
 
                       <StatusChip tone="neutral">
+                        Score {contact.leadScore}
+                      </StatusChip>
+
+                      <StatusChip tone="neutral">
                         {getChannelIcon(contact.sourceChannel)}
                         <span className="ml-1">{contact.sourceChannel}</span>
                       </StatusChip>
@@ -2044,6 +2055,13 @@ export default function OperationalPanel() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
                         Contexto de growth por item
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <StatusChip tone="neutral">{contact.lifecycleStage}</StatusChip>
+                        <StatusChip tone="neutral">SLA {contact.operationalSlaHours}h</StatusChip>
+                        {contact.readinessLabel ? (
+                          <StatusChip tone="gold">{contact.readinessLabel}</StatusChip>
+                        ) : null}
+                      </div>
                       {contact.growthContext?.summaryLines?.length ? (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {contact.growthContext.summaryLines.map((line) => (
@@ -2064,6 +2082,15 @@ export default function OperationalPanel() {
                             <div key={signal.key} className="rounded-xl border border-[#e8e0d1] bg-white px-3 py-2">
                               <p className="text-sm font-medium text-[#10261d]">{signal.label}</p>
                               <p className="mt-1 text-sm text-[#5d6d66]">{signal.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {contact.scoreExplanation.length ? (
+                        <div className="mt-3 space-y-2">
+                          {contact.scoreExplanation.slice(0, 3).map((line) => (
+                            <div key={line} className="rounded-xl border border-[#e8e0d1] bg-white px-3 py-2 text-sm text-[#5d6d66]">
+                              {line}
                             </div>
                           ))}
                         </div>
@@ -2362,6 +2389,14 @@ export default function OperationalPanel() {
                   <StatusChip tone={getTemperatureTone(selectedContact.leadTemperature)}>
                     {selectedContact.leadTemperature === 'hot' ? 'Quente' : selectedContact.leadTemperature === 'warm' ? 'Morno' : 'Frio'}
                   </StatusChip>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <StatusChip tone="neutral">Score {selectedContact.leadScore}</StatusChip>
+                    <StatusChip tone="neutral">{selectedContact.lifecycleStage}</StatusChip>
+                    <StatusChip tone="neutral">SLA {selectedContact.operationalSlaHours}h</StatusChip>
+                  </div>
+                  {selectedContact.readinessLabel ? (
+                    <p className="mt-2 text-xs text-[#6a7a73]">{selectedContact.readinessLabel}</p>
+                  ) : null}
                 </div>
               </div>
 

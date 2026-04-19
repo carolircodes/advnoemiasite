@@ -7,11 +7,14 @@ import { assertStaffActor } from "../auth/guards";
 import {
   caseAreaLabels,
   intakeRequestStatusLabels,
+  publicContactChannelLabels,
+  publicIntakeReadinessLabels,
   publicIntakeUrgencyLabels,
   submitLegacySiteTriageSchema,
   submitPublicTriageSchema,
   updateIntakeRequestStatusSchema
 } from "../domain/portal";
+import { calculateLeadScore } from "../growth/lead-scoring";
 import { notifyStaffAboutIntakeRequest } from "./automation-rules";
 import { createAdminSupabaseClient } from "../supabase/admin";
 
@@ -55,6 +58,14 @@ type NormalizedPublicTriageInput = {
     | "recebi-negativa-ou-cobranca";
   urgencyLevel: "baixa" | "moderada" | "alta" | "urgente";
   preferredContactPeriod: "manha" | "tarde" | "noite" | "horario-comercial";
+  preferredContactChannel: "whatsapp" | "telefone" | "email";
+  stateCode: string;
+  readinessLevel:
+    | "explorando"
+    | "comparando"
+    | "pronto-para-agendar"
+    | "urgencia-imediata";
+  appointmentInterest: boolean;
   caseSummary: string;
   consentAccepted: boolean;
   sourcePath: string;
@@ -66,6 +77,11 @@ type NormalizedPublicTriageInput = {
     theme: string;
     campaign: string;
     video: string;
+    contentId: string;
+    contentStage: "awareness" | "consideration" | "decision" | "";
+    returnVisitor: boolean;
+    experimentId: string;
+    variantId: string;
     areaRaw: string;
     problemType: string;
     urgencyRaw: string;
@@ -157,6 +173,10 @@ function normalizePublicTriageInput(
       currentStage: input.currentStage,
       urgencyLevel: input.urgencyLevel,
       preferredContactPeriod: input.preferredContactPeriod,
+      preferredContactChannel: input.preferredContactChannel,
+      stateCode: input.stateCode,
+      readinessLevel: input.readinessLevel,
+      appointmentInterest: input.appointmentInterest,
       caseSummary: input.caseSummary,
       consentAccepted: input.consentAccepted,
       sourcePath: input.sourcePath || context.pagePath || "/triagem",
@@ -169,6 +189,11 @@ function normalizePublicTriageInput(
         theme: input.captureMetadata?.theme || "",
         campaign: input.captureMetadata?.campaign || "",
         video: input.captureMetadata?.video || "",
+        contentId: input.captureMetadata?.contentId || "",
+        contentStage: input.captureMetadata?.contentStage || "",
+        returnVisitor: Boolean(input.captureMetadata?.returnVisitor),
+        experimentId: input.captureMetadata?.experimentId || "",
+        variantId: input.captureMetadata?.variantId || "",
         areaRaw: input.caseArea,
         problemType: input.caseArea,
         urgencyRaw: input.urgencyLevel
@@ -192,6 +217,10 @@ function normalizePublicTriageInput(
     currentStage: "ainda-nao-iniciei",
     urgencyLevel: inferUrgencyLevel(legacyInput.urgency),
     preferredContactPeriod: "horario-comercial",
+    preferredContactChannel: "whatsapp",
+    stateCode: "",
+    readinessLevel: "explorando",
+    appointmentInterest: false,
     caseSummary: legacyInput.description,
     consentAccepted: true,
     sourcePath: legacyInput.sourcePath || context.pagePath || "/triagem.html",
@@ -203,6 +232,11 @@ function normalizePublicTriageInput(
       theme: legacyInput.theme,
       campaign: legacyInput.campaign,
       video: legacyInput.video,
+      contentId: "",
+      contentStage: "",
+      returnVisitor: false,
+      experimentId: "",
+      variantId: "",
       areaRaw: legacyInput.area,
       problemType: legacyInput.problem_type,
       urgencyRaw: legacyInput.urgency
@@ -242,6 +276,22 @@ export async function submitPublicTriage(
   context: PublicTriageContext = {}
 ) {
   const input = normalizePublicTriageInput(rawInput, context);
+  const leadProfile = calculateLeadScore({
+    caseArea: input.caseArea,
+    urgencyLevel: input.urgencyLevel,
+    currentStage: input.currentStage,
+    readinessLevel: input.readinessLevel,
+    preferredContactChannel: input.preferredContactChannel,
+    preferredContactPeriod: input.preferredContactPeriod,
+    appointmentInterest: input.appointmentInterest,
+    caseSummary: input.caseSummary,
+    source: input.captureMetadata.source,
+    topic: input.captureMetadata.theme || input.caseArea,
+    campaign: input.captureMetadata.campaign,
+    contentId: input.captureMetadata.contentId,
+    contentStage: input.captureMetadata.contentStage || undefined,
+    returnVisitor: input.captureMetadata.returnVisitor
+  });
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("intake_requests")
@@ -254,10 +304,23 @@ export async function submitPublicTriage(
       current_stage: input.currentStage,
       urgency_level: input.urgencyLevel,
       preferred_contact_period: input.preferredContactPeriod,
+      preferred_contact_channel: input.preferredContactChannel,
+      state_code: input.stateCode || null,
+      readiness_level: input.readinessLevel,
+      appointment_interest: input.appointmentInterest,
       case_summary: input.caseSummary,
       consent_accepted: input.consentAccepted,
       source_path: input.sourcePath || context.pagePath || "/triagem",
       status: "new",
+      lead_score: leadProfile.score,
+      lead_temperature: leadProfile.temperature,
+      lifecycle_stage: leadProfile.lifecycleStage,
+      score_explanation: leadProfile.reasons,
+      experiment_context: {
+        experimentId: input.captureMetadata.experimentId || null,
+        variantId: input.captureMetadata.variantId || null
+      },
+      last_activity_at: new Date().toISOString(),
       metadata: {
         captureMode: input.captureMetadata.captureMode,
         source: input.captureMetadata.source || null,
@@ -268,6 +331,27 @@ export async function submitPublicTriage(
         campaign: input.captureMetadata.campaign || null,
         campanha: input.captureMetadata.campaign || null,
         video: input.captureMetadata.video || null,
+        contentId: input.captureMetadata.contentId || null,
+        content_id: input.captureMetadata.contentId || null,
+        contentStage: input.captureMetadata.contentStage || null,
+        content_stage: input.captureMetadata.contentStage || null,
+        returnVisitor: input.captureMetadata.returnVisitor,
+        experimentId: input.captureMetadata.experimentId || null,
+        variantId: input.captureMetadata.variantId || null,
+        preferredContactChannel: input.preferredContactChannel,
+        preferredContactChannelLabel:
+          publicContactChannelLabels[input.preferredContactChannel],
+        readinessLevel: input.readinessLevel,
+        readinessLevelLabel: publicIntakeReadinessLabels[input.readinessLevel],
+        appointmentInterest: input.appointmentInterest,
+        stateCode: input.stateCode || null,
+        leadScore: leadProfile.score,
+        leadTemperature: leadProfile.temperature,
+        lifecycleStage: leadProfile.lifecycleStage,
+        leadScoreExplanation: leadProfile.reasons,
+        recommendedAction: leadProfile.recommendedAction,
+        recommendedActionLabel: leadProfile.recommendedActionLabel,
+        operationalSlaHours: leadProfile.operationalSlaHours,
         areaRaw: input.captureMetadata.areaRaw || null,
         area: input.captureMetadata.areaRaw || null,
         problemType: input.captureMetadata.problemType || null,
@@ -301,6 +385,17 @@ export async function submitPublicTriage(
         currentStageLabel: `Stage ${input.currentStage}`,
         preferredContactPeriod: input.preferredContactPeriod,
         preferredContactPeriodLabel: `Period ${input.preferredContactPeriod}`,
+        preferredContactChannel: input.preferredContactChannel,
+        readinessLevel: input.readinessLevel,
+        appointmentInterest: input.appointmentInterest,
+        stateCode: input.stateCode || null,
+        leadScore: leadProfile.score,
+        leadTemperature: leadProfile.temperature,
+        lifecycleStage: leadProfile.lifecycleStage,
+        experimentId: input.captureMetadata.experimentId || null,
+        variantId: input.captureMetadata.variantId || null,
+        contentId: input.captureMetadata.contentId || null,
+        contentStage: input.captureMetadata.contentStage || null,
         source: input.captureMetadata.source || null,
         origem: input.captureMetadata.source || null,
         page: input.captureMetadata.page || null,
@@ -318,6 +413,70 @@ export async function submitPublicTriage(
         captureMode: input.captureMetadata.captureMode
       }
     });
+    await recordProductEvent({
+      eventKey: "lead_created",
+      eventGroup: "conversion",
+      pagePath: input.sourcePath || context.pagePath || "/triagem",
+      sessionId: context.sessionId,
+      intakeRequestId: data.id,
+      payload: {
+        caseArea: input.caseArea,
+        legalArea: input.caseArea,
+        topic: input.captureMetadata.theme || input.caseArea,
+        source: input.captureMetadata.source || null,
+        campaign: input.captureMetadata.campaign || null,
+        contentId: input.captureMetadata.contentId || null,
+        contentStage: input.captureMetadata.contentStage || null,
+        leadScore: leadProfile.score,
+        leadTemperature: leadProfile.temperature,
+        lifecycleStage: leadProfile.lifecycleStage,
+        experimentId: input.captureMetadata.experimentId || null,
+        variantId: input.captureMetadata.variantId || null
+      }
+    });
+
+    if (leadProfile.score >= 35) {
+      await recordProductEvent({
+        eventKey: "lead_qualified",
+        eventGroup: "conversion",
+        pagePath: input.sourcePath || context.pagePath || "/triagem",
+        sessionId: context.sessionId,
+        intakeRequestId: data.id,
+        payload: {
+          leadScore: leadProfile.score,
+          leadTemperature: leadProfile.temperature,
+          lifecycleStage: leadProfile.lifecycleStage,
+          recommendedAction: leadProfile.recommendedAction,
+          recommendedActionLabel: leadProfile.recommendedActionLabel,
+          experimentId: input.captureMetadata.experimentId || null,
+          variantId: input.captureMetadata.variantId || null,
+          source: input.captureMetadata.source || null,
+          topic: input.captureMetadata.theme || input.caseArea
+        }
+      });
+    }
+
+    if (
+      input.appointmentInterest ||
+      input.readinessLevel === "pronto-para-agendar" ||
+      input.readinessLevel === "urgencia-imediata"
+    ) {
+      await recordProductEvent({
+        eventKey: "appointment_started",
+        eventGroup: "conversion",
+        pagePath: input.sourcePath || context.pagePath || "/triagem",
+        sessionId: context.sessionId,
+        intakeRequestId: data.id,
+        payload: {
+          leadScore: leadProfile.score,
+          leadTemperature: leadProfile.temperature,
+          readinessLevel: input.readinessLevel,
+          appointmentInterest: input.appointmentInterest,
+          experimentId: input.captureMetadata.experimentId || null,
+          variantId: input.captureMetadata.variantId || null
+        }
+      });
+    }
   } catch (trackingError) {
     console.error("[triage.submit] Failed to record conversion event", {
       intakeRequestId: data.id,
@@ -333,6 +492,9 @@ export async function submitPublicTriage(
       urgencyLevel: input.urgencyLevel,
       currentStage: input.currentStage,
       preferredContactPeriod: input.preferredContactPeriod,
+      preferredContactChannel: input.preferredContactChannel,
+      readinessLevel: input.readinessLevel,
+      appointmentInterest: input.appointmentInterest,
       email: input.email,
       phone: input.phone,
       caseSummary: input.caseSummary,

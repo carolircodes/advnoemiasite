@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 
 import { AppFrame } from "@/components/app-frame";
+import { ContextualConversionPanel } from "@/components/contextual-conversion-panel";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
-import { getAllArticles } from "@/lib/site/article-content";
+import { getAllArticles, getTopicHubs } from "@/lib/site/article-content";
 import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ const articleIndexSchema = {
 
 export default function ArticleIndexPage() {
   const articles = getAllArticles();
+  const topicHubs = getTopicHubs();
 
   return (
     <>
@@ -74,6 +76,42 @@ export default function ArticleIndexPage() {
           { label: "Conversao", value: "CTA rastreado para triagem" }
         ]}
       >
+        <SectionCard
+          title="Hubs tematicos"
+          description="Cada cluster editorial agora tem uma pagina-hub para fortalecer autoridade, interlinking e passagem para triagem."
+        >
+          <div className="grid two">
+            {topicHubs.map((hub) => (
+              <article key={hub.slug} className="article-card editorial-card">
+                <div className="article-card-meta">
+                  <span className="tag soft">{hub.title}</span>
+                  <span className="tag soft">cluster</span>
+                </div>
+                <strong>{hub.description}</strong>
+                <p>{hub.strategicAngle}</p>
+                <div className="form-actions">
+                  <TrackedLink
+                    href={`/artigos/tema/${hub.slug}`}
+                    className="button secondary"
+                    eventKey="article_hub_cta_clicked"
+                    trackingPayload={{ topic: hub.topic, location: "article_hub_index" }}
+                  >
+                    Abrir hub
+                  </TrackedLink>
+                  <TrackedLink
+                    href={hub.serviceHref}
+                    className="button"
+                    eventKey="cta_start_triage_clicked"
+                    trackingPayload={{ topic: hub.topic, location: "article_hub_index" }}
+                  >
+                    Ir para triagem
+                  </TrackedLink>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+
         <SectionCard
           title="Biblioteca editorial pronta para autoridade real"
           description="Cada artigo agora entra no mesmo ecossistema de observabilidade e conversao da plataforma."
@@ -124,6 +162,14 @@ export default function ArticleIndexPage() {
             ))}
           </div>
         </SectionCard>
+        <ContextualConversionPanel
+          surface="article_hub"
+          topic="conteudo-juridico"
+          contentStage="consideration"
+          primaryHref="/#triagem-inicial?origem=artigos"
+          secondaryHref="/#atendimento"
+          location="article_index_footer"
+        />
       </AppFrame>
     </>
   );

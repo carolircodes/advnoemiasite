@@ -29,6 +29,13 @@ export interface OperationalContact {
   isClient: boolean;
   pipelineStage: string;
   leadTemperature: string;
+  leadScore: number;
+  leadScoreBand: string;
+  lifecycleStage: string;
+  lifecycleDetail?: string;
+  readinessLabel?: string;
+  scoreExplanation: string[];
+  operationalSlaHours: number;
   areaInterest?: string;
   sourceChannel: string;
   followUpStatus?: string;
@@ -680,6 +687,45 @@ class OperationalPanel {
       isClient: client.is_client,
       pipelineStage: pipeline.stage,
       leadTemperature: pipeline.lead_temperature,
+      leadScore:
+        typeof pipeline.lead_score === "number"
+          ? pipeline.lead_score
+          : growthContext?.intakeContext?.leadScore || 0,
+      leadScoreBand:
+        pipeline.lead_score_band ||
+        growthContext?.intakeContext?.leadTemperature ||
+        pipeline.lead_temperature,
+      lifecycleStage:
+        pipeline.lifecycle_stage ||
+        growthContext?.intakeContext?.lifecycleStage ||
+        "new_inquiry",
+      lifecycleDetail:
+        pipeline.lifecycle_detail ||
+        growthContext?.intakeContext?.recommendedActionLabel ||
+        undefined,
+      readinessLabel: growthContext?.intakeContext?.readinessLabel,
+      scoreExplanation:
+        Array.isArray(pipeline.score_explanation)
+          ? pipeline.score_explanation
+              .map((item: any) =>
+                typeof item?.label === "string" && typeof item?.points === "number"
+                  ? `${item.label}: +${item.points}`
+                  : null
+              )
+              .filter(Boolean)
+          : growthContext?.intakeContext?.recommendedActionLabel
+            ? [growthContext.intakeContext.recommendedActionLabel]
+            : [],
+      operationalSlaHours:
+        typeof pipeline.operational_sla_hours === "number"
+          ? pipeline.operational_sla_hours
+          : growthContext?.intakeContext?.leadTemperature === "urgent"
+            ? 2
+            : growthContext?.intakeContext?.leadTemperature === "hot"
+              ? 6
+              : growthContext?.intakeContext?.leadTemperature === "warm"
+                ? 24
+                : 48,
       areaInterest: pipeline.area_interest,
       sourceChannel: pipeline.source_channel,
       followUpStatus: pipeline.follow_up_status,

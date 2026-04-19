@@ -7,6 +7,7 @@ import {
 
 const SESSION_STORAGE_KEY = "portal_product_session_id";
 const SESSION_FLAG_PREFIX = "portal_product_flag:";
+const RETURNING_VISITOR_KEY = "portal_product_returning_visitor";
 
 type ProductEventPayload = {
   eventKey: string;
@@ -46,6 +47,9 @@ export function getProductSessionId() {
   const existingSessionId = window.localStorage.getItem(SESSION_STORAGE_KEY);
 
   if (existingSessionId) {
+    if (canUseStorage(window.sessionStorage)) {
+      window.sessionStorage.setItem(RETURNING_VISITOR_KEY, "1");
+    }
     return existingSessionId;
   }
 
@@ -120,6 +124,30 @@ export function trackProductEventOncePerSession(input: ProductEventPayload) {
   }
 
   const flagKey = `${SESSION_FLAG_PREFIX}${input.eventKey}`;
+
+  if (window.sessionStorage.getItem(flagKey)) {
+    return;
+  }
+
+  window.sessionStorage.setItem(flagKey, "1");
+  trackProductEvent(input);
+}
+
+export function trackProductEventOnceByFlag(
+  input: ProductEventPayload,
+  flagSuffix: string
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!canUseStorage(window.sessionStorage)) {
+    trackProductEvent(input);
+    return;
+  }
+
+  const safeSuffix = flagSuffix.trim().slice(0, 200);
+  const flagKey = `${SESSION_FLAG_PREFIX}${safeSuffix}`;
 
   if (window.sessionStorage.getItem(flagKey)) {
     return;

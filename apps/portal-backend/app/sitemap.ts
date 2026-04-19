@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
-import { getAllArticles } from "@/lib/site/article-content";
+import { getAllArticles, getTopicHubs } from "@/lib/site/article-content";
 
 const publicRoutes = [
   "",
@@ -20,6 +20,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "monthly" as const,
     priority: 0.82
   }));
+  const hubEntries: MetadataRoute.Sitemap = getTopicHubs().map((hub) => ({
+    url: new URL(`/artigos/tema/${hub.slug}`, baseUrl).toString(),
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.78
+  }));
 
   const staticEntries: MetadataRoute.Sitemap = publicRoutes.map((route) => ({
       url: new URL(route || "/", baseUrl).toString(),
@@ -30,6 +36,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     ...staticEntries,
+    ...hubEntries,
     ...articleEntries
   ];
 }

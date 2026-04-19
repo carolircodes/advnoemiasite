@@ -11,6 +11,7 @@ type FunnelStage =
   | "lead_qualified"
   | "appointment_started"
   | "appointment_completed"
+  | "experiment_impression"
   | "dashboard_view";
 
 type EventDefinition = {
@@ -40,6 +41,12 @@ const PRODUCT_EVENT_DEFINITIONS = [
     description: "Artigo estrategico visualizado."
   },
   {
+    eventKey: "article_hub_viewed",
+    eventGroup: "content",
+    funnelStage: "content_view",
+    description: "Hub tematico de artigos visualizado."
+  },
+  {
     eventKey: "cta_start_attendance_clicked",
     eventGroup: "conversion",
     funnelStage: "cta_click",
@@ -62,6 +69,18 @@ const PRODUCT_EVENT_DEFINITIONS = [
     eventGroup: "conversion",
     funnelStage: "cta_click",
     description: "Clique em CTA de artigo estrategico."
+  },
+  {
+    eventKey: "article_hub_cta_clicked",
+    eventGroup: "conversion",
+    funnelStage: "cta_click",
+    description: "Clique em CTA do hub tematico."
+  },
+  {
+    eventKey: "experiment_variant_viewed",
+    eventGroup: "analytics",
+    funnelStage: "experiment_impression",
+    description: "Impressao de variante de experimento."
   },
   {
     eventKey: "whatsapp_channel_clicked",
@@ -137,6 +156,13 @@ const PAYLOAD_KEY_ALIASES: Record<string, string> = {
   contentId: "contentId",
   utm_content: "contentVariant",
   contentVariant: "contentVariant",
+  experimento: "experimentId",
+  experimentId: "experimentId",
+  variante: "variantId",
+  variantId: "variantId",
+  content_stage: "contentStage",
+  contentStage: "contentStage",
+  returnVisitor: "returnVisitor",
   entryPoint: "entryPoint",
   referrer: "referrer",
   landingPage: "landingPage",

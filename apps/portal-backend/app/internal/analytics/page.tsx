@@ -11,9 +11,11 @@ type AnalyticsResponse = {
   metrics: {
     totalLeads: number;
     qualifiedLeads: number;
+    hotLeads: number;
     scheduledAppointments: number;
     conversions: number;
     conversionRate: number;
+    averageLeadScore: number;
     averageResponseTimeHours: number;
     strategicContentViews: number;
     ctaClicks: number;
@@ -49,10 +51,35 @@ type AnalyticsResponse = {
     conversions: number;
     conversionRate: number;
   }>;
+  readiness: Array<{
+    level: string;
+    leads: number;
+    hotLeads: number;
+  }>;
+  leadScore: {
+    average: number;
+    cold: number;
+    warm: number;
+    hot: number;
+    urgent: number;
+  };
   content: Array<{
     contentId: string;
     views: number;
     ctaClicks: number;
+    qualifiedLeads: number;
+    hotLeads: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  experiments: Array<{
+    experimentId: string;
+    variantId: string;
+    impressions: number;
+    ctaClicks: number;
+    triageSubmissions: number;
+    leads: number;
+    qualifiedLeads: number;
     conversions: number;
     conversionRate: number;
   }>;
@@ -197,6 +224,11 @@ export default function InternalAnalyticsPage() {
               <strong>{formatNumber(data.metrics.strategicContentViews)}</strong>
               <p>Visualizacoes relevantes de artigos em subpasta.</p>
             </article>
+            <article className="operational-band-card success">
+              <span>Leads quentes/urgentes</span>
+              <strong>{formatNumber(data.metrics.hotLeads)}</strong>
+              <p>Intencoes com maior chance de resposta comercial imediata.</p>
+            </article>
             <article
               className={`operational-band-card ${
                 data.metrics.automationFailures > 0 ? "critical" : "success"
@@ -256,6 +288,11 @@ export default function InternalAnalyticsPage() {
                   <p>Tempo medio entre triagem recebida e primeira revisao registrada.</p>
                 </div>
                 <div className="summary-card">
+                  <span>Score medio</span>
+                  <strong>{data.metrics.averageLeadScore.toFixed(1)}</strong>
+                  <p>Leitura consolidada da qualidade media de entrada no periodo.</p>
+                </div>
+                <div className="summary-card">
                   <span>CTAs clicados</span>
                   <strong>{formatNumber(data.metrics.ctaClicks)}</strong>
                   <p>Cliques em atendimento, triagem e canal de contato.</p>
@@ -275,6 +312,48 @@ export default function InternalAnalyticsPage() {
           </section>
 
           <section className="grid two">
+            <article className="panel">
+              <div className="section-head">
+                <h2>Score e prontidao</h2>
+                <p>Distribuicao de temperatura e leitura comercial da intencao declarada na triagem.</p>
+              </div>
+              <div className="summary-grid compact">
+                <div className="summary-card">
+                  <span>Frios</span>
+                  <strong>{formatNumber(data.leadScore.cold)}</strong>
+                  <p>Demandas ainda em descoberta.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Mornos</span>
+                  <strong>{formatNumber(data.leadScore.warm)}</strong>
+                  <p>Leads que pedem follow-up qualificado.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Quentes</span>
+                  <strong>{formatNumber(data.leadScore.hot)}</strong>
+                  <p>Janela forte para consulta ou retorno humano.</p>
+                </div>
+                <div className="summary-card">
+                  <span>Urgentes</span>
+                  <strong>{formatNumber(data.leadScore.urgent)}</strong>
+                  <p>Itens com prioridade operacional mais curta.</p>
+                </div>
+              </div>
+              <div className="operations-list">
+                {data.readiness.map((item) => (
+                  <div key={item.level} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>{item.level}</strong>
+                      <span className="operation-kind">{formatNumber(item.leads)} leads</span>
+                    </div>
+                    <div className="operation-footer">
+                      <span>{formatNumber(item.hotLeads)} quentes/urgentes</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+
             <article className="panel">
               <div className="section-head">
                 <h2>Origens e canais</h2>
@@ -358,11 +437,36 @@ export default function InternalAnalyticsPage() {
                   </div>
                   <strong>{content.contentId}</strong>
                   <p>
-                    {formatNumber(content.conversions)} conversoes registradas com taxa de{" "}
-                    {formatPercentage(content.conversionRate)}.
+                    {formatNumber(content.conversions)} conversoes, {formatNumber(content.qualifiedLeads)} leads qualificados e {formatNumber(content.hotLeads)} leads quentes.
                   </p>
                 </article>
               ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="section-head">
+              <h2>Experimentos e variantes</h2>
+              <p>Leitura inicial da camada leve de CRO para CTA e copy em superficies estrategicas.</p>
+            </div>
+            <div className="operations-list">
+              {data.experiments.length ? (
+                data.experiments.map((experiment) => (
+                  <div key={`${experiment.experimentId}-${experiment.variantId}`} className="operation-card low">
+                    <div className="operation-head">
+                      <strong>{experiment.experimentId}</strong>
+                      <span className="operation-kind">{experiment.variantId}</span>
+                    </div>
+                    <div className="operation-footer">
+                      <span>{formatNumber(experiment.impressions)} impressoes</span>
+                      <span>{formatNumber(experiment.leads)} leads</span>
+                      <span>{formatPercentage(experiment.conversionRate)}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="empty-state">As variantes aparecem aqui conforme a camada de experimentacao comeca a ganhar volume.</p>
+              )}
             </div>
           </section>
         </>

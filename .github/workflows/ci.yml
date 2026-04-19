@@ -56,6 +56,9 @@ jobs:
       - name: Phase 10 Smoke
         run: npm run smoke:phase10
 
+      - name: Phase 11 Smoke
+        run: npm run smoke:phase11
+
       - name: Upload Backend Operations Evidence
         if: always()
         uses: actions/upload-artifact@v4

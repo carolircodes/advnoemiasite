@@ -235,6 +235,9 @@ export async function notifyStaffAboutIntakeRequest(input: {
   urgencyLevel: string;
   currentStage: string;
   preferredContactPeriod: string;
+  preferredContactChannel?: string;
+  readinessLevel?: string;
+  appointmentInterest?: boolean;
   email: string;
   phone: string;
   caseSummary: string;
@@ -267,6 +270,9 @@ export async function notifyStaffAboutIntakeRequest(input: {
           input.currentStage as keyof typeof publicIntakeStageLabels
         ] || input.currentStage,
       preferredContactPeriod: input.preferredContactPeriod,
+      preferredContactChannel: input.preferredContactChannel || "",
+      readinessLevel: input.readinessLevel || "",
+      appointmentInterest: Boolean(input.appointmentInterest),
       contactEmail: input.email,
       contactPhone: input.phone,
       caseSummary: input.caseSummary,

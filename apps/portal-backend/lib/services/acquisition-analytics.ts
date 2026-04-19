@@ -9,9 +9,11 @@ export type AcquisitionAnalyticsResponse = {
   metrics: {
     totalLeads: number;
     qualifiedLeads: number;
+    hotLeads: number;
     scheduledAppointments: number;
     conversions: number;
     conversionRate: number;
+    averageLeadScore: number;
     averageResponseTimeHours: number;
     strategicContentViews: number;
     ctaClicks: number;
@@ -47,10 +49,35 @@ export type AcquisitionAnalyticsResponse = {
     conversions: number;
     conversionRate: number;
   }>;
+  readiness: Array<{
+    level: string;
+    leads: number;
+    hotLeads: number;
+  }>;
+  leadScore: {
+    average: number;
+    cold: number;
+    warm: number;
+    hot: number;
+    urgent: number;
+  };
   content: Array<{
     contentId: string;
     views: number;
     ctaClicks: number;
+    qualifiedLeads: number;
+    hotLeads: number;
+    conversions: number;
+    conversionRate: number;
+  }>;
+  experiments: Array<{
+    experimentId: string;
+    variantId: string;
+    impressions: number;
+    ctaClicks: number;
+    triageSubmissions: number;
+    leads: number;
+    qualifiedLeads: number;
     conversions: number;
     conversionRate: number;
   }>;
@@ -75,7 +102,12 @@ type IntakeRequestRow = {
   id: string;
   status: string;
   case_area: string;
+  readiness_level: string | null;
+  lead_score: number | null;
+  lead_temperature: string | null;
+  lifecycle_stage: string | null;
   source_path: string | null;
+  experiment_context: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   submitted_at: string;
   reviewed_at: string | null;
@@ -190,7 +222,7 @@ export async function buildAcquisitionAnalytics(
       .order("occurred_at", { ascending: false }),
     supabase
       .from("intake_requests")
-      .select("id,status,case_area,source_path,metadata,submitted_at,reviewed_at")
+      .select("id,status,case_area,readiness_level,lead_score,lead_temperature,lifecycle_stage,source_path,experiment_context,metadata,submitted_at,reviewed_at")
       .gte("submitted_at", rangeStart)
       .lte("submitted_at", rangeEnd)
       .order("submitted_at", { ascending: false }),
@@ -255,6 +287,19 @@ export async function buildAcquisitionAnalytics(
     ["in_review", "contacted", "converted"].includes(request.status)
   ).length;
   const conversions = intakeRequests.filter((request) => request.status === "converted").length;
+  const hotLeads = intakeRequests.filter((request) =>
+    ["hot", "urgent"].includes(request.lead_temperature || "")
+  ).length;
+  const averageLeadScore = intakeRequests.length
+    ? Number(
+        (
+          intakeRequests.reduce(
+            (sum, request) => sum + Math.max(request.lead_score || 0, 0),
+            0
+          ) / intakeRequests.length
+        ).toFixed(1)
+      )
+    : 0;
   const scheduledAppointments = appointments.filter((appointment) =>
     ["scheduled", "confirmed", "completed"].includes(appointment.status)
   ).length;
@@ -283,6 +328,7 @@ export async function buildAcquisitionAnalytics(
   const channelMap = new Map<string, { leads: number; qualified: number; conversions: number }>();
   const topicMap = new Map<string, { leads: number; qualified: number; conversions: number }>();
   const campaignMap = new Map<string, { leads: number; qualified: number; conversions: number }>();
+  const readinessMap = new Map<string, { leads: number; hotLeads: number }>();
 
   for (const request of intakeRequests) {
     const source =
@@ -297,17 +343,58 @@ export async function buildAcquisitionAnalytics(
       readPayloadField(request.metadata, "campanha", "organic");
     const qualified = ["in_review", "contacted", "converted"].includes(request.status);
     const converted = request.status === "converted";
+    const readinessLevel = request.readiness_level || "explorando";
 
     pushAggregate(sourceMap, source, { lead: true, qualified, converted });
     pushAggregate(channelMap, channel, { lead: true, qualified, converted });
     pushAggregate(topicMap, topic, { lead: true, qualified, converted });
     pushAggregate(campaignMap, campaign, { lead: true, qualified, converted });
+
+    const readinessEntry = readinessMap.get(readinessLevel) || { leads: 0, hotLeads: 0 };
+    readinessEntry.leads += 1;
+    if (["hot", "urgent"].includes(request.lead_temperature || "")) {
+      readinessEntry.hotLeads += 1;
+    }
+    readinessMap.set(readinessLevel, readinessEntry);
   }
 
   const contentMap = new Map<
     string,
-    { views: number; ctaClicks: number; conversions: number }
+    { views: number; ctaClicks: number; qualifiedLeads: number; hotLeads: number; conversions: number }
   >();
+  const experimentMap = new Map<
+    string,
+    {
+      experimentId: string;
+      variantId: string;
+      impressions: number;
+      ctaClicks: number;
+      triageSubmissions: number;
+      leads: number;
+      qualifiedLeads: number;
+      conversions: number;
+    }
+  >();
+
+  function getExperimentKey(experimentId: string, variantId: string) {
+    return `${experimentId}:${variantId}`;
+  }
+
+  function touchExperiment(experimentId: string, variantId: string) {
+    const key = getExperimentKey(experimentId, variantId);
+    const existing = experimentMap.get(key) || {
+      experimentId,
+      variantId,
+      impressions: 0,
+      ctaClicks: 0,
+      triageSubmissions: 0,
+      leads: 0,
+      qualifiedLeads: 0,
+      conversions: 0
+    };
+    experimentMap.set(key, existing);
+    return existing;
+  }
 
   for (const event of productEvents) {
     const contentId =
@@ -323,6 +410,8 @@ export async function buildAcquisitionAnalytics(
     const existing = contentMap.get(contentId) || {
       views: 0,
       ctaClicks: 0,
+      qualifiedLeads: 0,
+      hotLeads: 0,
       conversions: 0
     };
 
@@ -338,6 +427,28 @@ export async function buildAcquisitionAnalytics(
     }
 
     contentMap.set(contentId, existing);
+
+    const experimentId = readPayloadField(event.payload, "experimentId", "");
+    const variantId = readPayloadField(event.payload, "variantId", "");
+
+    if (experimentId && variantId) {
+      const experiment = touchExperiment(experimentId, variantId);
+
+      if (event.event_key === "experiment_variant_viewed") {
+        experiment.impressions += 1;
+      }
+
+      if (
+        definition.funnelStage === "cta_click" ||
+        definition.funnelStage === "whatsapp_click"
+      ) {
+        experiment.ctaClicks += 1;
+      }
+
+      if (definition.funnelStage === "form_submitted") {
+        experiment.triageSubmissions += 1;
+      }
+    }
   }
 
   for (const request of intakeRequests) {
@@ -353,14 +464,44 @@ export async function buildAcquisitionAnalytics(
     const existing = contentMap.get(contentId) || {
       views: 0,
       ctaClicks: 0,
+      qualifiedLeads: 0,
+      hotLeads: 0,
       conversions: 0
     };
+
+    if (["in_review", "contacted", "converted"].includes(request.status)) {
+      existing.qualifiedLeads += 1;
+    }
+
+    if (["hot", "urgent"].includes(request.lead_temperature || "")) {
+      existing.hotLeads += 1;
+    }
 
     if (request.status === "converted") {
       existing.conversions += 1;
     }
 
     contentMap.set(contentId, existing);
+
+    const experimentId =
+      readPayloadField(request.metadata, "experimentId", "") ||
+      readPayloadField(request.experiment_context, "experimentId", "");
+    const variantId =
+      readPayloadField(request.metadata, "variantId", "") ||
+      readPayloadField(request.experiment_context, "variantId", "");
+
+    if (experimentId && variantId) {
+      const experiment = touchExperiment(experimentId, variantId);
+      experiment.leads += 1;
+
+      if (["in_review", "contacted", "converted"].includes(request.status)) {
+        experiment.qualifiedLeads += 1;
+      }
+
+      if (request.status === "converted") {
+        experiment.conversions += 1;
+      }
+    }
   }
 
   const funnelStages = [
@@ -389,12 +530,14 @@ export async function buildAcquisitionAnalytics(
     metrics: {
       totalLeads: intakeRequests.length,
       qualifiedLeads,
+      hotLeads,
       scheduledAppointments,
       conversions,
       conversionRate:
         intakeRequests.length > 0
           ? Number(((conversions / intakeRequests.length) * 100).toFixed(1))
           : 0,
+      averageLeadScore,
       averageResponseTimeHours,
       strategicContentViews,
       ctaClicks,
@@ -438,16 +581,41 @@ export async function buildAcquisitionAnalytics(
           totals.leads > 0 ? Number(((totals.conversions / totals.leads) * 100).toFixed(1)) : 0
       }))
       .sort((left, right) => right.leads - left.leads),
+    readiness: Array.from(readinessMap.entries())
+      .map(([level, totals]) => ({
+        level,
+        leads: totals.leads,
+        hotLeads: totals.hotLeads
+      }))
+      .sort((left, right) => right.leads - left.leads),
+    leadScore: {
+      average: averageLeadScore,
+      cold: intakeRequests.filter((request) => (request.lead_temperature || "cold") === "cold").length,
+      warm: intakeRequests.filter((request) => request.lead_temperature === "warm").length,
+      hot: intakeRequests.filter((request) => request.lead_temperature === "hot").length,
+      urgent: intakeRequests.filter((request) => request.lead_temperature === "urgent").length
+    },
     content: Array.from(contentMap.entries())
       .map(([contentId, totals]) => ({
         contentId,
         views: totals.views,
         ctaClicks: totals.ctaClicks,
+        qualifiedLeads: totals.qualifiedLeads,
+        hotLeads: totals.hotLeads,
         conversions: totals.conversions,
         conversionRate:
           totals.views > 0 ? Number(((totals.conversions / totals.views) * 100).toFixed(1)) : 0
       }))
       .sort((left, right) => right.views - left.views),
+    experiments: Array.from(experimentMap.values())
+      .map((experiment) => ({
+        ...experiment,
+        conversionRate:
+          experiment.leads > 0
+            ? Number(((experiment.conversions / experiment.leads) * 100).toFixed(1))
+            : 0
+      }))
+      .sort((left, right) => right.leads - left.leads),
     automation: {
       failedDispatches: automationDispatches.filter((dispatch) => dispatch.status === "failed")
         .length,

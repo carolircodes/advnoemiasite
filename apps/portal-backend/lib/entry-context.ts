@@ -1,6 +1,15 @@
 import type { CaseArea } from "./domain/portal";
 
-const ENTRY_CONTEXT_QUERY_KEYS = ["origem", "tema", "campanha", "video"] as const;
+const ENTRY_CONTEXT_QUERY_KEYS = [
+  "origem",
+  "tema",
+  "campanha",
+  "video",
+  "experimento",
+  "variante",
+  "content_id",
+  "content_stage"
+] as const;
 
 export type EntryContext = Record<(typeof ENTRY_CONTEXT_QUERY_KEYS)[number], string>;
 
@@ -88,6 +97,21 @@ export function readEntryContext(
     ),
     video: normalizeEntryContextValue(
       getQueryValue(searchParams, ["video"]) || defaults.video
+    ),
+    experimento: normalizeEntryContextValue(
+      getQueryValue(searchParams, ["experimento", "experimentId", "exp"]) ||
+        defaults.experimento
+    ),
+    variante: normalizeEntryContextValue(
+      getQueryValue(searchParams, ["variante", "variantId", "variant"]) ||
+        defaults.variante
+    ),
+    content_id: normalizeEntryContextValue(
+      getQueryValue(searchParams, ["content_id", "contentId"]) || defaults.content_id
+    ),
+    content_stage: normalizeEntryContextValue(
+      getQueryValue(searchParams, ["content_stage", "contentStage"]) ||
+        defaults.content_stage
     )
   };
 }
