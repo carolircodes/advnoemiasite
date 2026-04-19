@@ -1,7 +1,10 @@
 import "dotenv/config";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 import {
   buildBackendOperationsVerificationReport,
+  renderBackendReleaseEvidenceMarkdown,
   type BackendEnforcementProfile,
   renderBackendOperationsVerificationReport,
   type BackendRuntimeVerificationMode
@@ -31,14 +34,39 @@ function parseFormat(value: string | undefined) {
   return value === "json" ? "json" : "text";
 }
 
+function parseWriteDir(value: string | undefined) {
+  return value && value.trim().length > 0 ? value.trim() : null;
+}
+
 const profile = parseProfile(parseArgument("--policy="));
 const runtimeMode = parseRuntimeMode(parseArgument("--runtime="));
 const outputFormat = parseFormat(parseArgument("--format="));
+const writeDir = parseWriteDir(parseArgument("--write-dir="));
 
 const report = await buildBackendOperationsVerificationReport({
   profile,
   runtimeMode
 });
+
+if (writeDir) {
+  const resolvedDir = path.resolve(process.cwd(), writeDir);
+  await mkdir(resolvedDir, { recursive: true });
+  await writeFile(
+    path.join(resolvedDir, "backend-operations-report.json"),
+    renderBackendOperationsVerificationReport(report, "json"),
+    "utf8"
+  );
+  await writeFile(
+    path.join(resolvedDir, "backend-operations-summary.txt"),
+    renderBackendOperationsVerificationReport(report, "text"),
+    "utf8"
+  );
+  await writeFile(
+    path.join(resolvedDir, "backend-release-evidence.md"),
+    renderBackendReleaseEvidenceMarkdown(report),
+    "utf8"
+  );
+}
 
 process.stdout.write(renderBackendOperationsVerificationReport(report, outputFormat));
 

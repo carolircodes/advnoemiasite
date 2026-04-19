@@ -41,6 +41,7 @@ Modos uteis:
 - `npm run operations:verify`: leitura local/operacional sem bloquear tudo por padrao
 - `npm run operations:verify:ci`: gate repo-safe para CI, sem depender de runtime administrativo real
 - `npm run operations:verify:release`: gate mais estrito para promocao production-like
+- `npm run operations:evidence:release`: gera artifacts locais de release evidence
 
 ## 4. Conferir readiness protegida
 
@@ -118,6 +119,22 @@ Governanca:
 - em `production`, `payments_signature_not_enforced` passa a ser blocker de release
 - em `ci` ou verificacao local continua aparecendo como warning/action-required, sem fingir que o runtime real foi provado
 
+## 6.1 Evidence de release
+
+Quando a liberacao exigir prova rastreavel:
+
+```powershell
+npm run operations:evidence:release
+```
+
+Revise os arquivos gerados em `apps/portal-backend/.artifacts/operations/release`:
+
+- `backend-operations-report.json`
+- `backend-operations-summary.txt`
+- `backend-release-evidence.md`
+
+Se o artifact listar `manualFollowUps`, trate-os como follow-up real e nao como nota decorativa.
+
 ## 7. Confirmar notificacoes e worker
 
 Verifique:
@@ -167,3 +184,4 @@ Sinais de desvio:
 - rotacoes externas/manuais de secrets herdadas do fechamento anterior
 - aplicacao da migracao duravel em qualquer ambiente ainda nao convergido
 - integracao do checklist com observabilidade externa ou alertas, se desejado em fase futura
+- prova administrativa real da convergencia duravel enquanto o runtime ainda nao puder ser provado so por CI

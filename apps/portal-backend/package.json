@@ -28,6 +28,8 @@
     "operations:verify:json": "node --experimental-strip-types scripts/verify-backend-operations.ts --format=json",
     "operations:verify:ci": "node --experimental-strip-types scripts/verify-backend-operations.ts --policy=ci --runtime=off",
     "operations:verify:release": "node --experimental-strip-types scripts/verify-backend-operations.ts --policy=production --runtime=required",
+    "operations:evidence:ci": "node --experimental-strip-types scripts/verify-backend-operations.ts --policy=ci --runtime=off --write-dir=.artifacts/operations/ci",
+    "operations:evidence:release": "node --experimental-strip-types scripts/verify-backend-operations.ts --policy=production --runtime=required --write-dir=.artifacts/operations/release",
     "supabase:start": "npx supabase start",
     "supabase:stop": "npx supabase stop",
     "supabase:db:reset": "npx supabase db reset",

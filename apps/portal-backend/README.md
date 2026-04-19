@@ -263,6 +263,7 @@ Modos de enforcement:
 - `npm run operations:verify`: modo local, preserva conveniencia de desenvolvimento e evidencia gaps sem bloquear tudo
 - `npm run operations:verify:ci`: modo repo-safe para CI, valida governanca sem depender de runtime administrativo real
 - `npm run operations:verify:release`: modo mais estrito para promocao production-like, bloqueando runtime duravel nao provado ou fallback critico
+- `npm run operations:evidence:release`: gera evidence local em arquivo para anexar ao workflow de liberacao
 
 O relatorio protegido em `GET /api/internal/readiness` agora tambem inclui `operator.releaseSafety`, com:
 
@@ -274,6 +275,10 @@ O relatorio protegido em `GET /api/internal/readiness` agora tambem inclui `oper
 Checklist detalhado:
 
 - [`docs/BACKEND_OPERATOR_CHECKLIST.md`](docs/BACKEND_OPERATOR_CHECKLIST.md)
+- [`docs/BACKEND_RELEASE_RUNBOOK.md`](docs/BACKEND_RELEASE_RUNBOOK.md)
+
+O worker de notificacoes:
+
 - processa itens `pending` e `failed` disponiveis no horario atual
 - envia por SMTP ou Resend, conforme `NOTIFICATIONS_PROVIDER`
 - marca como `sent`, `failed` ou `skipped`

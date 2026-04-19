@@ -51,7 +51,14 @@ jobs:
           MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE: "true"
           TELEGRAM_BOT_TOKEN: ci-telegram-bot-token
           TELEGRAM_WEBHOOK_SECRET: ci-telegram-webhook-secret
-        run: npm run operations:verify:ci
+        run: npm run operations:evidence:ci
+
+      - name: Upload Backend Operations Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-operations-evidence
+          path: apps/portal-backend/.artifacts/operations/ci
 
       - name: Build
         run: npm run build
