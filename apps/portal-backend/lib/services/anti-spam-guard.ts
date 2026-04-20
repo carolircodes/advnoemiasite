@@ -1,4 +1,5 @@
 import { conversationPersistence, ConversationMessage } from './conversation-persistence';
+import { buildWebhookEventPayloadHash } from "./webhook-idempotency";
 
 export interface WebhookEvent {
   channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram';
@@ -143,6 +144,28 @@ class AntiSpamGuard {
       }
     }
 
+    const payloadHash = buildWebhookEventPayloadHash(event);
+    if (payloadHash) {
+      const isDuplicatePayload = await conversationPersistence.isPayloadHashProcessed(
+        event.channel,
+        payloadHash,
+        event.externalUserId
+      );
+
+      if (isDuplicatePayload) {
+        console.log('EVENT_IGNORED_DUPLICATE_MESSAGE: Message retry already processed', {
+          channel: event.channel,
+          externalMessageId: event.externalMessageId,
+          externalUserId: event.externalUserId
+        });
+        return {
+          shouldRespond: false,
+          reason: 'duplicate_retry',
+          isDuplicate: true
+        };
+      }
+    }
+
     console.log('ANTI_SPAM_GUARD_PASSED', {
       sessionId: session.id,
       channel: event.channel,
@@ -236,11 +259,14 @@ class AntiSpamGuard {
   // Marcar evento como processado após resposta bem-sucedida
   async markEventProcessed(event: WebhookEvent): Promise<void> {
     if (event.externalEventId) {
+      const payloadHash = buildWebhookEventPayloadHash(event);
+
       await conversationPersistence.markEventProcessed(
         event.channel,
         event.externalEventId,
         event.externalMessageId,
-        event.externalUserId
+        event.externalUserId,
+        payloadHash || undefined
       );
     }
   }

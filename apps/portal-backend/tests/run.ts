@@ -14,4 +14,5 @@ import "./phase10-hardening.test.ts";
 import "./phase11-hardening.test.ts";
 import "./phase12-omnichannel.test.ts";
 import "./meta-messenger-audit.test.ts";
+import "./facebook-messenger-closeout.test.ts";
 import "./payment-pricing.test.ts";

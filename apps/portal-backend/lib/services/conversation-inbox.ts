@@ -15,6 +15,11 @@ import {
   type LeadIdentityStatus
 } from "./lead-identity";
 import { commercialRelationshipService } from "./commercial-relationship";
+import {
+  presentOperationalChannelLabel,
+  presentOperationalSourceLabel,
+  presentOperationalThreadOriginLabel
+} from "../channels/channel-presentation";
 
 type ConversationChannel =
   | "instagram"
@@ -559,20 +564,7 @@ function buildPreview(session: SessionRow) {
 }
 
 function getChannelLabel(channel: ConversationChannel) {
-  switch (channel) {
-    case "instagram":
-      return "Instagram";
-    case "facebook":
-      return "Facebook";
-    case "whatsapp":
-      return "WhatsApp";
-    case "telegram":
-      return "Telegram";
-    case "portal":
-      return "Portal";
-    default:
-      return "Site";
-  }
+  return presentOperationalChannelLabel(channel, "Site");
 }
 
 function inferThreadOrigin(session: SessionRow) {
@@ -582,27 +574,45 @@ function inferThreadOrigin(session: SessionRow) {
   const entryType = asString(socialAcquisition.entryType);
 
   if (entryType === "instagram_comment") {
-    return { type: "comment" as const, label: "Comentario relevante" };
+    return {
+      type: "comment" as const,
+      label: presentOperationalThreadOriginLabel({ entryType })
+    };
   }
 
   if (entryType === "facebook_comment") {
-    return { type: "comment" as const, label: "Comentario relevante da pagina" };
+    return {
+      type: "comment" as const,
+      label: presentOperationalThreadOriginLabel({ entryType })
+    };
   }
 
   if (entryType === "instagram_comment_to_dm") {
-    return { type: "comment_to_dm" as const, label: "Comentario convertido em DM" };
+    return {
+      type: "comment_to_dm" as const,
+      label: presentOperationalThreadOriginLabel({ entryType })
+    };
   }
 
   if (entryType === "facebook_comment_to_dm") {
-    return { type: "comment_to_dm" as const, label: "Comentario convertido em Messenger" };
+    return {
+      type: "comment_to_dm" as const,
+      label: presentOperationalThreadOriginLabel({ entryType })
+    };
   }
 
   if (entryType === "instagram_dm") {
-    return { type: "dm" as const, label: "DM oficial" };
+    return {
+      type: "dm" as const,
+      label: presentOperationalThreadOriginLabel({ entryType })
+    };
   }
 
   if (entryType === "facebook_dm") {
-    return { type: "dm" as const, label: "Messenger oficial" };
+    return {
+      type: "dm" as const,
+      label: presentOperationalThreadOriginLabel({ entryType })
+    };
   }
 
   if (session.channel === "site") {
@@ -633,12 +643,10 @@ function inferThreadOrigin(session: SessionRow) {
       session.channel === "instagram" || session.channel === "facebook"
         ? ("dm" as const)
         : ("unknown" as const),
-    label:
-      session.channel === "instagram"
-        ? "DM oficial"
-        : session.channel === "facebook"
-          ? "Messenger oficial"
-          : "Thread operacional"
+    label: presentOperationalThreadOriginLabel({
+      channel: session.channel,
+      fallback: "Thread operacional"
+    })
   };
 }
 
@@ -1514,7 +1522,10 @@ class ConversationInboxService {
             : message.message_type === "system_event"
               ? "system"
               : "direct_message",
-        socialOrigin: asString(message.metadata_json?.source),
+        socialOrigin: presentOperationalSourceLabel(
+          asString(message.metadata_json?.source),
+          asString(message.metadata_json?.source) || ""
+        ),
         createdAt: message.created_at,
         isRead: message.is_read,
         errorMessage: message.error_message
@@ -1676,7 +1687,11 @@ class ConversationInboxService {
           }))
         },
         social: {
-          sourceLabel: asString(socialAcquisition.sourceLabel),
+          sourceLabel:
+            presentOperationalSourceLabel(
+              asString(socialAcquisition.source),
+              asString(socialAcquisition.sourceLabel) || ""
+            ) || null,
           entryType: asString(socialAcquisition.entryType),
           directTransitionStatus: asString(socialAcquisition.directTransitionStatus),
           topicLabel: asString(socialAcquisition.topicLabel),
@@ -1695,7 +1710,11 @@ class ConversationInboxService {
           rationale: asString(publicCommentPolicy.rationale)
         },
         origin: {
-          sourceLabel: asString(siteOrigin.sourceLabel),
+          sourceLabel:
+            presentOperationalSourceLabel(
+              asString(siteOrigin.source),
+              asString(siteOrigin.sourceLabel) || ""
+            ) || null,
           visitorStage: asString(siteOrigin.visitorStage),
           sessionId: asString(siteOrigin.sessionId) || (session as SessionRow).external_user_id,
           pagePath: asString(siteOrigin.pagePath),

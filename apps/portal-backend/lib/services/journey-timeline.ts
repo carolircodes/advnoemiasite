@@ -2,6 +2,10 @@ import "server-only";
 
 import { createServerSupabaseClient } from "../supabase/server";
 import { normalizeJourneyTaxonomy } from "../journey/taxonomy";
+import {
+  presentOperationalChannelLabel,
+  presentOperationalSourceLabel
+} from "../channels/channel-presentation";
 
 export type JourneyTimelineItem = {
   id: string;
@@ -200,7 +204,7 @@ export async function buildClientJourneyTimeline(input: {
       occurredAt: intake.submitted_at,
       kicker: "Entrada",
       title: "Lead entrou na operacao",
-      detail: `Origem ${formatEnum(taxonomy.channel, "Unknown")} com tema ${formatEnum(
+      detail: `Origem ${presentOperationalChannelLabel(taxonomy.channel, "Canal nao identificado")} com tema ${formatEnum(
         taxonomy.legalTopic,
         "Unknown"
       )}.`,
@@ -228,7 +232,11 @@ export async function buildClientJourneyTimeline(input: {
   for (const event of events) {
     const taxonomy = normalizeJourneyTaxonomy({ event: event.payload, metadata: intake?.metadata, pipeline });
     const detailParts = [
-      taxonomy.channel !== "unknown" ? formatEnum(taxonomy.channel, "Unknown") : "",
+      taxonomy.primaryTouch !== "unknown"
+        ? presentOperationalSourceLabel(taxonomy.primaryTouch, formatEnum(taxonomy.primaryTouch, "Unknown"))
+        : taxonomy.channel !== "unknown"
+          ? presentOperationalChannelLabel(taxonomy.channel, "Unknown")
+          : "",
       taxonomy.legalTopic !== "unknown" ? formatEnum(taxonomy.legalTopic, "Unknown") : "",
       event.page_path || ""
     ].filter(Boolean);
@@ -286,12 +294,12 @@ export async function buildClientJourneyTimeline(input: {
       title: `Conversa ${formatEnum(session.thread_status, "ativa")}`,
       detail:
         session.last_message_preview ||
-        `Canal ${formatEnum(session.channel, "Unknown")} em fluxo ${formatEnum(
+        `Canal ${presentOperationalChannelLabel(session.channel, "Unknown")} em fluxo ${formatEnum(
           session.waiting_for,
           "none"
         )}.`,
       meta: [
-        formatEnum(session.channel, "Unknown"),
+        presentOperationalChannelLabel(session.channel, "Unknown"),
         formatEnum(session.current_intent, "Sem intencao mapeada"),
         formatEnum(session.waiting_for, "none")
       ],
@@ -305,11 +313,14 @@ export async function buildClientJourneyTimeline(input: {
       occurredAt: followUp.scheduled_for || followUp.created_at,
       kicker: "Follow-up",
       title: formatEnum(followUp.message_type, "Contato programado"),
-      detail: `Canal ${formatEnum(followUp.channel, "Unknown")} com status ${formatEnum(
+      detail: `Canal ${presentOperationalChannelLabel(followUp.channel, "Unknown")} com status ${formatEnum(
         followUp.status,
         "Unknown"
       )}.`,
-      meta: [formatEnum(followUp.status, "unknown"), formatEnum(followUp.channel, "Unknown")],
+      meta: [
+        formatEnum(followUp.status, "unknown"),
+        presentOperationalChannelLabel(followUp.channel, "Unknown")
+      ],
       tone:
         followUp.status === "replied" || followUp.status === "sent"
           ? "success"

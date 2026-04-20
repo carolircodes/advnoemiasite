@@ -1244,7 +1244,9 @@ export function ConversationInboxDashboard({
                       }
                       footer={
                         <>
-                          {message.socialOrigin ? <span>Origem {message.socialOrigin}</span> : null}
+                          {message.socialOrigin ? (
+                            <span>Origem {presentChannelOrigin(message.socialOrigin)}</span>
+                          ) : null}
                           {message.errorMessage ? (
                             <span className="block text-[#ffd1c2]">{message.errorMessage}</span>
                           ) : null}

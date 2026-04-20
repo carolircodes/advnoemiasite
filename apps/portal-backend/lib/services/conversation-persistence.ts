@@ -21,33 +21,6 @@ export interface ConversationSession {
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
-}
-
-export interface ConversationMessage {
-  id: string;
-  session_id: string;
-  external_message_id?: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  direction: 'inbound' | 'outbound';
-  metadata_json?: Record<string, any>;
-  created_at: string;
-}
-
-export type ConversationMessageWriteOptions = {
-  messageType?: string;
-  senderType?: 'contact' | 'ai' | 'human' | 'system';
-  sendStatus?: 'received' | 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
-  deliveryStatus?: string | null;
-  isRead?: boolean;
-  readAt?: string | null;
-  errorMessage?: string | null;
-  attachments?: unknown[];
-  receivedAt?: string | null;
-  failedAt?: string | null;
-};
-
-export interface ConversationSession {
   thread_status?:
     | 'new'
     | 'unread'
@@ -82,6 +55,30 @@ export interface ConversationSession {
   follow_up_resolved_at?: string;
   last_status_event_at?: string;
 }
+
+export interface ConversationMessage {
+  id: string;
+  session_id: string;
+  external_message_id?: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  direction: 'inbound' | 'outbound';
+  metadata_json?: Record<string, any>;
+  created_at: string;
+}
+
+export type ConversationMessageWriteOptions = {
+  messageType?: string;
+  senderType?: 'contact' | 'ai' | 'human' | 'system';
+  sendStatus?: 'received' | 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  deliveryStatus?: string | null;
+  isRead?: boolean;
+  readAt?: string | null;
+  errorMessage?: string | null;
+  attachments?: unknown[];
+  receivedAt?: string | null;
+  failedAt?: string | null;
+};
 
 export interface ProcessedWebhookEvent {
   id: string;
@@ -331,6 +328,48 @@ class ConversationPersistenceService {
         externalEventId,
         error
       });
+    }
+  }
+
+  async isPayloadHashProcessed(
+    channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram',
+    payloadHash: string,
+    externalUserId?: string
+  ): Promise<boolean> {
+    if (!payloadHash.trim()) {
+      return false;
+    }
+
+    try {
+      let query = this.supabase
+        .from('processed_webhook_events')
+        .select('id')
+        .eq('channel', channel)
+        .eq('payload_hash', payloadHash)
+        .limit(1);
+
+      if (externalUserId?.trim()) {
+        query = query.eq('external_user_id', externalUserId.trim());
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) {
+        if (this.isMissingProcessedWebhookPayloadHashColumn(error)) {
+          console.warn('PROCESSED_EVENT_PAYLOAD_HASH_UNAVAILABLE', {
+            channel,
+            hasExternalUserId: Boolean(externalUserId?.trim())
+          });
+          return false;
+        }
+
+        throw error;
+      }
+
+      return Boolean(data?.id);
+    } catch (error) {
+      console.error('ERROR_CHECKING_EVENT_PAYLOAD_HASH_PROCESSED:', error);
+      return false;
     }
   }
 

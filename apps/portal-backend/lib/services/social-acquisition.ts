@@ -1,6 +1,10 @@
 import "server-only";
 
 import { recordProductEvent } from "./public-intake";
+import {
+  presentOperationalSourceLabel,
+  presentOperationalThreadOriginLabel
+} from "../channels/channel-presentation";
 
 export type AcquisitionEventGroup =
   | "acquisition"
@@ -265,17 +269,7 @@ function inferOperatorAction(
 }
 
 function inferSourceLabel(source: string) {
-  const labels: Record<string, string> = {
-    instagram_comment: "Instagram comentario",
-    instagram_dm: "Instagram direct",
-    facebook_comment: "Facebook comentario",
-    facebook_dm: "Facebook Messenger",
-    whatsapp_inbound: "WhatsApp inbound",
-    site_entry: "Site",
-    portal_entry: "Portal"
-  };
-
-  return labels[source] || source;
+  return presentOperationalSourceLabel(source, source);
 }
 
 function inferEntryDefinition(
@@ -307,7 +301,9 @@ function inferEntryDefinition(
       discoveryMechanism: "organic_direct",
       contentType: "instagram_dm_thread",
       eventOrigin: "social",
-      contentOriginLabel: "Conversa privada no Instagram"
+      contentOriginLabel: presentOperationalThreadOriginLabel({
+        entryType: "instagram_dm"
+      })
     };
   }
 
@@ -318,7 +314,7 @@ function inferEntryDefinition(
       discoveryMechanism: "organic_comment",
       contentType: "facebook_comment_thread",
       eventOrigin: "social",
-      contentOriginLabel: "Conteudo organico da Pagina com comentario publico"
+      contentOriginLabel: "Conteudo organico da pagina com comentario publico"
     };
   }
 
@@ -329,7 +325,9 @@ function inferEntryDefinition(
       discoveryMechanism: "organic_messenger",
       contentType: "facebook_messenger_thread",
       eventOrigin: "social",
-      contentOriginLabel: "Conversa privada no Messenger da Pagina"
+      contentOriginLabel: presentOperationalThreadOriginLabel({
+        entryType: "facebook_dm"
+      })
     };
   }
 
@@ -371,13 +369,15 @@ export function promoteCommentSnapshotToDm(
     ...snapshot,
     source: isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm",
     sourceLabel: isFacebook
-      ? "Facebook comentario para Messenger"
-      : "Instagram comentario para direct",
+      ? presentOperationalSourceLabel("facebook_comment_to_dm")
+      : presentOperationalSourceLabel("instagram_comment_to_dm"),
     entryType: isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm",
     entryPoint: isFacebook ? "messenger" : "direct",
     discoveryMechanism: isFacebook ? "organic_messenger" : "organic_direct",
     contentType: isFacebook ? "facebook_messenger_thread" : "instagram_dm_thread",
-    contentOriginLabel: "Comentario convertido em conversa privada",
+    contentOriginLabel: presentOperationalThreadOriginLabel({
+      entryType: isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm"
+    }),
     commercialContext: inferCommercialContext(
       snapshot.topic,
       isFacebook ? "facebook_comment_to_dm" : "instagram_comment_to_dm"

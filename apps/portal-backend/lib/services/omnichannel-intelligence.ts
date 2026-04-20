@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServerSupabaseClient } from "../supabase/server";
+import { resolveOperationalLabel } from "../channels/channel-presentation";
 import {
   buildJourneyTouchLabel,
   normalizeJourneyTaxonomy,
@@ -155,6 +156,12 @@ function average(values: number[]) {
 }
 
 function formatLabel(value: string) {
+  const operationalLabel = resolveOperationalLabel(value);
+
+  if (operationalLabel) {
+    return operationalLabel;
+  }
+
   return value
     .split(/[-_:]/)
     .filter(Boolean)

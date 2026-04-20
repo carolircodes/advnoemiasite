@@ -1,3 +1,8 @@
+import {
+  presentOperationalChannelLabel,
+  presentOperationalSourceLabel
+} from "@/lib/channels/channel-presentation";
+
 function normalizeToken(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
@@ -27,106 +32,112 @@ const tokenLabels: Record<string, string> = {
   client: "Cliente ativo",
   ai: "IA",
   human: "Humano",
-  hybrid: "Operação híbrida",
+  hybrid: "Operacao hibrida",
   ai_active: "IA conduzindo",
-  waiting_human: "Aguardando atuação humana",
+  waiting_human: "Aguardando atuacao humana",
   waiting_client: "Aguardando retorno do cliente",
   waiting_team: "Aguardando equipe",
-  waiting_office: "Aguardando escritório",
-  handoff: "Em transição",
+  waiting_office: "Aguardando escritorio",
+  handoff: "Em transicao",
   active: "Ativo",
   resolved: "Resolvido",
   closed: "Encerrado",
   archived: "Arquivado",
-  none: "Sem pendência",
+  none: "Sem pendencia",
   due: "Para hoje",
   overdue: "Vencido",
   pending: "Pendente",
   needs_return: "Retomar contato",
   scheduled: "Agendado",
-  completed: "Concluído",
+  completed: "Concluido",
   converted: "Convertido",
   dm: "Mensagem direta",
-  comment: "Comentário público",
-  comment_to_dm: "Comentário convertido em conversa",
+  comment: "Comentario publico",
+  comment_to_dm: "Comentario convertido em conversa",
   site_chat: "Site",
   telegram_private: "Telegram privado",
   telegram_group: "Telegram grupo",
   direct_message: "Mensagem direta",
-  public_comment: "Comentário público",
+  public_comment: "Comentario publico",
   inbound: "Recebida",
   outbound: "Enviada",
   contact: "Contato",
   system: "Sistema",
   operational: "Operacional",
-  next_action: "Próxima ação",
+  next_action: "Proxima acao",
   context: "Contexto",
-  sensitive: "Sensível",
-  cold: "Baixa prontidão",
+  sensitive: "Sensivel",
+  cold: "Baixa prontidao",
   warm: "Em amadurecimento",
   hot: "Quente",
   monitor: "Monitorar",
   closing: "Em fechamento",
   clarifying: "Esclarecimento em curso",
-  advanced_triage: "Triagem avançada",
+  advanced_triage: "Triagem avancada",
   almost_ready: "Quase pronto para consulta",
   ready_for_consultation: "Pronto para consulta",
-  blocked_by_objection: "Travado por objeção",
-  blocked_by_silence: "Travado por silêncio",
+  blocked_by_objection: "Travado por objecao",
+  blocked_by_silence: "Travado por silencio",
   blocked_by_missing_context: "Travado por contexto insuficiente",
   new_contact: "Novo contato",
   in_welcome: "Boas-vindas",
   in_triage: "Triagem em andamento",
-  in_qualification: "Qualificação comercial",
+  in_qualification: "Qualificacao comercial",
   consultation_ready: "Pronto para consulta",
   proposal_in_motion: "Proposta em andamento",
-  awaiting_decision: "Aguardando decisão",
+  awaiting_decision: "Aguardando decisao",
   converted_to_consultation: "Consulta convertida",
   cooled_down: "Esfriou",
   lost: "Perdido",
-  reactivable: "Reativável",
+  reactivable: "Reativavel",
   missing_context: "Contexto insuficiente",
-  missing_documents: "Documentação pendente",
+  missing_documents: "Documentacao pendente",
   objection_value: "Sensibilidade a valor",
-  objection_viability: "Dúvida de viabilidade",
-  objection_insecurity: "Insegurança",
+  objection_viability: "Duvida de viabilidade",
+  objection_insecurity: "Inseguranca",
   lead_silent: "Lead silencioso",
   diffuse_interest: "Interesse difuso",
-  urgency_without_structure: "Urgência sem estrutura",
-  value: "Objeção de valor",
-  viability: "Objeção de viabilidade",
-  insecurity: "Objeção por insegurança",
+  urgency_without_structure: "Urgencia sem estrutura",
+  value: "Objecao de valor",
+  viability: "Objecao de viabilidade",
+  insecurity: "Objecao por inseguranca",
   timing: "Timing inadequado",
-  silent: "Silêncio do lead",
+  silent: "Silencio do lead",
   hold: "Manter em preparo",
-  prepare: "Preparar avanço",
+  prepare: "Preparar avanco",
   recommend_now: "Recomendar agora",
   offered: "Apresentada",
   interest_detected: "Interesse detectado",
   collecting_availability: "Coletando disponibilidade",
   availability_collected: "Disponibilidade coletada",
   ready_for_lawyer: "Pronto para a advogada",
-  scheduled_pending_confirmation: "Agendado, aguardando confirmação",
-  forwarded_to_lawyer: "Encaminhado à advogada",
-  not_offered: "Proposta ainda não apresentada",
-  not_started: "Ainda não iniciado",
+  scheduled_pending_confirmation: "Agendado, aguardando confirmacao",
+  forwarded_to_lawyer: "Encaminhado a advogada",
+  not_offered: "Proposta ainda nao apresentada",
+  not_started: "Ainda nao iniciado",
   open: "Em aberto",
   approved: "Aprovado",
   failed: "Falhou",
   expired: "Expirado",
   abandoned: "Abandonado",
-  not_created: "Ainda não criado",
+  not_created: "Ainda nao criado",
   payment_in_progress: "Pagamento em andamento",
   scheduling_in_progress: "Agendamento em andamento",
   consultation_confirmed: "Consulta confirmada",
   consultation_recommended: "Consulta recomendada",
-  under_review: "Em revisão",
+  under_review: "Em revisao",
   private: "Privado",
   group: "Grupo",
   channel: "Canal",
-  unknown: "Não classificado",
+  unknown: "Nao classificado",
   founder: "Fundadora",
-  waitlist: "Lista de espera"
+  waitlist: "Lista de espera",
+  instagram: "Instagram Direct",
+  facebook: "Facebook Messenger",
+  whatsapp: "WhatsApp",
+  telegram: "Telegram",
+  site: "Site",
+  portal: "Portal"
 };
 
 export function presentToken(value: string | null | undefined, fallback = "Sem leitura") {
@@ -139,18 +150,25 @@ export function presentToken(value: string | null | undefined, fallback = "Sem l
   return tokenLabels[normalized] || titleize(normalized);
 }
 
-export function presentBoolean(value: boolean, yes = "Sim", no = "Não") {
+export function presentBoolean(value: boolean, yes = "Sim", no = "Nao") {
   return value ? yes : no;
 }
 
-export function presentMaybeId(value: string | null | undefined, fallback = "Sem vínculo") {
+export function presentMaybeId(value: string | null | undefined, fallback = "Sem vinculo") {
   if (!value) {
     return fallback;
   }
 
-  return value.length > 12 ? `${value.slice(0, 8)}…` : value;
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
 }
 
-export function presentChannelOrigin(value: string | null | undefined, fallback = "Origem não identificada") {
-  return presentToken(value, fallback);
+export function presentChannelOrigin(value: string | null | undefined, fallback = "Origem nao identificada") {
+  const sourceLabel = presentOperationalSourceLabel(value, "");
+
+  if (sourceLabel) {
+    return sourceLabel;
+  }
+
+  const channelLabel = presentOperationalChannelLabel(value, "");
+  return channelLabel || presentToken(value, fallback);
 }

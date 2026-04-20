@@ -54,6 +54,7 @@ function setupEnvironment() {
   const envContent = `
 # Configurações da Meta - Geradas em ${new Date().toISOString()}
 META_APP_SECRET=${appSecret}
+# Secret explicito para Facebook Messenger / object=page
 FACEBOOK_APP_SECRET=
 META_VERIFY_TOKEN=${verifyToken}
 
@@ -104,6 +105,8 @@ function showWebhookInstructions() {
   log(`   - Callback URL: https://seu-dominio.com/api/meta/webhook`, 'white');
   log(`   - Verify Token: META_VERIFY_TOKEN do .env.local`, 'white');
   log('5. Selecione eventos:', 'blue');
+  log('   ✓ Facebook Messenger', 'white');
+  log('   ✓ Facebook Page Comments', 'white');
   log('   ✓ Instagram Direct Messages', 'white');
   log('   ✓ Instagram Comments', 'white');
   log('   ✓ WhatsApp Business Messages', 'white');
@@ -231,7 +234,7 @@ function main() {
   log('1. Configure as credenciais no .env.local', 'blue');
   log('2. Configure o webhook no Meta Developers', 'blue');
   log('3. Teste com os comandos acima', 'blue');
-  log('4. Leia INTEGRACAO_META_GUIDE.md para detalhes', 'blue');
+  log('4. Leia INTEGRACAO_META_GUIDE.md e docs/FACEBOOK_MESSENGER_OPERATIONS.md para detalhes', 'blue');
   
   log('\n🚀 Sistema pronto para automação com Meta!', 'green');
   log('==========================================', 'cyan');
