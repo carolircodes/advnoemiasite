@@ -8,6 +8,9 @@ export type MetaWebhookSecretSource =
 
 export type MetaWebhookObjectHint = "page" | "instagram" | null;
 
+export const META_WEBHOOK_SIGNATURE_RESOLUTION_VERSION =
+  "meta-webhook-2026-04-20-facebook-secret-priority";
+
 export type MetaWebhookConfig = {
   verifyToken: string;
   verifyTokenConfigured: boolean;
@@ -219,6 +222,14 @@ export function resolveMetaWebhookSignatureCandidates(args?: {
         secret: string;
       } => Boolean(item)
     );
+}
+
+export function resolveMetaWebhookRuntimeMarker(env: NodeJS.ProcessEnv = process.env) {
+  return {
+    signatureResolutionVersion: META_WEBHOOK_SIGNATURE_RESOLUTION_VERSION,
+    deploymentCommitSha: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
+    deploymentId: env.VERCEL_DEPLOYMENT_ID?.slice(0, 12) || null
+  };
 }
 
 export function validateMetaWebhookSignature(args: {

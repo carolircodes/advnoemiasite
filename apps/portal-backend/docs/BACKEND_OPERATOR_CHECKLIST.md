@@ -7,6 +7,7 @@ Use este checklist sempre que o backend do portal for promovido, reconfigurado o
 - O backend endurecido vive em `apps/portal-backend`.
 - O host esperado e o host do portal, nao o apex editorial/marketing.
 - Confirme `NEXT_PUBLIC_APP_URL` apontando para o host canonico correto do portal antes de validar qualquer callback, readiness ou pagamento.
+- Para incidentes do webhook Meta, usar `docs/META_WEBHOOK_PRODUCTION_DEPLOY.md` e confirmar que o projeto Vercel aberto e `advnoemiaportal`, nao `advnoemiasite`.
 
 ## 2. Confirmar secrets e guardas internos
 
@@ -204,7 +205,7 @@ Sinais de desvio:
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
   Confirmar readiness saudavel, webhook protegido funcional e mensagem de teste sem erro de credencial.
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_APP_SECRET`, `INSTAGRAM_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
-  Confirmar verificacao GET da Meta, evento inbound real de `object=instagram` e `object=page`, revisar `matchedSecretSource` nos logs do webhook e validar envio outbound sem falha de credencial.
+  Confirmar verificacao GET da Meta, evento inbound real de `object=instagram` e `object=page`, revisar `matchedSecretSource`, `attemptedSources` e `signatureResolutionVersion` nos logs do webhook e validar envio outbound sem falha de credencial.
 
 ## 12. Fase 12 - operacao omnichannel
 

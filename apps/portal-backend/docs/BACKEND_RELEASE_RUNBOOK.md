@@ -5,6 +5,7 @@ Use este runbook quando o backend do portal entrar em deploy, promocao ou incide
 ## Pre-deploy
 
 - Confirmar que o alvo e o projeto/backend do portal, nao o apex de marketing.
+- Para incidentes de webhook Meta, abrir tambem `docs/META_WEBHOOK_PRODUCTION_DEPLOY.md`.
 - Executar `npm run operations:verify:release` no workspace do backend.
 - Tratar qualquer `release_blocker` como impeditivo real de promocao.
 - Se houver `action_required`, registrar a decisao conscientemente antes do deploy.
@@ -75,7 +76,7 @@ Quando isso acontecer, use `handoff/incident-escalation-summary.md` como o corpo
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
   Verificar `telegram.status = healthy`, sucesso do webhook protegido e mensagem de teste sem falha de credencial.
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_APP_SECRET`, `INSTAGRAM_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
-  Verificar callback GET da Meta, novo evento de `object=instagram` e `object=page` com `META_SIGNATURE_VALIDATED`, confirmar qual `matchedSecretSource` validou e revisar ausencia de falha outbound.
+  Verificar callback GET da Meta, novo evento de `object=instagram` e `object=page` com `META_SIGNATURE_VALIDATED`, confirmar qual `matchedSecretSource` validou, revisar `signatureResolutionVersion` e garantir que o projeto Vercel analisado e `advnoemiaportal`.
 
 ## External/manual proof still required
 

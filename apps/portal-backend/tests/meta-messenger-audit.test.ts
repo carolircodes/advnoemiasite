@@ -5,7 +5,9 @@ import path from "node:path";
 
 import {
   inferMetaWebhookObjectHint,
+  META_WEBHOOK_SIGNATURE_RESOLUTION_VERSION,
   resolveMetaWebhookConfig,
+  resolveMetaWebhookRuntimeMarker,
   resolveMetaWebhookSignatureCandidates,
   summarizeMetaWebhookPayload,
   validateMetaWebhookSignature,
@@ -117,6 +119,19 @@ test("meta webhook signature candidates prioritize FACEBOOK_APP_SECRET for page 
       );
     }
   );
+});
+
+test("meta webhook runtime marker exposes non-sensitive deploy proof for production logs", () => {
+  const runtimeMarker = resolveMetaWebhookRuntimeMarker({
+    VERCEL_GIT_COMMIT_SHA: "1084a99e54da7e6ef43e520d2afb69a3fdc31fb0",
+    VERCEL_DEPLOYMENT_ID: "dpl_3nRmExzb64KG7XR5jD33y2x3QvLz"
+  } as unknown as NodeJS.ProcessEnv);
+
+  assert.deepEqual(runtimeMarker, {
+    signatureResolutionVersion: META_WEBHOOK_SIGNATURE_RESOLUTION_VERSION,
+    deploymentCommitSha: "1084a99",
+    deploymentId: "dpl_3nRmExzb"
+  });
 });
 
 test("meta webhook verification challenge matches the route expectations", () => {

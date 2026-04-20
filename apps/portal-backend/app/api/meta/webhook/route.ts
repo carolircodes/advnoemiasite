@@ -7,6 +7,7 @@ import {
 import {
   inferMetaWebhookObjectHint,
   resolveMetaWebhookConfig,
+  resolveMetaWebhookRuntimeMarker,
   summarizeMetaWebhookPayload,
   validateMetaWebhookSignature,
   verifyMetaWebhookChallenge
@@ -343,6 +344,7 @@ export async function POST(request: NextRequest) {
     await assertOperationalSchemaCompatibility("meta_webhook");
 
     const config = resolveMetaWebhookConfig();
+    const runtimeMarker = resolveMetaWebhookRuntimeMarker();
     const rawBuffer = Buffer.from(await request.arrayBuffer());
     const signatureHeader = request.headers.get("x-hub-signature-256");
     const objectHint = inferMetaWebhookObjectHint(rawBuffer);
@@ -372,6 +374,7 @@ export async function POST(request: NextRequest) {
         attemptedSources: signatureValidation.attemptedSources,
         appSecretSource: config.appSecretSource,
         facebookAppSecretConfigured: config.secretPresence.FACEBOOK_APP_SECRET,
+        ...runtimeMarker,
         rawBodyBytes,
         shadowMode: allowShadowAcceptance,
         enforceSignature
@@ -402,6 +405,7 @@ export async function POST(request: NextRequest) {
         matchedSecretSource: signatureValidation.matchedSource,
         appSecretSource: config.appSecretSource,
         facebookAppSecretConfigured: config.secretPresence.FACEBOOK_APP_SECRET,
+        ...runtimeMarker,
         rawBodyBytes
       });
     }
@@ -434,6 +438,7 @@ export async function POST(request: NextRequest) {
       logEvent("META_WEBHOOK_OBJECT_IGNORED", {
         object: typeof data.object === "string" ? data.object : null,
         objectHint,
+        ...runtimeMarker,
         rawBodyBytes
       });
       return NextResponse.json({ received: true }, { status: 200 });
@@ -449,7 +454,8 @@ export async function POST(request: NextRequest) {
       messagingCount: payloadSummary.messagingCount,
       changeCount: payloadSummary.changeCount,
       attemptedSecretSources: signatureValidation.attemptedSources,
-      appSecretSource: config.appSecretSource
+      appSecretSource: config.appSecretSource,
+      ...runtimeMarker
     });
 
     for (const entry of Array.isArray(data.entry) ? data.entry : []) {
