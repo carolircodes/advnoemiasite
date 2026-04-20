@@ -63,8 +63,8 @@ export default async function EcosystemPage() {
   return (
     <AppFrame
       eyebrow="Ecossistema"
-      title="Expansão premium, recorrência e comunidade."
-      description="Esta área existe para separar o jurídico do que pertence ao ecossistema premium. Aqui entram catálogo, recorrência, acesso, conteúdo, comunidade e retenção sem contaminar o cockpit principal."
+      title="Camada estratégica de expansão, recorrência e comunidade."
+      description="Esta área separa o jurídico do que pertence ao ecossistema premium. Aqui entram catálogo, recorrência, acesso, conteúdo, comunidade e retenção sem contaminar o cockpit principal."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -387,7 +387,7 @@ export default async function EcosystemPage() {
         </SectionCard>
 
         <SectionCard
-          title="Operacao Curada De Entrada"
+          title="Operação curada de entrada"
           description="A curadoria deixa de ser ideia solta e passa a ter lote, estados, capacidade e regras de aprovacao."
         >
           <div className="summary-grid compact">
@@ -424,7 +424,7 @@ export default async function EcosystemPage() {
         </SectionCard>
 
         <SectionCard
-          title="Canais Prioritarios"
+          title="Canais prioritários"
           description="A comunidade passa a receber trafego qualificado com ponte pratica e sem abrir geral."
         >
           <ul className="update-feed">
@@ -447,7 +447,7 @@ export default async function EcosystemPage() {
       </div>
 
       <SectionCard
-        title="Origem Dos Interessados"
+        title="Origem dos interessados"
         description="A leitura executiva agora mostra de onde a comunidade esta sendo povoada e quais canais estao realmente alimentando o Circulo com aderencia."
       >
         <div className="summary-grid compact">
@@ -462,7 +462,7 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
-        title="Maturidade De Conteudo E Retencao"
+        title="Maturidade de conteúdo e retenção"
         description="A leitura executiva agora acompanha nao so entrada, mas permanencia, progresso e conclusao."
       >
         <div className="summary-grid compact">
@@ -487,7 +487,7 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
-        title="Densidade Social E Prova Comunitaria"
+        title="Densidade social e prova comunitária"
         description="A futura cobranca precisa nascer sobre uma comunidade com peso social visivel, retorno recorrente e pequenos marcos de prova."
       >
         <div className="summary-grid compact">
@@ -600,7 +600,7 @@ export default async function EcosystemPage() {
       </div>
 
       <SectionCard
-        title="Criterios De Futura Monetizacao"
+        title="Critérios de futura monetização"
         description="A cobranca futura so entra quando a comunidade provar vida, desejo e maturidade suficientes."
       >
         <div className="summary-grid compact">
@@ -615,7 +615,7 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
-        title="Checkpoint Executivo De Monetizacao"
+        title="Checkpoint executivo de monetização"
         description="Este painel compara a maturidade atual com os thresholds alvo para decidir o timing da futura cobranca."
       >
         <div className="summary-grid compact">
@@ -632,7 +632,7 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
-        title="Distancia Real Ate A Monetizacao"
+        title="Distância real até a monetização"
         description="A leitura executiva mostra quanto falta objetivamente para a futura cobranca nascer forte, natural e desejada."
       >
         <div className="summary-grid compact">
@@ -653,7 +653,7 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
-        title="Revisao Executiva Dos Thresholds"
+        title="Revisão executiva dos thresholds"
         description="A Fase 12.9 mantem os thresholds da 12.8 e explicita como eles devem ser lidos com honestidade operacional."
       >
         <ul className="update-feed">
@@ -673,7 +673,7 @@ export default async function EcosystemPage() {
       </SectionCard>
 
       <SectionCard
-        title="Cenarios De Evolucao"
+        title="Cenários de evolução"
         description="A decisao de monetizacao nao e binaria por impulso: ela precisa respeitar risco, marca e densidade comunitaria."
       >
         <div className="summary-grid compact">

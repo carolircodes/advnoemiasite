@@ -636,8 +636,8 @@ export default async function InternalLawyerPage({
       {success ? <div className="success-notice">{success}</div> : null}
 
       <SectionCard
-        title="Centro executivo da operação"
-        description="Radar institucional do dia com hierarquia clara: o que pede ação agora, o que trava a operação, onde existe resultado hoje e qual camada deve ser aberta em seguida."
+        title="Centro executivo do dia"
+        description="Radar institucional da operação com hierarquia mais silenciosa: o que pede ação agora, o que trava a rotina, onde existe resultado hoje e qual camada merece a próxima leitura."
       >
         <div className="notice">{cockpitProjection.focusHeadline}</div>
 
@@ -711,7 +711,7 @@ export default async function InternalLawyerPage({
           </div>
 
           <div className="subtle-panel stack">
-            <span className="shortcut-kicker">Proximos passos com maior impacto</span>
+            <span className="shortcut-kicker">Próximos movimentos de maior impacto</span>
             <div className="grid two">
               {commandQuickActions.map((item) => (
                 <Link key={item.title} href={item.href} className="route-card">
@@ -727,7 +727,7 @@ export default async function InternalLawyerPage({
 
         <div className="grid two">
           <div className="subtle-panel stack">
-            <span className="shortcut-kicker">Dependencias e bloqueios</span>
+            <span className="shortcut-kicker">Dependências que pedem tração</span>
             {cockpitProjection.dependencyDeck.length ? (
               <ul className="update-feed compact">
                 {cockpitProjection.dependencyDeck.map((item) => (
@@ -796,8 +796,8 @@ export default async function InternalLawyerPage({
 
       <SectionCard
         id="camadas-command-center"
-        title="Camadas centrais do painel"
-        description="Agenda, entradas, receita e gargalos agora aparecem como camadas do mesmo cérebro executivo, em vez de módulos separados competindo por atenção."
+        title="Camadas vivas do painel"
+        description="Agenda, entradas, receita e gargalos aparecem como camadas do mesmo cérebro executivo, em vez de módulos paralelos competindo pela mesma atenção."
       >
         <div className="summary-grid compact">
           <div className="summary-card">
@@ -923,13 +923,13 @@ export default async function InternalLawyerPage({
         </div>
 
         <div className="notice">
-          O command center agora responde no mesmo lugar onde esta o dinheiro, onde esta a agenda, onde entram as oportunidades e onde a operacao esta travando.
+          O centro executivo passa a responder no mesmo lugar onde estão agenda, monetização, novas entradas e os bloqueios que realmente pedem tração da equipe.
         </div>
       </SectionCard>
 
       <SectionCard
-        title="Busca e filtros"
-        description="Use estes filtros para encontrar clientes, casos e pendencias sem depender de leitura manual do painel inteiro."
+        title="Busca curada"
+        description="Use estes filtros quando quiser aprofundar cliente, caso ou pendência sem percorrer manualmente o painel inteiro."
       >
         <form className="stack">
           <div className="fields">
@@ -1037,8 +1037,8 @@ export default async function InternalLawyerPage({
       </SectionCard>
 
       <SectionCard
-        title="Proximos focos do command center"
-        description="Este bloco costura cliente, caso, triagem e inteligencia em uma leitura unica para a equipe comecar pelo ponto certo sem abrir paines paralelos."
+        title="Próximos focos do centro executivo"
+        description="Este bloco costura cliente, caso, triagem e inteligência em uma leitura única para a equipe começar pelo ponto certo, sem abrir painéis paralelos."
       >
         {executiveFocus.length ? (
           <div className="grid two">
@@ -1205,8 +1205,8 @@ export default async function InternalLawyerPage({
         </SectionCard>
 
         <SectionCard
-          title="Acoes rapidas e comando operacional"
-          description="Use estes atalhos quando souber exatamente o que precisa fazer. Cada card reduz cliques e leva voce direto para a acao principal."
+          title="Atalhos de comando"
+          description="Use estes atalhos quando a decisão já estiver tomada. Cada bloco reduz cliques e leva você direto para o próximo movimento principal."
         >
             <div className="shortcut-grid">
               <Link href="#cadastro-cliente" className="shortcut-card">

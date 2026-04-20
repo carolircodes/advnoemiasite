@@ -318,7 +318,7 @@ body:not(.auth-page) .button {
 .subtle-panel,
 .list-card,
 .inset-panel {
-  border: 1px solid rgba(142, 106, 59, 0.12);
+  border: 1px solid rgba(142, 106, 59, 0.1);
   border-radius: 30px;
   background: rgba(255, 252, 247, 0.96);
   box-shadow: var(--shadow-soft);
@@ -326,7 +326,7 @@ body:not(.auth-page) .button {
 
 .panel,
 .list-card {
-  padding: 30px;
+  padding: 28px;
 }
 
 .panel[id] {
@@ -334,9 +334,9 @@ body:not(.auth-page) .button {
 }
 
 .subtle-panel {
-  padding: 24px;
-  background: rgba(248, 244, 238, 0.9);
-  box-shadow: none;
+  padding: 22px;
+  background: rgba(248, 244, 238, 0.84);
+  box-shadow: 0 12px 28px rgba(16, 32, 29, 0.04);
 }
 
 .inset-panel {
@@ -590,8 +590,8 @@ body:not(.auth-page) .field-full textarea {
 
 .update-card {
   display: grid;
-  gap: 14px;
-  padding: 20px 22px;
+  gap: 12px;
+  padding: 18px 20px;
   border: 1px solid rgba(14, 31, 27, 0.1);
   border-radius: 22px;
   background:
@@ -637,31 +637,31 @@ body:not(.auth-page) .field-full textarea {
 .pill {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
 }
 
 .pill.success {
-  background: rgba(41, 93, 69, 0.12);
+  background: rgba(41, 93, 69, 0.1);
   color: var(--success);
 }
 
 .pill.warning {
-  background: rgba(142, 106, 59, 0.14);
+  background: rgba(142, 106, 59, 0.11);
   color: var(--accent-strong);
 }
 
 .pill.critical {
-  background: rgba(142, 67, 59, 0.12);
+  background: rgba(142, 67, 59, 0.1);
   color: var(--danger);
 }
 
 .pill.muted {
-  background: rgba(16, 32, 29, 0.08);
+  background: rgba(16, 32, 29, 0.06);
   color: var(--text);
 }
 
@@ -1088,7 +1088,7 @@ body:not(.auth-page) .field-full textarea {
 .summary-card {
   display: grid;
   gap: 10px;
-  padding: 20px;
+  padding: 18px;
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -1100,9 +1100,9 @@ body:not(.auth-page) .field-full textarea {
 .notice-card:hover,
 .summary-card:hover,
 .update-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: rgba(142, 106, 59, 0.18);
-  box-shadow: 0 18px 40px rgba(16, 32, 29, 0.08);
+  box-shadow: 0 14px 30px rgba(16, 32, 29, 0.07);
 }
 
 .shortcut-card strong,

@@ -96,7 +96,7 @@ export default async function InternalLawyerChannelsPage() {
     <AppFrame
       eyebrow="Distribuição e canais"
       title="Orquestração institucional entre origem, conversa e operação."
-      description="Esta área organiza de onde a demanda nasce, onde ela é atendida e qual módulo deve conduzir a próxima decisão sem confundir inbox, CRM e distribuição editorial."
+      description="Esta área organiza de onde a demanda nasce, onde ela é atendida e qual módulo deve conduzir a próxima decisão sem confundir Inbox, CRM e distribuição editorial."
       navigation={[
         { href: "/internal/advogada", label: "Painel" },
         { href: "/internal/advogada/atendimento", label: "Inbox" },
@@ -119,7 +119,7 @@ export default async function InternalLawyerChannelsPage() {
           fullName={profile.full_name}
           email={profile.email}
           workspaceLabel="Distribuição operacional protegida"
-          workspaceHint="Sessão interna para decidir canal, ownership e continuidade sem duplicar leitura entre módulos."
+          workspaceHint="Sessão interna para decidir canal, responsável e continuidade sem duplicar leitura entre módulos."
         />
       }
     >

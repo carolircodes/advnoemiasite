@@ -257,8 +257,8 @@ export default async function InternalCasesPage({
   return (
     <AppFrame
       eyebrow="Central de casos"
-      title="Operacao por caso, com leitura executiva e continuidade real."
-      description="Esta central organiza abertura, andamento, prioridade e reentrada de cada caso sem separar o que mudou, o que importa agora e qual deve ser o proximo passo."
+      title="Carteira jurídica com foco, prioridade e continuidade."
+      description="Esta central organiza abertura, andamento, prioridade e reentrada de cada caso com leitura mais clara entre foco atual, retorno devido e próximo passo jurídico."
       utilityContent={
         <PortalSessionBanner
           role={profile.role}
@@ -316,8 +316,8 @@ export default async function InternalCasesPage({
       </SectionCard>
 
       <SectionCard
-        title="Busca e recorte da central"
-        description="Os filtros continuam completos, mas agora entram depois da leitura executiva para a equipe começar pela prioridade certa e não por tentativa e erro."
+        title="Busca e recorte da carteira"
+        description="Os filtros continuam completos, mas entram depois da leitura executiva para a equipe começar pela prioridade certa e não por tentativa e erro."
       >
         <form className="stack">
           <div className="fields">
@@ -411,8 +411,8 @@ export default async function InternalCasesPage({
       </SectionCard>
 
       <SectionCard
-        title="Fluxos de caso"
-        description="O centro de casos agora virou uma trilha propria: abrir, continuar, revisar cliente e agir sem voltar para formularios no dashboard."
+        title="Rotas de condução"
+        description="A central de casos agora funciona como trilha própria: abrir, continuar, revisar cliente e agir sem voltar a formulários espalhados pelo painel."
       >
         <div className="grid three">
           <Link className="route-card" href={buildInternalNewCaseHref(selectedClientId || null)}>
@@ -453,8 +453,8 @@ export default async function InternalCasesPage({
 
       <div className="grid two">
         <SectionCard
-          title="Casos em operacao"
-          description="Cada card traz leitura rapida do caso e atalhos consistentes para cliente, agenda e documentos."
+          title="Carteira em andamento"
+          description="Cada bloco traz leitura rápida do caso e atalhos consistentes para cliente, agenda e documentos."
         >
           {filteredCases.length ? (
             <ul className="update-feed">

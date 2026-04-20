@@ -896,7 +896,7 @@ export default function OperationalPanel() {
     }
 
     const followUpReason = window.prompt(
-      'Motivo do follow-up:',
+      'Motivo da retomada:',
       contact.followUpReason || ''
     );
     const nextStep = window.prompt(
@@ -904,7 +904,7 @@ export default function OperationalPanel() {
       contact.nextStep || contact.nextBestAction.detail
     );
     const dueAt = window.prompt(
-      'Data/hora do follow-up (ISO, opcional):',
+      'Data e hora da retomada (ISO, opcional):',
       contact.nextStepDueAt || contact.nextFollowUpAt || ''
     );
     const waitingOn = window.prompt(
@@ -1069,7 +1069,7 @@ export default function OperationalPanel() {
       case 'needs_attention':
         return 'Exige atencao agora';
       case 'follow_up':
-        return 'Pede follow-up';
+        return 'Pede retomada';
       case 'blocked':
         return 'Travado';
       default:
@@ -1169,10 +1169,10 @@ export default function OperationalPanel() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PanelSection title="Painel operacional" description="Carregando dados do acompanhamento comercial.">
+        <PanelSection title="Cockpit comercial" description="Carregando a leitura comercial desta operação.">
           <div className="flex items-center gap-3 text-[#10261d]">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#b58d49] border-t-transparent" />
-            <span className="text-sm font-medium">Carregando painel operacional...</span>
+            <span className="text-sm font-medium">Carregando cockpit comercial...</span>
           </div>
         </PanelSection>
       </div>
@@ -1190,14 +1190,14 @@ export default function OperationalPanel() {
       </div>
 
       <PanelSection
-        title="CRM comercial do escritório"
-        description="Esta superfície existe para follow-up, consulta, prioridade comercial e travas de conversão. Conversas em tempo real ficam na Inbox; a leitura executiva ampla permanece no Painel."
+        title="Cockpit comercial do escritório"
+        description="Esta superfície existe para retomadas, consulta, prioridade comercial e travas de conversão. Conversas em tempo real ficam na Inbox; a leitura executiva ampla permanece no Painel."
       >
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Papel oficial</p>
             <p className="mt-2 text-sm text-[#4f6158]">
-              Organizar fila comercial, follow-up, consulta e próximo passo de conversão.
+              Organizar fila comercial, retomadas, consulta e próximo passo de conversão.
             </p>
           </div>
           <div className="rounded-2xl border border-[#e7e1d4] bg-[#fbfaf7] p-4 shadow-sm">
@@ -1247,7 +1247,7 @@ export default function OperationalPanel() {
             tone="orange"
           />
           <MetricCard
-            label="Follow-up pendente"
+            label="Retomadas pendentes"
             value={metrics.followUpPending}
             icon={<Clock className="h-6 w-6" />}
             tone="yellow"
@@ -1269,7 +1269,7 @@ export default function OperationalPanel() {
 
       <PanelSection
         title="Prioridades do dia"
-        description="A fila separa o que pede ação imediata, follow-up comercial, revisão de travamento e simples acompanhamento."
+        description="A fila separa o que pede ação imediata, retomada comercial, revisão de travamento e simples acompanhamento."
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
@@ -1281,9 +1281,9 @@ export default function OperationalPanel() {
             },
             {
               key: 'follow_up' as const,
-              label: 'Pede follow-up',
+              label: 'Pede retomada',
               count: queueSummary.follow_up.length,
-              note: queueSummary.follow_up[0]?.nextBestAction.title || 'Sem follow-up puxando a fila agora.',
+              note: queueSummary.follow_up[0]?.nextBestAction.title || 'Nenhuma retomada dominante puxando a fila agora.',
             },
             {
               key: 'blocked' as const,
@@ -1437,8 +1437,8 @@ export default function OperationalPanel() {
       </PanelSection>
 
       <PanelSection
-        title={`Contatos operacionais (${contacts.length})`}
-        description="Acompanhe prioridades, histórico recente e ações de avanço."
+        title={`Oportunidades em leitura (${contacts.length})`}
+        description="Acompanhe prioridade, histórico recente e os movimentos que pedem decisão comercial agora."
       >
         {contacts.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#d8d2c4] bg-[#fbfaf7] px-6 py-10 text-center">
@@ -1505,7 +1505,7 @@ export default function OperationalPanel() {
                       ) : null}
 
                       {contact.followUpCount > 0 ? (
-                        <StatusChip tone="neutral">{contact.followUpCount} follow-up(s)</StatusChip>
+                        <StatusChip tone="neutral">{contact.followUpCount} retomada(s)</StatusChip>
                       ) : null}
 
                       <StatusChip tone={getReadinessTone(contact.consultationReadiness)}>
@@ -1543,16 +1543,16 @@ export default function OperationalPanel() {
                       Responsável comercial
                     </p>
                     <p className="mt-2 text-sm font-semibold text-[#10261d]">
-                      {contact.ownerName || 'Sem responsavel'}
+                      {contact.ownerName || 'Sem responsável definido'}
                     </p>
                     <p className="mt-1 text-sm text-[#5d6d66]">
                       {contact.threadStatus
-                        ? `Thread ${contact.threadStatus}`
+                        ? `Thread ${presentToken(contact.threadStatus)}`
                         : 'Thread comercial ainda sem leitura consolidada.'}
                     </p>
                     {contact.ownerAssignedAt ? (
                       <p className="mt-2 text-xs text-[#6a7a73]">
-                        Assumido em {formatDate(contact.ownerAssignedAt)}
+                        Responsável desde {formatDate(contact.ownerAssignedAt)}
                       </p>
                     ) : null}
                   </div>
@@ -1565,7 +1565,7 @@ export default function OperationalPanel() {
                       {presentToken(contact.followUpState || contact.followUpStatus, 'Sem pendência')}
                     </p>
                     <p className="mt-1 text-sm text-[#5d6d66]">
-                      {contact.followUpReason || 'Sem motivo de follow-up registrado.'}
+                      {contact.followUpReason || 'Sem motivo de retomada registrado.'}
                     </p>
                     {contact.nextStepDueAt ? (
                       <p className="mt-2 text-xs text-[#6a7a73]">
@@ -1817,7 +1817,7 @@ export default function OperationalPanel() {
                         <StatusChip tone="green">Encaminhamento operacional registrado</StatusChip>
                       ) : null}
                       {contact.conversationState.humanFollowUpPending ? (
-                        <StatusChip tone="orange">Follow-up humano pendente</StatusChip>
+                        <StatusChip tone="orange">Retomada humana pendente</StatusChip>
                       ) : null}
                     </div>
 
@@ -1929,7 +1929,7 @@ export default function OperationalPanel() {
                     {contact.conversationState.humanHandoffMode ||
                     contact.conversationState.commercialFollowUpType ? (
                       <p className="mt-3 text-sm text-[#5d6d66]">
-                        <span className="font-medium text-[#10261d]">Follow-up e handoff:</span>{' '}
+                        <span className="font-medium text-[#10261d]">Retomada e handoff:</span>{' '}
                         {[
                           contact.conversationState.commercialFollowUpType,
                           contact.conversationState.humanHandoffMode,
@@ -2186,7 +2186,7 @@ export default function OperationalPanel() {
                     onClick={() => void updateCommercialFollowUp(contact)}
                   >
                     <Clock className="mr-2 h-4 w-4" />
-                    Atualizar follow-up
+                    Atualizar retomada
                   </ActionButton>
 
                   <ActionButton

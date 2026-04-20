@@ -27,6 +27,12 @@ import {
   PanelCard,
   SignalBadge
 } from "@/components/crm/commercial-primitives";
+import {
+  ActionToolbar,
+  ComposerPanel,
+  ConversationBubble,
+  InboxThreadListItem
+} from "@/components/inbox/premium-primitives";
 
 import {
   presentBoolean,
@@ -1090,11 +1096,11 @@ export function ConversationInboxDashboard({
         </div>
       </PanelCard>
 
-      <section className="grid gap-5 xl:grid-cols-[0.92fr_1.2fr_0.96fr]">
+      <section className="grid gap-5 xl:grid-cols-[0.88fr_1.28fr_0.84fr]">
         <PanelCard
-          eyebrow="Fila comercial"
-          title="Oportunidades em sequência"
-          description="Cada item destaca identidade, prioridade, responsável e risco sem transformar o funil em uma faixa de chips."
+          eyebrow="Lista de conversas"
+          title="Threads em continuidade"
+          description="A coluna lateral agora funciona como inbox premium: nome, última mensagem, tempo, sinais sutis de prioridade e leitura rápida do que pede atenção."
         >
           <div className="max-h-[980px] overflow-y-auto pr-1">
             {loading && !payload?.threads.length ? (
@@ -1102,48 +1108,23 @@ export function ConversationInboxDashboard({
             ) : payload?.threads.length ? (
               <div className="space-y-3">
                 {payload.threads.map((thread) => (
-                  <button
+                  <InboxThreadListItem
                     key={thread.id}
-                    type="button"
                     onClick={() => setSelectedThreadId(thread.id)}
-                    className={cx(
-                      "w-full rounded-[1.7rem] border px-4 py-4 text-left transition",
-                      selectedThreadId === thread.id
-                        ? "border-[#b28b54] bg-[#fbf6ed] shadow-[0_12px_24px_rgba(178,139,84,0.12)]"
-                        : "border-[#ece3d4] bg-[#fffdfa] hover:border-[#d4c0a0]"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-[#10261d]">{thread.displayName}</p>
-                          {thread.unreadCount > 0 ? (
-                            <SignalBadge label={`${thread.unreadCount} não lidas`} tone="blue" />
-                          ) : null}
-                        </div>
-                        <p className="mt-1 text-xs text-[#6c7b73]">{thread.contactLabel}</p>
-                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#4b5d55]">{thread.preview}</p>
-                      </div>
-                      <div className="text-right text-xs text-[#7a897f]">
-                        <p>{formatDateTime(thread.lastMessageAt)}</p>
-                        <p className="mt-1">
-                          {thread.idleMinutes ? `${thread.idleMinutes} min sem avanço` : "Leitura recente"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <SignalBadge label={thread.channelLabel} tone={toneForChannel(thread.channel)} />
-                      <SignalBadge label={presentToken(thread.priority)} tone={toneForPriority(thread.priority)} />
-                      <SignalBadge label={presentToken(thread.followUpStatus, "Sem follow-up")} tone={toneForFollowUp(thread.followUpStatus)} />
-                      {thread.hot ? <SignalBadge label="Oportunidade quente" tone="rose" /> : null}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[#6f7f77]">
-                      <span className="line-clamp-1">
-                        {presentToken(thread.ownerMode)} • {thread.nextAction}
-                      </span>
-                      <span>{presentToken(thread.threadStatus)}</span>
-                    </div>
-                  </button>
+                    active={selectedThreadId === thread.id}
+                    unreadLabel={thread.unreadCount > 0 ? `${thread.unreadCount} não lidas` : null}
+                    name={thread.displayName}
+                    subtitle={thread.contactLabel}
+                    preview={thread.preview}
+                    meta={thread.idleMinutes ? `${thread.idleMinutes} min` : formatDateTime(thread.lastMessageAt)}
+                    badges={
+                      <>
+                        <SignalBadge label={thread.channelLabel} tone={toneForChannel(thread.channel)} />
+                        <SignalBadge label={presentToken(thread.priority)} tone={toneForPriority(thread.priority)} />
+                        {thread.hot ? <SignalBadge label="Quente" tone="rose" /> : null}
+                      </>
+                    }
+                  />
                 ))}
               </div>
             ) : (
@@ -1155,11 +1136,11 @@ export function ConversationInboxDashboard({
         <div className="space-y-5">
           <PanelCard
             eyebrow="Thread ativa"
-            title={selectedThread ? "Conversa e condução comercial" : "Condução da conversa"}
+            title={selectedThread ? "Conversa em andamento" : "Fluxo da conversa"}
             description={
               selectedThread
-                ? "A área principal concentra o histórico vivo e as ações prioritárias do relacionamento."
-                : "Selecione uma conversa para abrir o histórico, responder e decidir a próxima ação."
+                ? "A thread vira o centro da experiência: histórico, resposta e próxima ação aparecem em fluxo, com menos ruído operacional."
+                : "Selecione uma conversa para abrir o histórico vivo, responder com fluidez e decidir a próxima ação."
             }
             actions={
               selectedThread ? (
@@ -1172,7 +1153,7 @@ export function ConversationInboxDashboard({
           >
             {selectedThread ? (
               <>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <ActionToolbar>
                   <button
                     type="button"
                     onClick={() => void markThreadRead()}
@@ -1218,7 +1199,7 @@ export function ConversationInboxDashboard({
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Programar follow-up
+                    Programar retomada
                   </button>
                   <button
                     type="button"
@@ -1242,67 +1223,73 @@ export function ConversationInboxDashboard({
                   >
                     Encerrar conversa
                   </button>
-                  <div className="rounded-[1.25rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3 text-xs leading-6 text-[#6f7f77] xl:col-span-2">
-                    Responsável, fila, follow-up e handoff continuam rastreados aqui, mas o foco principal da decisão fica concentrado no cabeçalho executivo e na barra de decisão.
+                  <div className="rounded-[1.25rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3 text-xs leading-6 text-[#6f7f77]">
+                    Responsável, fila, retomada e handoff continuam rastreados aqui, mas o foco principal da decisão fica concentrado no cabeçalho executivo e na barra de decisão.
                   </div>
-                </div>
+                </ActionToolbar>
 
-                <div className="mt-5 max-h-[520px] space-y-4 overflow-y-auto pr-1">
+                <div className="mt-5 max-h-[560px] space-y-4 overflow-y-auto rounded-[1.9rem] border border-[#ece2d3] bg-[linear-gradient(180deg,#fffefa,#faf4ea)] p-4 pr-3">
                   {selectedThread.messages.map((message) => (
-                    <div
+                    <ConversationBubble
                       key={message.id}
-                      className={cx(
-                        "max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-6 shadow-sm",
-                        message.direction === "outbound"
-                          ? "ml-auto bg-[#10261d] text-white"
-                          : "bg-[#f7f2e8] text-[#24372f]"
-                      )}
+                      direction={message.direction === "outbound" ? "outgoing" : "incoming"}
+                      emphasized={message.senderType === "human"}
+                      header={
+                        <>
+                          <span>{senderLabel(message.senderType)}</span>
+                          <span>{messageSurfaceLabel(message.surface)}</span>
+                          <span>{messageStatusLabel(message.sendStatus)}</span>
+                          <span>{formatDateTime(message.createdAt)}</span>
+                        </>
+                      }
+                      footer={
+                        <>
+                          {message.socialOrigin ? <span>Origem {message.socialOrigin}</span> : null}
+                          {message.errorMessage ? (
+                            <span className="block text-[#ffd1c2]">{message.errorMessage}</span>
+                          ) : null}
+                        </>
+                      }
                     >
-                      <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em] opacity-75">
-                        <span>{senderLabel(message.senderType)}</span>
-                        <span>{messageSurfaceLabel(message.surface)}</span>
-                        <span>{messageStatusLabel(message.sendStatus)}</span>
-                        <span>{formatDateTime(message.createdAt)}</span>
-                      </div>
-                      <p className="whitespace-pre-wrap">{message.content}</p>
-                      {message.socialOrigin ? (
-                        <p className="mt-2 text-[11px] uppercase tracking-[0.14em] opacity-70">
-                          Origem {message.socialOrigin}
-                        </p>
-                      ) : null}
-                      {message.errorMessage ? (
-                        <p className="mt-2 text-xs text-[#ffd1c2]">{message.errorMessage}</p>
-                      ) : null}
-                    </div>
+                      {message.content}
+                    </ConversationBubble>
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-[1.7rem] border border-[#ebe1d2] bg-[#fcfaf6] p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">
-                    Resposta humana
-                  </p>
-                  <textarea
-                    value={composer}
-                    onChange={(event) => setComposer(event.target.value)}
-                    placeholder="Responder manualmente com continuidade premium, clareza comercial e próximo passo nítido."
-                    rows={5}
-                    className="mt-3 w-full rounded-[1.4rem] border border-[#d8cfbf] bg-white px-4 py-4 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
-                  />
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <p className="text-xs text-[#718179]">
-                      O histórico de canal, responsável e handoff é preservado nesta central.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void sendHumanReply()}
-                      disabled={sending || !composer.trim()}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#10261d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#18362a] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Send className="h-4 w-4" />
-                      Enviar resposta
-                    </button>
-                  </div>
-                </div>
+                <ComposerPanel
+                  eyebrow="Responder conversa"
+                  textarea={
+                    <textarea
+                      value={composer}
+                      onChange={(event) => setComposer(event.target.value)}
+                        placeholder="Escreva uma resposta clara, humana e premium, preservando contexto, tom institucional e o próximo passo."
+                      rows={4}
+                      className="w-full resize-none rounded-[1.5rem] border border-[#d8cfbf] bg-white px-4 py-4 text-sm text-[#10261d] outline-none transition focus:border-[#b28b54]"
+                    />
+                  }
+                  helper="O histórico do canal, o responsável e o handoff continuam preservados enquanto você responde com continuidade e tom premium."
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void scheduleFollowUp("due")}
+                        disabled={sending}
+                        className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
+                      >
+                        Agendar retomada
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void sendHumanReply()}
+                        disabled={sending || !composer.trim()}
+                        className="inline-flex items-center gap-2 rounded-full bg-[#10261d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#18362a] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Send className="h-4 w-4" />
+                        Enviar resposta
+                      </button>
+                    </>
+                  }
+                />
               </>
             ) : (
               <div className="py-10 text-sm text-[#6b7b72]">
