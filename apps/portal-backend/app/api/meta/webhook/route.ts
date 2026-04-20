@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  computeHmacSha256Hex,
   shouldAllowShadowWebhookAcceptance,
-  shouldEnforceWebhookSignature,
-  timingSafeEqualText
+  shouldEnforceWebhookSignature
 } from "@/lib/http/webhook-security";
 import {
   resolveMetaWebhookConfig,
   summarizeMetaWebhookPayload,
+  validateMetaWebhookSignature,
   verifyMetaWebhookChallenge
 } from "@/lib/meta/meta-webhook-config";
 import { sendFacebookCommentReply, sendFacebookDirectMessage } from "@/lib/meta/facebook-service";
@@ -43,18 +42,6 @@ function logEvent(
     },
     data ?? {}
   );
-}
-
-function verifySignature(rawBuffer: Buffer, signature: string) {
-  const config = resolveMetaWebhookConfig();
-
-  if (!config.appSecretConfigured || !signature) {
-    return false;
-  }
-
-  const expectedSignature = `sha256=${computeHmacSha256Hex(config.appSecret, rawBuffer)}`;
-
-  return timingSafeEqualText(signature, expectedSignature);
 }
 
 function extractDmMessageText(message: Record<string, unknown>) {
@@ -356,63 +343,68 @@ export async function POST(request: NextRequest) {
 
     const config = resolveMetaWebhookConfig();
     const rawBuffer = Buffer.from(await request.arrayBuffer());
-    const signature = request.headers.get("x-hub-signature-256") || "";
-    const signatureValid = config.appSecretConfigured ? verifySignature(rawBuffer, signature) : false;
+    const signatureHeader = request.headers.get("x-hub-signature-256");
     const enforceSignature = shouldEnforceWebhookSignature("META_WEBHOOK_ENFORCE_SIGNATURE");
     const allowShadowAcceptance = shouldAllowShadowWebhookAcceptance(
       "META_WEBHOOK_ALLOW_SHADOW_SIGNATURE"
     );
+    const signatureValidation = validateMetaWebhookSignature({
+      rawBuffer,
+      signatureHeader,
+      config
+    });
+    const rawBodyBytes = rawBuffer.length;
+
+    if (!signatureValidation.ok) {
+      const diagnosticData = {
+        note: "Meta webhook signature validation failed before payload processing.",
+        reason: signatureValidation.reason,
+        hasSignatureHeader: Boolean(signatureHeader),
+        signaturePrefix:
+          typeof signatureHeader === "string" && signatureHeader.length > 0
+            ? signatureHeader.slice(0, 14)
+            : null,
+        expectedSignaturePrefix: signatureValidation.expectedSignaturePrefix,
+        attemptedSources: signatureValidation.attemptedSources,
+        appSecretSource: config.appSecretSource,
+        rawBodyBytes,
+        shadowMode: allowShadowAcceptance,
+        enforceSignature
+      };
+
+      if (signatureValidation.reason === "app_secret_missing") {
+        if (!allowShadowAcceptance) {
+          logEvent("META_SIGNATURE_SECRET_MISSING", diagnosticData, "error");
+
+          return NextResponse.json(
+            { error: "Webhook signature secret unavailable" },
+            { status: 503 }
+          );
+        }
+
+        logEvent("META_SIGNATURE_SHADOW_MODE", diagnosticData, "warn");
+      } else if (enforceSignature || !allowShadowAcceptance) {
+        logEvent("META_SIGNATURE_INVALID_REJECTED", diagnosticData, "warn");
+
+        return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+      } else {
+        logEvent("META_SIGNATURE_SHADOW_MODE", diagnosticData, "warn");
+      }
+    } else {
+      logEvent("META_SIGNATURE_VALIDATED", {
+        matchedSecretSource: signatureValidation.matchedSource,
+        appSecretSource: config.appSecretSource,
+        rawBodyBytes
+      });
+    }
 
     if (!config.appSecretConfigured) {
       if (!allowShadowAcceptance) {
-        logEvent(
-          "META_SIGNATURE_SECRET_MISSING",
-          {
-            note: "META webhook secret is required when signature enforcement is active.",
-            appSecretSource: config.appSecretSource
-          },
-          "error"
-        );
-
         return NextResponse.json(
           { error: "Webhook signature secret unavailable" },
           { status: 503 }
         );
       }
-
-      logEvent(
-        "META_SIGNATURE_SHADOW_MODE",
-        {
-          note: "Signature validation unavailable, but shadow mode was explicitly enabled.",
-          shadowMode: true,
-          appSecretSource: config.appSecretSource
-        },
-        "warn"
-      );
-    } else if (!signatureValid) {
-      if (enforceSignature || !allowShadowAcceptance) {
-        logEvent(
-          "META_SIGNATURE_INVALID_REJECTED",
-          {
-            note: "Webhook rejected because the signature is invalid.",
-            shadowMode: allowShadowAcceptance,
-            appSecretSource: config.appSecretSource
-          },
-          "warn"
-        );
-
-        return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
-      }
-
-      logEvent(
-        "META_SIGNATURE_SHADOW_MODE",
-        {
-          note: "Webhook kept in explicit shadow validation mode.",
-          shadowMode: true,
-          appSecretSource: config.appSecretSource
-        },
-        "warn"
-      );
     }
 
     let data;
@@ -431,6 +423,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.object !== "instagram" && data.object !== "page") {
+      logEvent("META_WEBHOOK_OBJECT_IGNORED", {
+        object: typeof data.object === "string" ? data.object : null,
+        rawBodyBytes
+      });
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
