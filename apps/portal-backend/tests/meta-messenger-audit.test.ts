@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  inferMetaWebhookObjectHint,
   resolveMetaWebhookConfig,
+  resolveMetaWebhookSignatureCandidates,
   summarizeMetaWebhookPayload,
   validateMetaWebhookSignature,
   verifyMetaWebhookChallenge
@@ -55,7 +57,8 @@ test("meta webhook config prefers META_APP_SECRET over INSTAGRAM_APP_SECRET", ()
     {
       META_VERIFY_TOKEN: "verify-token",
       META_APP_SECRET: "shared-secret",
-      INSTAGRAM_APP_SECRET: "stale-instagram-secret"
+      INSTAGRAM_APP_SECRET: "stale-instagram-secret",
+      FACEBOOK_APP_SECRET: "facebook-secret"
     },
     () => {
       const config = resolveMetaWebhookConfig();
@@ -65,6 +68,53 @@ test("meta webhook config prefers META_APP_SECRET over INSTAGRAM_APP_SECRET", ()
       assert.equal(config.appSecretConfigured, true);
       assert.equal(config.appSecretSource, "META_APP_SECRET");
       assert.equal(config.appSecret, "shared-secret");
+      assert.deepEqual(config.secretPresence, {
+        META_APP_SECRET: true,
+        INSTAGRAM_APP_SECRET: true,
+        FACEBOOK_APP_SECRET: true,
+        META_INSTAGRAM_APP_SECRET: false
+      });
+    }
+  );
+});
+
+test("meta webhook signature candidates prioritize FACEBOOK_APP_SECRET for page events without disturbing instagram order", () => {
+  return withEnv(
+    {
+      META_APP_SECRET: "meta-secret",
+      INSTAGRAM_APP_SECRET: "instagram-secret",
+      FACEBOOK_APP_SECRET: "facebook-secret",
+      META_INSTAGRAM_APP_SECRET: "legacy-meta-instagram-secret"
+    },
+    () => {
+      const config = resolveMetaWebhookConfig();
+      const pageCandidates = resolveMetaWebhookSignatureCandidates({
+        objectHint: "page",
+        config
+      });
+      const instagramCandidates = resolveMetaWebhookSignatureCandidates({
+        objectHint: "instagram",
+        config
+      });
+
+      assert.deepEqual(
+        pageCandidates.map((item) => item.source),
+        [
+          "FACEBOOK_APP_SECRET",
+          "META_APP_SECRET",
+          "INSTAGRAM_APP_SECRET",
+          "META_INSTAGRAM_APP_SECRET"
+        ]
+      );
+      assert.deepEqual(
+        instagramCandidates.map((item) => item.source),
+        [
+          "INSTAGRAM_APP_SECRET",
+          "META_APP_SECRET",
+          "META_INSTAGRAM_APP_SECRET",
+          "FACEBOOK_APP_SECRET"
+        ]
+      );
     }
   );
 });
@@ -169,6 +219,94 @@ test("meta webhook signature validator accepts realistic Instagram and Messenger
 
       assert.equal(instagramResult.ok, true);
       assert.equal(messengerResult.ok, true);
+      assert.equal(inferMetaWebhookObjectHint(instagramPayload), "instagram");
+      assert.equal(inferMetaWebhookObjectHint(messengerPayload), "page");
+    }
+  );
+});
+
+test("meta webhook signature validator accepts Messenger page payloads with FACEBOOK_APP_SECRET first", () => {
+  const messengerPayload = Buffer.from(
+    JSON.stringify({
+      object: "page",
+      entry: [{ id: "page-1", messaging: [{ sender: { id: "user-1" } }] }]
+    }),
+    "utf8"
+  );
+
+  return withEnv(
+    {
+      META_APP_SECRET: "meta-secret",
+      INSTAGRAM_APP_SECRET: "instagram-secret",
+      FACEBOOK_APP_SECRET: "facebook-secret",
+      META_INSTAGRAM_APP_SECRET: undefined
+    },
+    () => {
+      const messengerSignature = `sha256=${computeHmacSha256Hex(
+        "facebook-secret",
+        messengerPayload
+      )}`;
+      const messengerResult = validateMetaWebhookSignature({
+        rawBuffer: messengerPayload,
+        signatureHeader: messengerSignature
+      });
+
+      assert.deepEqual(messengerResult, {
+        ok: true,
+        matchedSource: "FACEBOOK_APP_SECRET",
+        expectedSignaturePrefix: messengerSignature.slice(0, 14),
+        attemptedSources: [
+          "FACEBOOK_APP_SECRET",
+          "META_APP_SECRET",
+          "INSTAGRAM_APP_SECRET"
+        ],
+        objectHint: "page"
+      });
+    }
+  );
+});
+
+test("meta webhook signature validator keeps Messenger fallback diagnostics clear when FACEBOOK_APP_SECRET is absent", () => {
+  const messengerPayload = Buffer.from(
+    JSON.stringify({
+      object: "page",
+      entry: [{ id: "page-1", messaging: [] }]
+    }),
+    "utf8"
+  );
+
+  return withEnv(
+    {
+      META_APP_SECRET: "meta-secret",
+      INSTAGRAM_APP_SECRET: "instagram-secret",
+      FACEBOOK_APP_SECRET: undefined,
+      META_INSTAGRAM_APP_SECRET: undefined
+    },
+    () => {
+      const config = resolveMetaWebhookConfig();
+      const pageCandidates = resolveMetaWebhookSignatureCandidates({
+        objectHint: "page",
+        config
+      });
+      const messengerSignature = `sha256=${computeHmacSha256Hex("meta-secret", messengerPayload)}`;
+      const messengerResult = validateMetaWebhookSignature({
+        rawBuffer: messengerPayload,
+        signatureHeader: messengerSignature,
+        config
+      });
+
+      assert.equal(config.secretPresence.FACEBOOK_APP_SECRET, false);
+      assert.deepEqual(
+        pageCandidates.map((item) => item.source),
+        ["META_APP_SECRET", "INSTAGRAM_APP_SECRET"]
+      );
+      assert.deepEqual(messengerResult, {
+        ok: true,
+        matchedSource: "META_APP_SECRET",
+        expectedSignaturePrefix: messengerSignature.slice(0, 14),
+        attemptedSources: ["META_APP_SECRET", "INSTAGRAM_APP_SECRET"],
+        objectHint: "page"
+      });
     }
   );
 });
@@ -195,7 +333,8 @@ test("meta webhook signature validator reports malformed headers and mismatches 
         ok: false,
         reason: "signature_header_malformed",
         expectedSignaturePrefix: null,
-        attemptedSources: ["META_APP_SECRET"]
+        attemptedSources: ["META_APP_SECRET"],
+        objectHint: "page"
       });
       assert.equal(mismatch.ok, false);
       assert.equal(mismatch.reason, "signature_mismatch");
@@ -224,7 +363,9 @@ test("meta webhook signature validator can recover legacy instagram secret witho
       assert.deepEqual(result, {
         ok: true,
         matchedSource: "INSTAGRAM_APP_SECRET",
-        expectedSignaturePrefix: signature.slice(0, 14)
+        expectedSignaturePrefix: signature.slice(0, 14),
+        attemptedSources: ["INSTAGRAM_APP_SECRET"],
+        objectHint: "instagram"
       });
     }
   );

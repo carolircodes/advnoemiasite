@@ -54,6 +54,7 @@ function setupEnvironment() {
   const envContent = `
 # Configurações da Meta - Geradas em ${new Date().toISOString()}
 META_APP_SECRET=${appSecret}
+FACEBOOK_APP_SECRET=
 META_VERIFY_TOKEN=${verifyToken}
 
 # WhatsApp Business API (preencher manualmente)

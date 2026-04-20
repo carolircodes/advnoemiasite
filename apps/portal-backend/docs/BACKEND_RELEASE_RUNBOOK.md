@@ -74,8 +74,8 @@ Quando isso acontecer, use `handoff/incident-escalation-summary.md` como o corpo
   Verificar `GET /api/payment/webhook` com acesso protegido, ausencia de `payments_signature_not_enforced` e prova listada em `proofRequired`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
   Verificar `telegram.status = healthy`, sucesso do webhook protegido e mensagem de teste sem falha de credencial.
-- `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
-  Verificar callback GET da Meta, novo evento com `META_WEBHOOK_INBOUND_ACCEPTED`, envio outbound sem erro de token e runtime logs do novo ciclo.
+- `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_APP_SECRET`, `INSTAGRAM_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
+  Verificar callback GET da Meta, novo evento de `object=instagram` e `object=page` com `META_SIGNATURE_VALIDATED`, confirmar qual `matchedSecretSource` validou e revisar ausencia de falha outbound.
 
 ## External/manual proof still required
 

@@ -5,6 +5,7 @@ import {
   shouldEnforceWebhookSignature
 } from "@/lib/http/webhook-security";
 import {
+  inferMetaWebhookObjectHint,
   resolveMetaWebhookConfig,
   summarizeMetaWebhookPayload,
   validateMetaWebhookSignature,
@@ -344,6 +345,7 @@ export async function POST(request: NextRequest) {
     const config = resolveMetaWebhookConfig();
     const rawBuffer = Buffer.from(await request.arrayBuffer());
     const signatureHeader = request.headers.get("x-hub-signature-256");
+    const objectHint = inferMetaWebhookObjectHint(rawBuffer);
     const enforceSignature = shouldEnforceWebhookSignature("META_WEBHOOK_ENFORCE_SIGNATURE");
     const allowShadowAcceptance = shouldAllowShadowWebhookAcceptance(
       "META_WEBHOOK_ALLOW_SHADOW_SIGNATURE"
@@ -351,6 +353,7 @@ export async function POST(request: NextRequest) {
     const signatureValidation = validateMetaWebhookSignature({
       rawBuffer,
       signatureHeader,
+      objectHint,
       config
     });
     const rawBodyBytes = rawBuffer.length;
@@ -360,6 +363,7 @@ export async function POST(request: NextRequest) {
         note: "Meta webhook signature validation failed before payload processing.",
         reason: signatureValidation.reason,
         hasSignatureHeader: Boolean(signatureHeader),
+        objectHint,
         signaturePrefix:
           typeof signatureHeader === "string" && signatureHeader.length > 0
             ? signatureHeader.slice(0, 14)
@@ -367,6 +371,7 @@ export async function POST(request: NextRequest) {
         expectedSignaturePrefix: signatureValidation.expectedSignaturePrefix,
         attemptedSources: signatureValidation.attemptedSources,
         appSecretSource: config.appSecretSource,
+        facebookAppSecretConfigured: config.secretPresence.FACEBOOK_APP_SECRET,
         rawBodyBytes,
         shadowMode: allowShadowAcceptance,
         enforceSignature
@@ -392,8 +397,11 @@ export async function POST(request: NextRequest) {
       }
     } else {
       logEvent("META_SIGNATURE_VALIDATED", {
+        objectHint: signatureValidation.objectHint,
+        attemptedSources: signatureValidation.attemptedSources,
         matchedSecretSource: signatureValidation.matchedSource,
         appSecretSource: config.appSecretSource,
+        facebookAppSecretConfigured: config.secretPresence.FACEBOOK_APP_SECRET,
         rawBodyBytes
       });
     }
@@ -425,6 +433,7 @@ export async function POST(request: NextRequest) {
     if (data.object !== "instagram" && data.object !== "page") {
       logEvent("META_WEBHOOK_OBJECT_IGNORED", {
         object: typeof data.object === "string" ? data.object : null,
+        objectHint,
         rawBodyBytes
       });
       return NextResponse.json({ received: true }, { status: 200 });
@@ -439,6 +448,7 @@ export async function POST(request: NextRequest) {
       entryCount: payloadSummary.entryCount,
       messagingCount: payloadSummary.messagingCount,
       changeCount: payloadSummary.changeCount,
+      attemptedSecretSources: signatureValidation.attemptedSources,
       appSecretSource: config.appSecretSource
     });
 

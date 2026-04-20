@@ -1,16 +1,25 @@
 import { computeHmacSha256Hex, timingSafeEqualText } from "../http/webhook-security.ts";
 
+export type MetaWebhookSecretSource =
+  | "META_APP_SECRET"
+  | "INSTAGRAM_APP_SECRET"
+  | "FACEBOOK_APP_SECRET"
+  | "META_INSTAGRAM_APP_SECRET";
+
+export type MetaWebhookObjectHint = "page" | "instagram" | null;
+
 export type MetaWebhookConfig = {
   verifyToken: string;
   verifyTokenConfigured: boolean;
   verifyTokenEnvName: "META_VERIFY_TOKEN";
   appSecret: string;
   appSecretConfigured: boolean;
-  appSecretSource: "META_APP_SECRET" | "INSTAGRAM_APP_SECRET" | null;
+  appSecretSource: MetaWebhookSecretSource | null;
   appSecretCandidates: Array<{
-    source: "META_APP_SECRET" | "INSTAGRAM_APP_SECRET" | "META_INSTAGRAM_APP_SECRET";
+    source: MetaWebhookSecretSource;
     secret: string;
   }>;
+  secretPresence: Record<MetaWebhookSecretSource, boolean>;
 };
 
 export type MetaWebhookVerificationInput = {
@@ -35,8 +44,10 @@ export type MetaWebhookVerificationResult =
 export type MetaWebhookSignatureValidationResult =
   | {
       ok: true;
-      matchedSource: "META_APP_SECRET" | "INSTAGRAM_APP_SECRET" | "META_INSTAGRAM_APP_SECRET";
+      matchedSource: MetaWebhookSecretSource;
       expectedSignaturePrefix: string;
+      objectHint: MetaWebhookObjectHint;
+      attemptedSources: MetaWebhookSecretSource[];
     }
   | {
       ok: false;
@@ -47,9 +58,8 @@ export type MetaWebhookSignatureValidationResult =
         | "raw_body_empty"
         | "signature_mismatch";
       expectedSignaturePrefix: string | null;
-      attemptedSources: Array<
-        "META_APP_SECRET" | "INSTAGRAM_APP_SECRET" | "META_INSTAGRAM_APP_SECRET"
-      >;
+      attemptedSources: MetaWebhookSecretSource[];
+      objectHint: MetaWebhookObjectHint;
     };
 
 export function resolveMetaWebhookConfig(
@@ -58,8 +68,9 @@ export function resolveMetaWebhookConfig(
   const verifyToken = env.META_VERIFY_TOKEN?.trim() || "";
   const metaAppSecret = env.META_APP_SECRET?.trim() || "";
   const instagramAppSecret = env.INSTAGRAM_APP_SECRET?.trim() || "";
+  const facebookAppSecret = env.FACEBOOK_APP_SECRET?.trim() || "";
   const metaInstagramAppSecret = env.META_INSTAGRAM_APP_SECRET?.trim() || "";
-  const appSecret = metaAppSecret || instagramAppSecret;
+  const appSecret = metaAppSecret || instagramAppSecret || facebookAppSecret || metaInstagramAppSecret;
   const appSecretCandidates = [
     metaAppSecret
       ? ({
@@ -71,6 +82,12 @@ export function resolveMetaWebhookConfig(
       ? ({
           source: "INSTAGRAM_APP_SECRET",
           secret: instagramAppSecret
+        } as const)
+      : null,
+    facebookAppSecret
+      ? ({
+          source: "FACEBOOK_APP_SECRET",
+          secret: facebookAppSecret
         } as const)
       : null,
     metaInstagramAppSecret
@@ -91,7 +108,17 @@ export function resolveMetaWebhookConfig(
       ? "META_APP_SECRET"
       : instagramAppSecret
         ? "INSTAGRAM_APP_SECRET"
-        : null,
+        : facebookAppSecret
+          ? "FACEBOOK_APP_SECRET"
+          : metaInstagramAppSecret
+            ? "META_INSTAGRAM_APP_SECRET"
+            : null,
+    secretPresence: {
+      META_APP_SECRET: metaAppSecret.length > 0,
+      INSTAGRAM_APP_SECRET: instagramAppSecret.length > 0,
+      FACEBOOK_APP_SECRET: facebookAppSecret.length > 0,
+      META_INSTAGRAM_APP_SECRET: metaInstagramAppSecret.length > 0
+    },
     appSecretCandidates
   };
 }
@@ -138,21 +165,84 @@ export function summarizeMetaWebhookPayload(payload: unknown) {
   };
 }
 
+export function inferMetaWebhookObjectHint(rawBuffer: Buffer): MetaWebhookObjectHint {
+  if (!rawBuffer.length) {
+    return null;
+  }
+
+  const rawText = rawBuffer.toString("utf8");
+  const objectMatch = rawText.match(/"object"\s*:\s*"(page|instagram)"/);
+
+  return objectMatch?.[1] === "page" || objectMatch?.[1] === "instagram"
+    ? objectMatch[1]
+    : null;
+}
+
+export function resolveMetaWebhookSignatureCandidates(args?: {
+  objectHint?: MetaWebhookObjectHint;
+  config?: MetaWebhookConfig;
+  env?: NodeJS.ProcessEnv;
+}) {
+  const config = args?.config || resolveMetaWebhookConfig(args?.env);
+  const objectHint = args?.objectHint ?? null;
+  const preferredSources: MetaWebhookSecretSource[] =
+    objectHint === "page"
+      ? [
+          "FACEBOOK_APP_SECRET",
+          "META_APP_SECRET",
+          "INSTAGRAM_APP_SECRET",
+          "META_INSTAGRAM_APP_SECRET"
+        ]
+      : objectHint === "instagram"
+        ? [
+            "INSTAGRAM_APP_SECRET",
+            "META_APP_SECRET",
+            "META_INSTAGRAM_APP_SECRET",
+            "FACEBOOK_APP_SECRET"
+          ]
+        : [
+            "META_APP_SECRET",
+            "INSTAGRAM_APP_SECRET",
+            "FACEBOOK_APP_SECRET",
+            "META_INSTAGRAM_APP_SECRET"
+          ];
+
+  const candidateMap = new Map(config.appSecretCandidates.map((item) => [item.source, item] as const));
+
+  return preferredSources
+    .map((source) => candidateMap.get(source) || null)
+    .filter(
+      (
+        item
+      ): item is {
+        source: MetaWebhookSecretSource;
+        secret: string;
+      } => Boolean(item)
+    );
+}
+
 export function validateMetaWebhookSignature(args: {
   rawBuffer: Buffer;
   signatureHeader: string | null;
+  objectHint?: MetaWebhookObjectHint;
   config?: MetaWebhookConfig;
   env?: NodeJS.ProcessEnv;
 }): MetaWebhookSignatureValidationResult {
   const config = args.config || resolveMetaWebhookConfig(args.env);
   const signatureHeader = args.signatureHeader?.trim() || "";
+  const objectHint = args.objectHint ?? inferMetaWebhookObjectHint(args.rawBuffer);
+  const signatureCandidates = resolveMetaWebhookSignatureCandidates({
+    objectHint,
+    config
+  });
 
   if (!signatureHeader) {
     return {
       ok: false,
       reason: "signature_header_missing",
       expectedSignaturePrefix: null,
-      attemptedSources: config.appSecretCandidates.map((item) => item.source)
+      attemptedSources: signatureCandidates.map((item) => item.source),
+      objectHint
     };
   }
 
@@ -161,16 +251,18 @@ export function validateMetaWebhookSignature(args: {
       ok: false,
       reason: "signature_header_malformed",
       expectedSignaturePrefix: null,
-      attemptedSources: config.appSecretCandidates.map((item) => item.source)
+      attemptedSources: signatureCandidates.map((item) => item.source),
+      objectHint
     };
   }
 
-  if (!config.appSecretCandidates.length) {
+  if (!signatureCandidates.length) {
     return {
       ok: false,
       reason: "app_secret_missing",
       expectedSignaturePrefix: null,
-      attemptedSources: []
+      attemptedSources: [],
+      objectHint
     };
   }
 
@@ -179,24 +271,27 @@ export function validateMetaWebhookSignature(args: {
       ok: false,
       reason: "raw_body_empty",
       expectedSignaturePrefix: null,
-      attemptedSources: config.appSecretCandidates.map((item) => item.source)
+      attemptedSources: signatureCandidates.map((item) => item.source),
+      objectHint
     };
   }
 
-  for (const candidate of config.appSecretCandidates) {
+  for (const candidate of signatureCandidates) {
     const expectedSignature = `sha256=${computeHmacSha256Hex(candidate.secret, args.rawBuffer)}`;
 
     if (timingSafeEqualText(signatureHeader, expectedSignature)) {
       return {
         ok: true,
         matchedSource: candidate.source,
-        expectedSignaturePrefix: expectedSignature.slice(0, 14)
+        expectedSignaturePrefix: expectedSignature.slice(0, 14),
+        attemptedSources: signatureCandidates.map((item) => item.source),
+        objectHint
       };
     }
   }
 
   const expectedSignaturePrefix = `sha256=${computeHmacSha256Hex(
-    config.appSecretCandidates[0].secret,
+    signatureCandidates[0].secret,
     args.rawBuffer
   )}`.slice(0, 14);
 
@@ -204,6 +299,7 @@ export function validateMetaWebhookSignature(args: {
     ok: false,
     reason: "signature_mismatch",
     expectedSignaturePrefix,
-    attemptedSources: config.appSecretCandidates.map((item) => item.source)
+    attemptedSources: signatureCandidates.map((item) => item.source),
+    objectHint
   };
 }

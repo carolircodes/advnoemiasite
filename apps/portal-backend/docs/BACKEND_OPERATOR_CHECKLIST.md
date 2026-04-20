@@ -203,8 +203,8 @@ Sinais de desvio:
   Confirmar webhook protegido, ausencia de blocker de assinatura e prova de rotacao listada em `proofRequired`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
   Confirmar readiness saudavel, webhook protegido funcional e mensagem de teste sem erro de credencial.
-- `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
-  Confirmar verificacao GET da Meta, evento inbound real, envio outbound sem falha de credencial e runtime logs com o novo ciclo de autenticacao.
+- `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_APP_SECRET`, `INSTAGRAM_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
+  Confirmar verificacao GET da Meta, evento inbound real de `object=instagram` e `object=page`, revisar `matchedSecretSource` nos logs do webhook e validar envio outbound sem falha de credencial.
 
 ## 12. Fase 12 - operacao omnichannel
 

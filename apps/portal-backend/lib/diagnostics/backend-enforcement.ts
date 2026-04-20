@@ -475,7 +475,13 @@ function buildSecretRotationGuidance(): BackendOperationsVerificationReport["rel
       owner: "provider_operator",
       completionType: "external_manual",
       blocksReleaseUntilVerified: false,
-      envNames: ["META_VERIFY_TOKEN", "META_APP_SECRET", "FACEBOOK_PAGE_ACCESS_TOKEN"],
+      envNames: [
+        "META_VERIFY_TOKEN",
+        "META_APP_SECRET",
+        "FACEBOOK_APP_SECRET",
+        "INSTAGRAM_APP_SECRET",
+        "FACEBOOK_PAGE_ACCESS_TOKEN"
+      ],
       postRotationSteps: [
         "Refazer verificacao GET /api/meta/webhook no dashboard da Meta.",
         "Enviar evento real do canal apos a rotacao.",
@@ -488,7 +494,7 @@ function buildSecretRotationGuidance(): BackendOperationsVerificationReport["rel
       ],
       verificationSignals: [
         "Meta revalida GET /api/meta/webhook com sucesso.",
-        "Runtime logs mostram META_WEBHOOK_INBOUND_ACCEPTED apos novo evento.",
+        "Runtime logs mostram META_SIGNATURE_VALIDATED e META_WEBHOOK_INBOUND_ACCEPTED apos novo evento.",
         "Envio outbound deixa de retornar facebook_access_token_missing ou falhas de assinatura."
       ],
       followUp:
