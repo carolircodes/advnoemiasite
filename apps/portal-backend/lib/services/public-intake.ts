@@ -15,7 +15,9 @@ import {
   updateIntakeRequestStatusSchema
 } from "../domain/portal";
 import { calculateLeadScore } from "../growth/lead-scoring";
+import { normalizeJourneyTaxonomy, serializeJourneyTaxonomy } from "../journey/taxonomy";
 import { notifyStaffAboutIntakeRequest } from "./automation-rules";
+import { buildContextRoutingDecision } from "./context-routing";
 import { createAdminSupabaseClient } from "../supabase/admin";
 
 type ProductEventInput = {
@@ -292,6 +294,46 @@ export async function submitPublicTriage(
     contentStage: input.captureMetadata.contentStage || undefined,
     returnVisitor: input.captureMetadata.returnVisitor
   });
+  const routingDecision = buildContextRoutingDecision({
+    score: leadProfile.score,
+    temperature: leadProfile.temperature,
+    readiness: input.readinessLevel,
+    topic: input.captureMetadata.theme || input.caseArea,
+    sourceChannel: input.captureMetadata.source,
+    funnelStage: leadProfile.lifecycleStage,
+    preferredChannel: input.preferredContactChannel,
+    appointmentInterest: input.appointmentInterest,
+    lifecycleStage: leadProfile.lifecycleStage,
+    metadata: {
+      source: input.captureMetadata.source,
+      medium: input.captureMetadata.captureMode,
+      campaign: input.captureMetadata.campaign,
+      theme: input.captureMetadata.theme || input.caseArea,
+      contentId: input.captureMetadata.contentId,
+      contentStage: input.captureMetadata.contentStage,
+      page: input.captureMetadata.page,
+      preferredContactChannel: input.preferredContactChannel
+    }
+  });
+  const journeyTaxonomy = serializeJourneyTaxonomy(
+    normalizeJourneyTaxonomy({
+      metadata: {
+        source: input.captureMetadata.source,
+        medium: input.captureMetadata.captureMode,
+        campaign: input.captureMetadata.campaign,
+        theme: input.captureMetadata.theme || input.caseArea,
+        contentId: input.captureMetadata.contentId,
+        contentStage: input.captureMetadata.contentStage,
+        page: input.captureMetadata.page,
+        preferredContactChannel: input.preferredContactChannel
+      },
+      defaults: {
+        funnelStage: leadProfile.lifecycleStage as never,
+        legalTopic: input.caseArea,
+        preferredChannel: input.preferredContactChannel
+      }
+    })
+  );
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("intake_requests")
@@ -352,6 +394,8 @@ export async function submitPublicTriage(
         recommendedAction: leadProfile.recommendedAction,
         recommendedActionLabel: leadProfile.recommendedActionLabel,
         operationalSlaHours: leadProfile.operationalSlaHours,
+        routingDecision,
+        journeyTaxonomy,
         areaRaw: input.captureMetadata.areaRaw || null,
         area: input.captureMetadata.areaRaw || null,
         problemType: input.captureMetadata.problemType || null,
@@ -392,6 +436,8 @@ export async function submitPublicTriage(
         leadScore: leadProfile.score,
         leadTemperature: leadProfile.temperature,
         lifecycleStage: leadProfile.lifecycleStage,
+        routingDecision,
+        journeyTaxonomy,
         experimentId: input.captureMetadata.experimentId || null,
         variantId: input.captureMetadata.variantId || null,
         contentId: input.captureMetadata.contentId || null,
@@ -430,6 +476,8 @@ export async function submitPublicTriage(
         leadScore: leadProfile.score,
         leadTemperature: leadProfile.temperature,
         lifecycleStage: leadProfile.lifecycleStage,
+        routingDecision,
+        journeyTaxonomy,
         experimentId: input.captureMetadata.experimentId || null,
         variantId: input.captureMetadata.variantId || null
       }
@@ -448,6 +496,8 @@ export async function submitPublicTriage(
           lifecycleStage: leadProfile.lifecycleStage,
           recommendedAction: leadProfile.recommendedAction,
           recommendedActionLabel: leadProfile.recommendedActionLabel,
+          routingDecision,
+          journeyTaxonomy,
           experimentId: input.captureMetadata.experimentId || null,
           variantId: input.captureMetadata.variantId || null,
           source: input.captureMetadata.source || null,
@@ -472,6 +522,8 @@ export async function submitPublicTriage(
           leadTemperature: leadProfile.temperature,
           readinessLevel: input.readinessLevel,
           appointmentInterest: input.appointmentInterest,
+          routingDecision,
+          journeyTaxonomy,
           experimentId: input.captureMetadata.experimentId || null,
           variantId: input.captureMetadata.variantId || null
         }

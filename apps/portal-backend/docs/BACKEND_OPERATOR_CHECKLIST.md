@@ -205,3 +205,10 @@ Sinais de desvio:
   Confirmar readiness saudavel, webhook protegido funcional e mensagem de teste sem erro de credencial.
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `FACEBOOK_PAGE_ACCESS_TOKEN`
   Confirmar verificacao GET da Meta, evento inbound real, envio outbound sem falha de credencial e runtime logs com o novo ciclo de autenticacao.
+
+## 12. Fase 12 - operacao omnichannel
+
+- confirmar se o dashboard interno mostra canais, temas, campanhas, conteudos, follow-ups e automacoes em leitura unica
+- conferir se um cliente com `sourceIntakeRequestId` exibe timeline omnichannel junto da linha operacional
+- validar se leads novos persistem `routingDecision` e `journeyTaxonomy` em `intake_requests.metadata`
+- se algum canal externo ainda nao estiver habilitado, manter a flag ligada apenas em modo preparatorio e nao prometer envio real sem credencial

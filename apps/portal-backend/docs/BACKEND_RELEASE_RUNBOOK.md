@@ -85,3 +85,14 @@ Quando isso acontecer, use `handoff/incident-escalation-summary.md` como o corpo
 - reexecutar readiness protegida ate o runtime sair de `memory-fallback`
 - validar segredos apos qualquer rotacao manual/external
 - encaminhar o handoff final para o canal real de release/incidente continua externo ao repo, mas agora deve usar os artifacts em `handoff/`
+
+## Phase 12 release gate
+
+- revisar `docs/PHASE12_OMNICHANNEL_OPERATIONS.md`
+- confirmar flags:
+  - `CHANNEL_ENABLE_PHASE12_JOURNEY_ORCHESTRATION`
+  - `CHANNEL_ENABLE_PHASE12_EXECUTIVE_DASHBOARD`
+  - `CHANNEL_ENABLE_PHASE12_EXTERNAL_DISPATCH_PREPARATION`
+- abrir `/internal/advogada/inteligencia` e confirmar os blocos omnichannel
+- abrir `/internal/advogada/clientes/[id]` e confirmar a linha omnichannel da jornada
+- validar que o intake continua gravando `routingDecision` e `journeyTaxonomy` em `intake_requests.metadata`

@@ -6,6 +6,7 @@ import {
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels
 } from "../domain/portal";
+import { normalizeJourneyTaxonomy } from "../journey/taxonomy";
 import { createWebhookSupabaseClient } from "../supabase/webhook";
 import { getBusinessIntelligenceOverview } from "./intelligence";
 
@@ -295,38 +296,18 @@ export async function getGrowthContextByItems(seeds: OperationalGrowthSeed[]) {
       ? latestEventByIntake.get(seed.sourceIntakeRequestId)
       : null;
 
-    const sourceKey = normalizeValue(
-      getPayloadValue(event?.payload, ["source", "origem"]),
-      "nao-identificado"
-    );
-    const sourceLabel = formatValue(
-      getPayloadValue(event?.payload, ["source", "origem"]),
-      "Nao identificado"
-    );
-    const campaignKey = normalizeValue(
-      getPayloadValue(event?.payload, ["campaign", "campanha"]),
-      "sem-campanha"
-    );
-    const campaignLabel = formatValue(
-      getPayloadValue(event?.payload, ["campaign", "campanha"]),
-      "Sem campanha"
-    );
-    const topicKey = normalizeValue(
-      getPayloadValue(event?.payload, ["topic", "tema"]),
-      "sem-tema"
-    );
-    const topicLabel = formatValue(
-      getPayloadValue(event?.payload, ["topic", "tema"]),
-      "Sem tema"
-    );
-    const contentKey = normalizeValue(
-      getPayloadValue(event?.payload, ["content_id", "contentId"]),
-      "sem-conteudo"
-    );
-    const contentLabel = formatValue(
-      getPayloadValue(event?.payload, ["content_id", "contentId"]),
-      "Sem conteudo identificado"
-    );
+    const taxonomy = normalizeJourneyTaxonomy({
+      event: event?.payload,
+      metadata: intakeRecord?.metadata || null
+    });
+    const sourceKey = normalizeValue(taxonomy.source, "nao-identificado");
+    const sourceLabel = formatValue(taxonomy.source, "Nao identificado");
+    const campaignKey = normalizeValue(taxonomy.campaign, "sem-campanha");
+    const campaignLabel = formatValue(taxonomy.campaign, "Sem campanha");
+    const topicKey = normalizeValue(taxonomy.legalTopic, "sem-tema");
+    const topicLabel = formatValue(taxonomy.legalTopic, "Sem tema");
+    const contentKey = normalizeValue(taxonomy.contentId, "sem-conteudo");
+    const contentLabel = formatValue(taxonomy.contentId, "Sem conteudo identificado");
 
     const acquisitionContext: AcquisitionContext | null = event
       ? {

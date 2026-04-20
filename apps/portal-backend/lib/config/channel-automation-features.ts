@@ -22,6 +22,12 @@ export const channelAutomationFeatures = {
   unifiedConversationRouter: readBooleanFlag("CHANNEL_ENABLE_UNIFIED_CONVERSATION_ROUTER", true),
   unifiedHumanHandoff: readBooleanFlag("CHANNEL_ENABLE_HUMAN_HANDOFF", true),
   unifiedMaterialRouting: readBooleanFlag("CHANNEL_ENABLE_MATERIAL_ROUTING", true),
+  phase12JourneyOrchestration: readBooleanFlag("CHANNEL_ENABLE_PHASE12_JOURNEY_ORCHESTRATION", true),
+  phase12ExecutiveDashboard: readBooleanFlag("CHANNEL_ENABLE_PHASE12_EXECUTIVE_DASHBOARD", true),
+  phase12ExternalDispatchPreparation: readBooleanFlag(
+    "CHANNEL_ENABLE_PHASE12_EXTERNAL_DISPATCH_PREPARATION",
+    true
+  ),
   instagramCommentPublicReply: readBooleanFlag("INSTAGRAM_ENABLE_PUBLIC_COMMENT_REPLY", true),
   instagramCommentAutoDm: readBooleanFlag("INSTAGRAM_ENABLE_COMMENT_AUTO_DM", false),
   facebookCommentPublicReply: readBooleanFlag("FACEBOOK_ENABLE_PUBLIC_COMMENT_REPLY", true),

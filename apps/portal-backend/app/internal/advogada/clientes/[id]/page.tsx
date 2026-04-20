@@ -22,6 +22,7 @@ import {
   buildInternalNewCaseHref
 } from "@/lib/navigation";
 import { getStaffOverview } from "@/lib/services/dashboard";
+import { buildClientJourneyTimeline } from "@/lib/services/journey-timeline";
 
 import { updateInternalClientAction } from "../actions";
 
@@ -287,6 +288,10 @@ export default async function InternalClientPage({
   ]
     .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
     .slice(0, 10);
+  const omnichannelTimeline = await buildClientJourneyTimeline({
+    clientId: client.id,
+    intakeRequestId: client.sourceIntakeRequestId
+  });
 
   return (
     <AppFrame
@@ -798,6 +803,40 @@ export default async function InternalClientPage({
                   <span className="shortcut-kicker">Linha do atendimento</span>
                   <ul className="update-feed compact">
                     {clientTimeline.map((item) => (
+                      <li key={item.id} className="update-card">
+                        <div className="update-head">
+                          <div>
+                            <strong>{item.title}</strong>
+                            <span className="item-meta">{item.kicker}</span>
+                          </div>
+                          <span className={`pill ${item.tone}`}>{formatPortalDateTime(item.occurredAt)}</span>
+                        </div>
+                        <p className="update-body">{item.detail}</p>
+                        <div className="pill-row">
+                          {item.meta.map((meta) => (
+                            <span key={`${item.id}-${meta}`} className={`pill ${item.tone}`}>
+                              {meta}
+                            </span>
+                          ))}
+                        </div>
+                        {item.actionHref ? (
+                          <div className="form-actions">
+                            <Link className="button secondary" href={item.actionHref}>
+                              {item.actionLabel || "Abrir"}
+                            </Link>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {omnichannelTimeline.length ? (
+                <div className="subtle-panel stack">
+                  <span className="shortcut-kicker">Linha omnichannel da jornada</span>
+                  <ul className="update-feed compact">
+                    {omnichannelTimeline.map((item) => (
                       <li key={item.id} className="update-card">
                         <div className="update-head">
                           <div>

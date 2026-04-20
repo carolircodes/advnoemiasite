@@ -9,6 +9,7 @@ import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
+import { getOmnichannelOverview } from "@/lib/services/omnichannel-intelligence";
 import { getRevenueIntelligenceOverview } from "@/lib/services/revenue-intelligence";
 
 function getStringParam(
@@ -63,6 +64,7 @@ export default async function IntelligencePage({
   const params = searchParams ? await searchParams : {};
   const selectedDays = Number.parseInt(getStringParam(params.days, "30"), 10);
   const intelligence = await getBusinessIntelligenceOverview(selectedDays);
+  const omnichannel = await getOmnichannelOverview(selectedDays);
   const revenue = await getRevenueIntelligenceOverview(selectedDays);
   const executiveSignals = [
     {
@@ -128,6 +130,196 @@ export default async function IntelligencePage({
         { href: "/noemia", label: "Abrir Noemia", tone: "secondary" }
       ]}
     >
+      <SectionCard
+        title="Orquestracao omnichannel e loops fechados"
+        description="A Fase 12 conecta canal, campanha, conteudo, triagem, follow-up, agenda e fechamento numa leitura unica para growth e operacao."
+      >
+        <div className="summary-grid">
+          <div className="summary-card">
+            <span>Canal mais quente</span>
+            <strong>{omnichannel.executiveSummary.hottestChannel}</strong>
+            <p>Combina volume, qualidade comercial e velocidade de resposta no mesmo corte.</p>
+          </div>
+          <div className="summary-card">
+            <span>Tema com melhor sinal</span>
+            <strong>{omnichannel.executiveSummary.hottestTheme}</strong>
+            <p>Ajuda a sincronizar editorial, distribuicao, atendimento e agenda.</p>
+          </div>
+          <div className="summary-card">
+            <span>Campanha lider</span>
+            <strong>{omnichannel.executiveSummary.strongestCampaign}</strong>
+            <p>Mostra onde insistir quando a cadeia canal para fechamento esta forte.</p>
+          </div>
+          <div className="summary-card">
+            <span>Conteudo que mais aquece</span>
+            <strong>{omnichannel.executiveSummary.bestContent}</strong>
+            <p>Diferencia leitura vazia de conteudo com impacto real em lead e conversao.</p>
+          </div>
+          <div className="summary-card">
+            <span>SLA mais lento</span>
+            <strong>{omnichannel.executiveSummary.slowestChannel}</strong>
+            <p>Explicita onde a operacao ainda perde timing depois da entrada do lead.</p>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="grid two">
+        <SectionCard
+          title="Canais, temas e campanhas por qualidade"
+          description="Leitura para decidir onde insistir, onde corrigir e onde redistribuir energia nacional."
+        >
+          <div className="stack">
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Canais</span>
+              <ul className="list">
+                {omnichannel.channels.slice(0, 5).map((item) => (
+                  <li key={item.key}>
+                    <div className="item-head">
+                      <strong>{item.label}</strong>
+                      <span className="tag soft">{item.volume} lead(s)</span>
+                    </div>
+                    <span className="item-meta">
+                      {item.hotLeads} quente(s), {item.appointments} agenda(s), {item.conversions} conversao(oes)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Temas</span>
+              <ul className="list">
+                {omnichannel.themes.slice(0, 5).map((item) => (
+                  <li key={item.key}>
+                    <div className="item-head">
+                      <strong>{item.label}</strong>
+                      <span className="tag soft">Score medio {item.averageScore}</span>
+                    </div>
+                    <span className="item-meta">
+                      {item.hotLeads} quente(s) e {item.conversions} conversao(oes)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Campanhas</span>
+              <ul className="list">
+                {omnichannel.campaigns.slice(0, 5).map((item) => (
+                  <li key={item.key}>
+                    <div className="item-head">
+                      <strong>{item.label}</strong>
+                      <span className="tag soft">{item.conversions} conversao(oes)</span>
+                    </div>
+                    <span className="item-meta">
+                      {item.volume} lead(s), {item.hotLeads} quente(s), {item.responseHours ?? "sem base"}h de resposta
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Conteudo, retomadas e automacoes"
+          description="A maquina fica auditavel quando conteudo, follow-up e fila automatica passam a conversar no mesmo dashboard."
+        >
+          <div className="stack">
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Conteudos com impacto real</span>
+              <ul className="list">
+                {omnichannel.contents.slice(0, 5).map((item) => (
+                  <li key={item.key}>
+                    <div className="item-head">
+                      <strong>{item.label}</strong>
+                      <span className="tag soft">{item.conversions} conversao(oes)</span>
+                    </div>
+                    <span className="item-meta">
+                      {item.qualifiedReads} leitura(s) qualificada(s), {item.ctaClicks} CTA(s), {item.hotLeads} quente(s)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Follow-up por resultado</span>
+              <ul className="list">
+                {omnichannel.followUpsByResult.slice(0, 5).map((item) => (
+                  <li key={item.result}>
+                    <div className="item-head">
+                      <strong>{item.result}</strong>
+                      <span className="tag soft">{item.count}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="subtle-panel stack">
+              <span className="shortcut-kicker">Saude de automacao</span>
+              <ul className="list">
+                {omnichannel.automationHealth.slice(0, 5).map((item) => (
+                  <li key={item.key}>
+                    <div className="item-head">
+                      <strong>{item.key}</strong>
+                      <span className="tag soft">{item.total} disparo(s)</span>
+                    </div>
+                    <span className="item-meta">
+                      {item.failed} falha(s) e {item.queued} item(ns) na fila
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid two">
+        <SectionCard
+          title="Abandono, score e prontidao"
+          description="Mostra onde o funil ainda perde forca e onde a operacao deve agir primeiro."
+        >
+          <div className="summary-grid compact">
+            {omnichannel.abandonmentByStage.slice(0, 4).map((item) => (
+              <div key={item.stage} className="summary-card">
+                <span>Abandono em {item.stage}</span>
+                <strong>{item.count}</strong>
+                <p>Jornadas que ainda travam antes da qualificacao ou agenda.</p>
+              </div>
+            ))}
+            {omnichannel.scoreBands.map((item) => (
+              <div key={item.band} className="summary-card">
+                <span>Score {item.band}</span>
+                <strong>{item.leads}</strong>
+                <p>{item.conversions} conversao(oes) dentro desse intervalo.</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Roteamento explicito por contexto"
+          description="Score, prontidao e origem agora viram acao legivel em vez de heuristica dispersa."
+        >
+          <ul className="update-feed">
+            {omnichannel.routingActions.slice(0, 6).map((item) => (
+              <li key={item.action} className="update-card">
+                <div className="update-head">
+                  <div>
+                    <strong>{item.action}</strong>
+                    <span className="item-meta">Acao sugerida pelo motor de contexto</span>
+                  </div>
+                  <span className="tag soft">{item.total} lead(s)</span>
+                </div>
+                <p className="update-body">
+                  {item.converted} conversao(oes) vieram de jornadas que passaram por esta recomendacao.
+                </p>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      </div>
+
       <SectionCard
         title="Leitura executiva da inteligência"
         description="O módulo passa a abrir com uma camada decisória clara: receita confirmada, travas monetizáveis e conversão núcleo aparecem antes do detalhamento analítico."
