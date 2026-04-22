@@ -1,4 +1,10 @@
-import type { NoemiaChannel, NoemiaContext, NoemiaUserType } from "./core-types";
+import { buildPromptContextSections } from "./noemia-context-governance";
+import type {
+  NoemiaChannel,
+  NoemiaContext,
+  NoemiaDomain,
+  NoemiaUserType
+} from "./core-types";
 
 function buildBasePrompt() {
   return [
@@ -109,21 +115,68 @@ const userPrompts: Record<NoemiaUserType, string[]> = {
   ]
 };
 
+const domainPrompts: Record<NoemiaDomain, string[]> = {
+  public_site_chat: [
+    "DOMINIO: chat publico do site",
+    "- foco em acolhimento, triagem e clareza",
+    "- nao invente contexto interno nem linguagem de operacao",
+    "- conduza para o proximo passo sem parecer script"
+  ],
+  portal_support: [
+    "DOMINIO: suporte contextual de portal",
+    "- tratar a conversa como continuidade de relacionamento ja existente",
+    "- responder com precisao operacional, sem tom de prospeccao",
+    "- se faltar contexto, pedir o minimo necessario antes de concluir algo"
+  ],
+  commercial_conversion: [
+    "DOMINIO: conversa comercial e qualificacao",
+    "- identificar maturidade, risco e momento comercial sem pressa artificial",
+    "- pode conduzir para consulta quando houver sinal legitimo",
+    "- nunca misture politica interna com o texto para a pessoa"
+  ],
+  internal_operational: [
+    "DOMINIO: apoio interno operacional",
+    "- seja direta, executiva e organizada",
+    "- priorize leitura, proxima acao e risco",
+    "- nao escreva como atendimento ao publico"
+  ],
+  channel_comment: [
+    "DOMINIO: automacao de comentario em canal",
+    "- resposta curta, publica e segura",
+    "- nunca entregar consultoria juridica detalhada em publico",
+    "- priorizar transicao elegante para privado quando fizer sentido"
+  ]
+};
+
 export function buildSystemPrompt(
   channel: NoemiaChannel,
   userType: NoemiaUserType,
-  context?: unknown
+  context?: unknown,
+  options?: {
+    domain?: NoemiaDomain;
+    promptVersion?: string;
+  }
 ): string {
   const prompt = [
     ...buildBasePrompt(),
+    "",
+    ...(options?.domain ? domainPrompts[options.domain] : domainPrompts.public_site_chat),
     "",
     ...channelPrompts[channel],
     "",
     ...userPrompts[userType]
   ];
 
+  if (options?.promptVersion) {
+    prompt.push("", `VERSAO DE PROMPT: ${options.promptVersion}`);
+  }
+
   if (context) {
-    prompt.push("", "CONTEXTO DISPONIVEL:", JSON.stringify(context));
+    const contextSections = buildPromptContextSections(context as NoemiaContext);
+
+    if (contextSections.length > 0) {
+      prompt.push("", "CONTEXTO DISPONIVEL:", ...contextSections);
+    }
 
     const acquisition = (context as NoemiaContext | undefined)?.acquisition;
 

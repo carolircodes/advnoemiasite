@@ -20,3 +20,4 @@ import "./facebook-messenger-closeout.test.ts";
 import "./youtube-omnichannel.test.ts";
 import "./youtube-activation.test.ts";
 import "./payment-pricing.test.ts";
+import "./payment-workflow.test.ts";

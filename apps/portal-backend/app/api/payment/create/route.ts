@@ -26,6 +26,13 @@ import {
 } from "@/lib/payment/pricing";
 import { buildPublicPaymentPayload } from "@/lib/payment/public-payment-payload";
 import {
+  buildPaymentContextSnapshot,
+  buildPaymentTransitionKey,
+  getPersistedFinancialState,
+  resolvePaymentOrigin,
+  shouldTreatPaymentAsActivePending
+} from "@/lib/payment/payment-workflow";
+import {
   buildSafePaymentMetadata,
   paymentCreateRequestSchema,
   publicPaymentLookupQuerySchema
@@ -112,11 +119,16 @@ function extractLeadIdFromExternalReference(externalReference: string | null) {
 }
 
 type PersistedPaymentRecord = {
+  id: string;
   amount?: number | null;
   payment_url?: string | null;
   external_id?: string | null;
+  external_reference?: string | null;
   price_source?: string | null;
   final_amount_cents?: number | null;
+  status?: string | null;
+  financial_state?: string | null;
+  active_for_lead?: boolean | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -125,7 +137,7 @@ function shouldReusePendingPayment(
   resolvedPricing: ReturnType<typeof resolvePaymentPricing>,
   offerCode: string
 ) {
-  if (!pendingPayment) {
+  if (!pendingPayment || !shouldTreatPaymentAsActivePending(pendingPayment)) {
     return false;
   }
 
@@ -273,6 +285,7 @@ export async function POST(request: NextRequest) {
     } = parsedBody.data;
     const safeMetadata = buildSafePaymentMetadata(metadata);
     const requestFingerprint = buildRequestFingerprint(request, "payment-create");
+    const actorProfileId = access.actor === "staff" ? access.profile.id : null;
 
     const selectedOffer =
       offerCode && typeof offerCode === "string"
@@ -378,14 +391,48 @@ export async function POST(request: NextRequest) {
       requestFingerprint: requestIdempotencyFingerprint
     };
 
-    const { data: existingPayment } = await supabase
+    const { data: existingPayments, error: existingPaymentsError } = await supabase
       .from("payments")
       .select("*")
       .eq("lead_id", leadId)
-      .eq("status", "pending")
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(5);
+
+    if (existingPaymentsError) {
+      throw existingPaymentsError;
+    }
+
+    const paymentCandidates = Array.isArray(existingPayments)
+      ? (existingPayments as PersistedPaymentRecord[])
+      : [];
+    const approvedPayment = paymentCandidates.find(
+      (payment) =>
+        payment.active_for_lead !== false &&
+        getPersistedFinancialState(payment) === "approved"
+    );
+
+    if (approvedPayment) {
+      logPaymentCreateEvent("warn", "PAYMENT_CREATE_ALREADY_APPROVED", observation, {
+        outcome: "denied",
+        status: 409,
+        errorCategory: "boundary",
+        leadId,
+        userId,
+        paymentId: approvedPayment.external_id || approvedPayment.id
+      });
+      return createObservedJsonResponse(
+        observation,
+        { ok: false, error: "payment_already_confirmed" },
+        {
+          status: 409,
+          headers: buildDurableRateLimitHeaders(rateLimit)
+        }
+      );
+    }
+
+    const existingPayment = paymentCandidates.find((payment) =>
+      shouldTreatPaymentAsActivePending(payment)
+    );
 
     if (
       existingPayment &&
@@ -446,6 +493,13 @@ export async function POST(request: NextRequest) {
       (typeof monetizationSource === "string" && monetizationSource.trim()) ||
       (typeof metadata?.monetization_source === "string" && metadata.monetization_source) ||
       "noemia";
+    const paymentOrigin = resolvePaymentOrigin({
+      accessActor: access.actor,
+      monetizationSource: revenueSource,
+      metadata: safeMetadata,
+      profileId: actorProfileId,
+      userId
+    });
     const checkoutStartedAt = new Date().toISOString();
     const externalReference = `${selectedOffer.code}_${leadId}_${Date.now()}`;
     const ipAddress = getClientIp(request);
@@ -458,6 +512,15 @@ export async function POST(request: NextRequest) {
       price_reason: resolvedPricing.auditReason,
       pricing_context: resolvedPricing.safeMetadata
     };
+    const paymentContextSnapshot = buildPaymentContextSnapshot({
+      offerCode: selectedOffer.code,
+      offerKind: selectedOffer.kind,
+      monetizationPath: revenuePath,
+      monetizationSource: revenueSource,
+      requestFingerprint,
+      requestedAmountCents: resolvedPricing.requestedTestAmountCents,
+      metadata: safeMetadata
+    });
     const supportsAutoReturn = /^https:\/\//i.test(baseUrl);
 
     const preferenceData = {
@@ -521,6 +584,7 @@ export async function POST(request: NextRequest) {
         lead_id: leadId,
         user_id: userId,
         external_id: response.id,
+        external_reference: externalReference,
         payment_url: response.init_point,
         amount,
         base_amount_cents: resolvedPricing.baseAmountCents,
@@ -529,6 +593,16 @@ export async function POST(request: NextRequest) {
         requested_test_amount_cents: resolvedPricing.requestedTestAmountCents,
         owner_override_phone: resolvedPricing.ownerOverridePhone,
         status: "pending",
+        financial_state: "pending",
+        technical_state: "checkout_created",
+        origin_type: paymentOrigin.originType,
+        origin_source: paymentOrigin.originSource,
+        origin_actor_id: paymentOrigin.originActorId,
+        origin_context: paymentContextSnapshot,
+        active_for_lead: true,
+        last_provider_status: "pending",
+        last_provider_payment_id: response.id,
+        last_reconciled_at: checkoutStartedAt,
         metadata: {
           ...preferenceData.metadata,
           preference_id: response.id
@@ -562,6 +636,63 @@ export async function POST(request: NextRequest) {
     }
 
     await supabase
+      .from("payments")
+      .update({
+        active_for_lead: false,
+        superseded_at: checkoutStartedAt,
+        superseded_by_payment_id: payment.id,
+        technical_state: "superseded",
+        updated_at: checkoutStartedAt
+      })
+      .eq("lead_id", leadId)
+      .neq("id", payment.id)
+      .eq("active_for_lead", true)
+      .eq("status", "pending");
+
+    try {
+      await supabase.from("payment_events").insert({
+        payment_id: payment.id,
+        event_kind: "checkout_created",
+        transition_key: buildPaymentTransitionKey({
+          paymentId: payment.id,
+          providerPaymentId: response.id,
+          financialState: "pending",
+          stage: "checkout"
+        }),
+        source: "payment_create",
+        provider_payment_id: response.id,
+        provider_status: "pending",
+        financial_state: "pending",
+        technical_state: "checkout_created",
+        commercial_state: "link_sent",
+        side_effect_applied: false,
+        payload: {
+          lead_id: leadId,
+          user_id: userId,
+          offer_code: selectedOffer.code,
+          price_source: resolvedPricing.priceSource,
+          origin_type: paymentOrigin.originType,
+          origin_source: paymentOrigin.originSource
+        }
+      });
+    } catch (paymentEventError) {
+      logPaymentCreateEvent(
+        "warn",
+        "PAYMENT_CREATE_AUDIT_EVENT_DEGRADED",
+        observation,
+        {
+          outcome: "degraded",
+          status: 200,
+          errorCategory: "internal",
+          leadId,
+          userId,
+          paymentId: payment.id
+        },
+        paymentEventError
+      );
+    }
+
+    await supabase
       .from("noemia_leads")
       .update({
         status: "payment_pending",
@@ -590,6 +721,20 @@ export async function POST(request: NextRequest) {
           createEvent: false
         });
       }
+
+      await supabase
+        .from("payments")
+        .update({
+          commercial_effect_applied_at: checkoutStartedAt,
+          commercial_effect_key: buildPaymentTransitionKey({
+            paymentId: payment.id,
+            providerPaymentId: response.id,
+            financialState: "pending",
+            stage: "commercial"
+          }),
+          updated_at: checkoutStartedAt
+        })
+        .eq("id", payment.id);
     } catch (closingSyncError) {
       logPaymentCreateEvent(
         "warn",

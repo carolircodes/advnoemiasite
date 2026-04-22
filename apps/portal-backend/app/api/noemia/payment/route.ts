@@ -4,6 +4,7 @@ import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
 import { extractErrorMessage } from "@/lib/http/api-response";
 import { parseJsonBody } from "@/lib/http/request-guards";
 import { extractAmountCentsFromMessage } from "@/lib/payment/pricing";
+import { getPersistedFinancialState } from "@/lib/payment/payment-workflow";
 import { noemiaPaymentRequestSchema } from "@/lib/payment/payment-security";
 import { generatePaymentLink, generatePaymentMessage } from "@/lib/payment/payment-service";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       .from("payments")
       .select("*")
       .eq("lead_id", leadId)
-      .in("status", ["pending", "approved"])
+      .eq("active_for_lead", true)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
         ? getRevenueOfferByCode(offerCode)
         : getRevenueOfferByIntent(typeof intentionType === "string" ? intentionType : "");
 
-    if (existingPayment && existingPayment.status === "pending") {
+    if (existingPayment && getPersistedFinancialState(existingPayment) === "pending") {
       const responseMessage = generatePaymentMessage({
         success: true,
         paymentUrl: existingPayment.payment_url,
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (existingPayment && existingPayment.status === "approved") {
+    if (existingPayment && getPersistedFinancialState(existingPayment) === "approved") {
       return NextResponse.json({
         success: true,
         message:
@@ -253,6 +254,10 @@ export async function GET(request: NextRequest) {
         id: payment.id,
         external_id: payment.external_id,
         status: payment.status,
+        financial_state: payment.financial_state || payment.status,
+        technical_state: payment.technical_state || null,
+        external_reference: payment.external_reference || null,
+        active_for_lead: payment.active_for_lead ?? null,
         amount: payment.amount,
         base_amount_cents: payment.base_amount_cents,
         final_amount_cents: payment.final_amount_cents,

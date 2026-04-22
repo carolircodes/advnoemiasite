@@ -20,6 +20,8 @@ import {
   LegalTheme,
   NoemiaContext,
   NoemiaChannel,
+  NoemiaDomain,
+  NoemiaPolicyMode,
   NoemiaUserType,
   PriorityLevel,
   RecommendedAction
@@ -29,6 +31,20 @@ import {
   detectLegalTheme as detectConversationTheme,
   detectUserIntent as detectConversationIntent
 } from "./message-classifier";
+import { minimizeNoemiaContext } from "./noemia-context-governance";
+import {
+  getNoemiaPromptVersion,
+  resolveNoemiaDomain,
+  resolveNoemiaPolicyMode,
+  shouldAutoUpdateCommercialPipeline,
+  shouldLoadClientContext,
+  shouldPersistTriage
+} from "./noemia-domains";
+import {
+  buildNoemiaTraceMetadata,
+  traceNoemiaEvent
+} from "./noemia-observability";
+import { runNoemiaModel } from "./noemia-provider";
 import { buildSystemPrompt as buildNoemiaSystemPrompt } from "./system-prompt";
 import {
   initializeConversationState as initializeManagedConversationState,
@@ -53,6 +69,7 @@ export type {
   LegalTheme,
   NoemiaChannel,
   NoemiaContext,
+  NoemiaDomain,
   NoemiaUserType,
   PriorityLevel,
   RecommendedAction
@@ -1126,6 +1143,7 @@ type ConversationStep =
 export interface NoemiaCoreInput {
   channel: NoemiaChannel;
   userType: NoemiaUserType;
+  domain?: NoemiaDomain;
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   context?: NoemiaContext;
@@ -1152,6 +1170,21 @@ interface NoemiaCoreOutput {
       intent: ClassifiedIntent;
       leadTemperature: LeadTemperature;
     };
+    domain?: NoemiaDomain;
+    policyMode?: NoemiaPolicyMode;
+    promptVersion?: string;
+    contextSummary?: {
+      domain: NoemiaDomain;
+      channel: NoemiaChannel;
+      audience: NoemiaUserType;
+      sections: string[];
+      inputKeys: string[];
+      hasAcquisitionContext: boolean;
+      hasClientContext: boolean;
+      hasPageContext: boolean;
+      hasJourneyContext: boolean;
+    };
+    sideEffects?: string[];
     conversationState?: ConversationState;
   };
 }
@@ -1168,6 +1201,8 @@ interface CommentProcessingOutput {
     responseTime: number;
     channel: string;
     openaiUsed: boolean;
+    domain?: NoemiaDomain;
+    promptVersion?: string;
   };
 }
 
@@ -1876,10 +1911,33 @@ async function callOpenAI(
   }
 }
 
+async function callGovernedModel(
+  domain: NoemiaDomain,
+  message: string,
+  systemPrompt: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = []
+): Promise<{ success: boolean; response?: string; error?: string }> {
+  const result = await runNoemiaModel({
+    domain,
+    message,
+    systemPrompt,
+    history
+  });
+
+  return {
+    success: result.success,
+    response: result.response,
+    error: result.error
+  };
+}
+
 export async function processNoemiaCore(
   input: NoemiaCoreInput
 ): Promise<NoemiaCoreOutput> {
   const startTime = Date.now();
+  const promptVersion = getNoemiaPromptVersion();
+  const domain = input.domain || resolveNoemiaDomain(input);
+  const policyMode = resolveNoemiaPolicyMode(domain);
 
   const classification = classifyIncomingMessage(input.message);
   const currentConversationState =
@@ -1890,6 +1948,23 @@ export async function processNoemiaCore(
     classification,
     evaluateManagedPolicyHandoff
   );
+
+  traceNoemiaEvent("info", "NOEMIA_CORE_STARTED", {
+    channel: input.channel,
+    domain,
+    userType: input.userType,
+    policyMode,
+    sessionId:
+      typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+    clientId:
+      typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null
+  }, {
+    outcome: "started",
+    classification,
+    currentStep: currentConversationState.currentStep,
+    nextStep: newConversationState.currentStep,
+    messagePreview: input.message.slice(0, 120)
+  });
 
   console.log(
     `NOEMIA_CORE_START: ${input.channel} | ${input.userType} | ${classification.theme} | ${classification.intent} | ${classification.leadTemperature}`
@@ -1907,9 +1982,8 @@ export async function processNoemiaCore(
     let enrichedContext = input.context;
 
     if (
-      input.channel === 'whatsapp' ||
-      input.channel === 'instagram' ||
-      input.channel === 'telegram'
+      shouldLoadClientContext(domain) &&
+      (input.channel === "whatsapp" || input.channel === "instagram" || input.channel === "telegram")
     ) {
       try {
         // Tentar obter clientId do metadata ou context
@@ -1927,24 +2001,38 @@ export async function processNoemiaCore(
         });
 
         if (clientContext) {
-          console.log('AI_CONTEXT_ENRICHED', {
+          traceNoemiaEvent("info", "NOEMIA_CONTEXT_ENRICHED", {
+            channel: input.channel,
+            domain,
+            userType: input.userType,
+            policyMode,
+            sessionId:
+              typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+            clientId: clientContext.client.id
+          }, {
+            outcome: "success",
             clientId: clientContext.client.id,
             isClient: clientContext.client.is_client,
             pipelineStage: clientContext.pipeline?.stage,
             leadTemperature: clientContext.pipeline?.lead_temperature
           });
-
-          // Formatar contexto para a IA
-          const formattedContext = clientContextService.formatContextForAI(clientContext);
-          
-          // Enriquecer o contexto existente
-            enrichedContext = {
-             ...(input.context ? (input.context as Record<string, unknown>) : {}),
-              clientContext: formattedContext
-               } as any;
+          enrichedContext = {
+            ...(input.context ? (input.context as Record<string, unknown>) : {})
+          } as NoemiaContext;
         }
       } catch (contextError) {
-        console.error('CLIENT_CONTEXT_ENRICHMENT_ERROR', contextError);
+        traceNoemiaEvent("warn", "NOEMIA_CONTEXT_ENRICHMENT_FAILED", {
+          channel: input.channel,
+          domain,
+          userType: input.userType,
+          policyMode,
+          sessionId:
+            typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+          clientId:
+            typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null
+        }, {
+          outcome: "degraded"
+        }, contextError);
         // Continuar sem contexto enriquecido
       }
     }
@@ -1967,17 +2055,46 @@ export async function processNoemiaCore(
       effectiveAudience = "client";
     }
 
+    const minimizedContext = minimizeNoemiaContext({
+      domain,
+      channel: input.channel,
+      userType: effectiveAudience,
+      context: enrichedContext,
+      clientContext
+    });
+
     const systemPrompt = buildNoemiaSystemPrompt(
       input.channel,
       effectiveAudience,
-      enrichedContext
+      minimizedContext.promptContext,
+      {
+        domain,
+        promptVersion
+      }
     );
 
     console.log(
       `NOEMIA_CORE_OPENAI_ATTEMPT: ${input.channel} | ${effectiveAudience}`
     );
 
-    const openaiResult = await callOpenAI(
+    traceNoemiaEvent("info", "NOEMIA_MODEL_REQUESTED", {
+      channel: input.channel,
+      domain,
+      userType: effectiveAudience,
+      policyMode,
+      sessionId:
+        typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+      clientId:
+        clientContext?.client.id ||
+        (typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null)
+    }, buildNoemiaTraceMetadata({
+      promptVersion,
+      contextSummary: minimizedContext.summary,
+      classification
+    }));
+
+    const openaiResult = await callGovernedModel(
+      domain,
       input.message,
       systemPrompt,
       input.history ?? []
@@ -1985,14 +2102,10 @@ export async function processNoemiaCore(
 
     if (openaiResult.success && openaiResult.response) {
       console.log(`NOEMIA_CORE_OPENAI_SUCCESS: ${input.channel}`);
+      const sideEffects: string[] = [];
 
       // Fase 4.5 - Atualizar pipeline automaticamente após interação
-      if (
-        clientContext &&
-        (input.channel === 'whatsapp' ||
-          input.channel === 'instagram' ||
-          input.channel === 'telegram')
-      ) {
+      if (clientContext && shouldAutoUpdateCommercialPipeline(domain)) {
         try {
           await clientContextService.updatePipelineFromInteraction(
             clientContext.client.id,
@@ -2003,21 +2116,64 @@ export async function processNoemiaCore(
               leadTemperature: classification.leadTemperature
             }
           );
+          sideEffects.push("pipeline_auto_update");
         } catch (pipelineError) {
-          console.error('PIPELINE_AUTO_UPDATE_ERROR', pipelineError);
+          traceNoemiaEvent("warn", "NOEMIA_PIPELINE_AUTO_UPDATE_FAILED", {
+            channel: input.channel,
+            domain,
+            userType: effectiveAudience,
+            policyMode,
+            sessionId:
+              typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+            clientId: clientContext.client.id
+          }, {
+            outcome: "degraded"
+          }, pipelineError);
           // Não quebrar o fluxo se a atualização do pipeline falhar
         }
       }
 
       // Fase 4.6 - Salvar dados da triagem se houver estado de conversação
-      if (newConversationState && input.channel !== 'portal') {
+      if (newConversationState && input.channel !== 'portal' && shouldPersistTriage(domain)) {
         try {
           await saveTriageData(input, newConversationState, classification);
+          sideEffects.push("triage_persisted");
         } catch (triageError) {
-          console.error('TRIAGE_SAVE_ERROR', triageError);
+          traceNoemiaEvent("warn", "NOEMIA_TRIAGE_PERSISTENCE_FAILED", {
+            channel: input.channel,
+            domain,
+            userType: effectiveAudience,
+            policyMode,
+            sessionId:
+              typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+            clientId:
+              clientContext?.client.id ||
+              (typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null)
+          }, {
+            outcome: "degraded"
+          }, triageError);
           // Não quebrar o fluxo se o salvamento da triagem falhar
         }
       }
+
+      traceNoemiaEvent("info", "NOEMIA_MODEL_SUCCEEDED", {
+        channel: input.channel,
+        domain,
+        userType: effectiveAudience,
+        policyMode,
+        sessionId:
+          typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+        clientId:
+          clientContext?.client.id ||
+          (typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null)
+      }, buildNoemiaTraceMetadata({
+        promptVersion,
+        contextSummary: minimizedContext.summary,
+        source: "openai",
+        usedFallback: false,
+        sideEffects,
+        classification
+      }));
 
       return {
         reply: openaiResult.response,
@@ -2032,6 +2188,11 @@ export async function processNoemiaCore(
           channel: input.channel,
           openaiUsed: true,
           classification,
+          domain,
+          policyMode,
+          promptVersion,
+          contextSummary: minimizedContext.summary,
+          sideEffects,
           conversationState: newConversationState,
         },
       };
@@ -2040,6 +2201,24 @@ export async function processNoemiaCore(
     console.log(
       `NOEMIA_CORE_FALLBACK: ${input.channel} | ${openaiResult.error}`
     );
+
+    traceNoemiaEvent("warn", "NOEMIA_MODEL_FALLBACK", {
+      channel: input.channel,
+      domain,
+      userType: effectiveAudience,
+      policyMode,
+      sessionId:
+        typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+      clientId:
+        clientContext?.client.id ||
+        (typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null)
+    }, buildNoemiaTraceMetadata({
+      promptVersion,
+      contextSummary: minimizedContext.summary,
+      source: effectiveAudience === "visitor" ? "triage" : "fallback",
+      usedFallback: true,
+      classification
+    }), openaiResult.error);
 
     const fallbackReply =
       effectiveAudience === "visitor"
@@ -2087,6 +2266,11 @@ export async function processNoemiaCore(
         channel: input.channel,
         openaiUsed: false,
         classification,
+        domain,
+        policyMode,
+        promptVersion,
+        contextSummary: minimizedContext.summary,
+        sideEffects: [],
         conversationState: newConversationState,
       },
     };
@@ -2094,7 +2278,18 @@ export async function processNoemiaCore(
     const errorMessage =
       error instanceof Error ? error.message : String(error);
 
-    console.log(`NOEMIA_CORE_ERROR: ${input.channel} | ${errorMessage}`);
+    traceNoemiaEvent("error", "NOEMIA_CORE_FAILED", {
+      channel: input.channel,
+      domain,
+      userType: input.userType,
+      policyMode,
+      sessionId:
+        typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+      clientId:
+        typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null
+    }, {
+      outcome: "failed"
+    }, error);
 
     const emergencyResponse =
       "Oi! Me conta com calma o que está acontecendo no seu caso.";
@@ -2111,6 +2306,21 @@ export async function processNoemiaCore(
         channel: input.channel,
         openaiUsed: false,
         classification,
+        domain,
+        policyMode,
+        promptVersion,
+        contextSummary: {
+          domain,
+          channel: input.channel,
+          audience: input.userType,
+          sections: [],
+          inputKeys: Object.keys(input.context || {}),
+          hasAcquisitionContext: false,
+          hasClientContext: false,
+          hasPageContext: false,
+          hasJourneyContext: false
+        },
+        sideEffects: [],
         conversationState: newConversationState,
       },
     };
@@ -2124,6 +2334,9 @@ export async function processComment(
   userId: string
 ): Promise<CommentProcessingOutput> {
   const startTime = Date.now();
+  const domain: NoemiaDomain = "channel_comment";
+  const policyMode: NoemiaPolicyMode = "channel_automation";
+  const promptVersion = getNoemiaPromptVersion();
 
   console.log(`NOEMIA_COMMENT_START: ${platform} | ${commentId} | ${userId}`);
   console.log(`NOEMIA_COMMENT_TEXT: ${commentText.substring(0, 100)}...`);
@@ -2136,7 +2349,7 @@ export async function processComment(
     classification.leadTemperature === "hot";
 
   try {
-    const systemPrompt = [
+    const legacyCommentPrompt = [
       "Você é a assistente virtual do escritório da Dra. Noêmia.",
       "Está respondendo a um comentário em rede social.",
       "",
@@ -2157,8 +2370,44 @@ export async function processComment(
       "2. trazer uma micro-revelação",
       "3. convidar para continuar em privado",
     ].join("\n");
+    const commentContext = minimizeNoemiaContext({
+      domain,
+      channel: platform,
+      userType: "visitor",
+      context: {
+        journey: {
+          source: `${platform}_comment`
+        },
+        page: {
+          commentId,
+          shouldReplyPrivately
+        }
+      }
+    });
+    const systemPrompt = buildNoemiaSystemPrompt(
+      platform,
+      "visitor",
+      commentContext.promptContext || { commentPolicy: legacyCommentPrompt },
+      {
+        domain,
+        promptVersion
+      }
+    );
 
-    const openaiResult = await callOpenAI(commentText, systemPrompt);
+    traceNoemiaEvent("info", "NOEMIA_COMMENT_MODEL_REQUESTED", {
+      channel: platform,
+      domain,
+      userType: "visitor",
+      policyMode,
+      sessionId: commentId,
+      clientId: userId
+    }, buildNoemiaTraceMetadata({
+      promptVersion,
+      contextSummary: commentContext.summary,
+      classification
+    }));
+
+    const openaiResult = await callGovernedModel(domain, commentText, systemPrompt);
 
     if (openaiResult.success && openaiResult.response) {
       console.log(
@@ -2166,6 +2415,21 @@ export async function processComment(
           shouldReplyPrivately ? "PRIVATE_REPLY" : "PUBLIC_REPLY"
         }`
       );
+
+      traceNoemiaEvent("info", "NOEMIA_COMMENT_MODEL_SUCCEEDED", {
+        channel: platform,
+        domain,
+        userType: "visitor",
+        policyMode,
+        sessionId: commentId,
+        clientId: userId
+      }, buildNoemiaTraceMetadata({
+        promptVersion,
+        contextSummary: commentContext.summary,
+        source: "openai",
+        usedFallback: false,
+        classification
+      }));
 
       return {
         reply: openaiResult.response,
@@ -2175,11 +2439,27 @@ export async function processComment(
           responseTime: Date.now() - startTime,
           channel: `${platform}_comment`,
           openaiUsed: true,
+          domain,
+          promptVersion
         },
       };
     }
 
     console.log(`NOEMIA_COMMENT_FALLBACK: ${platform} | ${openaiResult.error}`);
+    traceNoemiaEvent("warn", "NOEMIA_COMMENT_MODEL_FALLBACK", {
+      channel: platform,
+      domain,
+      userType: "visitor",
+      policyMode,
+      sessionId: commentId,
+      clientId: userId
+    }, buildNoemiaTraceMetadata({
+      promptVersion,
+      contextSummary: commentContext.summary,
+      source: "fallback",
+      usedFallback: true,
+      classification
+    }), openaiResult.error);
 
     const fallbackReply = generateCommentFallback(classification);
 
@@ -2191,13 +2471,25 @@ export async function processComment(
         responseTime: Date.now() - startTime,
         channel: `${platform}_comment`,
         openaiUsed: false,
+        domain,
+        promptVersion
       },
     };
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : String(error);
 
-    console.log(`NOEMIA_COMMENT_ERROR: ${platform} | ${errorMessage}`);
+    traceNoemiaEvent("error", "NOEMIA_COMMENT_FAILED", {
+      channel: platform,
+      domain,
+      userType: "visitor",
+      policyMode,
+      sessionId: commentId,
+      clientId: userId
+    }, {
+      outcome: "failed",
+      reason: errorMessage
+    }, error);
 
     return {
       reply:
@@ -2208,6 +2500,8 @@ export async function processComment(
         responseTime: Date.now() - startTime,
         channel: `${platform}_comment`,
         openaiUsed: false,
+        domain,
+        promptVersion
       },
     };
   }

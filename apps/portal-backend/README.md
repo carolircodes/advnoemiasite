@@ -7,6 +7,8 @@ Deploy e mapeamento Vercel: [`../../docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md`]
 
 Arquitetura do produto, inventário (o que existe / o que falta) e plano por etapas: [`docs/PORTAL_PRODUCT.md`](docs/PORTAL_PRODUCT.md).
 
+Governanca canonica da camada NoemIA: [`docs/NOEMIA_GOVERNANCE.md`](docs/NOEMIA_GOVERNANCE.md).
+
 Checklist de deploy (apex + `portal.advnoemia.com.br`): [`docs/DEPLOY_PRODUCTION_CHECKLIST.md`](docs/DEPLOY_PRODUCTION_CHECKLIST.md).
 
 O fluxo local validado para este projeto e:

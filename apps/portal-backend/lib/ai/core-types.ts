@@ -8,6 +8,13 @@ export type NoemiaChannel =
   | "facebook"
   | "telegram";
 export type NoemiaUserType = "visitor" | "client" | "staff" | "unknown";
+export type NoemiaDomain =
+  | "public_site_chat"
+  | "portal_support"
+  | "commercial_conversion"
+  | "internal_operational"
+  | "channel_comment";
+export type NoemiaPolicyMode = "public" | "commercial" | "internal" | "channel_automation";
 
 export type LegalTheme =
   | "previdenciario"
@@ -46,7 +53,22 @@ export type AcquisitionContext = {
 
 export type NoemiaContext = {
   acquisition?: AcquisitionContext;
+  page?: Record<string, unknown>;
+  journey?: Record<string, unknown>;
+  relationship?: Record<string, unknown>;
   [key: string]: unknown;
+};
+
+export type NoemiaPromptContextSummary = {
+  domain: NoemiaDomain;
+  channel: NoemiaChannel;
+  audience: NoemiaUserType;
+  sections: string[];
+  inputKeys: string[];
+  hasAcquisitionContext: boolean;
+  hasClientContext: boolean;
+  hasPageContext: boolean;
+  hasJourneyContext: boolean;
 };
 
 export type FollowUpTrigger =
@@ -187,6 +209,7 @@ export interface ConversationState {
 export interface NoemiaCoreInput {
   channel: NoemiaChannel;
   userType: NoemiaUserType;
+  domain?: NoemiaDomain;
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   context?: NoemiaContext;
@@ -213,6 +236,11 @@ export interface NoemiaCoreOutput {
       intent: ClassifiedIntent;
       leadTemperature: LeadTemperature;
     };
+    domain?: NoemiaDomain;
+    policyMode?: NoemiaPolicyMode;
+    promptVersion?: string;
+    contextSummary?: NoemiaPromptContextSummary;
+    sideEffects?: string[];
     conversationState?: ConversationState;
   };
 }
@@ -229,5 +257,7 @@ export interface CommentProcessingOutput {
     responseTime: number;
     channel: string;
     openaiUsed: boolean;
+    domain?: NoemiaDomain;
+    promptVersion?: string;
   };
 }

@@ -354,6 +354,10 @@ export async function POST(request: NextRequest) {
           source: coreResponse.source,
           usedFallback: coreResponse.usedFallback,
           responseTime: coreResponse.metadata.responseTime,
+          domain: coreResponse.metadata.domain || null,
+          policyMode: coreResponse.metadata.policyMode || null,
+          promptVersion: coreResponse.metadata.promptVersion || null,
+          contextSummary: coreResponse.metadata.contextSummary || null,
           handoffRequested: siteContext?.shouldHandoff || false,
           handoffReason: siteContext?.handoffReason || null
         }

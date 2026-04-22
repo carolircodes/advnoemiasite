@@ -18,6 +18,7 @@ type RevenuePaymentRow = {
   final_amount_cents?: number | null;
   price_source?: string | null;
   status: string | null;
+  financial_state?: string | null;
   created_at: string;
   updated_at: string;
   approved_at: string | null;
@@ -42,6 +43,10 @@ function asNumber(value: unknown) {
 
 function asString(value: unknown) {
   return typeof value === "string" ? value : "";
+}
+
+function getFinancialState(payment: RevenuePaymentRow) {
+  return asString(payment.financial_state) || asString(payment.status) || "pending";
 }
 
 function currency(value: number) {
@@ -85,7 +90,7 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
     supabase
       .from("payments")
       .select(
-        "id,lead_id,user_id,external_id,amount,base_amount_cents,final_amount_cents,price_source,status,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
+        "id,lead_id,user_id,external_id,amount,base_amount_cents,final_amount_cents,price_source,status,financial_state,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
       )
       .gte("created_at", since)
       .order("created_at", { ascending: false })
@@ -112,10 +117,10 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
   const payments = (paymentsResult.data || []) as RevenuePaymentRow[];
   const revenueEvents = (productEventsResult.data || []) as RevenueEventRow[];
 
-  const pendingPayments = payments.filter((payment) => payment.status === "pending");
-  const approvedPayments = payments.filter((payment) => payment.status === "approved");
+  const pendingPayments = payments.filter((payment) => getFinancialState(payment) === "pending");
+  const approvedPayments = payments.filter((payment) => getFinancialState(payment) === "approved");
   const failedPayments = payments.filter(
-    (payment) => payment.status === "rejected" || payment.status === "failed"
+    (payment) => ["failed", "cancelled", "expired", "refunded", "charged_back"].includes(getFinancialState(payment))
   );
   const stalePendingPayments = pendingPayments.filter(
     (payment) => payment.created_at <= stalePendingLimit
@@ -192,13 +197,15 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
     const offerCode = asString(payment.metadata?.offer_code) || "consultation_initial";
     const bucket = ensureOffer(offerCode);
 
-    if (payment.status === "pending") {
+    const financialState = getFinancialState(payment);
+
+    if (financialState === "pending") {
       bucket.pending += 1;
       bucket.revenueInFormation += asNumber(payment.amount);
-    } else if (payment.status === "approved") {
+    } else if (financialState === "approved") {
       bucket.approved += 1;
       bucket.revenueConfirmed += asNumber(payment.amount);
-    } else if (payment.status === "rejected" || payment.status === "failed") {
+    } else if (["failed", "cancelled", "expired", "refunded", "charged_back"].includes(financialState)) {
       bucket.failed += 1;
     }
   }
@@ -317,7 +324,7 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
       const offer = getRevenueOfferByCode(asString(payment.metadata?.offer_code));
       return {
         id: payment.id,
-        status: payment.status || "pending",
+        status: getFinancialState(payment),
         amountLabel: currency(asNumber(payment.amount)),
         offerLabel: offer.name,
         kindLabel: offer.kind,
@@ -326,7 +333,7 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
         leadId: payment.lead_id,
         externalId: payment.external_id,
         followUpNeeded:
-          payment.status === "pending" && payment.created_at <= stalePendingLimit,
+          getFinancialState(payment) === "pending" && payment.created_at <= stalePendingLimit,
         statusDetail: payment.status_detail || "",
         priceSource: payment.price_source || asString(payment.metadata?.price_source) || "default_consultation",
         finalAmountCents:
