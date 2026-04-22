@@ -24,6 +24,7 @@ import {
 type ConversationChannel =
   | "instagram"
   | "facebook"
+  | "youtube"
   | "whatsapp"
   | "site"
   | "portal"
@@ -493,6 +494,9 @@ export type ConversationInboxMetrics = {
   followUpOverdueCount: number;
   whatsappVolume: number;
   instagramVolume: number;
+  youtubeVolume: number;
+  youtubeCommentSignals: number;
+  youtubeHotThreads: number;
   instagramDmVolume: number;
   instagramCommentSignals: number;
   instagramWaitingHumanCount: number;
@@ -587,6 +591,17 @@ function inferThreadOrigin(session: SessionRow) {
     };
   }
 
+  if (
+    entryType === "youtube_comment" ||
+    entryType === "youtube_video_comment" ||
+    entryType === "youtube_short_comment"
+  ) {
+    return {
+      type: "comment" as const,
+      label: presentOperationalThreadOriginLabel({ entryType, channel: "youtube" })
+    };
+  }
+
   if (entryType === "instagram_comment_to_dm") {
     return {
       type: "comment_to_dm" as const,
@@ -642,6 +657,8 @@ function inferThreadOrigin(session: SessionRow) {
     type:
       session.channel === "instagram" || session.channel === "facebook"
         ? ("dm" as const)
+        : session.channel === "youtube"
+          ? ("comment" as const)
         : ("unknown" as const),
     label: presentOperationalThreadOriginLabel({
       channel: session.channel,
@@ -707,6 +724,12 @@ function buildEventSummary(event: EventRow) {
       return "Comentario do Facebook ganhou continuidade privada no Messenger.";
     case "instagram_comment_dm_started":
       return "Comentario publico ganhou continuidade privada no direct.";
+    case "youtube_comment_signal_captured":
+      return "Comentario relevante do YouTube entrou como sinal operacional.";
+    case "youtube_comment_review_requested":
+      return "Comentario do YouTube foi encaminhado para revisao humana.";
+    case "youtube_comment_reply_suggested":
+      return "Sugestao de resposta do YouTube foi registrada com guardrails.";
     case "site_context_captured":
       return "Origem, CTA e contexto de navegacao capturados no site.";
     case "site_handoff_requested":
@@ -998,6 +1021,7 @@ class ConversationInboxService {
     return (
       asString(session.metadata?.username) ||
       asString(session.metadata?.instagram_username) ||
+      asString(safeObject(session.metadata?.youtube).authorDisplayName) ||
       asString(session.metadata?.telegram_username) ||
       null
     );
@@ -1300,6 +1324,10 @@ class ConversationInboxService {
         accumulator.followUpOverdueCount += item.followUpStatus === "overdue" ? 1 : 0;
         accumulator.whatsappVolume += item.channel === "whatsapp" ? 1 : 0;
         accumulator.instagramVolume += item.channel === "instagram" ? 1 : 0;
+        accumulator.youtubeVolume += item.channel === "youtube" ? 1 : 0;
+        accumulator.youtubeCommentSignals +=
+          item.channel === "youtube" && item.threadOriginType === "comment" ? 1 : 0;
+        accumulator.youtubeHotThreads += item.channel === "youtube" && item.hot ? 1 : 0;
         accumulator.instagramDmVolume +=
           item.channel === "instagram" && item.threadOriginType !== "comment" ? 1 : 0;
         accumulator.instagramCommentSignals +=
@@ -1366,6 +1394,9 @@ class ConversationInboxService {
         followUpOverdueCount: 0,
         whatsappVolume: 0,
         instagramVolume: 0,
+        youtubeVolume: 0,
+        youtubeCommentSignals: 0,
+        youtubeHotThreads: 0,
         instagramDmVolume: 0,
         instagramCommentSignals: 0,
         instagramWaitingHumanCount: 0,
@@ -1850,7 +1881,7 @@ class ConversationInboxService {
 
     if (!sendResult) {
       throw new Error(
-        "A resposta manual pelo painel esta disponivel apenas para WhatsApp, Instagram, Facebook, Site Chat e Telegram."
+        "A resposta manual pelo painel esta disponivel para WhatsApp, Instagram, Facebook, Site Chat e Telegram. Threads do YouTube seguem por revisao e dispatch auditavel."
       );
     }
     const sendSucceeded = "success" in sendResult ? sendResult.success : sendResult.ok;

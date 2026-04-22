@@ -86,7 +86,11 @@ export function buildContextRoutingDecision(
     why.push("lead ja declarou interesse em agenda");
   }
 
-  if (taxonomy.channel === "instagram" || taxonomy.channel === "facebook") {
+  if (
+    taxonomy.channel === "instagram" ||
+    taxonomy.channel === "facebook" ||
+    taxonomy.channel === "youtube"
+  ) {
     priorityChannel = priorityChannel === "unknown" ? "whatsapp" : priorityChannel;
     suggestedContentTrack = `${suggestedContentTrack}-social`;
     why.push("entrada social pede passagem rapida para canal de continuidade");

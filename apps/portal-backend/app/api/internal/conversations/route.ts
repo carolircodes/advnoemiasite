@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         | "all"
         | "instagram"
         | "facebook"
+        | "youtube"
         | "whatsapp"
         | "site"
         | "portal"

@@ -6,12 +6,33 @@ type ObservationLevel = "info" | "warn" | "error";
 
 type ObservationMetadata = Record<string, unknown>;
 
+export type ObservedErrorCategory =
+  | "configuration"
+  | "authentication"
+  | "provider"
+  | "fallback"
+  | "boundary"
+  | "validation"
+  | "rate_limit"
+  | "idempotency"
+  | "not_found"
+  | "internal";
+
 export type RequestObservation = {
   requestId: string;
   correlationId: string;
   method: string;
   pathname: string;
   startedAt: number;
+  flow?: string;
+  channel?: string;
+  provider?: string;
+};
+
+type RequestObservationOptions = {
+  flow?: string;
+  channel?: string;
+  provider?: string;
 };
 
 function sanitizeValue(value: unknown): unknown {
@@ -64,7 +85,10 @@ function sanitizeMetadata(metadata: ObservationMetadata = {}) {
   return sanitizeValue(metadata) as ObservationMetadata;
 }
 
-export function startRequestObservation(request: Request): RequestObservation {
+export function startRequestObservation(
+  request: Request,
+  options: RequestObservationOptions = {}
+): RequestObservation {
   const url = new URL(request.url);
   const headerRequestId =
     request.headers.get("x-request-id") ||
@@ -77,7 +101,63 @@ export function startRequestObservation(request: Request): RequestObservation {
     correlationId: requestId,
     method: request.method,
     pathname: url.pathname,
-    startedAt: performance.now()
+    startedAt: performance.now(),
+    flow: options.flow,
+    channel: options.channel,
+    provider: options.provider
+  };
+}
+
+function splitObservedMetadata(metadata: ObservationMetadata) {
+  const known = {
+    flow:
+      typeof metadata.flow === "string" && metadata.flow.trim().length > 0
+        ? metadata.flow.trim()
+        : null,
+    outcome:
+      typeof metadata.outcome === "string" && metadata.outcome.trim().length > 0
+        ? metadata.outcome.trim()
+        : null,
+    status:
+      typeof metadata.status === "number" || typeof metadata.status === "string"
+        ? metadata.status
+        : null,
+    channel:
+      typeof metadata.channel === "string" && metadata.channel.trim().length > 0
+        ? metadata.channel.trim()
+        : null,
+    provider:
+      typeof metadata.provider === "string" && metadata.provider.trim().length > 0
+        ? metadata.provider.trim()
+        : null,
+    errorCategory:
+      typeof metadata.errorCategory === "string" && metadata.errorCategory.trim().length > 0
+        ? metadata.errorCategory.trim()
+        : null,
+    runtimeState:
+      typeof metadata.runtimeState === "string" && metadata.runtimeState.trim().length > 0
+        ? metadata.runtimeState.trim()
+        : null
+  };
+
+  const rest = Object.fromEntries(
+    Object.entries(metadata).filter(
+      ([key]) =>
+        ![
+          "flow",
+          "outcome",
+          "status",
+          "channel",
+          "provider",
+          "errorCategory",
+          "runtimeState"
+        ].includes(key)
+    )
+  );
+
+  return {
+    known,
+    rest
   };
 }
 
@@ -89,16 +169,24 @@ export function logObservedRequest(
   error?: unknown
 ) {
   const durationMs = Math.round(performance.now() - observation.startedAt);
+  const { known, rest } = splitObservedMetadata(metadata);
   const output = {
     timestamp: new Date().toISOString(),
     level,
     event,
     requestId: observation.requestId,
     correlationId: observation.correlationId,
+    flow: known.flow || observation.flow || null,
     method: observation.method,
     pathname: observation.pathname,
+    channel: known.channel || observation.channel || null,
+    provider: known.provider || observation.provider || null,
+    outcome: known.outcome,
+    status: known.status,
+    errorCategory: known.errorCategory,
+    runtimeState: known.runtimeState,
     durationMs,
-    metadata: sanitizeMetadata(metadata),
+    metadata: sanitizeMetadata(rest),
     error:
       error instanceof Error
         ? {

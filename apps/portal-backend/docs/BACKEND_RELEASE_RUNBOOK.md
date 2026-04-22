@@ -98,3 +98,17 @@ Quando isso acontecer, use `handoff/incident-escalation-summary.md` como o corpo
 - abrir `/internal/advogada/inteligencia` e confirmar os blocos omnichannel
 - abrir `/internal/advogada/clientes/[id]` e confirmar a linha omnichannel da jornada
 - validar que o intake continua gravando `routingDecision` e `journeyTaxonomy` em `intake_requests.metadata`
+
+## YouTube release gate
+
+- revisar `docs/YOUTUBE_OPERATIONS.md`
+- confirmar:
+  - `YOUTUBE_ENABLE_INGESTION`
+  - `YOUTUBE_ENABLE_COMMENT_SYNC`
+  - modo escolhido entre read only, suggestion e active reply
+- validar `GET /api/internal/youtube?action=status`
+- validar `GET /api/internal/youtube?action=oauthStart` quando o canal estiver indo para active
+- validar `POST /api/internal/youtube` com `registerAsset`
+- validar `POST /api/internal/youtube` com `ingestComment` para video e Short
+- confirmar no portal que a thread entra como `YouTube`
+- confirmar `automation_dispatches`, `conversation_events` e `product_events` do comentario

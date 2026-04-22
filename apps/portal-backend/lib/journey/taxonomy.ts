@@ -4,6 +4,7 @@ export type JourneyChannel =
   | "landing"
   | "instagram"
   | "facebook"
+  | "youtube"
   | "tiktok"
   | "whatsapp"
   | "telegram"
@@ -24,6 +25,9 @@ export type JourneySurface =
   | "instagram_dm"
   | "instagram_comment"
   | "facebook_dm"
+  | "youtube_video"
+  | "youtube_short"
+  | "youtube_comment"
   | "telegram_chat"
   | "portal"
   | "inbox"
@@ -158,6 +162,10 @@ function mapChannel(rawValue: string): JourneyChannel {
     return "facebook";
   }
 
+  if (value.includes("youtube") || value === "yt") {
+    return "youtube";
+  }
+
   if (value.includes("tiktok") || value === "tt") {
     return "tiktok";
   }
@@ -220,6 +228,8 @@ function mapSurface(rawValue: string, fallbackChannel: JourneyChannel): JourneyS
         return "instagram_dm";
       case "facebook":
         return "facebook_dm";
+      case "youtube":
+        return "youtube_comment";
       case "article":
         return "article";
       case "landing":
@@ -280,6 +290,18 @@ function mapSurface(rawValue: string, fallbackChannel: JourneyChannel): JourneyS
 
   if (value.includes("facebook")) {
     return "facebook_dm";
+  }
+
+  if (value.includes("youtube-short") || value.includes("youtube_short") || value.includes("short")) {
+    return "youtube_short";
+  }
+
+  if (value.includes("youtube-comment") || value.includes("youtube_comment")) {
+    return "youtube_comment";
+  }
+
+  if (value.includes("youtube") || value.includes("video")) {
+    return "youtube_video";
   }
 
   if (value.includes("telegram")) {

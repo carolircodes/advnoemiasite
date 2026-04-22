@@ -2,6 +2,9 @@
 
 Base real do portal juridico com Supabase Auth, cadastro interno, convite por e-mail e area autenticada para equipe e cliente.
 
+Source of truth arquitetural do monorepo: [`../../docs/ARCHITECTURE_SURFACES.md`](../../docs/ARCHITECTURE_SURFACES.md).
+Deploy e mapeamento Vercel: [`../../docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md`](../../docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md).
+
 Arquitetura do produto, inventário (o que existe / o que falta) e plano por etapas: [`docs/PORTAL_PRODUCT.md`](docs/PORTAL_PRODUCT.md).
 
 Checklist de deploy (apex + `portal.advnoemia.com.br`): [`docs/DEPLOY_PRODUCTION_CHECKLIST.md`](docs/DEPLOY_PRODUCTION_CHECKLIST.md).
@@ -101,6 +104,8 @@ RESEND_API_KEY=
 EMAIL_FROM=Noemia Paixao Advocacia <no-reply@advnoemia.local>
 OPENAI_API_KEY=
 OPENAI_MODEL=
+INTERNAL_API_SECRET=
+SITE_CHAT_SESSION_SECRET=
 PORTAL_ADMIN_EMAIL=advogada@advnoemia.local
 PORTAL_ADMIN_FULL_NAME=Noemia Paixao
 PORTAL_ADMIN_TEMP_PASSWORD=TroqueEstaSenha123
@@ -117,6 +122,16 @@ Para envio real de notificacoes do portal:
 - use `NOTIFICATIONS_PROVIDER=smtp` no ambiente local para falar com o Inbucket exposto em `127.0.0.1:54325`
 - use `NOTIFICATIONS_PROVIDER=resend` em ambiente externo quando quiser enviar pela API da Resend
 - defina `NOTIFICATIONS_WORKER_SECRET` antes de expor a rota do worker
+- defina `INTERNAL_API_SECRET` antes de usar `POST /api/payment/create`, `/api/acquisition/events` ou qualquer chamada interna sem sessao
+- defina `SITE_CHAT_SESSION_SECRET` para habilitar o chat publico com cookie httpOnly assinado
+
+## Contratos de seguranca desta fase
+
+- `GET /api/noemia/chat` nao aceita mais `sessionId` em query string; o transcript do site depende de cookie httpOnly assinado no servidor
+- `POST /api/payment/create` passou a exigir `x-internal-api-secret` ou sessao staff autenticada
+- `GET/POST /api/acquisition/events` passaram a exigir acesso interno autenticado; tracking publico continua em `/api/public/events`
+- `GET /api/payment/webhook` agora falha fechado para acessos nao autorizados e o webhook exige `MERCADO_PAGO_WEBHOOK_SECRET`
+- em producao, se rate limit/idempotencia duraveis cairem para `memory-fallback`, rotas publicas criticas respondem `503` em vez de fingir protecao
 
 ## Setup local
 

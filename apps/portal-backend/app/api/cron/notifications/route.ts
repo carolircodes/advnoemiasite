@@ -1,9 +1,12 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
-
 import { requireRouteSecretOrStaffAccess } from "../../../../lib/auth/api-authorization";
 import { getNotificationEnv, getServerEnv } from "../../../../lib/config/env";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "../../../../lib/observability/request-observability";
 import { processPendingNotifications } from "../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
@@ -24,6 +27,10 @@ export const dynamic = "force-dynamic";
  * interno), o que e mais eficiente e evita problemas de rede em serverless.
  */
 export async function GET(request: Request) {
+  const observation = startRequestObservation(request, {
+    flow: "notifications_cron",
+    provider: "notifications"
+  });
   const env = getServerEnv();
   const notificationEnv = getNotificationEnv();
 
@@ -38,11 +45,26 @@ export async function GET(request: Request) {
   });
 
   if (!access.ok) {
+    logObservedRequest("warn", "NOTIFICATIONS_CRON_DENIED", observation, {
+      flow: "notifications_cron",
+      provider: "notifications",
+      outcome: "denied",
+      status: access.status,
+      errorCategory: "boundary"
+    });
     return access.response;
   }
 
   if (!notificationEnv.emailFrom) {
-    return NextResponse.json(
+    logObservedRequest("error", "NOTIFICATIONS_CRON_EMAIL_FROM_MISSING", observation, {
+      flow: "notifications_cron",
+      provider: notificationEnv.provider,
+      outcome: "failed",
+      status: 503,
+      errorCategory: "configuration"
+    });
+    return createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error:
@@ -51,7 +73,7 @@ export async function GET(request: Request) {
         recommendation:
           "Configure EMAIL_FROM e RESEND_API_KEY ou variaveis SMTP no painel do Vercel"
       },
-      { status: 200 }
+      { status: 503 }
     );
   }
 
@@ -61,7 +83,15 @@ export async function GET(request: Request) {
       : Boolean(notificationEnv.smtpHost && notificationEnv.smtpPort);
 
   if (!providerReady) {
-    return NextResponse.json(
+    logObservedRequest("error", "NOTIFICATIONS_CRON_PROVIDER_CONFIG_MISSING", observation, {
+      flow: "notifications_cron",
+      provider: notificationEnv.provider,
+      outcome: "failed",
+      status: 503,
+      errorCategory: "configuration"
+    });
+    return createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error:
@@ -72,14 +102,26 @@ export async function GET(request: Request) {
         recommendation:
           "Configure as variaveis de ambiente do provedor de email no painel do Vercel"
       },
-      { status: 200 }
+      { status: 503 }
     );
   }
 
   try {
     const result = await processPendingNotifications(20);
 
-    return NextResponse.json(
+    logObservedRequest("info", "NOTIFICATIONS_CRON_PROCESSED", observation, {
+      flow: "notifications_cron",
+      provider: notificationEnv.provider,
+      outcome: result.failed > 0 ? "degraded" : "success",
+      status: 200,
+      processed: result.processed,
+      sent: result.sent,
+      failed: result.failed,
+      runtimeState: result.diagnostics.status
+    });
+
+    return createObservedJsonResponse(
+      observation,
       {
         ok: true,
         provider: notificationEnv.provider,
@@ -88,7 +130,15 @@ export async function GET(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    return NextResponse.json(
+    logObservedRequest("error", "NOTIFICATIONS_CRON_FAILED", observation, {
+      flow: "notifications_cron",
+      provider: notificationEnv.provider,
+      outcome: "failed",
+      status: 500,
+      errorCategory: "internal"
+    }, error);
+    return createObservedJsonResponse(
+      observation,
       {
         ok: false,
         error:

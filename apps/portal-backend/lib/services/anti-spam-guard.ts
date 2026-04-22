@@ -2,7 +2,7 @@ import { conversationPersistence, ConversationMessage } from './conversation-per
 import { buildWebhookEventPayloadHash } from "./webhook-idempotency";
 
 export interface WebhookEvent {
-  channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram';
+  channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram' | 'youtube';
   externalEventId?: string;
   externalMessageId?: string;
   externalUserId: string;

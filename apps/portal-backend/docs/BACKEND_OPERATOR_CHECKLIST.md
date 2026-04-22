@@ -214,3 +214,19 @@ Sinais de desvio:
 - conferir se um cliente com `sourceIntakeRequestId` exibe timeline omnichannel junto da linha operacional
 - validar se leads novos persistem `routingDecision` e `journeyTaxonomy` em `intake_requests.metadata`
 - se algum canal externo ainda nao estiver habilitado, manter a flag ligada apenas em modo preparatorio e nao prometer envio real sem credencial
+
+## 13. YouTube - rollout seguro
+
+- revisar `docs/YOUTUBE_OPERATIONS.md`
+- confirmar `YOUTUBE_ENABLE_INGESTION` e `YOUTUBE_ENABLE_COMMENT_SYNC`
+- validar modo atual:
+  - read only
+  - suggestion
+  - active reply
+- revisar `GET /api/internal/youtube?action=status`
+- usar `GET /api/internal/youtube?action=oauthStart` antes de qualquer tentativa de active reply
+- testar um video e um Short via `/api/internal/youtube`
+- conferir se a thread aparece como `YouTube` no portal
+- revisar `automation_dispatches` para `entity_type = youtube_comment`
+- revisar `conversation_events` com `youtube_comment_signal_captured`, `youtube_comment_review_requested` ou `youtube_comment_reply_suggested`
+- confirmar que comentarios repetidos nao geram duplicidade operacional

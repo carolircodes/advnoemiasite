@@ -1,4 +1,3 @@
-import { shouldEnforceWebhookSignature } from "../http/webhook-security.ts";
 import { buildDiagnosticSection, type DiagnosticSection } from "./status.ts";
 
 type PaymentSiteUrlSource =
@@ -29,6 +28,9 @@ export function getPaymentRuntimeDiagnostics(): PaymentRuntimeDiagnostics {
         : process.env.NEXT_PUBLIC_APP_URL?.trim()
           ? "NEXT_PUBLIC_APP_URL"
           : null;
+  const webhookSecretConfigured = Boolean(
+    process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim()
+  );
 
   return {
     mercadoPagoAccessTokenConfigured: Boolean(
@@ -37,9 +39,7 @@ export function getPaymentRuntimeDiagnostics(): PaymentRuntimeDiagnostics {
     mercadoPagoPublicKeyConfigured: Boolean(
       process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY?.trim()
     ),
-    webhookSecretConfigured: Boolean(
-      process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim()
-    ),
+    webhookSecretConfigured,
     supabaseUrlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()),
     supabaseSecretConfigured: Boolean(
       process.env.SUPABASE_SECRET_KEY?.trim() ||
@@ -47,9 +47,7 @@ export function getPaymentRuntimeDiagnostics(): PaymentRuntimeDiagnostics {
     ),
     siteUrlConfigured: Boolean(siteUrlSource),
     siteUrlSource,
-    signatureEnforced: shouldEnforceWebhookSignature(
-      "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
-    )
+    signatureEnforced: webhookSecretConfigured
   };
 }
 

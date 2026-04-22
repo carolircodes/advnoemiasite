@@ -1,13 +1,14 @@
 import { randomUUID } from "crypto";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 import { processNoemiaCore, type ConversationState } from "@/lib/ai/noemia-core";
 import { getCurrentProfile } from "@/lib/auth/guards";
 import { askNoemiaSchema } from "@/lib/domain/portal";
 import {
   buildDurableRateLimitHeaders,
-  consumeDurableRateLimit
+  consumeDurableRateLimit,
+  shouldEnforceDurableProtection
 } from "@/lib/http/durable-abuse-protection";
 import { getClientIp } from "@/lib/http/request-guards";
 import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-middleware";
@@ -19,6 +20,17 @@ import {
   normalizeSiteChatOrigin,
   sendSiteChatMessage
 } from "@/lib/site/site-chat-service";
+import {
+  clearSiteChatSessionCookie,
+  readSiteChatSessionFromRequest,
+  setSiteChatSessionCookie
+} from "@/lib/site/site-chat-session";
+import { categorizeObservedError } from "@/lib/observability/error-categorization";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "@/lib/observability/request-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,41 +66,96 @@ type SiteThreadContext = {
   handoffReason: string | null;
 };
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get("sessionId")?.trim();
+function buildEmptyConversationResponse() {
+  return {
+    ok: true,
+    data: {
+      threadId: null,
+      threadStatus: "new",
+      waitingFor: "ai",
+      messages: []
+    }
+  };
+}
 
-    if (!sessionId) {
-      return NextResponse.json({ error: "session_id_required" }, { status: 400 });
+export async function GET(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "noemia_chat_sync",
+    channel: "site"
+  });
+  try {
+    const trustedSession = readSiteChatSessionFromRequest(request);
+
+    if (!trustedSession.ok) {
+      if (trustedSession.reason === "misconfigured") {
+        logObservedRequest("error", "NOEMIA_CHAT_SYNC_MISCONFIGURED", observation, {
+          flow: "noemia_chat_sync",
+          channel: "site",
+          outcome: "failed",
+          status: 503,
+          errorCategory: "configuration"
+        });
+        return createObservedJsonResponse(
+          observation,
+          {
+            ok: false,
+            error: "site_chat_session_not_configured"
+          },
+          { status: 503 }
+        );
+      }
+
+      logObservedRequest("warn", "NOEMIA_CHAT_SYNC_INVALID_SESSION", observation, {
+        flow: "noemia_chat_sync",
+        channel: "site",
+        outcome: "denied",
+        status: 200,
+        errorCategory: "authentication",
+        reason: trustedSession.reason
+      });
+
+      const response = createObservedJsonResponse(
+        observation,
+        buildEmptyConversationResponse()
+      );
+
+      if (trustedSession.reason === "invalid") {
+        clearSiteChatSessionCookie(response);
+      }
+
+      return response;
     }
 
     const { data: session } = await conversationPersistence.supabaseClient
       .from("conversation_sessions")
       .select("*")
       .eq("channel", "site")
-      .eq("external_user_id", sessionId)
+      .eq("external_user_id", trustedSession.sessionId)
       .maybeSingle();
 
     if (!session) {
-      return NextResponse.json({
-        ok: true,
-        data: {
-          sessionId,
-          threadId: null,
-          threadStatus: "new",
-          waitingFor: "ai",
-          messages: []
-        }
+      logObservedRequest("info", "NOEMIA_CHAT_SYNC_EMPTY", observation, {
+        flow: "noemia_chat_sync",
+        channel: "site",
+        outcome: "success",
+        status: 200
       });
+      return createObservedJsonResponse(observation, buildEmptyConversationResponse());
     }
 
     const messages = await conversationPersistence.getRecentMessages(session.id, 50);
 
-    return NextResponse.json({
+    logObservedRequest("info", "NOEMIA_CHAT_SYNC_LOADED", observation, {
+      flow: "noemia_chat_sync",
+      channel: "site",
+      outcome: "success",
+      status: 200,
+      threadId: session.id
+    });
+
+    return createObservedJsonResponse(observation, {
       ok: true,
       data: {
-        sessionId,
         threadId: session.id,
         threadStatus: session.thread_status || "new",
         waitingFor: session.waiting_for || "ai",
@@ -105,13 +172,18 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    return NextResponse.json(
+    logObservedRequest("error", "NOEMIA_CHAT_SYNC_FAILED", observation, {
+      flow: "noemia_chat_sync",
+      channel: "site",
+      outcome: "failed",
+      status: 500,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
+    return createObservedJsonResponse(
+      observation,
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nao foi possivel sincronizar a conversa do site."
+        error: "internal_error"
       },
       { status: 500 }
     );
@@ -119,6 +191,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "noemia_chat",
+    channel: "site"
+  });
   let profile: Awaited<ReturnType<typeof getCurrentProfile>> = null;
   const rateLimit = await consumeDurableRateLimit({
     bucket: "noemia-chat",
@@ -127,8 +203,40 @@ export async function POST(request: NextRequest) {
     windowMs: 5 * 60 * 1000
   });
 
+  if (rateLimit.mode !== "durable" && shouldEnforceDurableProtection()) {
+    logObservedRequest("error", "NOEMIA_CHAT_DURABLE_PROTECTION_UNAVAILABLE", observation, {
+      flow: "noemia_chat",
+      channel: "site",
+      outcome: "failed",
+      status: 503,
+      errorCategory: "fallback",
+      runtimeState: rateLimit.mode
+    });
+    return createObservedJsonResponse(
+      observation,
+      {
+        ok: false,
+        audience: "visitor",
+        answer: "A NoemIA esta temporariamente indisponivel. Tente novamente em instantes.",
+        error: "durable_protection_unavailable"
+      },
+      {
+        status: 503,
+        headers: buildDurableRateLimitHeaders(rateLimit)
+      }
+    );
+  }
+
   if (!rateLimit.ok) {
-    return NextResponse.json(
+    logObservedRequest("warn", "NOEMIA_CHAT_RATE_LIMITED", observation, {
+      flow: "noemia_chat",
+      channel: "site",
+      outcome: "failed",
+      status: 429,
+      errorCategory: "rate_limit"
+    });
+    return createObservedJsonResponse(
+      observation,
       {
         ok: false,
         audience: "visitor",
@@ -147,12 +255,38 @@ export async function POST(request: NextRequest) {
     const rawPayload = await request.json();
     const payload = normalizeChatPayload(rawPayload);
     const resolvedChannel = resolveChannel(payload.channel, payload.currentPath, payload.audience);
+    const trustedSiteSession =
+      resolvedChannel === "site" ? readSiteChatSessionFromRequest(request) : null;
     const metaContext = extractMetaContext(payload);
     const acquisitionContext = extractAcquisitionFromRequest(request);
     const combinedContext = {
       ...(metaContext || {}),
       acquisition: acquisitionContext ?? undefined
     };
+
+    if (resolvedChannel === "site" && trustedSiteSession && !trustedSiteSession.ok && trustedSiteSession.reason === "misconfigured") {
+      logObservedRequest("error", "NOEMIA_CHAT_SITE_SESSION_MISCONFIGURED", observation, {
+        flow: "noemia_chat",
+        channel: resolvedChannel,
+        outcome: "failed",
+        status: 503,
+        errorCategory: "configuration"
+      });
+      return createObservedJsonResponse(
+        observation,
+        {
+          ok: false,
+          audience: "visitor",
+          answer: "O chat do site nao esta configurado com seguranca neste ambiente.",
+          error: "site_chat_session_not_configured"
+        },
+        {
+          status: 503,
+          headers: buildDurableRateLimitHeaders(rateLimit)
+        }
+      );
+    }
+
     const siteContext =
       resolvedChannel === "site"
         ? await hydrateSiteThreadContext({
@@ -160,9 +294,23 @@ export async function POST(request: NextRequest) {
             profile,
             metaContext,
             acquisitionContext,
-            request
+            request,
+            trustedSessionId:
+              trustedSiteSession && trustedSiteSession.ok ? trustedSiteSession.sessionId : null
           })
         : null;
+
+    if (siteContext?.shouldHandoff) {
+      logObservedRequest("warn", "NOEMIA_CHAT_HANDOFF_REQUESTED", observation, {
+        flow: "noemia_chat",
+        channel: resolvedChannel,
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "boundary",
+        threadId: siteContext.threadId,
+        handoffReason: siteContext.handoffReason
+      });
+    }
 
     try {
       const coreResponse = await processNoemiaCore({
@@ -236,14 +384,42 @@ export async function POST(request: NextRequest) {
           }
         });
       } catch (trackingError) {
-        console.warn("[noemia.chat] Failed to record product event", trackingError);
+        logObservedRequest("warn", "NOEMIA_CHAT_PRODUCT_EVENT_DEGRADED", observation, {
+          flow: "noemia_chat",
+          channel: resolvedChannel,
+          outcome: "degraded",
+          status: 200,
+          errorCategory: "provider"
+        }, trackingError);
       }
 
-      return NextResponse.json(result, {
+      logObservedRequest("info", "NOEMIA_CHAT_SUCCEEDED", observation, {
+        flow: "noemia_chat",
+        channel: resolvedChannel,
+        outcome: "success",
+        status: 200,
+        threadId: siteContext?.threadId || null,
+        source: coreResponse.source,
+        usedFallback: coreResponse.usedFallback
+      });
+
+      const response = createObservedJsonResponse(observation, result, {
         headers: buildDurableRateLimitHeaders(rateLimit)
       });
+
+      if (siteContext) {
+        setSiteChatSessionCookie(response, siteContext.sessionId);
+      }
+
+      return response;
     } catch (error) {
-      console.warn("[noemia.chat] Falling back after Noemia Core error", error);
+      logObservedRequest("warn", "NOEMIA_CHAT_CORE_FALLBACK", observation, {
+        flow: "noemia_chat",
+        channel: resolvedChannel,
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "fallback"
+      }, error);
 
       const fallbackMessage =
         "A NoemIA esta temporariamente indisponivel. Tente novamente em alguns instantes.";
@@ -285,17 +461,36 @@ export async function POST(request: NextRequest) {
           }
         });
       } catch (trackingError) {
-        console.warn("[noemia.chat] Failed to record emergency fallback event", trackingError);
+        logObservedRequest("warn", "NOEMIA_CHAT_FALLBACK_EVENT_DEGRADED", observation, {
+          flow: "noemia_chat",
+          channel: resolvedChannel,
+          outcome: "degraded",
+          status: 200,
+          errorCategory: "provider"
+        }, trackingError);
       }
 
-      return NextResponse.json(fallbackResult, {
+      const response = createObservedJsonResponse(observation, fallbackResult, {
         headers: buildDurableRateLimitHeaders(rateLimit)
       });
+
+      if (siteContext) {
+        setSiteChatSessionCookie(response, siteContext.sessionId);
+      }
+
+      return response;
     }
   } catch (error) {
-    console.error("[noemia.chat] Unhandled endpoint error", error);
+    logObservedRequest("error", "NOEMIA_CHAT_FAILED", observation, {
+      flow: "noemia_chat",
+      channel: "site",
+      outcome: "failed",
+      status: 500,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
 
-    return NextResponse.json(
+    return createObservedJsonResponse(
+      observation,
       {
         ok: false,
         audience: profile ? "client" : "visitor",
@@ -316,6 +511,7 @@ async function hydrateSiteThreadContext(input: {
   metaContext: MetaContext | null;
   acquisitionContext: ReturnType<typeof extractAcquisitionFromRequest>;
   request: NextRequest;
+  trustedSessionId: string | null;
 }): Promise<SiteThreadContext> {
   const origin = normalizeSiteChatOrigin({
     audience: input.payload.audience,
@@ -342,7 +538,7 @@ async function hydrateSiteThreadContext(input: {
       input.acquisitionContext?.source ||
       "site",
     contentId: input.payload.contentId || input.acquisitionContext?.content_id,
-    sessionId: input.payload.sessionId || input.metaContext?.sessionId,
+    sessionId: input.trustedSessionId,
     referrer: input.payload.referrer || input.request.headers.get("referer"),
     timeOnPageSeconds: input.payload.timeOnPageSeconds,
     acquisitionTags: input.acquisitionContext?.acquisition_tags || input.payload.acquisitionTags,

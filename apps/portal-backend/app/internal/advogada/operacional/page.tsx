@@ -1437,8 +1437,8 @@ export default function OperationalPanel() {
       </PanelSection>
 
       <PanelSection
-        title={`Oportunidades em leitura (${contacts.length})`}
-        description="Acompanhe prioridade, histórico recente e os movimentos que pedem decisão comercial agora."
+        title={`Cockpit de oportunidades (${contacts.length})`}
+        description="A leitura principal prioriza quem e a oportunidade, o momento comercial e a proxima decisao. Contexto profundo e trilhos avancados ficam recolhidos."
       >
         {contacts.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#d8d2c4] bg-[#fbfaf7] px-6 py-10 text-center">
@@ -1537,6 +1537,14 @@ export default function OperationalPanel() {
                   </div>
                 ) : null}
 
+                <div className="mt-3 rounded-[1.5rem] border border-[rgba(19,37,31,0.12)] bg-[#13251f] p-4 text-white shadow-[0_14px_34px_rgba(16,38,29,0.14)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d8bc87]">
+                    Proxima conducao
+                  </p>
+                  <p className="mt-2 text-base font-semibold">{contact.recommendedActionLabel}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#d4ddd7]">{contact.recommendedActionDetail}</p>
+                </div>
+
                 <div className="mt-3 grid gap-3 lg:grid-cols-3">
                   <div className="rounded-2xl border border-[#ece5d8] bg-[#faf7f0] p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
@@ -1609,7 +1617,12 @@ export default function OperationalPanel() {
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 lg:grid-cols-[1.1fr_1fr_1fr]">
+                <details className="mt-4 rounded-[1.4rem] border border-[#ece5d8] bg-[#fcfaf6] px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">
+                    Abrir leitura expandida de conversao, fechamento, contexto e automacao
+                  </summary>
+                  <div className="mt-4 space-y-3">
+                <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr_1fr]">
                   <div className="rounded-2xl border border-[#ece5d8] bg-[#fbfaf7] p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7c61]">
                       Estagio de conversao
@@ -2130,6 +2143,9 @@ export default function OperationalPanel() {
                   </div>
                 ) : null}
 
+                  </div>
+                </details>
+
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#677770]">
                   <span className="font-medium text-[#10261d]">Canais:</span>
                   {contact.channels.map((channel, index) => (
@@ -2150,7 +2166,7 @@ export default function OperationalPanel() {
                     onClick={() => void generateSuggestedMessage(contact)}
                   >
                     <MessageSquare className="mr-2 h-4 w-4" />
-                    Gerar mensagem
+                    Preparar mensagem
                   </ActionButton>
 
                   <ActionButton
@@ -2168,7 +2184,7 @@ export default function OperationalPanel() {
                     onClick={() => void assignCommercialOwner(contact)}
                   >
                     <Users className="mr-2 h-4 w-4" />
-                    Definir responsável
+                    Definir responsavel
                   </ActionButton>
 
                   <ActionButton
@@ -2177,7 +2193,7 @@ export default function OperationalPanel() {
                     onClick={() => void saveCommercialNote(contact)}
                   >
                     <MessageSquare className="mr-2 h-4 w-4" />
-                    Registrar nota
+                    Registrar memoria
                   </ActionButton>
 
                   <ActionButton
@@ -2187,33 +2203,6 @@ export default function OperationalPanel() {
                   >
                     <Clock className="mr-2 h-4 w-4" />
                     Atualizar retomada
-                  </ActionButton>
-
-                  <ActionButton
-                    variant="outline"
-                    disabled={actionLoading === `${contact.clientId}:mark_ready_for_consultation`}
-                    onClick={() => void applyOperationalAction(contact, 'mark_ready_for_consultation')}
-                  >
-                    <Target className="mr-2 h-4 w-4" />
-                    Apto para consulta
-                  </ActionButton>
-
-                  <ActionButton
-                    variant="outline"
-                    disabled={actionLoading === `${contact.clientId}:mark_hot_opportunity`}
-                    onClick={() => void applyOperationalAction(contact, 'mark_hot_opportunity')}
-                  >
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Oportunidade quente
-                  </ActionButton>
-
-                  <ActionButton
-                    variant="outline"
-                    disabled={actionLoading === `${contact.clientId}:mark_reactivatable`}
-                    onClick={() => void applyOperationalAction(contact, 'mark_reactivatable')}
-                  >
-                    <Clock className="mr-2 h-4 w-4" />
-                    Marcar reativavel
                   </ActionButton>
 
                   <ActionButton
@@ -2290,6 +2279,40 @@ export default function OperationalPanel() {
                     </ActionButton>
                   ) : null}
                 </div>
+
+                <details className="mt-3 rounded-[1.3rem] border border-[#ece5d8] bg-[#fbfaf7] px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">
+                    Acoes avancadas de pipeline e fechamento
+                  </summary>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ActionButton
+                      variant="outline"
+                      disabled={actionLoading === `${contact.clientId}:mark_ready_for_consultation`}
+                      onClick={() => void applyOperationalAction(contact, 'mark_ready_for_consultation')}
+                    >
+                      <Target className="mr-2 h-4 w-4" />
+                      Pronto para consulta
+                    </ActionButton>
+
+                    <ActionButton
+                      variant="outline"
+                      disabled={actionLoading === `${contact.clientId}:mark_hot_opportunity`}
+                      onClick={() => void applyOperationalAction(contact, 'mark_hot_opportunity')}
+                    >
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Aquecer oportunidade
+                    </ActionButton>
+
+                    <ActionButton
+                      variant="outline"
+                      disabled={actionLoading === `${contact.clientId}:mark_reactivatable`}
+                      onClick={() => void applyOperationalAction(contact, 'mark_reactivatable')}
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Tornar reativavel
+                    </ActionButton>
+                  </div>
+                </details>
               </div>
             ))}
           </div>

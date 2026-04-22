@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export type WebhookIdempotencyInput = {
-  channel: "instagram" | "facebook" | "whatsapp" | "telegram";
+  channel: "instagram" | "facebook" | "whatsapp" | "telegram" | "youtube";
   externalMessageId?: string;
   externalUserId: string;
   messageText?: string;

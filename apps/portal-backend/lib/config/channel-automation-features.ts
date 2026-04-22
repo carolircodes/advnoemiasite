@@ -38,6 +38,14 @@ export const channelAutomationFeatures = {
     "INSTAGRAM_ENABLE_COMMENT_CAMPAIGN_AUTOMATION",
     false
   ),
+  youtubeIngestion: readBooleanFlag("YOUTUBE_ENABLE_INGESTION", false),
+  youtubeCommentSync: readBooleanFlag("YOUTUBE_ENABLE_COMMENT_SYNC", false),
+  youtubeReadOnlyMode: readBooleanFlag("YOUTUBE_ENABLE_COMMENT_READ_ONLY", true),
+  youtubeSuggestionMode: readBooleanFlag("YOUTUBE_ENABLE_COMMENT_SUGGESTION_MODE", true),
+  youtubeActiveReply: readBooleanFlag("YOUTUBE_ENABLE_COMMENT_ACTIVE_REPLY", false),
+  youtubeInboxRouting: readBooleanFlag("YOUTUBE_ENABLE_INBOX_ROUTING", true),
+  youtubeCrmRouting: readBooleanFlag("YOUTUBE_ENABLE_CRM_ROUTING", true),
+  youtubeHumanReviewDefault: readBooleanFlag("YOUTUBE_ENABLE_HUMAN_REVIEW_DEFAULT", true),
   disableLegacyCommentResponders: readBooleanFlag("CHANNEL_DISABLE_LEGACY_COMMENT_RESPONDERS", true),
   whatsappEmergencyFallback: readBooleanFlag("WHATSAPP_ENABLE_EMERGENCY_FALLBACK", true)
 } as const;

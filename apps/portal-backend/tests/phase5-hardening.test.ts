@@ -45,7 +45,7 @@ function withEnv(
   }
 }
 
-test("payment readiness reports degraded when signature enforcement is disabled", () => {
+test("payment readiness reports healthy when webhook secret is configured and enforcement is fail-closed", () => {
   return withEnv(
     {
       MERCADO_PAGO_ACCESS_TOKEN: "token",
@@ -59,9 +59,9 @@ test("payment readiness reports degraded when signature enforcement is disabled"
     () => {
       const section = buildPaymentReadinessSection();
 
-      assert.equal(section.status, "degraded");
-      assert.equal(section.code, "payments_signature_not_enforced");
-      assert.equal(section.details.signatureEnforced, false);
+      assert.equal(section.status, "healthy");
+      assert.equal(section.code, "payments_fully_ready");
+      assert.equal(section.details.signatureEnforced, true);
     }
   );
 });

@@ -56,6 +56,9 @@ type Metrics = {
   followUpOverdueCount: number;
   whatsappVolume: number;
   instagramVolume: number;
+  youtubeVolume: number;
+  youtubeCommentSignals: number;
+  youtubeHotThreads: number;
   instagramDmVolume: number;
   instagramCommentSignals: number;
   instagramWaitingHumanCount: number;
@@ -85,12 +88,13 @@ type Metrics = {
 
 type ThreadItem = {
   id: string;
-  channel: "instagram" | "whatsapp" | "site" | "portal" | "telegram";
+  channel: "instagram" | "facebook" | "youtube" | "whatsapp" | "site" | "portal" | "telegram";
   channelLabel: string;
   threadOriginType:
     | "dm"
     | "comment"
     | "comment_to_dm"
+    | "youtube_comment"
     | "site_chat"
     | "telegram_private"
     | "telegram_group"
@@ -1099,9 +1103,23 @@ export function ConversationInboxDashboard({
       <section className="grid gap-5 xl:grid-cols-[0.88fr_1.28fr_0.84fr]">
         <PanelCard
           eyebrow="Lista de conversas"
-          title="Threads em continuidade"
+          title="Fila viva"
           description="A coluna lateral agora funciona como inbox premium: nome, última mensagem, tempo, sinais sutis de prioridade e leitura rápida do que pede atenção."
         >
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[1.3rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Pedem humano</p>
+              <p className="mt-2 text-lg font-semibold text-[#10261d]">{payload?.metrics.waitingHumanCount || 0}</p>
+            </div>
+            <div className="rounded-[1.3rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Quentes</p>
+              <p className="mt-2 text-lg font-semibold text-[#10261d]">{payload?.metrics.hotThreads || 0}</p>
+            </div>
+            <div className="rounded-[1.3rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">Retomada pendente</p>
+              <p className="mt-2 text-lg font-semibold text-[#10261d]">{payload?.metrics.followUpPendingCount || 0}</p>
+            </div>
+          </div>
           <div className="max-h-[980px] overflow-y-auto pr-1">
             {loading && !payload?.threads.length ? (
               <div className="py-10 text-sm text-[#6b7b72]">Carregando conversas...</div>
@@ -1160,7 +1178,7 @@ export function ConversationInboxDashboard({
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Assumir e marcar como lida
+                    Assumir thread
                   </button>
                   <button
                     type="button"
@@ -1177,6 +1195,11 @@ export function ConversationInboxDashboard({
                   >
                     Colocar sob cuidado humano
                   </button>
+                  <details className="rounded-[1.25rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3 text-xs leading-6 text-[#6f7f77]">
+                    <summary className="cursor-pointer text-sm font-semibold text-[#10261d]">
+                      Acoes operacionais avancadas
+                    </summary>
+                    <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -1207,7 +1230,7 @@ export function ConversationInboxDashboard({
                     disabled={sending}
                     className="rounded-full border border-[#d3c5ac] bg-white px-4 py-2 text-sm font-medium text-[#10261d] transition hover:border-[#b28b54] disabled:opacity-60"
                   >
-                    Marcar como vencido hoje
+                    Marcar vencimento de hoje
                   </button>
                   <button
                     type="button"
@@ -1223,6 +1246,8 @@ export function ConversationInboxDashboard({
                   >
                     Encerrar conversa
                   </button>
+                    </div>
+                  </details>
                   <div className="rounded-[1.25rem] border border-[#ece3d4] bg-[#fcfaf6] px-4 py-3 text-xs leading-6 text-[#6f7f77]">
                     Responsável, fila, retomada e handoff continuam rastreados aqui, mas o foco principal da decisão fica concentrado no cabeçalho executivo e na barra de decisão.
                   </div>
@@ -1363,7 +1388,7 @@ export function ConversationInboxDashboard({
         <div className="space-y-5">
           <PanelCard
             eyebrow="Leitura executiva"
-            title="Contexto da oportunidade"
+            title="Leitura executiva da oportunidade"
             description="A lateral agora separa o que é decisão comercial, o que é apoio e o que é metadado técnico."
           >
             {selectedThread ? (
@@ -1549,7 +1574,7 @@ export function ConversationInboxDashboard({
 
           <PanelCard
             eyebrow="Pulso da operação"
-            title="Indicadores consolidados"
+            title="Pulso consolidado"
             description="Os números continuam disponíveis, mas agora entram em grupos executivos e breakdowns recolhíveis."
           >
             <div className="space-y-3">
@@ -1575,8 +1600,10 @@ export function ConversationInboxDashboard({
                     items={[
                       { label: "WhatsApp", value: payload?.metrics.whatsappVolume || 0 },
                       { label: "Instagram", value: payload?.metrics.instagramVolume || 0 },
+                      { label: "YouTube", value: payload?.metrics.youtubeVolume || 0 },
                       { label: "Site", value: payload?.metrics.siteVolume || 0 },
                       { label: "Telegram", value: payload?.metrics.telegramVolume || 0 },
+                      { label: "YouTube sinais / quentes", value: `${payload?.metrics.youtubeCommentSignals || 0} / ${payload?.metrics.youtubeHotThreads || 0}` },
                       { label: "Instagram DM / comentário", value: `${payload?.metrics.instagramDmVolume || 0} / ${payload?.metrics.instagramCommentSignals || 0}` },
                       { label: "Telegram privado / grupo", value: `${payload?.metrics.telegramPrivateVolume || 0} / ${payload?.metrics.telegramGroupSignals || 0}` }
                     ]}

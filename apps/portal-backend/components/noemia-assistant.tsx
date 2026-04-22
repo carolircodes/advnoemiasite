@@ -21,55 +21,45 @@ type NoemiaAssistantProps = {
 const audienceCopy = {
   visitor: {
     welcome:
-      "Olá. Sou a NoemIA. Posso te ajudar a organizar seu caso, esclarecer as dúvidas iniciais e indicar o próximo passo mais adequado com a equipe.",
-    modeLabel: "Concierge jurídica inicial",
+      "Ola. Sou a NoemIA. Posso te ajudar a organizar seu caso, esclarecer as duvidas iniciais e indicar o proximo passo mais adequado com a equipe.",
+    modeLabel: "Concierge juridica inicial",
     usageHint:
-      "Pergunte sobre triagem, consulta, documentos iniciais, funcionamento do escritório ou diga que quer iniciar seu atendimento.",
+      "Pergunte sobre triagem, consulta, documentos iniciais, funcionamento do escritorio ou diga que quer iniciar seu atendimento.",
     placeholder:
-      "Ex.: Quero entender meu melhor próximo passo e se já faz sentido marcar uma consulta.",
+      "Ex.: Quero entender meu melhor proximo passo e se ja faz sentido marcar uma consulta.",
     pendingText:
-      "Estou organizando sua resposta com base no fluxo público do escritório para te indicar o melhor caminho agora...",
-    successText: "Resposta pronta com orientação inicial e próximo passo sugerido.",
+      "Estou organizando sua resposta com base no fluxo publico do escritorio para te indicar o melhor caminho agora...",
+    successText: "Resposta pronta com orientacao inicial e proximo passo sugerido.",
     errorText:
-      "Não consegui responder com segurança neste instante. Tente novamente em alguns segundos."
+      "Nao consegui responder com seguranca neste instante. Tente novamente em alguns segundos."
   },
   client: {
     welcome:
-      "Olá. Sou a NoemIA. Posso traduzir o que aparece no seu portal com linguagem clara, resumir status, agenda, documentos e indicar o próximo passo prático.",
+      "Ola. Sou a NoemIA. Posso traduzir o que aparece no seu portal com linguagem clara, resumir status, agenda, documentos e indicar o proximo passo pratico.",
     modeLabel: "Leitura clara do seu portal",
     usageHint:
-      "Pergunte sobre status, documentos, agenda, pendências ou o significado de uma etapa do seu caso.",
+      "Pergunte sobre status, documentos, agenda, pendencias ou o significado de uma etapa do seu caso.",
     placeholder:
-      "Ex.: O que significa o estágio atual do meu caso e o que eu preciso fazer agora?",
+      "Ex.: O que significa o estagio atual do meu caso e o que eu preciso fazer agora?",
     pendingText:
-      "Estou cruzando o contexto disponível do seu portal para responder com mais precisão...",
-    successText: "Resposta pronta com base no que está visível no seu portal.",
-    errorText: "Não consegui acessar seu contexto agora. Tente novamente em instantes."
+      "Estou cruzando o contexto disponivel do seu portal para responder com mais precisao...",
+    successText: "Resposta pronta com base no que esta visivel no seu portal.",
+    errorText: "Nao consegui acessar seu contexto agora. Tente novamente em instantes."
   },
   staff: {
     welcome:
-      "Olá. Sou a NoemIA. Posso resumir triagens, destacar prioridades, sugerir próximos passos internos e acelerar a resposta operacional da equipe.",
+      "Ola. Sou a NoemIA. Posso resumir triagens, destacar prioridades, sugerir proximos passos internos e acelerar a resposta operacional da equipe.",
     modeLabel: "Cockpit operacional",
     usageHint:
-      "Peça leitura de prioridades, resumo de triagens, próximo passo interno ou um rascunho de retorno ao cliente.",
+      "Peca leitura de prioridades, resumo de triagens, proximo passo interno ou um rascunho de retorno ao cliente.",
     placeholder:
-      "Ex.: Resuma as prioridades de hoje e diga onde há maior chance de avanço comercial ou risco operacional.",
+      "Ex.: Resuma as prioridades de hoje e diga onde ha maior chance de avanco comercial ou risco operacional.",
     pendingText:
-      "Estou cruzando operação, telemetria e filas internas para responder com visão mais acionável...",
-    successText: "Análise operacional pronta com foco em decisão rápida.",
-    errorText: "Não consegui acessar os dados operacionais agora. Tente novamente."
+      "Estou cruzando operacao, telemetria e filas internas para responder com visao mais acionavel...",
+    successText: "Analise operacional pronta com foco em decisao rapida.",
+    errorText: "Nao consegui acessar os dados operacionais agora. Tente novamente."
   }
 } as const;
-
-const SITE_SESSION_STORAGE_KEY = "noemia_site_chat_session_id";
-
-function buildBrowserSessionId() {
-  if (typeof window !== "undefined" && typeof window.crypto?.randomUUID === "function") {
-    return window.crypto.randomUUID();
-  }
-
-  return `site-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 export function NoemiaAssistant({
   audience,
@@ -91,36 +81,17 @@ export function NoemiaAssistant({
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const [lastSuccess, setLastSuccess] = useState(false);
-  const [siteSessionId, setSiteSessionId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (audience !== "visitor" || typeof window === "undefined") {
-      return;
-    }
-
-    const stored = window.localStorage.getItem(SITE_SESSION_STORAGE_KEY);
-    const nextSessionId = stored || buildBrowserSessionId();
-    if (!stored) {
-      window.localStorage.setItem(SITE_SESSION_STORAGE_KEY, nextSessionId);
-    }
-    setSiteSessionId(nextSessionId);
-  }, [audience]);
-
-  useEffect(() => {
-    if (audience !== "visitor" || !siteSessionId) {
+    if (audience !== "visitor") {
       return;
     }
 
     let cancelled = false;
 
     async function syncConversation() {
-      const activeSessionId = siteSessionId;
-      if (!activeSessionId) {
-        return;
-      }
-
       try {
-        const response = await fetch(`/api/noemia/chat?sessionId=${encodeURIComponent(activeSessionId)}`, {
+        const response = await fetch("/api/noemia/chat", {
           cache: "no-store"
         });
         const result = await response.json().catch(() => ({}));
@@ -154,11 +125,13 @@ export function NoemiaAssistant({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [audience, siteSessionId, welcomeMessage.content]);
+  }, [audience, welcomeMessage.content]);
 
   function buildPayload(cleanMessage: string, nextHistory: ChatMessage[]) {
     const url =
-      typeof window !== "undefined" ? new URL(window.location.href) : new URL(`https://app.local${currentPath}`);
+      typeof window !== "undefined"
+        ? new URL(window.location.href)
+        : new URL(`https://app.local${currentPath}`);
     const urlParams = Object.fromEntries(url.searchParams.entries());
 
     return {
@@ -166,7 +139,6 @@ export function NoemiaAssistant({
       channel: audience === "visitor" ? "site" : "portal",
       currentPath,
       message: cleanMessage,
-      sessionId: audience === "visitor" ? siteSessionId : undefined,
       history: nextHistory
         .filter((message) => message.id !== "welcome")
         .slice(-8)
@@ -183,7 +155,7 @@ export function NoemiaAssistant({
         origem: urlParams.origem || urlParams.source || "site",
         campanha: urlParams.campanha || urlParams.utm_campaign || "",
         video: urlParams.video || "",
-        sessionId: audience === "visitor" ? siteSessionId || "" : "",
+        sessionId: "",
         timestamp: Date.now()
       }
     };
@@ -193,7 +165,7 @@ export function NoemiaAssistant({
     const cleanMessage = nextMessage.trim();
 
     if (cleanMessage.length < 5) {
-      setError("Escreva uma pergunta um pouco mais completa para eu te responder com mais precisão.");
+      setError("Escreva uma pergunta um pouco mais completa para eu te responder com mais precisao.");
       return;
     }
 
@@ -222,11 +194,6 @@ export function NoemiaAssistant({
         if (!response.ok || typeof result?.answer !== "string") {
           setError(typeof result?.error === "string" ? result.error : copy.errorText);
           return;
-        }
-
-        if (audience === "visitor" && typeof result?.sessionId === "string" && result.sessionId) {
-          window.localStorage.setItem(SITE_SESSION_STORAGE_KEY, result.sessionId);
-          setSiteSessionId(result.sessionId);
         }
 
         setLastSuccess(true);

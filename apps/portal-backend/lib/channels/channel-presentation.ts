@@ -1,6 +1,7 @@
 const CHANNEL_LABELS: Record<string, string> = {
   instagram: "Instagram Direct",
   facebook: "Facebook Messenger",
+  youtube: "YouTube",
   whatsapp: "WhatsApp",
   telegram: "Telegram",
   portal: "Portal",
@@ -14,6 +15,13 @@ const SOURCE_LABELS: Record<string, string> = {
   facebook_comment: "Comentario do Facebook",
   facebook_dm: "Facebook Messenger",
   facebook_comment_to_dm: "Comentario do Facebook convertido em Messenger",
+  youtube_comment: "Comentario do YouTube",
+  youtube_video_comment: "Comentario de video do YouTube",
+  youtube_short_comment: "Comentario de Short do YouTube",
+  youtube_video: "Video do YouTube",
+  youtube_short: "Short do YouTube",
+  youtube_entry: "Entrada via YouTube",
+  youtube_conversion: "Conversao via YouTube",
   whatsapp_inbound: "WhatsApp inbound",
   site_entry: "Chat do site",
   portal_entry: "Entrada pelo portal",
@@ -28,7 +36,10 @@ const THREAD_ORIGIN_LABELS: Record<string, string> = {
   instagram_comment_to_dm: "Comentario do Instagram convertido em Direct",
   facebook_comment: "Comentario relevante do Facebook",
   facebook_dm: "Facebook Messenger oficial",
-  facebook_comment_to_dm: "Comentario do Facebook convertido em Messenger"
+  facebook_comment_to_dm: "Comentario do Facebook convertido em Messenger",
+  youtube_comment: "Comentario relevante do YouTube",
+  youtube_video_comment: "Comentario relevante em video do YouTube",
+  youtube_short_comment: "Comentario relevante em Short do YouTube"
 };
 
 function normalizeKey(value: string | null | undefined) {
@@ -76,6 +87,10 @@ export function presentOperationalThreadOriginLabel(input: {
 
   if (normalizeKey(input.channel) === "instagram") {
     return "Instagram Direct oficial";
+  }
+
+  if (normalizeKey(input.channel) === "youtube") {
+    return "Entrada oficial via YouTube";
   }
 
   return input.fallback || "Thread operacional";

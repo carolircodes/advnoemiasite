@@ -165,6 +165,24 @@ function hashAbuseKey(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function readBooleanLikeEnv(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
 function normalizeWindowSeconds(windowMs: number) {
   return Math.max(1, Math.ceil(windowMs / 1000));
 }
@@ -415,6 +433,16 @@ function traceOperationalEvent(service: string, error: unknown) {
     });
 }
 
+export function shouldEnforceDurableProtection() {
+  const explicit = readBooleanLikeEnv(process.env.DURABLE_PROTECTION_REQUIRED);
+
+  if (explicit !== null) {
+    return explicit;
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
 export async function claimDurableIdempotencyKey(
   options: ClaimIdempotencyOptions,
   adapter: DurableProtectionAdapter = createSupabaseAdapter()
@@ -546,6 +574,8 @@ export function buildIdempotencyFingerprint(parts: Array<string | number | null 
 export async function getDurableProtectionStatus(
   adapter: DurableProtectionAdapter = createSupabaseAdapter()
 ) {
+  const strictEnforcement = shouldEnforceDurableProtection();
+
   try {
     const durable = await adapter.getDurableStatus();
     const migrationApplied = durable.rateLimits && durable.idempotency;
@@ -557,6 +587,7 @@ export async function getDurableProtectionStatus(
       migrationApplied,
       runtime: {
         mode: fallbackMode as "durable" | "memory-fallback",
+        strictEnforcement,
         fallbackActive: DURABLE_FALLBACK_STATE.count > 0,
         fallbackEventCount: DURABLE_FALLBACK_STATE.count,
         lastFallbackAt: DURABLE_FALLBACK_STATE.lastFallbackAt,
@@ -584,6 +615,7 @@ export async function getDurableProtectionStatus(
       migrationApplied: false,
       runtime: {
         mode: "memory-fallback" as const,
+        strictEnforcement,
         fallbackActive: DURABLE_FALLBACK_STATE.count > 0,
         fallbackEventCount: DURABLE_FALLBACK_STATE.count,
         lastFallbackAt: DURABLE_FALLBACK_STATE.lastFallbackAt,

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 
 import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
@@ -6,11 +6,9 @@ import {
   buildPaymentReadinessSection,
   getPaymentRuntimeDiagnostics
 } from "@/lib/diagnostics/payment-readiness";
-import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
 import {
   computeHmacSha256Hex,
   parseMercadoPagoSignatureInput,
-  shouldEnforceWebhookSignature,
   timingSafeEqualText
 } from "@/lib/http/webhook-security";
 import { getRevenueOfferByCode } from "@/lib/services/revenue-architecture";
@@ -18,6 +16,13 @@ import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 import { commercialClosingService } from "@/lib/services/commercial-closing";
 import { commercialAppointmentService } from "@/lib/services/commercial-appointment";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { categorizeObservedError } from "@/lib/observability/error-categorization";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation,
+  type RequestObservation
+} from "@/lib/observability/request-observability";
 
 type PaymentWebhookContext = {
   mercadopago: MercadoPagoConfig;
@@ -29,6 +34,13 @@ type ParsedExternalReference = {
   offerCode: string;
   leadId: string;
 };
+
+type PaymentWebhookLogger = (
+  level: "info" | "warn" | "error",
+  event: string,
+  metadata?: Record<string, unknown>,
+  error?: unknown
+) => void;
 
 function getWebhookContext():
   | { ok: true; value: PaymentWebhookContext }
@@ -43,7 +55,8 @@ function getWebhookContext():
   const missing = [
     !mercadoPagoAccessToken ? "MERCADO_PAGO_ACCESS_TOKEN" : null,
     !supabaseUrl ? "NEXT_PUBLIC_SUPABASE_URL" : null,
-    !supabaseSecretKey ? "SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY" : null
+    !supabaseSecretKey ? "SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY" : null,
+    !webhookSecret ? "MERCADO_PAGO_WEBHOOK_SECRET" : null
   ].filter(Boolean) as string[];
 
   if (missing.length > 0) {
@@ -62,12 +75,20 @@ function getWebhookContext():
   };
 }
 
-function paymentWebhookUnavailableResponse(missing: string[]) {
-  console.error("[payment.webhook] Missing required payment configuration", {
-    missing
-  });
-
-  return jsonError("payment_webhook_not_configured", 503);
+function createPaymentWebhookLogger(observation: RequestObservation): PaymentWebhookLogger {
+  return (level, event, metadata = {}, error) => {
+    logObservedRequest(
+      level,
+      event,
+      observation,
+      {
+        flow: "payment_webhook",
+        provider: "mercado_pago",
+        ...metadata
+      },
+      error
+    );
+  };
 }
 
 function getMercadoPagoWebhookEventId(request: NextRequest, event: any) {
@@ -86,14 +107,10 @@ function validateMercadoPagoWebhookSignature(args: {
   event: any;
   webhookSecret?: string;
 }) {
-  const enforceSignature = shouldEnforceWebhookSignature(
-    "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
-  );
-
   if (!args.webhookSecret) {
     return {
-      ok: !enforceSignature,
-      status: enforceSignature ? 503 : 200,
+      ok: false,
+      status: 503,
       code: "missing_secret"
     } as const;
   }
@@ -106,7 +123,7 @@ function validateMercadoPagoWebhookSignature(args: {
 
   if (!signatureInput) {
     return {
-      ok: !enforceSignature,
+      ok: false,
       status: 401,
       code: "invalid_signature_input"
     } as const;
@@ -119,7 +136,7 @@ function validateMercadoPagoWebhookSignature(args: {
 
   if (!timingSafeEqualText(expectedSignature, signatureInput.version)) {
     return {
-      ok: !enforceSignature,
+      ok: false,
       status: 401,
       code: "invalid_signature"
     } as const;
@@ -193,10 +210,25 @@ async function findPaymentRecordForWebhook(
 }
 
 export async function POST(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "payment_webhook",
+    provider: "mercado_pago"
+  });
+  const log = createPaymentWebhookLogger(observation);
   const context = getWebhookContext();
 
   if (!context.ok) {
-    return paymentWebhookUnavailableResponse(context.missing);
+    log("error", "PAYMENT_WEBHOOK_CONFIG_MISSING", {
+      outcome: "failed",
+      status: 503,
+      errorCategory: "configuration",
+      missing: context.missing
+    });
+    return createObservedJsonResponse(
+      observation,
+      { ok: false, error: "payment_webhook_not_configured" },
+      { status: 503 }
+    );
   }
 
   const { mercadopago, supabase, webhookSecret } = context.value;
@@ -208,8 +240,16 @@ export async function POST(request: NextRequest) {
     try {
       event = JSON.parse(body);
     } catch (parseError) {
-      console.error("[payment.webhook] Invalid JSON payload", { parseError });
-      return jsonError("invalid_json", 400);
+      log("warn", "PAYMENT_WEBHOOK_INVALID_JSON", {
+        outcome: "failed",
+        status: 400,
+        errorCategory: "validation"
+      }, parseError);
+      return createObservedJsonResponse(
+        observation,
+        { ok: false, error: "invalid_json" },
+        { status: 400 }
+      );
     }
 
     const signatureValidation = validateMercadoPagoWebhookSignature({
@@ -219,68 +259,81 @@ export async function POST(request: NextRequest) {
     });
 
     if (!signatureValidation.ok) {
-      console.error("[payment.webhook] Signature validation failed", {
-        code: signatureValidation.code,
-        enforceSignature: shouldEnforceWebhookSignature(
-          "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
-        )
+      log("warn", "PAYMENT_WEBHOOK_SIGNATURE_REJECTED", {
+        outcome: "denied",
+        status: signatureValidation.status,
+        errorCategory:
+          signatureValidation.code === "missing_secret" ? "configuration" : "authentication",
+        code: signatureValidation.code
       });
 
-      return NextResponse.json(
+      return createObservedJsonResponse(
+        observation,
         { ok: false, error: "invalid_webhook_signature", code: signatureValidation.code },
         { status: signatureValidation.status }
       );
     }
 
-    if (signatureValidation.code !== "validated") {
-      console.warn("[payment.webhook] Signature validation bypassed", {
-        code: signatureValidation.code,
-        enforceSignature: shouldEnforceWebhookSignature(
-          "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
-        )
-      });
-    }
-
     if (event.type !== "payment") {
-      console.log("[payment.webhook] Ignoring non-payment event", {
+      log("info", "PAYMENT_WEBHOOK_IGNORED_NON_PAYMENT", {
+        outcome: "ignored",
+        status: 200,
         type: event.type
       });
-      return NextResponse.json({ received: true }, { status: 200 });
+      return createObservedJsonResponse(observation, { received: true }, { status: 200 });
     }
 
     const payment = new Payment(mercadopago);
     const paymentInfo = await payment.get({ id: event.data.id });
 
-    console.log("[payment.webhook] Payment fetched", {
-      id: paymentInfo.id,
-      status: paymentInfo.status,
+    log("info", "PAYMENT_WEBHOOK_PAYMENT_FETCHED", {
+      outcome: "processing",
+      status: 200,
+      paymentId: paymentInfo.id,
+      paymentStatus: paymentInfo.status,
       status_detail: paymentInfo.status_detail,
       external_reference: paymentInfo.external_reference
     });
 
     if (paymentInfo.status === "approved") {
-      await handleApprovedPayment(supabase, paymentInfo);
+      await handleApprovedPayment(supabase, paymentInfo, log);
     } else if (paymentInfo.status === "rejected") {
-      await handleRejectedPayment(supabase, paymentInfo);
+      await handleRejectedPayment(supabase, paymentInfo, log);
     } else if (paymentInfo.status === "pending") {
-      await handlePendingPayment(supabase, paymentInfo);
+      await handlePendingPayment(supabase, paymentInfo, log);
     }
 
-    return NextResponse.json({ received: true }, { status: 200 });
-  } catch (error) {
-    console.error("[payment.webhook] Internal error", {
-      error: extractErrorMessage(error, "internal_server_error")
+    log("info", "PAYMENT_WEBHOOK_PROCESSED", {
+      outcome: "success",
+      status: 200,
+      paymentStatus: paymentInfo.status,
+      paymentId: paymentInfo.id
     });
-    return jsonError("internal_server_error", 500);
+
+    return createObservedJsonResponse(observation, { received: true }, { status: 200 });
+  } catch (error) {
+    log("error", "PAYMENT_WEBHOOK_FAILED", {
+      outcome: "failed",
+      status: 500,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
+    return createObservedJsonResponse(
+      observation,
+      { ok: false, error: "internal_server_error" },
+      { status: 500 }
+    );
   }
 }
 
-async function handleApprovedPayment(supabase: any, paymentInfo: any) {
+async function handleApprovedPayment(supabase: any, paymentInfo: any, log: PaymentWebhookLogger) {
   try {
     const reference = parseExternalReference(paymentInfo.external_reference);
 
     if (!reference) {
-      console.error("[payment.webhook] Invalid external reference", {
+      log("error", "PAYMENT_WEBHOOK_INVALID_EXTERNAL_REFERENCE", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "validation",
         externalReference: paymentInfo.external_reference
       });
       return;
@@ -304,14 +357,19 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       ));
 
     if (existingApprovedPayment) {
-      console.log("[payment.webhook] Payment already processed; replaying reconciliation", {
+      log("info", "PAYMENT_WEBHOOK_APPROVAL_REPLAY", {
+        outcome: "replay",
+        status: 200,
         paymentId: paymentInfo.id,
         leadId
       });
     }
 
     if (!previousPayment?.id) {
-      console.error("[payment.webhook] Payment record not found for approval", {
+      log("error", "PAYMENT_WEBHOOK_APPROVAL_PAYMENT_NOT_FOUND", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "not_found",
         leadId,
         externalReference: paymentInfo.external_reference
       });
@@ -335,7 +393,11 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       .single();
 
     if (paymentError) {
-      console.error("[payment.webhook] Failed to update payment", { paymentError });
+      log("error", "PAYMENT_WEBHOOK_APPROVAL_UPDATE_PAYMENT_FAILED", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "internal"
+      }, paymentError);
       return;
     }
 
@@ -352,7 +414,12 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       .single();
 
     if (leadError) {
-      console.error("[payment.webhook] Failed to update lead", { leadError });
+      log("error", "PAYMENT_WEBHOOK_APPROVAL_UPDATE_LEAD_FAILED", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "internal",
+        leadId
+      }, leadError);
       return;
     }
 
@@ -391,14 +458,16 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
         }
       }
     } catch (closingSyncError) {
-      console.error("[payment.webhook] Failed to sync approved closing state", {
-        closingSyncError,
+      log("warn", "PAYMENT_WEBHOOK_APPROVAL_COMMERCIAL_SYNC_DEGRADED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "internal",
         paymentId: payment?.id,
         mercadoPagoPaymentId: paymentInfo.id
-      });
+      }, closingSyncError);
     }
 
-    await sendPaymentConfirmationMessage(supabase, lead);
+    await sendPaymentConfirmationMessage(supabase, lead, log);
 
     try {
       const { error: followUpError } = await supabase.from("follow_up_events").insert({
@@ -416,20 +485,24 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
       });
 
       if (followUpError) {
-        console.error("[payment.webhook] Failed to persist follow-up event", {
-          followUpError,
+        log("warn", "PAYMENT_WEBHOOK_APPROVAL_FOLLOWUP_DEGRADED", {
+          outcome: "degraded",
+          status: 200,
+          errorCategory: "internal",
           leadId,
           paymentId: payment.id,
           mercadoPagoPaymentId: paymentInfo.id
-        });
+        }, followUpError);
       }
     } catch (followUpInsertError) {
-      console.error("[payment.webhook] Follow-up event insert crashed", {
-        followUpInsertError,
+      log("warn", "PAYMENT_WEBHOOK_APPROVAL_FOLLOWUP_CRASHED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "internal",
         leadId,
         paymentId: payment.id,
         mercadoPagoPaymentId: paymentInfo.id
-      });
+      }, followUpInsertError);
     }
 
     try {
@@ -497,21 +570,32 @@ async function handleApprovedPayment(supabase: any, paymentInfo: any) {
         });
       }
     } catch (trackingError) {
-      console.error("[payment.webhook] Failed to record approval telemetry", {
-        trackingError
-      });
+      log("warn", "PAYMENT_WEBHOOK_APPROVAL_TELEMETRY_DEGRADED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "provider",
+        leadId,
+        paymentId: payment?.id || null
+      }, trackingError);
     }
   } catch (error) {
-    console.error("[payment.webhook] Error processing approved payment", { error });
+    log("error", "PAYMENT_WEBHOOK_APPROVAL_FAILED", {
+      outcome: "failed",
+      status: 200,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
   }
 }
 
-async function handleRejectedPayment(supabase: any, paymentInfo: any) {
+async function handleRejectedPayment(supabase: any, paymentInfo: any, log: PaymentWebhookLogger) {
   try {
     const reference = parseExternalReference(paymentInfo.external_reference);
 
     if (!reference) {
-      console.error("[payment.webhook] Invalid external reference", {
+      log("error", "PAYMENT_WEBHOOK_REJECTION_INVALID_REFERENCE", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "validation",
         externalReference: paymentInfo.external_reference
       });
       return;
@@ -526,7 +610,10 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
     );
 
     if (!previousPayment?.id) {
-      console.error("[payment.webhook] Payment record not found for rejection", {
+      log("error", "PAYMENT_WEBHOOK_REJECTION_PAYMENT_NOT_FOUND", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "not_found",
         leadId,
         externalReference: paymentInfo.external_reference
       });
@@ -582,11 +669,13 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
         }
       }
     } catch (closingSyncError) {
-      console.error("[payment.webhook] Failed to sync rejected closing state", {
-        closingSyncError,
+      log("warn", "PAYMENT_WEBHOOK_REJECTION_COMMERCIAL_SYNC_DEGRADED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "internal",
         leadId,
         mercadoPagoPaymentId: paymentInfo.id
-      });
+      }, closingSyncError);
     }
 
     try {
@@ -624,21 +713,31 @@ async function handleRejectedPayment(supabase: any, paymentInfo: any) {
         }
       });
     } catch (trackingError) {
-      console.error("[payment.webhook] Failed to record rejection telemetry", {
-        trackingError
-      });
+      log("warn", "PAYMENT_WEBHOOK_REJECTION_TELEMETRY_DEGRADED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "provider",
+        leadId
+      }, trackingError);
     }
   } catch (error) {
-    console.error("[payment.webhook] Error processing rejected payment", { error });
+    log("error", "PAYMENT_WEBHOOK_REJECTION_FAILED", {
+      outcome: "failed",
+      status: 200,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
   }
 }
 
-async function handlePendingPayment(supabase: any, paymentInfo: any) {
+async function handlePendingPayment(supabase: any, paymentInfo: any, log: PaymentWebhookLogger) {
   try {
     const reference = parseExternalReference(paymentInfo.external_reference);
 
     if (!reference) {
-      console.error("[payment.webhook] Invalid external reference", {
+      log("error", "PAYMENT_WEBHOOK_PENDING_INVALID_REFERENCE", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "validation",
         externalReference: paymentInfo.external_reference
       });
       return;
@@ -653,7 +752,10 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
     );
 
     if (!previousPayment?.id) {
-      console.error("[payment.webhook] Payment record not found for pending update", {
+      log("error", "PAYMENT_WEBHOOK_PENDING_PAYMENT_NOT_FOUND", {
+        outcome: "failed",
+        status: 200,
+        errorCategory: "not_found",
         leadId,
         externalReference: paymentInfo.external_reference
       });
@@ -699,11 +801,13 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
         }
       }
     } catch (closingSyncError) {
-      console.error("[payment.webhook] Failed to sync pending closing state", {
-        closingSyncError,
+      log("warn", "PAYMENT_WEBHOOK_PENDING_COMMERCIAL_SYNC_DEGRADED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "internal",
         leadId,
         mercadoPagoPaymentId: paymentInfo.id
-      });
+      }, closingSyncError);
     }
 
     try {
@@ -728,18 +832,26 @@ async function handlePendingPayment(supabase: any, paymentInfo: any) {
         }
       });
     } catch (trackingError) {
-      console.error("[payment.webhook] Failed to record pending telemetry", {
-        trackingError
-      });
+      log("warn", "PAYMENT_WEBHOOK_PENDING_TELEMETRY_DEGRADED", {
+        outcome: "degraded",
+        status: 200,
+        errorCategory: "provider",
+        leadId
+      }, trackingError);
     }
   } catch (error) {
-    console.error("[payment.webhook] Error processing pending payment", { error });
+    log("error", "PAYMENT_WEBHOOK_PENDING_FAILED", {
+      outcome: "failed",
+      status: 200,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
   }
 }
 
 async function sendPaymentConfirmationMessage(
   supabase: any,
-  lead: any
+  lead: any,
+  log: PaymentWebhookLogger
 ) {
   try {
     const confirmationMessage = `Recebemos a confirmacao do seu pagamento.
@@ -760,11 +872,20 @@ Em instantes voce recebera as proximas orientacoes.`;
       created_at: new Date().toISOString()
     });
   } catch (error) {
-    console.error("[payment.webhook] Failed to send confirmation message", { error });
+    log("warn", "PAYMENT_WEBHOOK_CONFIRMATION_MESSAGE_FAILED", {
+      outcome: "degraded",
+      status: 200,
+      errorCategory: "internal",
+      leadId: lead?.id || null
+    }, error);
   }
 }
 
 export async function GET(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "payment_webhook_diagnostics",
+    provider: "mercado_pago"
+  });
   const diagnosticsAccess = await requireRouteSecretOrStaffAccess({
     request,
     service: "payment_webhook",
@@ -777,17 +898,28 @@ export async function GET(request: NextRequest) {
   });
 
   if (!diagnosticsAccess.ok) {
-    return NextResponse.json({
-      status: "webhook_active",
-      timestamp: new Date().toISOString(),
-      message: "Webhook do Mercado Pago acessivel."
+    logObservedRequest("warn", "PAYMENT_WEBHOOK_DIAGNOSTICS_DENIED", observation, {
+      flow: "payment_webhook_diagnostics",
+      provider: "mercado_pago",
+      outcome: "denied",
+      status: diagnosticsAccess.status,
+      errorCategory: "boundary"
     });
+    return diagnosticsAccess.response;
   }
 
   const diagnostics = getPaymentRuntimeDiagnostics();
   const paymentReadiness = buildPaymentReadinessSection();
 
-  return NextResponse.json({
+  logObservedRequest("info", "PAYMENT_WEBHOOK_DIAGNOSTICS_READY", observation, {
+    flow: "payment_webhook_diagnostics",
+    provider: "mercado_pago",
+    outcome: paymentReadiness.status === "healthy" ? "success" : "degraded",
+    status: 200,
+    runtimeState: paymentReadiness.status
+  });
+
+  return createObservedJsonResponse(observation, {
     status: paymentReadiness.status,
     timestamp: new Date().toISOString(),
     message: "Webhook do Mercado Pago esta acessivel para validacao e monitoramento.",

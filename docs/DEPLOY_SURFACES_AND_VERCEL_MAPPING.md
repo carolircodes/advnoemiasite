@@ -1,26 +1,32 @@
-# Mapeamento de Superfícies e Deploy Vercel
+# Mapeamento de Superficies e Deploy Vercel
 
-## Superfícies oficiais
+## Superficies oficiais
 
-- Site principal: raiz do repositório (`index.html`, páginas estáticas e APIs legadas em `app/api`)
+- Site principal: raiz do repositorio (`index.html`, paginas estaticas e assets)
 - Portal operacional: `apps/portal-backend` (Next.js)
+
+## Superficies legadas que nao sao source of truth
+
+- `app/api` na raiz existe apenas como legado e compatibilidade historica
+- webhooks e APIs canonicas vivem em `apps/portal-backend/app/api`
+- `docs/debug/*` e relatorios antigos ajudam investigacao, mas nao definem deploy nem runtime atual
 
 ## Projetos Vercel oficiais
 
 - Projeto `advnoemiasite`
-  - domínio principal: `advnoemia.com.br`
-  - domínios adicionais: `www.advnoemia.com.br`, `api.advnoemia.com.br`
-  - função esperada: publicar o site institucional da raiz do repositório
+  - dominio principal: `advnoemia.com.br`
+  - dominios adicionais: `www.advnoemia.com.br`, `api.advnoemia.com.br`
+  - funcao esperada: publicar o site institucional da raiz do repositorio
 
 - Projeto `advnoemiaportal`
-  - domínio principal: `portal.advnoemia.com.br`
-  - função esperada: publicar o Next.js de `apps/portal-backend`
+  - dominio principal: `portal.advnoemia.com.br`
+  - funcao esperada: publicar o Next.js de `apps/portal-backend`
 
-## Diagnóstico confirmado em 2026-04-19
+## Diagnostico confirmado em 2026-04-19
 
 Os commits recentes do frontend do portal foram implantados no projeto errado.
 
-Evidência observada na Vercel:
+Evidencia observada na Vercel:
 
 - `advnoemiasite` recebeu os deploys de:
   - `2a3e897` em `2026-04-18 19:50`
@@ -29,9 +35,9 @@ Evidência observada na Vercel:
 - `advnoemiaportal` parou em:
   - `2a3e897` em `2026-04-18 19:50`
 
-Conclusão: o portal não está deixando de refletir mudanças por erro de frontend ou de build local. O problema está no vínculo de deploy do projeto `advnoemiaportal`, que deixou de acompanhar os commits mais recentes enquanto o projeto `advnoemiasite` continuou publicando tudo.
+Conclusao: o portal nao esta deixando de refletir mudancas por erro de frontend ou de build local. O problema esta no vinculo de deploy do projeto `advnoemiaportal`, que deixou de acompanhar os commits mais recentes enquanto o projeto `advnoemiasite` continuou publicando tudo.
 
-## Configuração correta esperada na Vercel
+## Configuracao correta esperada na Vercel
 
 ### Projeto `advnoemiaportal`
 
@@ -43,13 +49,14 @@ Conclusão: o portal não está deixando de refletir mudanças por erro de front
 - Production Branch: `main`
 - Ignored Build Step: vazio ou desabilitado
 - Monorepo path filters: precisam incluir `apps/portal-backend/**`
-- Cron compatível com Hobby: no máximo 1x por dia
+- Cron compativel com Hobby: no maximo 1x por dia
 
 ### Projeto `advnoemiasite`
 
 - Root Directory: `.`
-- Framework Preset: `Other` ou a configuração estática atualmente usada pelo projeto
-- Ele não deve ser a fonte de validação do frontend do portal
+- Framework Preset: `Other` ou a configuracao estatica atualmente usada pelo projeto
+- `app/api` da raiz nao deve receber novas features
+- Ele nao deve ser a fonte de validacao do frontend do portal
 
 ## Prova visual do deploy do portal
 
@@ -58,29 +65,29 @@ O shell interno do portal agora exibe um selo discreto `Release do portal <sha>`
 Origem do valor:
 
 - `NEXT_PUBLIC_PORTAL_RELEASE_LABEL`, se definido manualmente
-- senão `VERCEL_GIT_COMMIT_SHA` truncado para 7 caracteres durante o build
+- senao `VERCEL_GIT_COMMIT_SHA` truncado para 7 caracteres durante o build
 - fallback local: `local`
 
-Validação operacional:
+Validacao operacional:
 
 1. fazer deploy do projeto `advnoemiaportal`
 2. abrir `portal.advnoemia.com.br`
 3. confirmar no topo do portal o selo `Release do portal`
 4. verificar se o SHA exibido bate com o commit publicado
 
-## Política de cron do portal
+## Politica de cron do portal
 
-O cron do portal fica em `apps/portal-backend/vercel.json` e agora está em frequência diária compatível com o plano Hobby.
+O cron do portal fica em `apps/portal-backend/vercel.json` e agora esta em frequencia diaria compativel com o plano Hobby.
 
 - schedule atual: `0 12 * * *`
 - rota acionada: `/api/cron/notifications`
-- proteção esperada: `Authorization: Bearer <CRON_SECRET>`
+- protecao esperada: `Authorization: Bearer <CRON_SECRET>`
 
-Se a operação voltar a exigir processamento subdiário, a ação correta não é recolocar `*/5 * * * *` no repositório. A ação correta é promover o projeto `advnoemiaportal` para Pro e só então aumentar a cadência.
+Se a operacao voltar a exigir processamento subdiario, a acao correta nao e recolocar `*/5 * * * *` no repositorio. A acao correta e promover o projeto `advnoemiaportal` para Pro e so entao aumentar a cadencia.
 
 ## Como evitar novos desvios
 
 1. validar qualquer ajuste de frontend do portal em `apps/portal-backend`
 2. confirmar que o preview ou production deploy saiu em `advnoemiaportal`
-3. não usar `advnoemia.com.br` como prova de deploy do portal
+3. nao usar `advnoemia.com.br` como prova de deploy do portal
 4. sempre comparar commit SHA do deploy com o selo interno do portal

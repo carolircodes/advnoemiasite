@@ -30,6 +30,9 @@ export type SocialEntryType =
   | "facebook_comment"
   | "facebook_dm"
   | "facebook_comment_to_dm"
+  | "youtube_comment"
+  | "youtube_video_comment"
+  | "youtube_short_comment"
   | "whatsapp_inbound"
   | "site_entry"
   | "portal_entry";
@@ -38,6 +41,7 @@ export type SocialEntryPoint =
   | "comment"
   | "direct"
   | "messenger"
+  | "youtube_comment"
   | "whatsapp"
   | "site"
   | "portal";
@@ -46,6 +50,8 @@ export type DiscoveryMechanism =
   | "organic_comment"
   | "organic_direct"
   | "organic_messenger"
+  | "organic_youtube_comment"
+  | "organic_youtube_short_comment"
   | "whatsapp_inbound"
   | "cta_link"
   | "bio_link"
@@ -61,6 +67,9 @@ export type SocialContentType =
   | "facebook_post"
   | "facebook_comment_thread"
   | "facebook_messenger_thread"
+  | "youtube_video"
+  | "youtube_short"
+  | "youtube_comment_thread"
   | "whatsapp_chat"
   | "site_page"
   | "portal_workspace"
@@ -78,7 +87,7 @@ export type CommercialIntentSignal = "low" | "medium" | "high";
 
 export type SocialAcquisitionSnapshot = {
   schemaVersion: "social-acquisition-v1";
-  channel: "instagram" | "facebook" | "whatsapp" | "site" | "portal";
+  channel: "instagram" | "facebook" | "youtube" | "whatsapp" | "site" | "portal";
   source: string;
   sourceLabel: string;
   entryType: SocialEntryType;
@@ -104,13 +113,15 @@ export type SocialAcquisitionSnapshot = {
 };
 
 type BuildSnapshotInput = {
-  channel: "instagram" | "facebook" | "whatsapp";
+  channel: "instagram" | "facebook" | "youtube" | "whatsapp";
   source: string;
   messageText: string;
   occurredAt?: string;
   commentContext?: {
     commentId?: string;
     mediaId?: string;
+    contentFormat?: string;
+    contentLabel?: string;
   };
   existing?: SocialAcquisitionSnapshot | null;
 };
@@ -223,6 +234,14 @@ function inferCommercialContext(topic: string, entryType: SocialEntryType) {
   }
 
   if (
+    entryType === "youtube_comment" ||
+    entryType === "youtube_video_comment" ||
+    entryType === "youtube_short_comment"
+  ) {
+    return `captacao_youtube_publica_${topic}`;
+  }
+
+  if (
     entryType === "instagram_comment_to_dm" ||
     entryType === "facebook_comment_to_dm"
   ) {
@@ -251,6 +270,16 @@ function inferOperatorAction(
   }
 
   if (
+    entryType === "youtube_comment" ||
+    entryType === "youtube_video_comment" ||
+    entryType === "youtube_short_comment"
+  ) {
+    return intentSignal === "high"
+      ? "responder com valor e CTA elegante para triagem ou agenda"
+      : "responder com valor curto e preservar o tom editorial";
+  }
+
+  if (
     entryType === "instagram_comment_to_dm" ||
     entryType === "facebook_comment_to_dm"
   ) {
@@ -273,7 +302,7 @@ function inferSourceLabel(source: string) {
 }
 
 function inferEntryDefinition(
-  channel: "instagram" | "facebook" | "whatsapp",
+  channel: "instagram" | "facebook" | "youtube" | "whatsapp",
   source: string
 ): {
   entryType: SocialEntryType;
@@ -328,6 +357,28 @@ function inferEntryDefinition(
       contentOriginLabel: presentOperationalThreadOriginLabel({
         entryType: "facebook_dm"
       })
+    };
+  }
+
+  if (channel === "youtube") {
+    const isShort = source === "youtube_short_comment";
+
+    return {
+      entryType:
+        source === "youtube_comment"
+          ? "youtube_comment"
+          : isShort
+            ? "youtube_short_comment"
+            : "youtube_video_comment",
+      entryPoint: "youtube_comment",
+      discoveryMechanism: isShort
+        ? "organic_youtube_short_comment"
+        : "organic_youtube_comment",
+      contentType: isShort ? "youtube_short" : "youtube_video",
+      eventOrigin: "social",
+      contentOriginLabel: isShort
+        ? "Short organico com comentario publico"
+        : "Video organico com comentario publico"
     };
   }
 
@@ -416,6 +467,7 @@ export function buildSocialAcquisitionSnapshot(
     topicLabel: formatTopicLabel(topic),
     contentId,
     contentLabel:
+      input.commentContext?.contentLabel ||
       input.existing?.contentLabel ||
       (contentPlatformId
         ? `Conteudo ${contentPlatformId}`
@@ -432,6 +484,10 @@ export function buildSocialAcquisitionSnapshot(
             ? "facebook_organic_comment_capture"
             : input.channel === "facebook"
               ? "facebook_messenger_conversation"
+              : input.channel === "youtube" && input.source === "youtube_short_comment"
+                ? "youtube_shorts_comment_capture"
+                : input.channel === "youtube"
+                  ? "youtube_video_comment_capture"
               : "whatsapp_inbound_conversation"),
     campaignLabel:
       input.existing?.campaignLabel ||
@@ -443,6 +499,10 @@ export function buildSocialAcquisitionSnapshot(
             ? "Facebook comentario organico"
             : input.channel === "facebook"
               ? "Facebook Messenger"
+              : input.channel === "youtube" && input.source === "youtube_short_comment"
+                ? "YouTube Shorts"
+                : input.channel === "youtube"
+                  ? "YouTube videos"
           : "WhatsApp inbound"),
     contentOriginLabel: entry.contentOriginLabel,
     commercialContext: inferCommercialContext(topic, entry.entryType),
@@ -452,6 +512,8 @@ export function buildSocialAcquisitionSnapshot(
       (input.channel === "instagram" && input.source === "instagram_comment") ||
       (input.channel === "facebook" && input.source === "facebook_comment")
         ? "awaiting_dm"
+        : input.channel === "youtube"
+          ? "human_review"
         : "not_applicable",
     commentId: input.commentContext?.commentId || input.existing?.commentId || null,
     firstTouchAt: input.existing?.firstTouchAt || now,
@@ -523,9 +585,11 @@ export async function trackSocialAcquisitionEvent(input: TrackSocialEventInput) 
           ? "/instagram/social"
           : input.snapshot.channel === "facebook"
             ? "/facebook/social"
-          : input.snapshot.channel === "whatsapp"
-            ? "/whatsapp/inbound"
-            : "/social/acquisition"),
+            : input.snapshot.channel === "youtube"
+              ? "/youtube/social"
+              : input.snapshot.channel === "whatsapp"
+                ? "/whatsapp/inbound"
+                : "/social/acquisition"),
       sessionId: input.sessionId,
       intakeRequestId: input.intakeRequestId || undefined,
       payload: {

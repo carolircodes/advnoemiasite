@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
 import { requireRouteSecretOrStaffAccess } from "@/lib/auth/api-authorization";
-import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
+import { extractErrorMessage } from "@/lib/http/api-response";
 import {
   buildRequestFingerprint,
   getClientIp,
@@ -15,7 +15,8 @@ import {
   claimDurableIdempotencyKey,
   completeDurableIdempotencyKey,
   consumeDurableRateLimit,
-  failDurableIdempotencyKey
+  failDurableIdempotencyKey,
+  shouldEnforceDurableProtection
 } from "@/lib/http/durable-abuse-protection";
 import {
   amountCentsToDecimal,
@@ -33,6 +34,13 @@ import { commercialClosingService } from "@/lib/services/commercial-closing";
 import { commercialAppointmentService } from "@/lib/services/commercial-appointment";
 import { getRevenueOfferByCode, getRevenueOfferByIntent } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
+import { categorizeObservedError } from "@/lib/observability/error-categorization";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation,
+  type RequestObservation
+} from "@/lib/observability/request-observability";
 type PaymentCreateContext = {
   mercadopago: MercadoPagoConfig;
   supabase: any;
@@ -74,12 +82,24 @@ function getPaymentCreateContext():
   };
 }
 
-function paymentCreateUnavailableResponse(missing: string[]) {
-  console.error("[payment.create] Missing required payment configuration", {
-    missing
-  });
-
-  return jsonError("payment_create_not_configured", 503);
+function logPaymentCreateEvent(
+  level: "info" | "warn" | "error",
+  event: string,
+  observation: RequestObservation,
+  metadata: Record<string, unknown> = {},
+  error?: unknown
+) {
+  logObservedRequest(
+    level,
+    event,
+    observation,
+    {
+      flow: observation.flow || "payment_create",
+      provider: "mercado_pago",
+      ...metadata
+    },
+    error
+  );
 }
 
 function extractLeadIdFromExternalReference(externalReference: string | null) {
@@ -129,10 +149,44 @@ function shouldReusePendingPayment(
 }
 
 export async function POST(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "payment_create",
+    provider: "mercado_pago"
+  });
+  const access = await requireRouteSecretOrStaffAccess({
+    request,
+    service: "payment_create",
+    action: "create_checkout",
+    expectedSecret: process.env.INTERNAL_API_SECRET?.trim(),
+    secretName: "INTERNAL_API_SECRET",
+    errorMessage: "A criacao de pagamento exige acesso interno autenticado.",
+    headerNames: ["x-internal-api-secret"],
+    allowStaffFallback: true
+  });
+
+  if (!access.ok) {
+    logPaymentCreateEvent("warn", "PAYMENT_CREATE_ACCESS_DENIED", observation, {
+      outcome: "denied",
+      status: access.status,
+      errorCategory: "boundary"
+    });
+    return access.response;
+  }
+
   const context = getPaymentCreateContext();
 
   if (!context.ok) {
-    return paymentCreateUnavailableResponse(context.missing);
+    logPaymentCreateEvent("error", "PAYMENT_CREATE_CONFIG_MISSING", observation, {
+      outcome: "failed",
+      status: 503,
+      errorCategory: "configuration",
+      missing: context.missing
+    });
+    return createObservedJsonResponse(
+      observation,
+      { ok: false, error: "payment_create_not_configured" },
+      { status: 503 }
+    );
   }
 
   const { mercadopago, supabase, baseUrl } = context.value;
@@ -143,13 +197,34 @@ export async function POST(request: NextRequest) {
     windowMs: 10 * 60 * 1000
   });
 
+  if (rateLimit.mode !== "durable" && shouldEnforceDurableProtection()) {
+    logPaymentCreateEvent("error", "PAYMENT_CREATE_DURABLE_PROTECTION_UNAVAILABLE", observation, {
+      outcome: "failed",
+      status: 503,
+      errorCategory: "fallback",
+      runtimeState: rateLimit.mode
+    });
+    return createObservedJsonResponse(
+      observation,
+      { ok: false, error: "payment_create_temporarily_unavailable" },
+      {
+        status: 503,
+        headers: buildDurableRateLimitHeaders(rateLimit)
+      }
+    );
+  }
+
   if (!rateLimit.ok) {
-    console.warn("[payment.create] Rate limit exceeded", {
+    logPaymentCreateEvent("warn", "PAYMENT_CREATE_RATE_LIMITED", observation, {
+      outcome: "failed",
+      status: 429,
+      errorCategory: "rate_limit",
       fingerprint: buildRequestFingerprint(request, "payment-create"),
       ipAddress: getClientIp(request)
     });
 
-    return NextResponse.json(
+    return createObservedJsonResponse(
+      observation,
       { ok: false, error: "payment_create_rate_limited" },
       {
         status: 429,
@@ -171,7 +246,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!parsedBody.ok) {
-      return parsedBody.response;
+      logPaymentCreateEvent("warn", "PAYMENT_CREATE_INVALID_BODY", observation, {
+        outcome: "failed",
+        status: 400,
+        errorCategory: "validation"
+      });
+      return createObservedJsonResponse(
+        observation,
+        { ok: false, error: "invalid_payment_request" },
+        {
+          status: 400,
+          headers: buildDurableRateLimitHeaders(rateLimit)
+        }
+      );
     }
 
     const {
@@ -211,9 +298,21 @@ export async function POST(request: NextRequest) {
     const amount = amountCentsToDecimal(resolvedPricing.finalAmountCents);
 
     if (!amount) {
-      return NextResponse.json(
+      logPaymentCreateEvent("warn", "PAYMENT_CREATE_INVALID_PRICING", observation, {
+        outcome: "failed",
+        status: 400,
+        errorCategory: "validation",
+        leadId,
+        userId,
+        offerCode: selectedOffer.code
+      });
+      return createObservedJsonResponse(
+        observation,
         { error: "Oferta sem configuracao de pagamento pronta para checkout" },
-        { status: 400 }
+        {
+          status: 400,
+          headers: buildDurableRateLimitHeaders(rateLimit)
+        }
       );
     }
 
@@ -236,7 +335,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (idempotency.ok && idempotency.status === "replay") {
-      return NextResponse.json(idempotency.responsePayload, {
+      logPaymentCreateEvent("info", "PAYMENT_CREATE_IDEMPOTENT_REPLAY", observation, {
+        outcome: "replay",
+        status: 200
+      });
+      return createObservedJsonResponse(observation, idempotency.responsePayload, {
         headers: {
           ...buildDurableRateLimitHeaders(rateLimit),
           "X-Idempotent-Replay": "true"
@@ -245,15 +348,27 @@ export async function POST(request: NextRequest) {
     }
 
     if (!idempotency.ok) {
-      return jsonError(
-        idempotency.status === "conflict"
-          ? "payment_create_idempotency_conflict"
-          : "payment_create_in_progress",
-        409,
+      logPaymentCreateEvent("warn", "PAYMENT_CREATE_IDEMPOTENCY_BLOCKED", observation, {
+        outcome: "failed",
+        status: 409,
+        errorCategory: "idempotency",
+        retryAfterSeconds: idempotency.retryAfterSeconds
+      });
+      return createObservedJsonResponse(
+        observation,
         {
+          ok: false,
+          error:
+            idempotency.status === "conflict"
+              ? "payment_create_idempotency_conflict"
+              : "payment_create_in_progress",
           details: {
             retryAfterSeconds: idempotency.retryAfterSeconds
           }
+        },
+        {
+          status: 409,
+          headers: buildDurableRateLimitHeaders(rateLimit)
         }
       );
     }
@@ -308,7 +423,16 @@ export async function POST(request: NextRequest) {
         responsePayload: payload
       });
 
-      return NextResponse.json(payload, {
+      logPaymentCreateEvent("info", "PAYMENT_CREATE_REUSED_PENDING", observation, {
+        outcome: "replay",
+        status: 200,
+        leadId,
+        userId,
+        paymentId: pendingPayment.external_id,
+        priceSource: resolvedPricing.priceSource
+      });
+
+      return createObservedJsonResponse(observation, payload, {
         headers: buildDurableRateLimitHeaders(rateLimit)
       });
     }
@@ -414,8 +538,27 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (paymentError) {
-      console.error("[payment.create] Failed to persist payment", { paymentError });
-      return jsonError("payment_persistence_failed", 500);
+      logPaymentCreateEvent(
+        "error",
+        "PAYMENT_CREATE_PERSISTENCE_FAILED",
+        observation,
+        {
+          outcome: "failed",
+          status: 500,
+          errorCategory: "internal",
+          leadId,
+          userId
+        },
+        paymentError
+      );
+      return createObservedJsonResponse(
+        observation,
+        { ok: false, error: "payment_persistence_failed" },
+        {
+          status: 500,
+          headers: buildDurableRateLimitHeaders(rateLimit)
+        }
+      );
     }
 
     await supabase
@@ -448,11 +591,19 @@ export async function POST(request: NextRequest) {
         });
       }
     } catch (closingSyncError) {
-      console.error("[payment.create] Failed to sync commercial closing state", {
-        closingSyncError,
-        userId,
-        leadId
-      });
+      logPaymentCreateEvent(
+        "warn",
+        "PAYMENT_CREATE_COMMERCIAL_SYNC_DEGRADED",
+        observation,
+        {
+          outcome: "degraded",
+          status: 200,
+          errorCategory: "internal",
+          leadId,
+          userId
+        },
+        closingSyncError
+      );
     }
 
     try {
@@ -512,9 +663,20 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (trackingError) {
-      console.error("[payment.create] Failed to record revenue telemetry", {
+      logPaymentCreateEvent(
+        "warn",
+        "PAYMENT_CREATE_TELEMETRY_DEGRADED",
+        observation,
+        {
+          outcome: "degraded",
+          status: 200,
+          errorCategory: "provider",
+          leadId,
+          userId,
+          paymentId: response.id
+        },
         trackingError
-      });
+      );
     }
 
     const payload = {
@@ -541,7 +703,17 @@ export async function POST(request: NextRequest) {
       responsePayload: payload
     });
 
-    return NextResponse.json(payload, {
+    logPaymentCreateEvent("info", "PAYMENT_CREATE_SUCCEEDED", observation, {
+      outcome: "success",
+      status: 200,
+      leadId,
+      userId,
+      paymentId: response.id,
+      priceSource: resolvedPricing.priceSource,
+      finalAmountCents: resolvedPricing.finalAmountCents
+    });
+
+    return createObservedJsonResponse(observation, payload, {
       headers: buildDurableRateLimitHeaders(rateLimit)
     });
   } catch (error) {
@@ -554,10 +726,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.error("[payment.create] Internal error", {
-      error: extractErrorMessage(error, "internal_server_error")
-    });
-    return NextResponse.json(
+    logPaymentCreateEvent(
+      "error",
+      "PAYMENT_CREATE_FAILED",
+      observation,
+      {
+        outcome: "failed",
+        status: 500,
+        errorCategory: categorizeObservedError(error, "internal")
+      },
+      error
+    );
+    return createObservedJsonResponse(
+      observation,
       { ok: false, error: "internal_server_error" },
       {
         status: 500,
@@ -568,10 +749,26 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "payment_status",
+    provider: "mercado_pago"
+  });
   const context = getPaymentCreateContext();
 
   if (!context.ok) {
-    return paymentCreateUnavailableResponse(context.missing);
+    logObservedRequest("error", "PAYMENT_STATUS_CONFIG_MISSING", observation, {
+      flow: "payment_status",
+      provider: "mercado_pago",
+      outcome: "failed",
+      status: 503,
+      errorCategory: "configuration",
+      missing: context.missing
+    });
+    return createObservedJsonResponse(
+      observation,
+      { ok: false, error: "payment_create_not_configured" },
+      { status: 503 }
+    );
   }
 
   const { supabase } = context.value;
@@ -582,8 +779,35 @@ export async function GET(request: NextRequest) {
     windowMs: 10 * 60 * 1000
   });
 
+  if (rateLimit.mode !== "durable" && shouldEnforceDurableProtection()) {
+    logObservedRequest("error", "PAYMENT_STATUS_DURABLE_PROTECTION_UNAVAILABLE", observation, {
+      flow: "payment_status",
+      provider: "mercado_pago",
+      outcome: "failed",
+      status: 503,
+      errorCategory: "fallback",
+      runtimeState: rateLimit.mode
+    });
+    return createObservedJsonResponse(
+      observation,
+      { ok: false, error: "payment_status_temporarily_unavailable" },
+      {
+        status: 503,
+        headers: buildDurableRateLimitHeaders(rateLimit)
+      }
+    );
+  }
+
   if (!rateLimit.ok) {
-    return NextResponse.json(
+    logObservedRequest("warn", "PAYMENT_STATUS_RATE_LIMITED", observation, {
+      flow: "payment_status",
+      provider: "mercado_pago",
+      outcome: "failed",
+      status: 429,
+      errorCategory: "rate_limit"
+    });
+    return createObservedJsonResponse(
+      observation,
       { ok: false, error: "payment_status_rate_limited" },
       {
         status: 429,
@@ -601,7 +825,15 @@ export async function GET(request: NextRequest) {
   });
 
   if (!parsedQuery.success) {
-    return NextResponse.json(
+    logObservedRequest("warn", "PAYMENT_STATUS_INVALID_QUERY", observation, {
+      flow: "payment_status",
+      provider: "mercado_pago",
+      outcome: "failed",
+      status: 400,
+      errorCategory: "validation"
+    });
+    return createObservedJsonResponse(
+      observation,
       { ok: false, error: "invalid_payment_lookup" },
       {
         status: 400,
@@ -631,6 +863,13 @@ export async function GET(request: NextRequest) {
       });
 
       if (!access.ok) {
+        logObservedRequest("warn", "PAYMENT_STATUS_LEAD_LOOKUP_DENIED", observation, {
+          flow: "payment_status",
+          provider: "mercado_pago",
+          outcome: "denied",
+          status: access.status,
+          errorCategory: "boundary"
+        });
         return access.response;
       }
     }
@@ -670,7 +909,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (!payment) {
-      return NextResponse.json(
+      logObservedRequest("warn", "PAYMENT_STATUS_NOT_FOUND", observation, {
+        flow: "payment_status",
+        provider: "mercado_pago",
+        outcome: "failed",
+        status: 404,
+        errorCategory: "not_found",
+        leadId,
+        paymentId
+      });
+      return createObservedJsonResponse(
+        observation,
         { ok: false, error: "payment_status_unavailable" },
         {
           status: 404,
@@ -679,7 +928,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(
+    logObservedRequest("info", "PAYMENT_STATUS_FETCHED", observation, {
+      flow: "payment_status",
+      provider: "mercado_pago",
+      outcome: "success",
+      status: 200,
+      leadId,
+      paymentId: payment.external_id || paymentId || null
+    });
+
+    return createObservedJsonResponse(
+      observation,
       {
         success: true,
         payment: buildPublicPaymentPayload(payment)
@@ -689,10 +948,15 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("[payment.create] Failed to fetch payment status", {
-      error: extractErrorMessage(error, "internal_server_error")
-    });
-    return NextResponse.json(
+    logObservedRequest("error", "PAYMENT_STATUS_FAILED", observation, {
+      flow: "payment_status",
+      provider: "mercado_pago",
+      outcome: "failed",
+      status: 500,
+      errorCategory: categorizeObservedError(error, "internal")
+    }, error);
+    return createObservedJsonResponse(
+      observation,
       { ok: false, error: "internal_server_error" },
       {
         status: 500,

@@ -1,15 +1,22 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
-
 import { requireRouteSecretOrStaffAccess } from "../../../../../lib/auth/api-authorization";
 import { getNotificationEnv } from "../../../../../lib/config/env";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "../../../../../lib/observability/request-observability";
 import { processPendingNotifications } from "../../../../../lib/services/process-notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const observation = startRequestObservation(request, {
+    flow: "notifications_worker",
+    provider: "notifications"
+  });
   const notificationEnv = getNotificationEnv();
 
   const access = await requireRouteSecretOrStaffAccess({
@@ -23,6 +30,13 @@ export async function POST(request: Request) {
   });
 
   if (!access.ok) {
+    logObservedRequest("warn", "NOTIFICATIONS_WORKER_DENIED", observation, {
+      flow: "notifications_worker",
+      provider: "notifications",
+      outcome: "denied",
+      status: access.status,
+      errorCategory: "boundary"
+    });
     return access.response;
   }
 
@@ -40,9 +54,29 @@ export async function POST(request: Request) {
 
   try {
     const result = await processPendingNotifications(requestedLimit);
-    return NextResponse.json(result, { status: 200 });
+    logObservedRequest("info", "NOTIFICATIONS_WORKER_PROCESSED", observation, {
+      flow: "notifications_worker",
+      provider: notificationEnv.provider,
+      outcome: result.failed > 0 ? "degraded" : "success",
+      status: 200,
+      requestedLimit,
+      processed: result.processed,
+      sent: result.sent,
+      failed: result.failed,
+      runtimeState: result.diagnostics.status
+    });
+    return createObservedJsonResponse(observation, result, { status: 200 });
   } catch (error) {
-    return NextResponse.json(
+    logObservedRequest("error", "NOTIFICATIONS_WORKER_FAILED", observation, {
+      flow: "notifications_worker",
+      provider: notificationEnv.provider,
+      outcome: "failed",
+      status: 500,
+      errorCategory: "internal",
+      requestedLimit
+    }, error);
+    return createObservedJsonResponse(
+      observation,
       {
         error:
           error instanceof Error

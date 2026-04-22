@@ -3,7 +3,8 @@ import { z } from "zod";
 import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
 import {
   buildDurableRateLimitHeaders,
-  consumeDurableRateLimit
+  consumeDurableRateLimit,
+  shouldEnforceDurableProtection
 } from "../../../../lib/http/durable-abuse-protection";
 import { getClientIp, parseJsonBody } from "../../../../lib/http/request-guards";
 import {
@@ -38,6 +39,27 @@ export async function POST(request: Request) {
     limit: 20,
     windowMs: 5 * 60 * 1000
   });
+
+  if (rateLimit.mode !== "durable" && shouldEnforceDurableProtection()) {
+    logObservedRequest("error", "PUBLIC_EVENT_DURABLE_PROTECTION_UNAVAILABLE", observation, {
+      limiter: "public-events",
+      mode: rateLimit.mode
+    });
+
+    const response = createObservedJsonResponse(
+      observation,
+      {
+        ok: false,
+        error: "public_event_temporarily_unavailable"
+      },
+      {
+        status: 503,
+        headers: buildDurableRateLimitHeaders(rateLimit)
+      }
+    );
+
+    return withPublicApiCors(request, response);
+  }
 
   if (!rateLimit.ok) {
     logObservedRequest("warn", "PUBLIC_EVENT_RATE_LIMITED", observation, {

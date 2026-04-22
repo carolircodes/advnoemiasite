@@ -14,6 +14,13 @@ export type OperationalTraceContext = {
   handoffState?: string | null;
   service?: string;
   action?: string;
+  requestId?: string | null;
+  correlationId?: string | null;
+  flow?: string | null;
+  provider?: string | null;
+  outcome?: string | null;
+  status?: number | string | null;
+  errorCategory?: string | null;
 };
 
 type TraceLevel = "info" | "warn" | "error";
@@ -38,6 +45,13 @@ export function traceOperationalEvent(
       decision_state: context.decisionState || null,
       send_result: context.sendResult || null,
       handoff_state: context.handoffState || null,
+      request_id: context.requestId || null,
+      correlation_id: context.correlationId || null,
+      flow: context.flow || null,
+      provider: context.provider || null,
+      outcome: context.outcome || null,
+      status: context.status || null,
+      error_category: context.errorCategory || null,
       schema_version: getOfficialSchemaVersion(),
       ...metadata
     }

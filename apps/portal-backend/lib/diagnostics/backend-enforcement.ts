@@ -270,7 +270,7 @@ function inferActionDomain(
     return "env_config";
   }
 
-  if (subsystem === "payments" || subsystem === "telegram" || subsystem === "meta") {
+  if (subsystem === "payments" || subsystem === "telegram" || subsystem === "meta" || subsystem === "youtube") {
     return "external_provider";
   }
 

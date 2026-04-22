@@ -2,10 +2,11 @@
 
 Entrypoint oficial do portal operacional: `apps/portal-backend`.
 
-Superfícies reais deste repositório:
+Superficies reais deste repositorio:
 
-- `apps/portal-backend`: portal interno e aplicação Next.js do subdomínio `portal.advnoemia.com.br`
-- raiz do repositório: site institucional estático e arquivos legados do domínio principal `advnoemia.com.br`
+- `apps/portal-backend`: portal interno e aplicacao Next.js do subdominio `portal.advnoemia.com.br`
+- raiz do repositorio: site institucional estatico e arquivos legados do dominio principal `advnoemia.com.br`
+- `app/` na raiz: compatibilidade historica apenas; nao e runtime canonico nem lugar para novas APIs
 
 Comandos oficiais na raiz:
 
@@ -18,7 +19,8 @@ Esses scripts delegam explicitamente para o workspace `portal-backend` para redu
 Regras operacionais:
 
 - deploy do portal: projeto Vercel `advnoemiaportal`, com Root Directory `apps/portal-backend`
-- deploy do site principal: projeto Vercel `advnoemiasite`, apontado para a raiz estática do repositório
+- deploy do site principal: projeto Vercel `advnoemiasite`, apontado para a raiz estatica do repositorio
 - commits de frontend do portal devem ser validados em `portal.advnoemia.com.br`, nunca apenas em `advnoemia.com.br`
 
-Guia de mapeamento e validação de deploy: [`docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md`](docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md).
+Guia de mapeamento e validacao de deploy: [`docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md`](docs/DEPLOY_SURFACES_AND_VERCEL_MAPPING.md).
+Source of truth arquitetural: [`docs/ARCHITECTURE_SURFACES.md`](docs/ARCHITECTURE_SURFACES.md).

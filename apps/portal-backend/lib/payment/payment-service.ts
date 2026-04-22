@@ -39,12 +39,23 @@ function getPaymentApiBaseUrl() {
   return value.replace(/\/$/, "");
 }
 
+function getInternalApiSecret() {
+  const value = process.env.INTERNAL_API_SECRET?.trim();
+
+  if (!value) {
+    throw new Error("INTERNAL_API_SECRET precisa estar configurado para gerar pagamentos.");
+  }
+
+  return value;
+}
+
 export async function generatePaymentLink(request: PaymentRequest): Promise<PaymentResponse> {
   try {
     const response = await fetch(`${getPaymentApiBaseUrl()}/api/payment/create`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-internal-api-secret": getInternalApiSecret()
       },
       body: JSON.stringify(request)
     });
@@ -59,16 +70,16 @@ export async function generatePaymentLink(request: PaymentRequest): Promise<Paym
     }
 
     return {
-        success: true,
-        paymentUrl: data.paymentUrl,
-        paymentId: data.paymentId,
-        amount: data.amount,
-        offer: data.offer,
-        priceSource: data.priceSource,
-        baseAmountCents: data.baseAmountCents,
-        finalAmountCents: data.finalAmountCents,
-        message: data.message
-      };
+      success: true,
+      paymentUrl: data.paymentUrl,
+      paymentId: data.paymentId,
+      amount: data.amount,
+      offer: data.offer,
+      priceSource: data.priceSource,
+      baseAmountCents: data.baseAmountCents,
+      finalAmountCents: data.finalAmountCents,
+      message: data.message
+    };
   } catch (error) {
     console.error("[payment.service] Failed to generate payment link", {
       error: error instanceof Error ? error.message : String(error)

@@ -18,6 +18,7 @@ export type BackendEnvRequirement = {
     | "payments"
     | "notifications"
     | "telegram"
+    | "youtube"
     | "durable";
   description: string;
   level: BackendEnvRequirementLevel;
@@ -223,6 +224,57 @@ export function buildBackendEnvRequirements(): BackendEnvRequirement[] {
       satisfied: hasConfiguredValue(process.env.TELEGRAM_WEBHOOK_SECRET)
     }),
     buildRequirement({
+      id: "youtube.channel_id",
+      subsystem: "youtube",
+      description: "Canal do YouTube monitorado pela operacao omnichannel.",
+      level: "subsystem_specific",
+      appliesTo: ["release"],
+      missing: ["YOUTUBE_CHANNEL_ID"],
+      satisfied: hasConfiguredValue(process.env.YOUTUBE_CHANNEL_ID)
+    }),
+    buildRequirement({
+      id: "youtube.mode",
+      subsystem: "youtube",
+      description: "Modo operacional explicito do YouTube para rollout seguro.",
+      level: "subsystem_specific",
+      appliesTo: ["release"],
+      missing: ["YOUTUBE_MODE"],
+      satisfied: hasConfiguredValue(process.env.YOUTUBE_MODE)
+    }),
+    buildRequirement({
+      id: "youtube.read_credentials",
+      subsystem: "youtube",
+      description: "Credencial minima para leitura de videos e comentarios.",
+      level: "subsystem_specific",
+      appliesTo: ["release"],
+      missing: ["YOUTUBE_API_KEY|YOUTUBE_CLIENT_ID+YOUTUBE_CLIENT_SECRET"],
+      satisfied:
+        hasConfiguredValue(process.env.YOUTUBE_API_KEY) ||
+        (hasConfiguredValue(process.env.YOUTUBE_CLIENT_ID) &&
+          hasConfiguredValue(process.env.YOUTUBE_CLIENT_SECRET))
+    }),
+    buildRequirement({
+      id: "youtube.oauth_active_reply",
+      subsystem: "youtube",
+      description: "OAuth completo para active reply quando o canal subir desse modo.",
+      level: "subsystem_specific",
+      appliesTo: ["release"],
+      missing: [
+        "YOUTUBE_CLIENT_ID",
+        "YOUTUBE_CLIENT_SECRET",
+        "YOUTUBE_REDIRECT_URI",
+        "YOUTUBE_REFRESH_TOKEN",
+        "YOUTUBE_OAUTH_STATE_SECRET|INTERNAL_API_SECRET"
+      ],
+      satisfied:
+        hasConfiguredValue(process.env.YOUTUBE_CLIENT_ID) &&
+        hasConfiguredValue(process.env.YOUTUBE_CLIENT_SECRET) &&
+        hasConfiguredValue(process.env.YOUTUBE_REDIRECT_URI) &&
+        hasConfiguredValue(process.env.YOUTUBE_REFRESH_TOKEN) &&
+        (hasConfiguredValue(process.env.YOUTUBE_OAUTH_STATE_SECRET) ||
+          hasConfiguredValue(process.env.INTERNAL_API_SECRET))
+    }),
+    buildRequirement({
       id: "durable.admin_access",
       subsystem: "durable",
       description: "Acesso administrativo minimo para confirmar a convergencia duravel.",
@@ -284,6 +336,7 @@ export function buildBackendEnvCompletenessSnapshot(): BackendEnvCompletenessSna
       payments: { satisfied: true, missing: [], requirementLevels: [] },
       notifications: { satisfied: true, missing: [], requirementLevels: [] },
       telegram: { satisfied: true, missing: [], requirementLevels: [] },
+      youtube: { satisfied: true, missing: [], requirementLevels: [] },
       durable: { satisfied: true, missing: [], requirementLevels: [] }
     }
   );

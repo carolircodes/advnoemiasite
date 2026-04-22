@@ -18,6 +18,11 @@ import {
   sendInstagramDirectMessage
 } from "@/lib/meta/instagram-service";
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "@/lib/observability/request-observability";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
 
@@ -293,11 +298,25 @@ async function processMetaChangeEntry(channel: MetaChannel, entry: Record<string
 }
 
 export async function GET(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "meta_webhook_verify",
+    channel: "meta",
+    provider: "meta"
+  });
   const config = resolveMetaWebhookConfig();
 
   if (!config.verifyTokenConfigured) {
+    logObservedRequest("error", "META_WEBHOOK_VERIFY_CONFIG_MISSING", observation, {
+      flow: "meta_webhook_verify",
+      channel: "meta",
+      provider: "meta",
+      outcome: "failed",
+      status: 503,
+      errorCategory: "configuration"
+    });
     logEvent("META_VERIFY_TOKEN_MISSING", undefined, "error");
-    return NextResponse.json(
+    return createObservedJsonResponse(
+      observation,
       { error: "Webhook verification unavailable" },
       { status: 503 }
     );
@@ -315,6 +334,13 @@ export async function GET(request: NextRequest) {
   });
 
   if (verification.ok) {
+    logObservedRequest("info", "META_WEBHOOK_VERIFY_ACCEPTED", observation, {
+      flow: "meta_webhook_verify",
+      channel: "meta",
+      provider: "meta",
+      outcome: "success",
+      status: 200
+    });
     logEvent("META_VERIFY_CHALLENGE_ACCEPTED", {
       challengeLength: verification.body.length,
       appSecretSource: config.appSecretSource
@@ -326,6 +352,14 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  logObservedRequest("warn", "META_WEBHOOK_VERIFY_REJECTED", observation, {
+    flow: "meta_webhook_verify",
+    channel: "meta",
+    provider: "meta",
+    outcome: "denied",
+    status: 403,
+    errorCategory: "authentication"
+  });
   logEvent(
     "META_VERIFY_CHALLENGE_REJECTED",
     {
@@ -340,6 +374,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const observation = startRequestObservation(request, {
+    flow: "meta_webhook",
+    channel: "meta",
+    provider: "meta"
+  });
   try {
     await assertOperationalSchemaCompatibility("meta_webhook");
 
@@ -382,9 +421,18 @@ export async function POST(request: NextRequest) {
 
       if (signatureValidation.reason === "app_secret_missing") {
         if (!allowShadowAcceptance) {
+          logObservedRequest("error", "META_WEBHOOK_SECRET_MISSING", observation, {
+            flow: "meta_webhook",
+            channel: "meta",
+            provider: "meta",
+            outcome: "failed",
+            status: 503,
+            errorCategory: "configuration"
+          });
           logEvent("META_SIGNATURE_SECRET_MISSING", diagnosticData, "error");
 
-          return NextResponse.json(
+          return createObservedJsonResponse(
+            observation,
             { error: "Webhook signature secret unavailable" },
             { status: 503 }
           );
@@ -392,9 +440,22 @@ export async function POST(request: NextRequest) {
 
         logEvent("META_SIGNATURE_SHADOW_MODE", diagnosticData, "warn");
       } else if (enforceSignature || !allowShadowAcceptance) {
+        logObservedRequest("warn", "META_WEBHOOK_SIGNATURE_REJECTED", observation, {
+          flow: "meta_webhook",
+          channel: "meta",
+          provider: "meta",
+          outcome: "denied",
+          status: 401,
+          errorCategory: "authentication",
+          reason: signatureValidation.reason
+        });
         logEvent("META_SIGNATURE_INVALID_REJECTED", diagnosticData, "warn");
 
-        return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+        return createObservedJsonResponse(
+          observation,
+          { error: "Invalid webhook signature" },
+          { status: 401 }
+        );
       } else {
         logEvent("META_SIGNATURE_SHADOW_MODE", diagnosticData, "warn");
       }
@@ -423,6 +484,14 @@ export async function POST(request: NextRequest) {
     try {
       data = JSON.parse(rawBuffer.toString("utf8"));
     } catch (parseError) {
+      logObservedRequest("warn", "META_WEBHOOK_INVALID_JSON", observation, {
+        flow: "meta_webhook",
+        channel: "meta",
+        provider: "meta",
+        outcome: "failed",
+        status: 400,
+        errorCategory: "validation"
+      }, parseError);
       logEvent(
         "META_WEBHOOK_INVALID_JSON",
         {
@@ -431,17 +500,28 @@ export async function POST(request: NextRequest) {
         "warn"
       );
 
-      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+      return createObservedJsonResponse(
+        observation,
+        { error: "Invalid JSON payload" },
+        { status: 400 }
+      );
     }
 
     if (data.object !== "instagram" && data.object !== "page") {
+      logObservedRequest("info", "META_WEBHOOK_OBJECT_IGNORED", observation, {
+        flow: "meta_webhook",
+        channel: "meta",
+        provider: "meta",
+        outcome: "ignored",
+        status: 200
+      });
       logEvent("META_WEBHOOK_OBJECT_IGNORED", {
         object: typeof data.object === "string" ? data.object : null,
         objectHint,
         ...runtimeMarker,
         rawBodyBytes
       });
-      return NextResponse.json({ received: true }, { status: 200 });
+      return createObservedJsonResponse(observation, { received: true }, { status: 200 });
     }
 
     const channel: MetaChannel = data.object === "page" ? "facebook" : "instagram";
@@ -464,9 +544,27 @@ export async function POST(request: NextRequest) {
       await processMetaChangeEntry(channel, typedEntry);
     }
 
-    return NextResponse.json({ received: true }, { status: 200 });
+    logObservedRequest("info", "META_WEBHOOK_ACCEPTED", observation, {
+      flow: "meta_webhook",
+      channel,
+      provider: "meta",
+      outcome: "success",
+      status: 200,
+      object: payloadSummary.object,
+      entryCount: payloadSummary.entryCount
+    });
+
+    return createObservedJsonResponse(observation, { received: true }, { status: 200 });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    logObservedRequest("error", "META_WEBHOOK_FAILED", observation, {
+      flow: "meta_webhook",
+      channel: "meta",
+      provider: "meta",
+      outcome: "failed",
+      status: 500,
+      errorCategory: "internal"
+    }, error);
     logEvent(
       "META_WEBHOOK_PROCESSING_ERROR",
       {
@@ -475,7 +573,8 @@ export async function POST(request: NextRequest) {
       "error"
     );
 
-    return NextResponse.json(
+    return createObservedJsonResponse(
+      observation,
       {
         error: "Failed to process Meta webhook",
         detail: process.env.CHANNEL_VALIDATION_EXPOSE_ERRORS === "true" ? errorMessage : undefined
