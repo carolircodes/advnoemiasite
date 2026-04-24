@@ -48,6 +48,7 @@ import {
   startRequestObservation,
   type RequestObservation
 } from "@/lib/observability/request-observability";
+import { getSchemaCompatibilityReportForSurface } from "@/lib/schema/compatibility";
 type PaymentCreateContext = {
   mercadopago: MercadoPagoConfig;
   supabase: any;
@@ -160,6 +161,41 @@ function shouldReusePendingPayment(
   );
 }
 
+async function ensurePaymentRuntimeSchemaReady(
+  observation: RequestObservation,
+  rateLimitHeaders: Record<string, string> = {}
+) {
+  const report = await getSchemaCompatibilityReportForSurface("payment_runtime");
+
+  if (report.ok) {
+    return null;
+  }
+
+  logPaymentCreateEvent("error", "PAYMENT_CREATE_SCHEMA_INCOMPATIBLE", observation, {
+    outcome: "failed",
+    status: 503,
+    errorCategory: "schema",
+    schemaVersion: report.schemaVersion,
+    missing: report.missing
+  });
+
+  return createObservedJsonResponse(
+    observation,
+    {
+      ok: false,
+      error: "payment_schema_incompatible",
+      details: {
+        schemaVersion: report.schemaVersion,
+        missing: report.missing
+      }
+    },
+    {
+      status: 503,
+      headers: rateLimitHeaders
+    }
+  );
+}
+
 export async function POST(request: NextRequest) {
   const observation = startRequestObservation(request, {
     flow: "payment_create",
@@ -243,6 +279,15 @@ export async function POST(request: NextRequest) {
         headers: buildDurableRateLimitHeaders(rateLimit)
       }
     );
+  }
+
+  const schemaFailure = await ensurePaymentRuntimeSchemaReady(
+    observation,
+    buildDurableRateLimitHeaders(rateLimit)
+  );
+
+  if (schemaFailure) {
+    return schemaFailure;
   }
 
   let idempotencyState:

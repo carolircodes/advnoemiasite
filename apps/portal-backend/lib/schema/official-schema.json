@@ -2,6 +2,58 @@
   "sourceOfTruth": "supabase/migrations",
   "schemaVersion": "phase6-data-foundation-2026-04-24",
   "requiredTables": {
+    "case_events": [
+      "id",
+      "case_id",
+      "client_id",
+      "event_type",
+      "title",
+      "public_summary",
+      "visible_to_client",
+      "should_notify_client",
+      "occurred_at"
+    ],
+    "documents": [
+      "id",
+      "case_id",
+      "file_name",
+      "category",
+      "description",
+      "status",
+      "visibility",
+      "document_date",
+      "created_at",
+      "storage_path",
+      "mime_type",
+      "file_size_bytes"
+    ],
+    "appointments": [
+      "id",
+      "case_id",
+      "client_id",
+      "title",
+      "appointment_type",
+      "status",
+      "visible_to_client",
+      "starts_at",
+      "notes",
+      "created_at",
+      "updated_at"
+    ],
+    "appointment_history": [
+      "id",
+      "appointment_id",
+      "case_id",
+      "client_id",
+      "change_type",
+      "title",
+      "appointment_type",
+      "status",
+      "visible_to_client",
+      "starts_at",
+      "changed_fields",
+      "created_at"
+    ],
     "client_channels": [
       "id",
       "client_id",
@@ -193,7 +245,6 @@
     "intake_requests": [
       "id",
       "full_name",
-      "contact_channel",
       "case_summary",
       "status",
       "preferred_contact_channel",

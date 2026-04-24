@@ -1,6 +1,7 @@
 import "./commercial-appointment.test.ts";
 import "./commercial-closing.test.ts";
 import "./commercial-conversion.test.ts";
+import "./data-foundation-governance.test.ts";
 import "./phase1-hardening-closeout.test.ts";
 import "./phase2-hardening.test.ts";
 import "./phase3-hardening.test.ts";

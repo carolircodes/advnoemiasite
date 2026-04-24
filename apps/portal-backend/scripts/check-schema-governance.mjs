@@ -40,6 +40,22 @@ function parseSupabaseTarget(url) {
   };
 }
 
+function classifySchemaProbeError(error) {
+  const code = typeof error?.code === "string" ? error.code : "";
+  const message = String(error?.message || "").toLowerCase();
+
+  return {
+    missingRelation:
+      code === "PGRST205" ||
+      ((message.includes("relation") && message.includes("does not exist")) ||
+        (message.includes("could not find the table") && message.includes("public."))),
+    missingColumn:
+      code === "42703" ||
+      ((message.includes("column") && message.includes("does not exist")) ||
+        message.includes("could not find the '"))
+  };
+}
+
 async function checkRuntimeSchemaCompatibility() {
   dotenv.config({ path: envPath });
 
@@ -75,14 +91,7 @@ async function checkRuntimeSchemaCompatibility() {
         continue;
       }
 
-      const message = error.message.toLowerCase();
-      const missingRelation =
-        (message.includes("relation") && message.includes("does not exist")) ||
-        (message.includes("could not find the table") &&
-          message.includes(`public.${table.toLowerCase()}`));
-      const missingColumn =
-        (message.includes("column") && message.includes("does not exist")) ||
-        message.includes(`could not find the '${column.toLowerCase()}' column`);
+      const { missingRelation, missingColumn } = classifySchemaProbeError(error);
 
       if (missingRelation || missingColumn) {
         missingColumns.push(column);

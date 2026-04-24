@@ -8,8 +8,10 @@ type OperationalSurface =
   | "meta_webhook"
   | "whatsapp_webhook"
   | "channel_router"
+  | "payment_runtime"
   | "public_intake"
   | "internal_panel"
+  | "client_portal"
   | "internal_conversations"
   | "internal_telegram_distribution";
 
@@ -41,8 +43,13 @@ const REQUIRED_TABLES_BY_SURFACE: Record<OperationalSurface, string[]> = {
     "processed_webhook_events",
     "noemia_triage_summaries"
   ],
+  payment_runtime: ["payments", "payment_events", "noemia_leads"],
   public_intake: ["intake_requests", "product_events"],
   internal_panel: [
+    "case_events",
+    "documents",
+    "appointments",
+    "appointment_history",
     "client_channels",
     "client_pipeline",
     "conversation_sessions",
@@ -53,6 +60,12 @@ const REQUIRED_TABLES_BY_SURFACE: Record<OperationalSurface, string[]> = {
     "payment_events",
     "follow_up_messages",
     "product_events"
+  ],
+  client_portal: [
+    "case_events",
+    "documents",
+    "appointments",
+    "document_requests"
   ],
   internal_conversations: [
     "conversation_sessions",
@@ -79,6 +92,25 @@ export function shouldEnforceOperationalSchemaCompatibility() {
   );
 }
 
+function classifySchemaProbeError(error: { code?: string; message?: string } | null | undefined) {
+  const code = typeof error?.code === "string" ? error.code : "";
+  const message = typeof error?.message === "string" ? error.message.toLowerCase() : "";
+
+  const missingRelation =
+    code === "PGRST205" ||
+    (message.includes("relation") && message.includes("does not exist")) ||
+    (message.includes("could not find the table") && message.includes("public."));
+  const missingColumn =
+    code === "42703" ||
+    ((message.includes("column") && message.includes("does not exist")) ||
+      message.includes("could not find the '"));
+
+  return {
+    missingRelation,
+    missingColumn
+  };
+}
+
 async function fetchCompatibilityReport(): Promise<CompatibilityReport> {
   return fetchCompatibilityReportForSurface("internal_panel");
 }
@@ -102,12 +134,7 @@ async function fetchCompatibilityReportForSurface(
         continue;
       }
 
-      const message = error.message.toLowerCase();
-      const missingRelation =
-        message.includes("relation") && message.includes("does not exist");
-      const missingColumn =
-        (message.includes("column") && message.includes("does not exist")) ||
-        message.includes(`could not find the '${column.toLowerCase()}' column`);
+      const { missingRelation, missingColumn } = classifySchemaProbeError(error);
 
       if (missingRelation || missingColumn) {
         missingColumns.push(column);

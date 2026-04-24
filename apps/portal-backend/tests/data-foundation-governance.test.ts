@@ -15,6 +15,10 @@ test("official schema governance tracks the current data foundation surfaces", (
   const requiredTables = officialSchema.requiredTables as Record<string, string[]>;
 
   for (const table of [
+    "case_events",
+    "documents",
+    "appointments",
+    "appointment_history",
     "client_pipeline",
     "client_channels",
     "noemia_leads",
@@ -25,6 +29,9 @@ test("official schema governance tracks the current data foundation surfaces", (
     assert.equal(Array.isArray(requiredTables[table]), true);
     assert.equal(requiredTables[table].length > 0, true);
   }
+
+  assert.equal(requiredTables.intake_requests.includes("contact_channel"), false);
+  assert.equal(requiredTables.intake_requests.includes("preferred_contact_channel"), true);
 });
 
 test("follow-up semantics normalize legacy pipeline statuses into the canonical language", () => {

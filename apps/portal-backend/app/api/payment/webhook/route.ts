@@ -34,6 +34,7 @@ import {
   startRequestObservation,
   type RequestObservation
 } from "@/lib/observability/request-observability";
+import { getSchemaCompatibilityReportForSurface } from "@/lib/schema/compatibility";
 
 type PaymentWebhookContext = {
   mercadopago: MercadoPagoConfig;
@@ -924,6 +925,38 @@ async function handlePaymentWebhookState(
   });
 }
 
+async function ensurePaymentRuntimeSchemaReady(
+  observation: RequestObservation,
+  log: PaymentWebhookLogger
+) {
+  const report = await getSchemaCompatibilityReportForSurface("payment_runtime");
+
+  if (report.ok) {
+    return null;
+  }
+
+  log("error", "PAYMENT_WEBHOOK_SCHEMA_INCOMPATIBLE", {
+    outcome: "failed",
+    status: 503,
+    errorCategory: "schema",
+    schemaVersion: report.schemaVersion,
+    missing: report.missing
+  });
+
+  return createObservedJsonResponse(
+    observation,
+    {
+      ok: false,
+      error: "payment_schema_incompatible",
+      details: {
+        schemaVersion: report.schemaVersion,
+        missing: report.missing
+      }
+    },
+    { status: 503 }
+  );
+}
+
 export async function POST(request: NextRequest) {
   const observation = startRequestObservation(request, {
     flow: "payment_webhook",
@@ -947,6 +980,11 @@ export async function POST(request: NextRequest) {
   }
 
   const { mercadopago, supabase, webhookSecret } = context.value;
+  const schemaFailure = await ensurePaymentRuntimeSchemaReady(observation, log);
+
+  if (schemaFailure) {
+    return schemaFailure;
+  }
 
   try {
     const body = await request.text();
