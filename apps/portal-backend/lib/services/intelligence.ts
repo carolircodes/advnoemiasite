@@ -63,6 +63,18 @@ function isMissingColumnError(error: { code?: string; message?: string } | null 
   );
 }
 
+function logSchemaCompatibilityFallback(
+  scope: string,
+  table: string,
+  missingColumn: string
+) {
+  console.warn("[intelligence.schema] Using legacy compatibility fallback", {
+    scope,
+    table,
+    missingColumn
+  });
+}
+
 async function loadUpcomingAppointments(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   nowIso: string,
@@ -94,6 +106,8 @@ async function loadUpcomingAppointments(
   if (legacyResult.error) {
     return legacyResult;
   }
+
+  logSchemaCompatibilityFallback("business-intelligence", "appointments", "title");
 
   return {
     data: (legacyResult.data || []).map((item) => ({

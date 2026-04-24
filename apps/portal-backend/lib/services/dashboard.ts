@@ -227,6 +227,18 @@ function isMissingColumnError(error: { code?: string; message?: string } | null 
   );
 }
 
+function logSchemaCompatibilityFallback(
+  scope: string,
+  table: string,
+  missingColumn: string
+) {
+  console.warn("[dashboard.schema] Using legacy compatibility fallback", {
+    scope,
+    table,
+    missingColumn
+  });
+}
+
 async function loadCaseEvents(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
   const result = await supabase
     .from("case_events")
@@ -249,6 +261,8 @@ async function loadCaseEvents(supabase: Awaited<ReturnType<typeof createServerSu
   if (legacyResult.error) {
     return legacyResult;
   }
+
+  logSchemaCompatibilityFallback("staff-overview", "case_events", "visible_to_client");
 
   return {
     data: (legacyResult.data || []).map((item) => ({
@@ -283,6 +297,8 @@ async function loadDocuments(supabase: Awaited<ReturnType<typeof createServerSup
   if (legacyResult.error) {
     return legacyResult;
   }
+
+  logSchemaCompatibilityFallback("staff-overview", "documents", "status");
 
   return {
     data: (legacyResult.data || []).map((item) => ({
@@ -321,6 +337,8 @@ async function loadAppointments(supabase: Awaited<ReturnType<typeof createServer
     return legacyResult;
   }
 
+  logSchemaCompatibilityFallback("staff-overview", "appointments", "title");
+
   return {
     data: (legacyResult.data || []).map((item) => ({
       ...item,
@@ -346,6 +364,8 @@ async function loadAppointmentHistory(
   if (!isMissingColumnError(result.error)) {
     return result;
   }
+
+  logSchemaCompatibilityFallback("staff-overview", "appointment_history", "case_id");
 
   return {
     data: [],
@@ -375,6 +395,8 @@ async function loadConversationSessions(
   if (legacyResult.error) {
     return legacyResult;
   }
+
+  logSchemaCompatibilityFallback("staff-overview", "conversation_sessions", "thread_status");
 
   return {
     data: (legacyResult.data || []).map((item) => ({
