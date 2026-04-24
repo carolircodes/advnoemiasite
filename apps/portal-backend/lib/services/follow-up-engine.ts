@@ -2,6 +2,10 @@ import { createWebhookSupabaseClient } from "../supabase/webhook";
 import { clientMergeService } from "./client-merge";
 import { clientContextService } from "./client-context";
 import { recordProductEvent } from "./public-intake";
+import {
+  isClosedFollowUpStatus,
+  mapFollowUpMessageStatusToFollowUpStatus
+} from "./follow-up-semantics";
 
 export interface FollowUpEligibility {
   clientId: string;
@@ -230,7 +234,7 @@ class FollowUpEngine {
 
     // 1. LEAD NOVO PARADO
     if ((stage === 'new_lead' || stage === 'engaged') && daysSinceLastContact >= 3) {
-      if (follow_up_status === 'completed') {
+      if (isClosedFollowUpStatus(follow_up_status, { pipelineStage: stage })) {
         return { isEligible: false, reason: 'follow_up_already_completed' };
       }
       return { isEligible: true, reason: 'new_lead_stalled' };
@@ -238,7 +242,7 @@ class FollowUpEngine {
 
     // 2. LEAD QUENTE
     if ((lead_temperature === 'warm' || lead_temperature === 'hot') && daysSinceLastContact >= 2) {
-      if (follow_up_status === 'completed') {
+      if (isClosedFollowUpStatus(follow_up_status, { pipelineStage: stage })) {
         return { isEligible: false, reason: 'follow_up_already_completed' };
       }
       return { isEligible: true, reason: 'hot_lead_needs_attention' };
@@ -514,7 +518,7 @@ Estava pensando na nossa conversa e queria saber como está indo. Se precisar de
 
       // Fase 5.6 - Atualizar pipeline
       await this.updatePipelineFollowUpStatus(input.clientId, input.pipelineId, {
-        followUpStatus: 'scheduled',
+        followUpStatus: 'pending',
         nextFollowUpAt: input.scheduledFor
       });
 
@@ -596,8 +600,16 @@ Estava pensando na nossa conversa e queria saber como está indo. Se precisar de
       }
 
       // Fase 5.6 - Atualizar pipeline baseado no resultado
+      const { data: pipeline } = await this.supabase
+        .from('client_pipeline')
+        .select('stage')
+        .eq('id', data.pipeline_id)
+        .maybeSingle();
+
       await this.updatePipelineFollowUpStatus(data.client_id, data.pipeline_id, {
-        followUpStatus: input.status
+        followUpStatus: mapFollowUpMessageStatusToFollowUpStatus(input.status, {
+          pipelineStage: pipeline?.stage || null
+        })
       });
 
       console.log('FOLLOW_UP_PIPELINE_UPDATED', {

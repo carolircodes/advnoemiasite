@@ -41,10 +41,16 @@ const REQUIRED_TABLES_BY_SURFACE: Record<OperationalSurface, string[]> = {
     "processed_webhook_events",
     "noemia_triage_summaries"
   ],
-  public_intake: ["product_events"],
+  public_intake: ["intake_requests", "product_events"],
   internal_panel: [
+    "client_channels",
+    "client_pipeline",
     "conversation_sessions",
     "noemia_triage_summaries",
+    "noemia_leads",
+    "acquisition_events",
+    "payments",
+    "payment_events",
     "follow_up_messages",
     "product_events"
   ],

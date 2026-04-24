@@ -17,6 +17,10 @@ import {
   type OperationalAttentionBucket,
   type OperationalNextBestAction
 } from "./operational-priority";
+import {
+  isPendingFollowUpStatus,
+  normalizeFollowUpStatus
+} from "./follow-up-semantics";
 import { projectPanelConversationState } from "./panel-state-projection";
 
 export interface OperationalContact {
@@ -574,6 +578,9 @@ class OperationalPanel {
     });
     const followUps = client.follow_up_messages || [];
 
+    const normalizedFollowUpStatus = normalizeFollowUpStatus(pipeline.follow_up_status, {
+      pipelineStage: pipeline.stage
+    });
     const now = new Date();
     const lastContact = pipeline.last_contact_at ? new Date(pipeline.last_contact_at) : now;
     const daysSinceLastContact = Math.max(
@@ -590,7 +597,7 @@ class OperationalPanel {
       leadTemperature: pipeline.lead_temperature,
       sourceChannel: pipeline.source_channel,
       areaInterest: pipeline.area_interest,
-      followUpStatus: pipeline.follow_up_status,
+      followUpStatus: normalizedFollowUpStatus,
       nextFollowUpAt: pipeline.next_follow_up_at,
       daysSinceLastContact,
       isOverdue,
@@ -952,7 +959,7 @@ class OperationalPanel {
           break;
         case "mark_consultation_scheduled":
           updateData.stage = "consultation_scheduled";
-          updateData.follow_up_status = "completed";
+          updateData.follow_up_status = "converted";
           updateData.scheduling_state = "confirmed";
           updateData.schedule_confirmed_at = now;
           updateData.consultation_scheduled_at = now;
@@ -1115,7 +1122,7 @@ class OperationalPanel {
           updateData.consultation_confirmed_at = now;
           updateData.consultation_scheduled_at = now;
           updateData.consultation_offer_state = "confirmed";
-          updateData.follow_up_status = "completed";
+          updateData.follow_up_status = "converted";
           updateData.follow_up_state = "completed";
           updateData.waiting_on = "none";
           updateData.closing_state = "consultation_confirmed";
@@ -1125,7 +1132,7 @@ class OperationalPanel {
           updateData.closed_lost_at = now;
           updateData.consultation_offer_state = "lost";
           updateData.closing_state = "lost";
-          updateData.follow_up_status = "completed";
+          updateData.follow_up_status = "resolved";
           updateData.follow_up_state = "completed";
           break;
         case "mark_client":
@@ -1136,11 +1143,11 @@ class OperationalPanel {
           break;
         case "mark_lost":
           updateData.stage = "closed_lost";
-          updateData.follow_up_status = "completed";
+          updateData.follow_up_status = "resolved";
           break;
         case "mark_inactive":
           updateData.stage = "inactive";
-          updateData.follow_up_status = "completed";
+          updateData.follow_up_status = "resolved";
           break;
       }
 
@@ -1340,7 +1347,11 @@ class OperationalPanel {
           metrics.activeConversations++;
         }
 
-        if (pipeline.follow_up_status === "pending" || pipeline.follow_up_status === "scheduled") {
+        if (
+          isPendingFollowUpStatus(pipeline.follow_up_status, {
+            pipelineStage: pipeline.stage
+          })
+        ) {
           metrics.followUpPending++;
         }
 
@@ -1382,7 +1393,9 @@ class OperationalPanel {
           pipelineStage: pipeline.stage,
           leadTemperature: pipeline.lead_temperature,
           sourceChannel: pipeline.source_channel || "unknown",
-          followUpStatus: pipeline.follow_up_status,
+          followUpStatus: normalizeFollowUpStatus(pipeline.follow_up_status, {
+            pipelineStage: pipeline.stage
+          }),
           nextFollowUpAt: pipeline.next_follow_up_at,
           daysSinceLastContact,
           isOverdue,
@@ -1463,8 +1476,9 @@ class OperationalPanel {
       }
 
       if (
-        contact.followUpStatus === "pending" ||
-        contact.followUpStatus === "scheduled" ||
+        isPendingFollowUpStatus(contact.followUpStatus, {
+          pipelineStage: contact.pipelineStage
+        }) ||
         contact.conversationState?.commercialFollowUpType
       ) {
         metrics.followUpPending += 1;

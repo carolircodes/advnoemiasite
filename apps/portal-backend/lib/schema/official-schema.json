@@ -1,7 +1,36 @@
 {
   "sourceOfTruth": "supabase/migrations",
-  "schemaVersion": "phase-13-2026-04-15",
+  "schemaVersion": "phase6-data-foundation-2026-04-24",
   "requiredTables": {
+    "client_channels": [
+      "id",
+      "client_id",
+      "channel",
+      "external_user_id",
+      "last_session_id",
+      "is_active",
+      "last_contact_at",
+      "updated_at"
+    ],
+    "client_pipeline": [
+      "id",
+      "client_id",
+      "stage",
+      "source_channel",
+      "follow_up_status",
+      "follow_up_state",
+      "next_follow_up_at",
+      "owner_profile_id",
+      "consultation_readiness",
+      "conversion_stage",
+      "opportunity_state",
+      "consultation_offer_state",
+      "scheduling_state",
+      "payment_state",
+      "closing_state",
+      "last_thread_session_id",
+      "updated_at"
+    ],
     "conversation_sessions": [
       "id",
       "channel",
@@ -98,6 +127,60 @@
       "follow_up_ready",
       "updated_at"
     ],
+    "noemia_leads": [
+      "id",
+      "status",
+      "lead_status",
+      "operational_status",
+      "source",
+      "campaign",
+      "topic",
+      "payment_id",
+      "payment_status",
+      "metadata",
+      "updated_at"
+    ],
+    "acquisition_events": [
+      "id",
+      "lead_id",
+      "event_type",
+      "source",
+      "campaign",
+      "topic",
+      "metadata",
+      "created_at"
+    ],
+    "payments": [
+      "id",
+      "lead_id",
+      "user_id",
+      "external_reference",
+      "amount",
+      "base_amount_cents",
+      "final_amount_cents",
+      "price_source",
+      "financial_state",
+      "technical_state",
+      "origin_type",
+      "active_for_lead",
+      "last_reconciled_at",
+      "commercial_effect_applied_at",
+      "updated_at"
+    ],
+    "payment_events": [
+      "id",
+      "payment_id",
+      "event_kind",
+      "transition_key",
+      "source",
+      "provider_payment_id",
+      "financial_state",
+      "technical_state",
+      "commercial_state",
+      "side_effect_applied",
+      "processed_at",
+      "created_at"
+    ],
     "follow_up_messages": [
       "id",
       "client_id",
@@ -106,6 +189,18 @@
       "status",
       "content",
       "created_at"
+    ],
+    "intake_requests": [
+      "id",
+      "full_name",
+      "contact_channel",
+      "case_summary",
+      "status",
+      "preferred_contact_channel",
+      "lead_score",
+      "lead_temperature",
+      "lifecycle_stage",
+      "last_activity_at"
     ],
     "product_events": [
       "id",

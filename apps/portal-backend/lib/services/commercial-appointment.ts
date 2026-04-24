@@ -349,7 +349,7 @@ class CommercialAppointmentService {
       consultation_offer_state: "confirmed",
       scheduling_state: "confirmed",
       payment_state: "approved",
-      follow_up_status: "completed",
+      follow_up_status: "converted",
       follow_up_state: "completed",
       waiting_on: "none",
       updated_at: now

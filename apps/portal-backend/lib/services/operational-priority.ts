@@ -75,8 +75,9 @@ function getAttentionBucket(
   }
 
   if (
-    input.followUpStatus === "pending" ||
-    input.followUpStatus === "scheduled" ||
+    isPendingFollowUpStatus(input.followUpStatus, {
+      pipelineStage: input.pipelineStage
+    }) ||
     input.pipelineStage === "consultation_offered" ||
     input.pipelineStage === "proposal_sent"
   ) {
@@ -301,3 +302,4 @@ export function evaluateOperationalPriority(
     nextBestAction
   };
 }
+import { isPendingFollowUpStatus } from "./follow-up-semantics";

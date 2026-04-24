@@ -12,6 +12,7 @@ import {
   evaluateCommercialConversion,
   type CommercialConversionAssessment
 } from "./commercial-conversion";
+import { normalizeFollowUpStatus } from "./follow-up-semantics";
 import { clientIdentityService } from "./client-identity";
 import { clientMergeService } from "./client-merge";
 import { sanitizeHumanName } from "./lead-identity";
@@ -639,7 +640,9 @@ class CommercialRelationshipService {
       pipelineId: link.pipelineId,
       pipelineStage: pipeline?.stage || null,
       leadTemperature: pipeline?.lead_temperature || null,
-      followUpStatus: pipeline?.follow_up_status || null,
+      followUpStatus: normalizeFollowUpStatus(pipeline?.follow_up_status || null, {
+        pipelineStage: pipeline?.stage || null
+      }),
       followUpState: pipeline?.follow_up_state || null,
       followUpReason: pipeline?.follow_up_reason || null,
       waitingOn: pipeline?.waiting_on || null,
