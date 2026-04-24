@@ -125,7 +125,7 @@ export function getPersistedFinancialState(payment: PersistedPaymentSnapshot | n
     return "pending" as PaymentFinancialState;
   }
 
-  return coercePaymentFinancialState(payment.financial_state || payment.status);
+  return coercePaymentFinancialState(payment.financial_state);
 }
 
 export function canApplyPaymentTransition(args: {

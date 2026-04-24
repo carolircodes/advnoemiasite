@@ -117,6 +117,17 @@ test("payment workflow persiste trilha financeira prioritariamente por financial
   );
 });
 
+test("payment workflow nao recai para status legado quando financial_state esta ausente", () => {
+  assert.equal(
+    getPersistedFinancialState({
+      id: "payment-2",
+      status: "approved",
+      financial_state: null
+    }),
+    "pending"
+  );
+});
+
 test("phase 5 migration registra trilha auditável e source of truth financeiro", () => {
   const migrationPath = path.join(
     process.cwd(),

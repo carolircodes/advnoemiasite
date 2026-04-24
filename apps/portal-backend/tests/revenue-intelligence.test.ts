@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { normalizeRevenuePaymentRows } from "../lib/services/revenue-intelligence-shared.ts";
 
-test("legacy payments rows keep revenue intelligence operational without financial_state", () => {
+test("revenue payment normalizer tolerates legacy-shaped rows but runtime now expects financial_state", () => {
   const normalized = normalizeRevenuePaymentRows([
     {
       id: "payment-1",

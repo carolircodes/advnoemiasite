@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
         id: payment.id,
         external_id: payment.external_id,
         status: payment.status,
-        financial_state: payment.financial_state || payment.status,
+        financial_state: getPersistedFinancialState(payment),
         technical_state: payment.technical_state || null,
         external_reference: payment.external_reference || null,
         active_for_lead: payment.active_for_lead ?? null,

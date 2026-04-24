@@ -14,6 +14,7 @@ import {
   resolveLeadIdentity,
   type LeadIdentityStatus
 } from "./lead-identity";
+import { getPersistedFinancialState } from "../payment/payment-workflow";
 import { commercialRelationshipService } from "./commercial-relationship";
 import {
   presentOperationalChannelLabel,
@@ -179,6 +180,7 @@ type PaymentRow = {
   user_id: string | null;
   amount: number | null;
   status: string;
+  financial_state?: string | null;
   payment_url: string | null;
   created_at: string;
   approved_at: string | null;
@@ -786,6 +788,14 @@ function minutesSince(value: string | null | undefined) {
   return Math.round(diff / 60000);
 }
 
+function isPendingPaymentState(payment: PaymentRow) {
+  return getPersistedFinancialState(payment) === "pending";
+}
+
+function isApprovedPaymentState(payment: PaymentRow) {
+  return getPersistedFinancialState(payment) === "approved";
+}
+
 class ConversationInboxService {
   private supabase = createAdminSupabaseClient();
 
@@ -972,7 +982,9 @@ class ConversationInboxService {
     if (leadIds.length) {
       const { data } = await this.supabase
         .from("payments")
-        .select("id, lead_id, user_id, amount, status, payment_url, created_at, approved_at")
+        .select(
+          "id, lead_id, user_id, amount, status, financial_state, payment_url, created_at, approved_at"
+        )
         .in("lead_id", leadIds);
 
       (data || []).forEach((row: PaymentRow) => {
@@ -989,7 +1001,9 @@ class ConversationInboxService {
     if (profileIds.length) {
       const { data } = await this.supabase
         .from("payments")
-        .select("id, lead_id, user_id, amount, status, payment_url, created_at, approved_at")
+        .select(
+          "id, lead_id, user_id, amount, status, financial_state, payment_url, created_at, approved_at"
+        )
         .in("user_id", profileIds);
 
       (data || []).forEach((row: PaymentRow) => {
@@ -1132,10 +1146,8 @@ class ConversationInboxService {
 
     const hasFounderContext = Boolean(membership) || grant?.portal_workspace === "community";
     const hasWaitlistContext = grant?.grant_status === "scheduled" || membership?.status === "invited";
-    const hasPaymentPending = payments.some((payment) =>
-      ["pending", "in_process", "requires_action"].includes(payment.status)
-    );
-    const paymentApproved = payments.some((payment) => payment.status === "approved");
+    const hasPaymentPending = payments.some((payment) => isPendingPaymentState(payment));
+    const paymentApproved = payments.some((payment) => isApprovedPaymentState(payment));
     const sessionIdentity = this.resolveSessionIdentity(session, client, profile);
     const origin = inferThreadOrigin(session);
 
@@ -1579,12 +1591,10 @@ class ConversationInboxService {
           sourceChannel: pipeline?.source_channel || (session as SessionRow).channel
         },
         payment: {
-          pendingCount: payments.filter((payment) =>
-            ["pending", "in_process", "requires_action"].includes(payment.status)
-          ).length,
-          approvedCount: payments.filter((payment) => payment.status === "approved").length,
+          pendingCount: payments.filter((payment) => isPendingPaymentState(payment)).length,
+          approvedCount: payments.filter((payment) => isApprovedPaymentState(payment)).length,
           latestAmount: latestPayment?.amount || null,
-          latestStatus: latestPayment?.status || null,
+          latestStatus: latestPayment ? getPersistedFinancialState(latestPayment) : null,
           latestUrl: latestPayment?.payment_url || null
         },
         founder: {

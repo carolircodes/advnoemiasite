@@ -22,13 +22,6 @@ type RevenueEventRow = {
   occurred_at: string;
 };
 
-function isMissingColumnError(error: { code?: string; message?: string } | null | undefined) {
-  return (
-    error?.code === "42703" ||
-    (typeof error?.message === "string" && error.message.includes("does not exist"))
-  );
-}
-
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -38,7 +31,7 @@ function asString(value: unknown) {
 }
 
 function getFinancialState(payment: RevenuePaymentRow) {
-  return asString(payment.financial_state) || asString(payment.status) || "pending";
+  return asString(payment.financial_state) || "pending";
 }
 
 function currency(value: number) {
@@ -84,35 +77,9 @@ async function loadRevenuePayments(
     .order("created_at", { ascending: false })
     .limit(2000);
 
-  if (!isMissingColumnError(result.error)) {
-    return {
-      data: normalizeRevenuePaymentRows((result.data || []) as RevenuePaymentRow[]),
-      error: result.error,
-      compatibilityMode: "canonical" as const
-    };
-  }
-
-  const legacyResult = await supabase
-    .from("payments")
-    .select(
-      "id,lead_id,user_id,external_id,amount,status,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
-    )
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(2000);
-
-  if (legacyResult.error) {
-    return {
-      data: null,
-      error: legacyResult.error,
-      compatibilityMode: "legacy" as const
-    };
-  }
-
   return {
-    data: normalizeRevenuePaymentRows((legacyResult.data || []) as RevenuePaymentRow[]),
-    error: null,
-    compatibilityMode: "legacy" as const
+    data: normalizeRevenuePaymentRows((result.data || []) as RevenuePaymentRow[]),
+    error: result.error
   };
 }
 
@@ -136,12 +103,6 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
 
   if (paymentsResult.error) {
     throw new Error(`Nao foi possivel carregar os pagamentos: ${paymentsResult.error.message}`);
-  }
-
-  if (paymentsResult.compatibilityMode === "legacy") {
-    console.warn("[revenue.intelligence] Using legacy payments compatibility mode", {
-      missingColumn: "financial_state"
-    });
   }
 
   if (productEventsResult.error) {
