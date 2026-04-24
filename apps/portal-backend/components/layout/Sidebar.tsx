@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   Bot,
   Brain,
@@ -24,6 +25,7 @@ import {
 interface SidebarProps {
   currentPath: string;
   isMobile?: boolean;
+  isOpen?: boolean;
   onClose?: () => void;
 }
 
@@ -40,17 +42,28 @@ const iconById = {
   operacional: Radio
 } as const;
 
-export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps) {
+export function Sidebar({
+  currentPath,
+  isMobile = false,
+  isOpen = false,
+  onClose
+}: SidebarProps) {
   const isActive = (href: string) => isInternalWorkspacePathActive(currentPath, href);
 
   const sidebarClasses = isMobile
-    ? `fixed inset-y-0 left-0 w-80 max-w-[calc(100vw-1rem)] z-50 transform transition-transform duration-300 ${
-        onClose ? 'translate-x-0' : '-translate-x-full'
+    ? `fixed inset-y-0 left-0 z-50 w-[min(20rem,calc(100vw-1rem))] transform transition-[transform,opacity] duration-300 ease-out lg:hidden ${
+        isOpen
+          ? 'translate-x-0 opacity-100 pointer-events-auto'
+          : '-translate-x-full opacity-0 pointer-events-none'
       }`
     : 'fixed left-0 top-0 h-screen w-[296px]';
 
   return (
-    <aside className={sidebarClasses}>
+    <aside
+      id={isMobile ? 'internal-mobile-sidebar' : undefined}
+      className={sidebarClasses}
+      aria-hidden={isMobile ? !isOpen : undefined}
+    >
       <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[rgba(142,106,59,0.12)] bg-[linear-gradient(180deg,#0f241d_0%,#143128_46%,#1d3c31_100%)] text-white shadow-[20px_0_60px_rgba(10,20,16,0.18)]">
         <div className="shrink-0 border-b border-white/10 p-6">
           <div className="flex items-center justify-between">
@@ -104,7 +117,7 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
 
                     return (
                       <li key={item.id}>
-                        <a
+                        <Link
                           href={item.href}
                           onClick={() => (isMobile && onClose ? onClose() : undefined)}
                           className={`group flex items-center gap-3 rounded-[22px] border px-4 py-3.5 transition-all duration-200 ${
@@ -135,7 +148,7 @@ export function Sidebar({ currentPath, isMobile = false, onClose }: SidebarProps
                                 : 'text-[#8da09a] group-hover:translate-x-0.5 group-hover:text-[#deebe6]'
                             }`}
                           />
-                        </a>
+                        </Link>
                       </li>
                     );
                   })}
