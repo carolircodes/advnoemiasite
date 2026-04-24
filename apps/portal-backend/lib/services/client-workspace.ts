@@ -156,25 +156,6 @@ function createLoaderResult<T>(
   };
 }
 
-function isMissingColumnError(error: { code?: string; message?: string } | null | undefined) {
-  return (
-    error?.code === "42703" ||
-    (typeof error?.message === "string" && error.message.includes("does not exist"))
-  );
-}
-
-function logSchemaCompatibilityFallback(
-  scope: string,
-  table: string,
-  missingColumn: string
-) {
-  console.warn("[client-workspace.schema] Using legacy compatibility fallback", {
-    scope,
-    table,
-    missingColumn
-  });
-}
-
 function buildEmptyClientCaseSummary(): ClientCaseSummaryData {
   return {
     clientRecord: normalizeClientRecordSummary(),
@@ -365,7 +346,7 @@ async function loadClientDocumentsWithCompatibility(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   caseIds: string[]
 ) {
-  const result = await supabase
+  return supabase
     .from("documents")
     .select(
       "id,case_id,file_name,category,description,status,visibility,document_date,created_at,storage_path,mime_type,file_size_bytes"
@@ -373,41 +354,13 @@ async function loadClientDocumentsWithCompatibility(
     .in("case_id", caseIds)
     .eq("visibility", "client")
     .order("created_at", { ascending: false });
-
-  if (!isMissingColumnError(result.error)) {
-    return result;
-  }
-
-  const legacyResult = await supabase
-    .from("documents")
-    .select("id,case_id,file_name,category,description,visibility,created_at,storage_path")
-    .in("case_id", caseIds)
-    .eq("visibility", "client")
-    .order("created_at", { ascending: false });
-
-  if (legacyResult.error) {
-    return legacyResult;
-  }
-
-  logSchemaCompatibilityFallback("client-documents", "documents", "status");
-
-  return {
-    data: (legacyResult.data || []).map((document) => ({
-      ...document,
-      status: "recebido",
-      document_date: document.created_at,
-      mime_type: null,
-      file_size_bytes: null
-    })),
-    error: null
-  };
 }
 
 async function loadClientAppointmentsWithCompatibility(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   clientId: string
 ) {
-  const result = await supabase
+  return supabase
     .from("appointments")
     .select(
       "id,case_id,title,appointment_type,starts_at,ends_at,mode,status,notes,visible_to_client"
@@ -415,70 +368,19 @@ async function loadClientAppointmentsWithCompatibility(
     .eq("client_id", clientId)
     .eq("visible_to_client", true)
     .order("starts_at", { ascending: true });
-
-  if (!isMissingColumnError(result.error)) {
-    return result;
-  }
-
-  const legacyResult = await supabase
-    .from("appointments")
-    .select("id,case_id,starts_at,ends_at,mode,status,notes,visible_to_client")
-    .eq("client_id", clientId)
-    .eq("visible_to_client", true)
-    .order("starts_at", { ascending: true });
-
-  if (legacyResult.error) {
-    return legacyResult;
-  }
-
-  logSchemaCompatibilityFallback("client-agenda", "appointments", "title");
-
-  return {
-    data: (legacyResult.data || []).map((appointment) => ({
-      ...appointment,
-      title: "Compromisso do caso",
-      appointment_type: "reuniao"
-    })),
-    error: null
-  };
 }
 
 async function loadClientEventsWithCompatibility(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   clientId: string
 ) {
-  const result = await supabase
+  return supabase
     .from("case_events")
     .select("id,case_id,event_type,title,public_summary,occurred_at")
     .eq("client_id", clientId)
     .eq("visible_to_client", true)
     .order("occurred_at", { ascending: false })
     .limit(100);
-
-  if (!isMissingColumnError(result.error)) {
-    return result;
-  }
-
-  const legacyResult = await supabase
-    .from("case_events")
-    .select("id,case_id,event_type,title,public_summary,occurred_at")
-    .eq("client_id", clientId)
-    .order("occurred_at", { ascending: false })
-    .limit(100);
-
-  if (legacyResult.error) {
-    return legacyResult;
-  }
-
-  logSchemaCompatibilityFallback("client-events", "case_events", "visible_to_client");
-
-  return {
-    data: (legacyResult.data || []).filter(
-      (event) =>
-        typeof event.public_summary === "string" && event.public_summary.trim().length > 0
-    ),
-    error: null
-  };
 }
 
 export async function getClientProfileSummary(

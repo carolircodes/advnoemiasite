@@ -63,6 +63,7 @@ type DurableProtectionAdapter = {
     available: boolean;
     rateLimits: boolean;
     idempotency: boolean;
+    rateLimitRpc?: boolean;
   }>;
 };
 
@@ -327,16 +328,24 @@ function createSupabaseAdapter(): DurableProtectionAdapter {
     },
     async getDurableStatus() {
       const supabase = await loadAdminSupabaseClient();
-      const [{ error: rateLimitError }, { error: idempotencyError }] = await Promise.all([
+      const [{ error: rateLimitError }, { error: idempotencyError }, { error: rpcError }] =
+        await Promise.all([
         supabase.from("request_rate_limits").select("scope", { head: true, count: "exact" }),
-        supabase.from("idempotency_keys").select("scope", { head: true, count: "exact" })
+        supabase.from("idempotency_keys").select("scope", { head: true, count: "exact" }),
+        supabase.rpc("claim_rate_limit_bucket", {
+          p_scope: "durable-runtime-status",
+          p_key_hash: "status-probe",
+          p_limit: 1,
+          p_window_seconds: 60
+        })
       ]);
 
       return {
         provider: "supabase-postgres" as const,
-        available: !rateLimitError && !idempotencyError,
-        rateLimits: !rateLimitError,
-        idempotency: !idempotencyError
+        available: !rateLimitError && !idempotencyError && !rpcError,
+        rateLimits: !rateLimitError && !rpcError,
+        idempotency: !idempotencyError,
+        rateLimitRpc: !rpcError
       };
     }
   };
@@ -607,13 +616,14 @@ export async function getDurableProtectionStatus(
       }))
     };
   } catch (error) {
-    return {
-      provider: "supabase-postgres" as const,
-      available: false,
-      rateLimits: false,
-      idempotency: false,
-      migrationApplied: false,
-      runtime: {
+      return {
+        provider: "supabase-postgres" as const,
+        available: false,
+        rateLimits: false,
+        idempotency: false,
+        rateLimitRpc: false,
+        migrationApplied: false,
+        runtime: {
         mode: "memory-fallback" as const,
         strictEnforcement,
         fallbackActive: DURABLE_FALLBACK_STATE.count > 0,

@@ -1,17 +1,12 @@
-import "dotenv/config";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-
-import {
-  buildBackendOperationsVerificationReport,
-  renderBackendIncidentEscalationSummaryMarkdown,
-  renderBackendReleaseChannelSummaryMarkdown,
-  renderBackendReleaseEvidenceMarkdown,
-  renderBackendReleaseManagerSummaryMarkdown,
-  type BackendEnforcementProfile,
-  renderBackendOperationsVerificationReport,
-  type BackendRuntimeVerificationMode
+import nextEnv from "@next/env";
+import type {
+  BackendEnforcementProfile,
+  BackendRuntimeVerificationMode
 } from "../lib/diagnostics/backend-enforcement.ts";
+
+const { loadEnvConfig } = nextEnv;
 
 function parseArgument(prefix: string) {
   return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length);
@@ -45,6 +40,17 @@ const profile = parseProfile(parseArgument("--policy="));
 const runtimeMode = parseRuntimeMode(parseArgument("--runtime="));
 const outputFormat = parseFormat(parseArgument("--format="));
 const writeDir = parseWriteDir(parseArgument("--write-dir="));
+
+loadEnvConfig(process.cwd());
+
+const {
+  buildBackendOperationsVerificationReport,
+  renderBackendIncidentEscalationSummaryMarkdown,
+  renderBackendReleaseChannelSummaryMarkdown,
+  renderBackendReleaseEvidenceMarkdown,
+  renderBackendReleaseManagerSummaryMarkdown,
+  renderBackendOperationsVerificationReport
+} = await import("../lib/diagnostics/backend-enforcement.ts");
 
 const report = await buildBackendOperationsVerificationReport({
   profile,
