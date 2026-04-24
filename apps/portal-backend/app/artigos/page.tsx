@@ -6,30 +6,15 @@ import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
 import { getAllArticles, getTopicHubs } from "@/lib/site/article-content";
-import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
+import { getEditorialServicePages } from "@/lib/site/editorial-taxonomy";
+import { buildPublicCanonicalUrl, buildPublicMetadata } from "@/lib/site/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicMetadata({
   title: "Artigos juridicos estrategicos",
   description:
     "Biblioteca editorial com orientacao juridica clara, artigos em subpasta e links diretos para triagem e atendimento.",
-  robots: {
-    index: true,
-    follow: true
-  },
-  alternates: {
-    canonical: "/artigos"
-  },
-  openGraph: {
-    title: "Artigos juridicos estrategicos | Noemia Paixao Advocacia",
-    description:
-      "Conteudo juridico em subpasta com foco em clareza, autoridade e conversao qualificada."
-  },
-  twitter: {
-    title: "Artigos juridicos estrategicos | Noemia Paixao Advocacia",
-    description:
-      "Conteudo juridico em subpasta com foco em clareza, autoridade e conversao qualificada."
-  }
-};
+  path: "/artigos"
+});
 
 const articleIndexSchema = {
   "@context": "https://schema.org",
@@ -37,12 +22,13 @@ const articleIndexSchema = {
   name: "Artigos juridicos estrategicos",
   description:
     "Biblioteca editorial com artigos juridicos do escritorio em subpasta.",
-  url: `${PUBLIC_SITE_BASE_URL}/artigos`
+  url: buildPublicCanonicalUrl("/artigos")
 };
 
 export default function ArticleIndexPage() {
   const articles = getAllArticles();
   const topicHubs = getTopicHubs();
+  const servicePages = getEditorialServicePages();
 
   return (
     <>
@@ -105,6 +91,42 @@ export default function ArticleIndexPage() {
                     trackingPayload={{ topic: hub.topic, location: "article_hub_index" }}
                   >
                     Ir para triagem
+                  </TrackedLink>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Paginas de entrada por area"
+          description="A biblioteca editorial agora conversa com money pages reais, para o visitante poder entrar pelo tema certo sem depender de artigo individual."
+        >
+          <div className="grid two">
+            {servicePages.map((page) => (
+              <article key={page.slug} className="article-card editorial-card">
+                <div className="article-card-meta">
+                  <span className="tag soft">{page.title}</span>
+                  <span className="tag soft">atuacao</span>
+                </div>
+                <strong>{page.description}</strong>
+                <p>{page.primaryIntent}</p>
+                <div className="form-actions">
+                  <TrackedLink
+                    href={page.href}
+                    className="button secondary"
+                    eventKey="strategic_content_cta_clicked"
+                    trackingPayload={{ topic: page.topic, location: "article_index_service_pages" }}
+                  >
+                    Abrir pagina
+                  </TrackedLink>
+                  <TrackedLink
+                    href={page.triageHref}
+                    className="button"
+                    eventKey="cta_start_triage_clicked"
+                    trackingPayload={{ topic: page.topic, location: "article_index_service_pages" }}
+                  >
+                    Iniciar triagem
                   </TrackedLink>
                 </div>
               </article>

@@ -16,6 +16,8 @@ import {
   getRelatedArticles,
   getTopicHubs
 } from "@/lib/site/article-content";
+import { getEditorialTopicByTopic } from "@/lib/site/editorial-taxonomy";
+import { buildPublicMetadata } from "@/lib/site/seo";
 
 type ArticlePageProps = {
   params: Promise<{ slug: string }>;
@@ -37,27 +39,12 @@ export async function generateMetadata({
     return {};
   }
 
-  return {
+  return buildPublicMetadata({
     title: article.title,
     description: article.description,
-    robots: {
-      index: true,
-      follow: true
-    },
-    alternates: {
-      canonical: `/artigos/${article.slug}`
-    },
-    openGraph: {
-      type: "article",
-      title: `${article.title} | Noemia Paixao Advocacia`,
-      description: article.description,
-      url: `${PUBLIC_SITE_BASE_URL}/artigos/${article.slug}`
-    },
-    twitter: {
-      title: `${article.title} | Noemia Paixao Advocacia`,
-      description: article.description
-    }
-  };
+    path: `/artigos/${article.slug}`,
+    openGraphType: "article"
+  });
 }
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
@@ -71,6 +58,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const relatedArticles = getRelatedArticles(article);
   const nextBestArticles = getNextBestArticles(article);
   const topicHub = getTopicHubs().find((hub) => hub.topic === article.topic) || null;
+  const topicDefinition = getEditorialTopicByTopic(article.topic);
   const canonicalUrl = `${PUBLIC_SITE_BASE_URL}/artigos/${article.slug}`;
   const articleSchema = {
     "@context": "https://schema.org",
@@ -258,6 +246,20 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                     >
                       Abrir hub do tema
                     </TrackedLink>
+                    {topicDefinition ? (
+                      <TrackedLink
+                        href={topicDefinition.serviceHref}
+                        className="button secondary"
+                        eventKey="article_hub_cta_clicked"
+                        trackingPayload={{
+                          topic: article.topic,
+                          contentId: article.slug,
+                          location: "article_service_page"
+                        }}
+                      >
+                        Ver pagina de atuacao
+                      </TrackedLink>
+                    ) : null}
                   </div>
                 </SectionCard>
               ) : null}

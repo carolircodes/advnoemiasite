@@ -8,6 +8,8 @@ import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
 import { TriageForm } from "@/components/triage-form";
 import { getFeaturedArticles } from "@/lib/site/article-content";
+import { getEditorialServicePages } from "@/lib/site/editorial-taxonomy";
+import { buildPublicMetadata } from "@/lib/site/seo";
 import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
 import {
   appendEntryContextToPath,
@@ -15,28 +17,12 @@ import {
   readEntryContext
 } from "../lib/entry-context";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicMetadata({
   title: "Atendimento juridico estrategico com concierge inteligente",
   description:
     "Inicie seu atendimento na propria home com a NoemIA. Organize o caso, tire duvidas iniciais e avance para consulta com mais clareza, contexto e seguranca.",
-  robots: {
-    index: true,
-    follow: true
-  },
-  alternates: {
-    canonical: "/"
-  },
-  openGraph: {
-    title: "Noemia Paixao Advocacia | Atendimento juridico com concierge inteligente",
-    description:
-      "A home agora concentra o primeiro atendimento: NoemIA, triagem inicial, orientacao clara e continuidade para consulta."
-  },
-  twitter: {
-    title: "Noemia Paixao Advocacia | Atendimento juridico com concierge inteligente",
-    description:
-      "A home agora concentra o primeiro atendimento: NoemIA, triagem inicial, orientacao clara e continuidade para consulta."
-  }
-};
+  path: "/"
+});
 
 const legalServiceSchema = {
   "@context": "https://schema.org",
@@ -66,7 +52,9 @@ export default async function HomePage({
   const funcionamentoHref = appendEntryContextToPath("/#como-funciona", entryContext);
   const clientLoginHref = appendEntryContextToPath(CLIENT_LOGIN_PATH, entryContext);
   const articleIndexHref = appendEntryContextToPath("/artigos", entryContext);
+  const practiceAreasHref = appendEntryContextToPath("/atuacao", entryContext);
   const featuredArticles = getFeaturedArticles(3);
+  const servicePages = getEditorialServicePages();
   const suggestedPrompts = [
     "Meu caso parece urgente. Como voce pode me orientar agora?",
     "Quero entender se vale marcar uma consulta e qual seria o melhor proximo passo.",
@@ -340,6 +328,69 @@ export default async function HomePage({
               <strong>Portal entra como continuidade</strong>
               <p>Documentos, agenda e acompanhamento aparecem depois, como camada de relacao, nao como distracao no primeiro contato.</p>
             </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Areas de atuacao que viraram paginas de entrada"
+          description="A estrategia organica agora nao depende so de artigos: cada area prioritaria ganhou uma pagina de entrada propria, conectada a hub, triagem e NoemIA."
+        >
+          <div className="article-index-grid">
+            {servicePages.map((servicePage) => (
+              <article key={servicePage.slug} className="article-card editorial-card">
+                <div className="article-card-meta">
+                  <span className="tag soft">{servicePage.title}</span>
+                  <span className="tag soft">entrada organica</span>
+                </div>
+                <strong>{servicePage.description}</strong>
+                <p>{servicePage.longDescription}</p>
+                <div className="tag-row">
+                  {servicePage.subtopics.slice(0, 3).map((subtopic) => (
+                    <span key={subtopic} className="tag soft">
+                      {subtopic}
+                    </span>
+                  ))}
+                </div>
+                <div className="form-actions">
+                  <TrackedLink
+                    href={appendEntryContextToPath(servicePage.href, entryContext)}
+                    className="button secondary"
+                    eventKey="strategic_content_cta_clicked"
+                    trackingPayload={{
+                      location: "home_service_pages",
+                      topic: servicePage.topic,
+                      contentId: servicePage.slug,
+                      ...entryContextPayload
+                    }}
+                  >
+                    Abrir pagina
+                  </TrackedLink>
+                  <TrackedLink
+                    href={appendEntryContextToPath(servicePage.triageHref, entryContext)}
+                    className="button"
+                    eventKey="cta_start_triage_clicked"
+                    trackingPayload={{
+                      location: "home_service_pages",
+                      topic: servicePage.topic,
+                      contentId: servicePage.slug,
+                      ...entryContextPayload
+                    }}
+                  >
+                    Iniciar triagem
+                  </TrackedLink>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="form-actions">
+            <TrackedLink
+              href={practiceAreasHref}
+              className="button secondary"
+              eventKey="strategic_content_cta_clicked"
+              trackingPayload={{ location: "home_service_index", ...entryContextPayload }}
+            >
+              Ver todas as areas de atuacao
+            </TrackedLink>
           </div>
         </SectionCard>
 

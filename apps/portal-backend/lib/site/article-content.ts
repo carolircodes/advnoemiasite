@@ -1,11 +1,14 @@
 import { readFile } from "fs/promises";
 import path from "path";
 
-export type ArticleTopic =
-  | "previdenciario"
-  | "consumidor_bancario"
-  | "familia"
-  | "civil";
+import {
+  getEditorialTopicBySlug,
+  getEditorialTopicByTopic,
+  getEditorialTopics,
+  type EditorialTopic
+} from "./editorial-taxonomy.ts";
+
+export type ArticleTopic = EditorialTopic;
 
 export type ArticleEntry = {
   slug: string;
@@ -205,49 +208,6 @@ const ARTICLES: ArticleEntry[] = [
 ];
 
 const ARTICLES_ROOT = path.resolve(process.cwd(), "..", "..", "artigos");
-const TOPIC_HUBS: ArticleTopicHub[] = [
-  {
-    topic: "previdenciario",
-    slug: "previdenciario",
-    title: "Hub previdenciario",
-    description:
-      "Negativas, revisoes e descontos indevidos organizados como trilha de leitura e entrada qualificada.",
-    strategicAngle:
-      "Transformar demanda previdenciaria em leitura profunda, triagem e consulta com mais contexto.",
-    serviceHref: "/#triagem-inicial?tema=previdenciario"
-  },
-  {
-    topic: "consumidor_bancario",
-    slug: "consumidor-bancario",
-    title: "Hub consumidor bancario",
-    description:
-      "Conteudos sobre descontos, consignado e negativacao com passagem clara para triagem.",
-    strategicAngle:
-      "Levar dores bancarias recorrentes para proximos passos mais claros, sem ruido nem promessa vazia.",
-    serviceHref: "/#triagem-inicial?tema=consumidor-bancario"
-  },
-  {
-    topic: "familia",
-    slug: "familia",
-    title: "Hub familia",
-    description:
-      "Leituras estruturadas sobre divorcio e pensao com foco em organizacao e criterio.",
-    strategicAngle:
-      "Converter temas sensiveis em atendimento com mais confianca, contexto e clareza do proximo passo.",
-    serviceHref: "/#triagem-inicial?tema=familia"
-  },
-  {
-    topic: "civil",
-    slug: "civil",
-    title: "Hub civil",
-    description:
-      "Contratos, descumprimentos e conflitos civis com leitura objetiva e CTA contextual.",
-    strategicAngle:
-      "Trazer para triagem casos civis que precisam sair do improviso e entrar em analise mais tecnica.",
-    serviceHref: "/#triagem-inicial?tema=civil"
-  }
-];
-
 function extractMatch(source: string, expression: RegExp) {
   const match = source.match(expression);
   return match?.[1]?.trim() || "";
@@ -272,11 +232,31 @@ export function getFeaturedArticles(limit = 3) {
 }
 
 export function getTopicHubs() {
-  return [...TOPIC_HUBS];
+  return getEditorialTopics().map<ArticleTopicHub>((topic) => ({
+    topic: topic.topic,
+    slug: topic.slug,
+    title: topic.hubTitle,
+    description: topic.hubDescription,
+    strategicAngle: topic.strategicAngle,
+    serviceHref: topic.serviceHref
+  }));
 }
 
 export function getTopicHubBySlug(slug: string) {
-  return TOPIC_HUBS.find((hub) => hub.slug === slug) || null;
+  const topic = getEditorialTopicBySlug(slug);
+
+  if (!topic) {
+    return null;
+  }
+
+  return {
+    topic: topic.topic,
+    slug: topic.slug,
+    title: topic.hubTitle,
+    description: topic.hubDescription,
+    strategicAngle: topic.strategicAngle,
+    serviceHref: topic.serviceHref
+  };
 }
 
 export function getArticlesByTopic(topic: ArticleTopic) {
@@ -321,6 +301,38 @@ export function getNextBestArticles(article: ArticleEntry, limit = 2) {
 
 export function getArticleBySlug(slug: string) {
   return ARTICLES.find((article) => article.slug === slug) || null;
+}
+
+export function getArticlesByTopicSlug(slug: string) {
+  const topic = getEditorialTopicBySlug(slug);
+
+  if (!topic) {
+    return [];
+  }
+
+  return getArticlesByTopic(topic.topic);
+}
+
+export function getArticleCountsByTopic() {
+  return getEditorialTopics().map((topic) => ({
+    topic: topic.topic,
+    slug: topic.slug,
+    label: topic.label,
+    count: getArticlesByTopic(topic.topic).length
+  }));
+}
+
+export function getEditorialTopicSummary(topic: ArticleTopic) {
+  const definition = getEditorialTopicByTopic(topic);
+
+  if (!definition) {
+    return null;
+  }
+
+  return {
+    ...definition,
+    articleCount: getArticlesByTopic(topic).length
+  };
 }
 
 export async function getArticleContentBySlug(slug: string): Promise<ArticleContent | null> {

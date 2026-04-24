@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
 import "./globals.css";
 
-const metadataBase = new URL(
-  process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000"
-);
+const metadataBase = new URL(PUBLIC_SITE_BASE_URL);
 
 export const metadata: Metadata = {
   metadataBase,

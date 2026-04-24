@@ -6,12 +6,13 @@ import { ContextualConversionPanel } from "@/components/contextual-conversion-pa
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
 import { TrackedLink } from "@/components/tracked-link";
-import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
 import {
   getArticlesByTopic,
   getTopicHubBySlug,
   getTopicHubs
 } from "@/lib/site/article-content";
+import { getEditorialServicePageBySlug } from "@/lib/site/editorial-taxonomy";
+import { buildPublicMetadata } from "@/lib/site/seo";
 
 type TopicHubPageProps = {
   params: Promise<{ topic: string }>;
@@ -33,18 +34,11 @@ export async function generateMetadata({
     return {};
   }
 
-  return {
-    title: `${hub.title} | Noemia Paixao Advocacia`,
+  return buildPublicMetadata({
+    title: hub.title,
     description: hub.description,
-    alternates: {
-      canonical: `/artigos/tema/${hub.slug}`
-    },
-    openGraph: {
-      title: `${hub.title} | Noemia Paixao Advocacia`,
-      description: hub.description,
-      url: `${PUBLIC_SITE_BASE_URL}/artigos/tema/${hub.slug}`
-    }
-  };
+    path: `/artigos/tema/${hub.slug}`
+  });
 }
 
 export default async function TopicHubPage({ params }: TopicHubPageProps) {
@@ -56,6 +50,7 @@ export default async function TopicHubPage({ params }: TopicHubPageProps) {
   }
 
   const articles = getArticlesByTopic(hub.topic);
+  const servicePage = getEditorialServicePageBySlug(hub.slug);
 
   return (
     <>
@@ -126,6 +121,36 @@ export default async function TopicHubPage({ params }: TopicHubPageProps) {
             ))}
           </div>
         </SectionCard>
+
+        {servicePage ? (
+          <SectionCard
+            title="Pagina de entrada desta area"
+            description="O hub agora empurra para uma money page mais clara quando a busca ja estiver madura o suficiente para triagem."
+          >
+            <div className="cta-strip">
+              <strong>{servicePage.title}</strong>
+              <p>{servicePage.longDescription}</p>
+              <div className="form-actions">
+                <TrackedLink
+                  href={servicePage.href}
+                  className="button secondary"
+                  eventKey="article_hub_cta_clicked"
+                  trackingPayload={{ topic: hub.topic, location: "topic_hub_service_page" }}
+                >
+                  Abrir pagina de atuacao
+                </TrackedLink>
+                <TrackedLink
+                  href={servicePage.triageHref}
+                  className="button"
+                  eventKey="cta_start_triage_clicked"
+                  trackingPayload={{ topic: hub.topic, location: "topic_hub_service_page" }}
+                >
+                  Iniciar triagem
+                </TrackedLink>
+              </div>
+            </div>
+          </SectionCard>
+        ) : null}
 
         <ContextualConversionPanel
           surface="article_hub"

@@ -7,25 +7,10 @@ import {
   listRevenueOffersByMoment,
   revenueArchitecture
 } from "./revenue-architecture";
-
-type RevenuePaymentRow = {
-  id: string;
-  lead_id: string | null;
-  user_id: string | null;
-  external_id: string | null;
-  amount: number | null;
-  base_amount_cents?: number | null;
-  final_amount_cents?: number | null;
-  price_source?: string | null;
-  status: string | null;
-  financial_state?: string | null;
-  created_at: string;
-  updated_at: string;
-  approved_at: string | null;
-  rejected_at: string | null;
-  metadata: Record<string, unknown> | null;
-  status_detail: string | null;
-};
+import {
+  normalizeRevenuePaymentRows,
+  type RevenuePaymentRow
+} from "./revenue-intelligence-shared";
 
 type RevenueEventRow = {
   id: string;
@@ -36,6 +21,13 @@ type RevenueEventRow = {
   payload: Record<string, unknown> | null;
   occurred_at: string;
 };
+
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return (
+    error?.code === "42703" ||
+    (typeof error?.message === "string" && error.message.includes("does not exist"))
+  );
+}
 
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -79,6 +71,51 @@ function getHoursBetween(start: string | null | undefined, end: string | null | 
   return (endDate - startDate) / (1000 * 60 * 60);
 }
 
+async function loadRevenuePayments(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  since: string
+) {
+  const result = await supabase
+    .from("payments")
+    .select(
+      "id,lead_id,user_id,external_id,amount,base_amount_cents,final_amount_cents,price_source,status,financial_state,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
+    )
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+
+  if (!isMissingColumnError(result.error)) {
+    return {
+      data: normalizeRevenuePaymentRows((result.data || []) as RevenuePaymentRow[]),
+      error: result.error,
+      compatibilityMode: "canonical" as const
+    };
+  }
+
+  const legacyResult = await supabase
+    .from("payments")
+    .select(
+      "id,lead_id,user_id,external_id,amount,status,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
+    )
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+
+  if (legacyResult.error) {
+    return {
+      data: null,
+      error: legacyResult.error,
+      compatibilityMode: "legacy" as const
+    };
+  }
+
+  return {
+    data: normalizeRevenuePaymentRows((legacyResult.data || []) as RevenuePaymentRow[]),
+    error: null,
+    compatibilityMode: "legacy" as const
+  };
+}
+
 export async function getRevenueIntelligenceOverview(rawDays = 30) {
   const days = clampDays(rawDays);
   const supabase = await createServerSupabaseClient();
@@ -87,14 +124,7 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
   const stalePendingLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
   const [paymentsResult, productEventsResult] = await Promise.all([
-    supabase
-      .from("payments")
-      .select(
-        "id,lead_id,user_id,external_id,amount,base_amount_cents,final_amount_cents,price_source,status,financial_state,created_at,updated_at,approved_at,rejected_at,metadata,status_detail"
-      )
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(2000),
+    loadRevenuePayments(supabase, since),
     supabase
       .from("product_events")
       .select("id,event_key,event_group,page_path,profile_id,payload,occurred_at")
@@ -108,13 +138,19 @@ export async function getRevenueIntelligenceOverview(rawDays = 30) {
     throw new Error(`Nao foi possivel carregar os pagamentos: ${paymentsResult.error.message}`);
   }
 
+  if (paymentsResult.compatibilityMode === "legacy") {
+    console.warn("[revenue.intelligence] Using legacy payments compatibility mode", {
+      missingColumn: "financial_state"
+    });
+  }
+
   if (productEventsResult.error) {
     throw new Error(
       `Nao foi possivel carregar os eventos de receita: ${productEventsResult.error.message}`
     );
   }
 
-  const payments = (paymentsResult.data || []) as RevenuePaymentRow[];
+  const payments = paymentsResult.data || [];
   const revenueEvents = (productEventsResult.data || []) as RevenueEventRow[];
 
   const pendingPayments = payments.filter((payment) => getFinancialState(payment) === "pending");

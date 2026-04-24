@@ -155,6 +155,18 @@ function formatMoneyBRL(value: number) {
   }).format(value);
 }
 
+async function loadDashboardSection<T>(section: string, loader: () => Promise<T>) {
+  try {
+    return await loader();
+  } catch (error) {
+    console.error("[internal.advogada] Failed to load dashboard section", {
+      section,
+      message: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+}
+
 async function createClientAction(formData: FormData) {
   "use server";
 
@@ -211,9 +223,11 @@ export default async function InternalLawyerPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const profile = await requireProfile(["advogada", "admin"]);
-  const overview = await getStaffOverview();
-  const intelligence = await getBusinessIntelligenceOverview(30);
-  const revenue = await getRevenueIntelligenceOverview(30);
+  const [overview, intelligence, revenue] = await Promise.all([
+    loadDashboardSection("staff-overview", () => getStaffOverview()),
+    loadDashboardSection("business-intelligence", () => getBusinessIntelligenceOverview(30)),
+    loadDashboardSection("revenue-intelligence", () => getRevenueIntelligenceOverview(30))
+  ]);
   const params = await searchParams;
   const rawError = typeof params.error === "string" ? decodeURIComponent(params.error) : "";
   const error = getAccessMessage(rawError) || rawError;
