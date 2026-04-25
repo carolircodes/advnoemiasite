@@ -30,8 +30,19 @@ function extractAddress(value: string) {
   return match?.[1]?.trim() || value.trim();
 }
 
+function containsUnsafeHeaderCharacter(value: string) {
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.charCodeAt(index);
+    if (codePoint <= 31 || codePoint === 127 || codePoint >= 255) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function encodeHeader(value: string) {
-  const needsEncoding = /[\x00-\x1F\x7F-\xFF]/.test(value) || /[\r\n]/.test(value) || value.startsWith('.');
+  const needsEncoding =
+    containsUnsafeHeaderCharacter(value) || /[\r\n]/.test(value) || value.startsWith(".");
   return needsEncoding ? `=?utf-8?B?${Buffer.from(value, "utf8").toString("base64")}?=` : value;
 }
 

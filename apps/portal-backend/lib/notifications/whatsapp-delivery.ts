@@ -2,7 +2,7 @@ import "server-only";
 
 import { sendWhatsAppMessage, isValidWhatsAppNumber } from "../meta/whatsapp-service";
 import { createAdminSupabaseClient } from "../supabase/admin";
-import { logger, logWhatsApp } from "../logging/structured-logger";
+import { logWhatsApp } from "../logging/structured-logger";
 
 export type WhatsAppDeliveryInput = {
   to: string;

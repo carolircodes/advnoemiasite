@@ -4,28 +4,40 @@ import {
   getNotificationWorkerDiagnostics,
   type NotificationWorkerDiagnosticsAdapter
 } from "../diagnostics/notification-worker";
-import { traceOperationalEvent } from "../observability/operational-trace";
-import { routeNotificationByChannel } from "../notifications/channel-router";
+import { recordNotificationInteraction } from "../notifications/action-tracking";
 import { renderNotificationEmail } from "../notifications/email-templates";
+import { routeNotificationByChannel } from "../notifications/channel-router";
+import { traceOperationalEvent } from "../observability/operational-trace";
 import { createAdminSupabaseClient } from "../supabase/admin";
+import { runOperationalAutomationRules } from "./automation-rules";
 import {
   classifyNotificationError,
   type NotificationErrorKind
 } from "./notification-error-classification";
-import { runOperationalAutomationRules } from "./automation-rules";
 
 const MAX_NOTIFICATION_ATTEMPTS = 5;
 const NOTIFICATION_WORKER_ID = `${process.env.VERCEL_REGION || "local"}:${process.pid}`;
+const NOTIFICATION_SELECT =
+  "id,event_type,channel,audience,priority,canonical_event_key,recipient_profile_id,recipient_email"
+  + ",subject,template_key,payload,action_label,action_url,expires_at,governance_reason,status"
+  + ",attempts,available_at";
 
 type NotificationRecord = {
   id: string;
   event_type: string;
   channel: string;
+  audience: string | null;
+  priority: string | null;
+  canonical_event_key: string | null;
   recipient_profile_id: string | null;
   recipient_email: string;
   subject: string;
   template_key: string;
   payload: Record<string, unknown> | null;
+  action_label: string | null;
+  action_url: string | null;
+  expires_at: string | null;
+  governance_reason: string | null;
   status: string;
   attempts: number;
   available_at: string;
@@ -98,9 +110,7 @@ async function claimNotificationForProcessing(record: NotificationRecord) {
     .eq("attempts", record.attempts)
     .in("status", ["pending", "failed"])
     .lte("available_at", now)
-    .select(
-      "id,event_type,channel,recipient_profile_id,recipient_email,subject,template_key,payload,status,attempts,available_at"
-    )
+    .select(NOTIFICATION_SELECT)
     .maybeSingle();
 
   if (error) {
@@ -160,9 +170,7 @@ async function markNotificationAsFailed(
   errorKind: NotificationErrorKind
 ) {
   const supabase = createAdminSupabaseClient();
-  const nextAttemptAt = new Date(
-    Date.now() + getRetryDelayMs(record.attempts + 1)
-  ).toISOString();
+  const nextAttemptAt = new Date(Date.now() + getRetryDelayMs(record.attempts + 1)).toISOString();
   const terminalFailure = record.attempts + 1 >= MAX_NOTIFICATION_ATTEMPTS;
   const { error } = await supabase
     .from("notifications_outbox")
@@ -191,6 +199,9 @@ async function logNotificationSentToHistory(record: NotificationRecord) {
       entity_id: record.id,
       payload: {
         channel: record.channel || "email",
+        audience: record.audience,
+        priority: record.priority,
+        canonicalEventKey: record.canonical_event_key,
         templateKey: record.template_key,
         recipientEmail: record.recipient_email,
         eventType: record.event_type,
@@ -209,13 +220,18 @@ async function processNotification(record: NotificationRecord) {
   const { claimedRecord, processingTimestamp } = await claimNotificationForProcessing(record);
 
   if (!claimedRecord) {
-    traceOperationalEvent("warn", "NOTIFICATION_PROCESSING_CONTENDED", {
-      service: "notifications_worker",
-      action: "claim"
-    }, {
-      notificationId: record.id,
-      workerId: NOTIFICATION_WORKER_ID
-    });
+    traceOperationalEvent(
+      "warn",
+      "NOTIFICATION_PROCESSING_CONTENDED",
+      {
+        service: "notifications_worker",
+        action: "claim"
+      },
+      {
+        notificationId: record.id,
+        workerId: NOTIFICATION_WORKER_ID
+      }
+    );
 
     return {
       id: record.id,
@@ -227,6 +243,30 @@ async function processNotification(record: NotificationRecord) {
     await markNotificationAsSkipped(
       claimedRecord.id,
       "Convite principal enviado pelo fluxo nativo do Supabase Auth."
+    );
+
+    return {
+      id: claimedRecord.id,
+      status: "skipped" as const
+    };
+  }
+
+  if (claimedRecord.expires_at && new Date(claimedRecord.expires_at).getTime() < Date.now()) {
+    await recordNotificationInteraction({
+      notificationId: claimedRecord.id,
+      interactionType: "expired_without_action",
+      profileId: claimedRecord.recipient_profile_id,
+      pagePath: claimedRecord.action_url
+    }).catch((error) => {
+      console.warn("[notifications.worker] failed_to_track_expiry", {
+        notificationId: claimedRecord.id,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    });
+
+    await markNotificationAsSkipped(
+      claimedRecord.id,
+      "Notificacao expirada antes do envio por governanca de janela util."
     );
 
     return {
@@ -271,14 +311,22 @@ async function processNotification(record: NotificationRecord) {
     await markNotificationAsSent(claimedRecord.id);
     await logNotificationSentToHistory(claimedRecord);
 
-    traceOperationalEvent("info", "NOTIFICATION_SENT", {
-      service: "notifications_worker",
-      action: "send"
-    }, {
-      notificationId: claimedRecord.id,
-      channel,
-      workerId: NOTIFICATION_WORKER_ID
-    });
+    traceOperationalEvent(
+      "info",
+      "NOTIFICATION_SENT",
+      {
+        service: "notifications_worker",
+        action: "send"
+      },
+      {
+        notificationId: claimedRecord.id,
+        channel,
+        audience: claimedRecord.audience,
+        priority: claimedRecord.priority,
+        canonicalEventKey: claimedRecord.canonical_event_key,
+        workerId: NOTIFICATION_WORKER_ID
+      }
+    );
 
     return {
       id: claimedRecord.id,
@@ -291,15 +339,24 @@ async function processNotification(record: NotificationRecord) {
 
     await markNotificationAsFailed(claimedRecord, processingTimestamp, message, errorKind);
 
-    traceOperationalEvent("error", "NOTIFICATION_SEND_FAILED", {
-      service: "notifications_worker",
-      action: "send"
-    }, {
-      notificationId: claimedRecord.id,
-      channel,
-      workerId: NOTIFICATION_WORKER_ID,
-      errorKind
-    }, error);
+    traceOperationalEvent(
+      "error",
+      "NOTIFICATION_SEND_FAILED",
+      {
+        service: "notifications_worker",
+        action: "send"
+      },
+      {
+        notificationId: claimedRecord.id,
+        channel,
+        audience: claimedRecord.audience,
+        priority: claimedRecord.priority,
+        canonicalEventKey: claimedRecord.canonical_event_key,
+        workerId: NOTIFICATION_WORKER_ID,
+        errorKind
+      },
+      error
+    );
 
     return {
       id: claimedRecord.id,
@@ -317,9 +374,7 @@ export async function processPendingNotifications(limit = 10) {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("notifications_outbox")
-    .select(
-      "id,event_type,channel,recipient_profile_id,recipient_email,subject,template_key,payload,status,attempts,available_at"
-    )
+    .select(NOTIFICATION_SELECT)
     .in("status", ["pending", "failed"])
     .lt("attempts", MAX_NOTIFICATION_ATTEMPTS)
     .lte("available_at", now)
@@ -332,7 +387,7 @@ export async function processPendingNotifications(limit = 10) {
 
   const results = [];
 
-  for (const record of (data || []) as NotificationRecord[]) {
+  for (const record of ((data || []) as unknown as NotificationRecord[])) {
     results.push(await processNotification(record));
   }
 

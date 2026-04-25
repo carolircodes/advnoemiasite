@@ -11,6 +11,7 @@ import {
   requestCaseDocumentSchema,
   updateDocumentRequestStatusSchema
 } from "../domain/portal";
+import { recordNotificationInteraction } from "../notifications/action-tracking";
 import { sendCaseUpdateNotification } from "../notifications/case-notifications";
 import { createAdminSupabaseClient } from "../supabase/admin";
 import { createServerSupabaseClient } from "../supabase/server";
@@ -880,6 +881,23 @@ export async function submitClientDocument(
     storagePath,
     requestId
   };
+}
+
+export async function recordClientDocumentNotificationCompletion(input: {
+  notificationId: string;
+  profileId: string;
+  requestId: string;
+}) {
+  await recordNotificationInteraction({
+    notificationId: input.notificationId,
+    interactionType: "action_completed",
+    profileId: input.profileId,
+    pagePath: "/documentos",
+    metadata: {
+      requestId: input.requestId,
+      completionMode: "document_uploaded"
+    }
+  });
 }
 
 export async function listLatestDocuments(limit = 20) {

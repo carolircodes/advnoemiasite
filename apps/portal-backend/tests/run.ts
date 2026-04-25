@@ -18,6 +18,8 @@ import "./phase12-omnichannel.test.ts";
 import "./phase13-hardening.test.ts";
 import "./phase14-observability.test.ts";
 import "./phase15-omnichannel-governance.test.ts";
+import "./notification-governance.test.ts";
+import "./notification-experience.test.ts";
 import "./meta-messenger-audit.test.ts";
 import "./facebook-messenger-closeout.test.ts";
 import "./youtube-omnichannel.test.ts";

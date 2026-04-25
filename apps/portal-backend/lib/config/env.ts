@@ -67,6 +67,9 @@ const envSchema = z
 
     OPENAI_API_KEY: optionalString(),
     OPENAI_MODEL: optionalString(),
+    NEXT_PUBLIC_PUSH_VAPID_PUBLIC_KEY: optionalString(),
+    PUSH_VAPID_PRIVATE_KEY: optionalString(),
+    NOTIFICATIONS_PUSH_PILOT_ENABLED: optionalString(),
     TELEGRAM_BOT_TOKEN: optionalString(),
     TELEGRAM_WEBHOOK_SECRET: optionalString(),
     TELEGRAM_CHANNEL_USERNAME: optionalString(),

@@ -26,6 +26,8 @@ import { getRevenueOfferByCode } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 import { commercialClosingService } from "@/lib/services/commercial-closing";
 import { commercialAppointmentService } from "@/lib/services/commercial-appointment";
+import { queueGovernedNotification } from "@/lib/notifications/governed-outbox";
+import { listStaffEmailRecipients } from "@/lib/notifications/outbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { categorizeObservedError } from "@/lib/observability/error-categorization";
 import {
@@ -495,6 +497,79 @@ Em instantes voce recebera as proximas orientacoes.`;
   }
 }
 
+async function queuePaymentConfirmationNotifications(args: {
+  supabase: any;
+  payment: PersistedPaymentRecord;
+  leadId: string;
+}) {
+  const profileId = typeof args.payment.user_id === "string" ? args.payment.user_id : null;
+
+  if (profileId) {
+    const { data: profile } = await args.supabase
+      .from("profiles")
+      .select("id,email,full_name")
+      .eq("id", profileId)
+      .maybeSingle();
+
+    if (profile?.email) {
+      await queueGovernedNotification({
+        eventKey: "client.payment.confirmed",
+        channel: "email",
+        recipientProfileId: profile.id,
+        recipientAddress: profile.email,
+        subject: "Pagamento confirmado com sucesso",
+        templateKey: "case-update",
+        payload: {
+          title: "Pagamento confirmado com sucesso",
+          publicSummary:
+            "Recebemos sua confirmacao e o atendimento segue para a proxima etapa com prioridade."
+        },
+        relatedTable: "payments",
+        relatedId: args.payment.id,
+        actionLabel: "Ver proximo passo",
+        actionPath: "/pagamento/sucesso",
+        decisionContext: {
+          source: "payment_webhook",
+          leadId: args.leadId,
+          paymentId: args.payment.id
+        }
+      });
+    }
+  }
+
+  const staffRecipients = await listStaffEmailRecipients();
+  for (const recipient of staffRecipients) {
+    await queueGovernedNotification({
+      eventKey: "operations.payment.confirmed",
+      channel: "email",
+      recipientProfileId: recipient.profileId,
+      recipientAddress: recipient.email,
+      subject: "Pagamento confirmado e pronto para proxima acao",
+      templateKey: "triage-submitted",
+      payload: {
+        fullName: "Pagamento confirmado",
+        caseAreaLabel: "Financeiro comercial",
+        urgencyLabel: "Importante",
+        stageLabel: "Aguardando proxima acao",
+        contactEmail: "",
+        contactPhone: "",
+        caseSummary: `Lead ${args.leadId} teve pagamento conciliado com sucesso.`,
+        submittedAtLabel: new Date().toISOString(),
+        destinationPath: "/internal/advogada/operacional"
+      },
+      relatedTable: "payments",
+      relatedId: args.payment.id,
+      actionLabel: "Abrir operacional",
+      actionPath: "/internal/advogada/operacional",
+      decisionContext: {
+        source: "payment_webhook",
+        leadId: args.leadId,
+        paymentId: args.payment.id
+      }
+    });
+  }
+}
+
 async function applyPaymentBusinessSideEffects(args: {
   supabase: any;
   payment: PersistedPaymentRecord;
@@ -544,6 +619,11 @@ async function applyPaymentBusinessSideEffects(args: {
       args.payment.id,
       args.log
     );
+    await queuePaymentConfirmationNotifications({
+      supabase: args.supabase,
+      payment: args.payment,
+      leadId: args.leadId
+    });
 
     try {
       const { error: followUpError } = await args.supabase.from("follow_up_events").insert({

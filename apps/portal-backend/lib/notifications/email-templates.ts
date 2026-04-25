@@ -3,15 +3,20 @@ import "server-only";
 import { CLIENT_LOGIN_PATH } from "../auth/access-control";
 import { getServerEnv } from "../config/env";
 import type { ClientTier } from "../domain/portal";
+import { buildNotificationRedirectPath } from "./notification-links";
 
 // ---------------------------------------------------------------------------
 // Tipos
 // ---------------------------------------------------------------------------
 
 type NotificationTemplateRecord = {
+  id?: string;
+  canonical_event_key?: string | null;
   template_key: string;
   subject: string;
   payload: Record<string, unknown> | null;
+  action_label?: string | null;
+  action_url?: string | null;
 };
 
 type RenderedEmail = {
@@ -65,6 +70,23 @@ function escapeHtml(raw: string) {
 
 function buildUrl(path: string) {
   return new URL(path, getServerEnv().NEXT_PUBLIC_APP_URL).toString();
+}
+
+function resolveActionHref(record: NotificationTemplateRecord, fallbackPath: string) {
+  const explicit = asString(record.action_url, "");
+  const finalTarget = explicit || fallbackPath;
+
+  if (record.id) {
+    return buildUrl(buildNotificationRedirectPath(record.id));
+  }
+  if (finalTarget.startsWith("http://") || finalTarget.startsWith("https://")) {
+    return finalTarget;
+  }
+  return buildUrl(finalTarget);
+}
+
+function resolveActionLabel(record: NotificationTemplateRecord, fallbackLabel: string) {
+  return asString(record.action_label, fallbackLabel);
 }
 
 function replyTo() {
@@ -388,8 +410,8 @@ function renderInvite(record: NotificationTemplateRecord): RenderedEmail {
       + `Do andamento às datas importantes, tudo organizado em um único lugar — acessível quando e onde você precisar.`,
       `O primeiro acesso leva menos de dois minutos.`
     ],
-    ctaLabel: "Acessar meu portal",
-    ctaHref: buildUrl(CLIENT_LOGIN_PATH)
+    ctaLabel: resolveActionLabel(record, "Acessar meu portal"),
+    ctaHref: resolveActionHref(record, CLIENT_LOGIN_PATH)
   };
 
   return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
@@ -425,8 +447,8 @@ function renderCaseEvent(record: NotificationTemplateRecord): RenderedEmail {
     eyebrow: eventLabel,
     title,
     paragraphs,
-    ctaLabel: action.label,
-    ctaHref: buildUrl(action.path)
+    ctaLabel: resolveActionLabel(record, action.label),
+    ctaHref: resolveActionHref(record, action.path)
   };
 
   return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
@@ -455,8 +477,8 @@ function renderTriage(record: NotificationTemplateRecord): RenderedEmail {
         `Telefone: ${asString(payload.contactPhone, "—")}`
       ].filter((l) => !l.endsWith("—"))
     },
-    ctaLabel: "Abrir painel interno",
-    ctaHref: buildUrl(dest),
+    ctaLabel: resolveActionLabel(record, "Abrir painel interno"),
+    ctaHref: resolveActionHref(record, dest),
     footerNote: "Notificação interna. Não encaminhar."
   };
 
@@ -484,8 +506,8 @@ function renderReminder(record: NotificationTemplateRecord): RenderedEmail {
         : [
             `${firstName}, tudo está pronto para o seu primeiro acesso. Em poucos minutos você terá o status do caso, os documentos e as próximas datas organizados em um único lugar.`
           ],
-      ctaLabel: "Entrar agora",
-      ctaHref: buildUrl(dest)
+      ctaLabel: resolveActionLabel(record, "Entrar agora"),
+      ctaHref: resolveActionHref(record, dest)
     };
 
     return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
@@ -515,8 +537,8 @@ function renderReminder(record: NotificationTemplateRecord): RenderedEmail {
         heading: docTitle,
         lines: infoLines
       },
-      ctaLabel: "Enviar documento",
-      ctaHref: buildUrl(dest)
+      ctaLabel: resolveActionLabel(record, "Enviar documento"),
+      ctaHref: resolveActionHref(record, dest)
     };
 
     return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
@@ -541,8 +563,8 @@ function renderReminder(record: NotificationTemplateRecord): RenderedEmail {
         heading: `Data e hora`,
         lines: [startsAt]
       },
-      ctaLabel: "Ver na agenda",
-      ctaHref: buildUrl(dest)
+      ctaLabel: resolveActionLabel(record, "Ver na agenda"),
+      ctaHref: resolveActionHref(record, dest)
     };
 
     return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
@@ -554,8 +576,8 @@ function renderReminder(record: NotificationTemplateRecord): RenderedEmail {
     eyebrow: "Portal jurídico",
     title: record.subject,
     paragraphs: [`${firstName}, há uma novidade no seu portal. Acesse para ver os detalhes.`],
-    ctaLabel: "Acessar portal",
-    ctaHref: buildUrl(dest)
+    ctaLabel: resolveActionLabel(record, "Acessar portal"),
+    ctaHref: resolveActionHref(record, dest)
   };
 
   return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
@@ -597,7 +619,7 @@ export function renderNotificationEmail(record: NotificationTemplateRecord): Ren
         title: record.subject,
         paragraphs: ["A equipe registrou uma novidade no seu atendimento. Acesse o portal para ver os detalhes."],
         ctaLabel: "Acessar portal",
-        ctaHref: buildUrl("/cliente")
+        ctaHref: resolveActionHref(record, "/cliente")
       };
       return { subject: record.subject, html: buildHtml(input), text: buildText(input) };
     }

@@ -13,6 +13,14 @@ import {
 import { getClientIp } from "@/lib/http/request-guards";
 import { extractAcquisitionFromRequest } from "@/lib/middleware/acquisition-middleware";
 import { resolveEntryCaseArea } from "@/lib/entry-context";
+import { queueGovernedNotification } from "@/lib/notifications/governed-outbox";
+import { listStaffEmailRecipients } from "@/lib/notifications/outbox";
+import { categorizeObservedError } from "@/lib/observability/error-categorization";
+import {
+  createObservedJsonResponse,
+  logObservedRequest,
+  startRequestObservation
+} from "@/lib/observability/request-observability";
 import { conversationPersistence } from "@/lib/services/conversation-persistence";
 import { recordProductEvent } from "@/lib/services/public-intake";
 import {
@@ -25,12 +33,6 @@ import {
   readSiteChatSessionFromRequest,
   setSiteChatSessionCookie
 } from "@/lib/site/site-chat-session";
-import { categorizeObservedError } from "@/lib/observability/error-categorization";
-import {
-  createObservedJsonResponse,
-  logObservedRequest,
-  startRequestObservation
-} from "@/lib/observability/request-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -683,6 +685,39 @@ async function hydrateSiteThreadContext(input: {
         intent: handoffDecision.intent
       }
     });
+
+    const staffRecipients = await listStaffEmailRecipients();
+    for (const recipient of staffRecipients) {
+      await queueGovernedNotification({
+        eventKey: "operations.handoff.human",
+        channel: "email",
+        recipientProfileId: recipient.profileId,
+        recipientAddress: recipient.email,
+        subject: `Handoff humano no site: ${origin.pagePath || "nova conversa"}`,
+        templateKey: "triage-urgent",
+        payload: {
+          fullName: "Visitante",
+          caseAreaLabel: origin.topic || "Site",
+          urgencyLabel: "Alta",
+          stageLabel: "Handoff aguardando humano",
+          contactEmail: "",
+          contactPhone: "",
+          caseSummary: handoffDecision.reason || "Conversa precisa de retomada humana.",
+          submittedAtLabel: new Date().toISOString(),
+          destinationPath: "/internal/advogada/atendimento"
+        },
+        relatedTable: "conversation_threads",
+        relatedId: session.id,
+        actionLabel: "Abrir inbox",
+        actionPath: "/internal/advogada/atendimento",
+        decisionContext: {
+          source: "site_chat",
+          intent: handoffDecision.intent,
+          threadId: session.id,
+          messagePreview: input.payload.message.slice(0, 220)
+        }
+      });
+    }
   }
 
   return {

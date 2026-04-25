@@ -158,6 +158,11 @@ export function ClientShell({
             href: "/noemia",
             label: "Falar com o escritorio",
             description: "Retomar o atendimento quando precisar de apoio humano."
+          },
+          {
+            href: "/cliente/notificacoes",
+            label: "Notificacoes",
+            description: "Escolher apenas os alertas que ajudam de verdade."
           }
         ]}
       />
@@ -223,6 +228,10 @@ export function ClientShell({
 
           <Link href="/auth/esqueci-senha" className="button secondary">
             Redefinir senha
+          </Link>
+
+          <Link href="/cliente/notificacoes" className="button secondary">
+            Ajustar notificacoes
           </Link>
 
           <form action={logoutAction}>

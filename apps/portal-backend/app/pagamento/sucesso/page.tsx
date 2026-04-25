@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { NotificationJourneyBeacon } from "@/components/notification-journey-beacon";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 
 type PaymentState =
@@ -136,6 +137,7 @@ function PaymentSuccessContent() {
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] px-5 py-8 text-[#10261d] sm:px-6 sm:py-10">
+      <NotificationJourneyBeacon completeOnViewEventKeys={["client.payment.confirmed"]} />
       <ProductEventBeacon
         eventKey="revenue_signal"
         eventGroup="revenue"

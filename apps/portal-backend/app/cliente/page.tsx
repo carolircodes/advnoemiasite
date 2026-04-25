@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { NotificationJourneyBeacon } from "@/components/notification-journey-beacon";
 import { getAccessMessage } from "@/lib/auth/access-control";
 import { requireProfile } from "@/lib/auth/guards";
 import { portalFeatures } from "@/lib/config/portal-features";
@@ -133,6 +134,7 @@ export default async function ClientPage({
 
   return (
     <ClientShell profile={profileSummary.data} notices={notices}>
+      <NotificationJourneyBeacon completeOnViewEventKeys={["client.portal.return"]} />
       {!portalFeatures.clientCaseSummary ||
       !portalFeatures.clientDocuments ||
       !portalFeatures.clientAgenda ||

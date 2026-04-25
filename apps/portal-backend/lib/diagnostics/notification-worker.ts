@@ -5,7 +5,7 @@ const STALE_PROCESSING_MINUTES = 15;
 
 export type NotificationWorkerDiagnosticsAdapter = {
   countByStatus(
-    status: "pending" | "failed" | "processing",
+    status: "pending" | "failed" | "processing" | "blocked",
     options?: {
       terminalOnly?: boolean;
       staleBefore?: string;
@@ -51,13 +51,14 @@ export async function getNotificationWorkerDiagnostics(
   const metadata = createNotificationWorkerDiagnosticsMetadata();
 
   try {
-    const [ready, retryableFailures, processing, staleProcessing, terminalFailures] =
+    const [ready, retryableFailures, processing, staleProcessing, terminalFailures, blocked] =
       await Promise.all([
         adapter.countByStatus("pending", { availableBefore: nowIso }),
         adapter.countByStatus("failed"),
         adapter.countByStatus("processing"),
         adapter.countByStatus("processing", { staleBefore }),
-        adapter.countByStatus("failed", { terminalOnly: true })
+        adapter.countByStatus("failed", { terminalOnly: true }),
+        adapter.countByStatus("blocked")
       ]);
 
     let section: DiagnosticSection = buildDiagnosticSection({
@@ -124,7 +125,8 @@ export async function getNotificationWorkerDiagnostics(
           retryableFailures,
           processing,
           staleProcessing,
-          terminalFailures
+          terminalFailures,
+          blocked
         }
       }
     };

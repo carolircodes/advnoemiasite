@@ -242,12 +242,14 @@ export function ClientDocumentUploadCard({
   requestTitle,
   instructions,
   dueAtLabel,
+  notificationId,
   uploadAction
 }: {
   requestId: string;
   requestTitle: string;
   instructions: string | null;
   dueAtLabel: string | null;
+  notificationId?: string | null;
   uploadAction: UploadAction;
 }) {
   const router = useRouter();
@@ -300,6 +302,9 @@ export function ClientDocumentUploadCard({
         noValidate
       >
         <input type="hidden" name="requestId" value={requestId} />
+        {notificationId ? (
+          <input type="hidden" name="notificationId" value={notificationId} />
+        ) : null}
 
         <div
           style={{

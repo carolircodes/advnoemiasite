@@ -11,6 +11,7 @@ import {
   listStaffEmailRecipients,
   queueEmailNotification
 } from "../notifications/outbox";
+import { queueGovernedNotification } from "../notifications/governed-outbox";
 import { createAdminSupabaseClient } from "../supabase/admin";
 
 type AutomationDispatchInput = {
@@ -107,16 +108,45 @@ async function queueAutomationNotification(input: QueuedAutomationNotificationIn
   }
 
   try {
-    const notification = await queueEmailNotification({
-      eventType: input.eventType,
-      recipientProfileId: input.recipientProfileId || "",
-      recipientEmail: input.recipientEmail,
-      subject: input.subject,
-      templateKey: input.templateKey,
-      payload: input.payload,
-      relatedTable: input.relatedTable,
-      relatedId: input.relatedId || null
-    });
+    const governedEventKey =
+      input.templateKey === "triage-submitted"
+        ? "operations.intake.new"
+        : input.templateKey === "triage-urgent"
+          ? "operations.intake.urgent"
+          : input.templateKey === "invite-reminder"
+            ? "client.portal.return"
+            : input.templateKey === "document-request-reminder"
+              ? "client.document.pending"
+              : input.templateKey === "appointment-reminder"
+                ? "client.appointment.reminder"
+                : null;
+
+    const notification = governedEventKey
+      ? await queueGovernedNotification({
+          eventKey: governedEventKey,
+          channel: "email",
+          recipientProfileId: input.recipientProfileId || null,
+          recipientAddress: input.recipientEmail,
+          subject: input.subject,
+          templateKey: input.templateKey,
+          payload: input.payload,
+          relatedTable: input.relatedTable,
+          relatedId: input.relatedId || null,
+          decisionContext: {
+            automationRuleKey: input.ruleKey,
+            automationEventType: input.eventType
+          }
+        })
+      : await queueEmailNotification({
+          eventType: input.eventType,
+          recipientProfileId: input.recipientProfileId || "",
+          recipientEmail: input.recipientEmail,
+          subject: input.subject,
+          templateKey: input.templateKey,
+          payload: input.payload,
+          relatedTable: input.relatedTable,
+          relatedId: input.relatedId || null
+        });
 
     await finalizeAutomationDispatch(dispatchId, notification.id);
     return notification.id;

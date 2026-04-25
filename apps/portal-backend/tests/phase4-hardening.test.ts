@@ -218,7 +218,7 @@ test("notification worker diagnostics surface stale processing and terminal fail
     async () => {
       const adapter = {
         countByStatus: async (
-          status: "pending" | "failed" | "processing",
+          status: "pending" | "failed" | "processing" | "blocked",
           options: {
             terminalOnly?: boolean;
             staleBefore?: string;
@@ -242,7 +242,8 @@ test("notification worker diagnostics surface stale processing and terminal fail
         retryableFailures: 4,
         processing: 2,
         staleProcessing: 1,
-        terminalFailures: 2
+        terminalFailures: 2,
+        blocked: 0
       });
     }
   );

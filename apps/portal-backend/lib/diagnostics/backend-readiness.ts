@@ -11,6 +11,7 @@ import {
   combineDiagnosticStatuses,
   type DiagnosticSection
 } from "./status.ts";
+import { assessPushPilotReadiness } from "../notifications/push-pilot.ts";
 
 export async function buildBackendReadinessReport(dependencies?: {
   enforcementProfile?: BackendEnforcementProfile;
@@ -31,6 +32,7 @@ export async function buildBackendReadinessReport(dependencies?: {
       return module.inspectNotificationWorkerDiagnostics();
     });
   const workerDiagnostics = await worker();
+  const pushPilot = await assessPushPilotReadiness();
   const envSections = buildEnvironmentConvergenceSections();
 
   const notifications = {
@@ -46,7 +48,8 @@ export async function buildBackendReadinessReport(dependencies?: {
       workerSecretConfigured: envSections.notifications.details.workerSecretConfigured,
       providerConfigured: workerDiagnostics.details.providerConfigured,
       queue: workerDiagnostics.details.queue,
-      retryPolicy: workerDiagnostics.details.retryPolicy
+      retryPolicy: workerDiagnostics.details.retryPolicy,
+      pushPilot
     }
   };
 

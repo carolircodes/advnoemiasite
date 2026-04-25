@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { presentToken } from '@/app/internal/advogada/atendimento/presentation';
+import { NotificationJourneyBeacon } from '@/components/notification-journey-beacon';
 import {
   OperationalActionButton as ActionButton,
   OperationalEmptyState,
@@ -266,10 +267,6 @@ const initialFilters: FilterState = {
   isClient: '',
   search: '',
 };
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(' ');
-}
 
 export default function OperationalPanel() {
   const [contacts, setContacts] = useState<OperationalContact[]>([]);
@@ -1062,6 +1059,7 @@ export default function OperationalPanel() {
 
   return (
     <div className="space-y-6 text-[#10261d]">
+      <NotificationJourneyBeacon completeOnViewEventKeys={["operations.intake.urgent", "operations.payment.confirmed"]} />
       {/* Botão de atualização */}
       <div className="flex justify-end">
         <ActionButton onClick={() => void loadPanelData()} variant="outline">

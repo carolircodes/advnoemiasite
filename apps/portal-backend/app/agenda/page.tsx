@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { ClientMobileDock } from "@/components/client-mobile-dock";
+import { NotificationJourneyBeacon } from "@/components/notification-journey-beacon";
 import { ClientPwaInstallPrompt } from "@/components/client-pwa-install-prompt";
 import { ClientQuickActions } from "@/components/client-quick-actions";
 import { FormSubmitButton } from "@/components/form-submit-button";
@@ -1072,6 +1073,7 @@ export default async function AgendaPage({
           { href: "/documentos", label: "Ver documentos", tone: "secondary" }
         ]}
       >
+      <NotificationJourneyBeacon />
       <ClientPwaInstallPrompt />
 
       <PremiumSection

@@ -6,6 +6,7 @@ import { ClientModuleBoundary } from "@/components/client-module-boundary";
 import { ClientMobileDock } from "@/components/client-mobile-dock";
 import type { ClientUploadState } from "@/components/client-document-upload";
 import { ClientDocumentUploadCard } from "@/components/client-document-upload";
+import { NotificationJourneyBeacon } from "@/components/notification-journey-beacon";
 import { ClientPwaInstallPrompt } from "@/components/client-pwa-install-prompt";
 import { ClientQuickActions } from "@/components/client-quick-actions";
 import { FormSubmitButton } from "@/components/form-submit-button";
@@ -22,7 +23,6 @@ import { isStaffRole, requireProfile } from "@/lib/auth/guards";
 import { portalFeatures } from "@/lib/config/portal-features";
 import {
   documentUploadAccept,
-  documentRequestStatusLabels,
   documentStatuses,
   documentStatusLabels,
   formatFileSize,
@@ -40,6 +40,7 @@ import {
 } from "@/lib/services/client-workspace";
 import {
   registerCaseDocument,
+  recordClientDocumentNotificationCompletion,
   requestCaseDocument,
   submitClientDocument,
   updateDocumentRequestStatus
@@ -186,6 +187,7 @@ async function submitClientDocumentAction(
   const profile = await requireProfile(["cliente"]);
   const requestId = String(formData.get("requestId") || "").trim();
   const uploadedFile = formData.get("file");
+  const notificationId = String(formData.get("notificationId") || "").trim();
 
   if (!requestId) {
     return { status: "error", message: "Solicitacao nao identificada. Recarregue a pagina e tente novamente." };
@@ -197,6 +199,13 @@ async function submitClientDocumentAction(
       profile.id,
       uploadedFile instanceof File ? uploadedFile : null
     );
+    if (notificationId) {
+      await recordClientDocumentNotificationCompletion({
+        notificationId,
+        profileId: profile.id,
+        requestId
+      });
+    }
     return { status: "success" };
   } catch (error) {
     return {
@@ -817,6 +826,7 @@ export default async function DocumentsPage({
   const error = getAccessMessage(rawError) || rawError;
   const successKey = typeof params.success === "string" ? params.success : "";
   const success = getSuccessMessage(successKey);
+  const notificationId = getStringParam(params.notification);
   const query = getStringParam(params.q);
   const scope = getStringParam(params.scope, "all");
   const sort = getStringParam(params.sort, "recent");
@@ -894,6 +904,7 @@ export default async function DocumentsPage({
           { href: "/agenda", label: "Agenda", tone: "secondary" as const }
         ]}
       >
+      <NotificationJourneyBeacon />
       <ClientPwaInstallPrompt />
 
       <PremiumSection
@@ -1253,6 +1264,7 @@ export default async function DocumentsPage({
                   requestTitle={request.title}
                   instructions={request.instructions ?? null}
                   dueAtLabel={request.due_at ? formatPortalDateTime(request.due_at) : null}
+                  notificationId={notificationId || null}
                   uploadAction={submitClientDocumentAction}
                 />
               </li>

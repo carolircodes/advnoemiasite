@@ -1,3 +1,4 @@
+import { NotificationJourneyBeacon } from "@/components/notification-journey-beacon";
 import { requireProfile } from "@/lib/auth/guards";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
 
@@ -30,9 +31,12 @@ export default async function InternalConversationInboxPage() {
   }
 
   return (
-    <ConversationInboxDashboard
-      initialPayload={initialPayload}
-      initialSelectedThreadId={initialSelectedThreadId}
-    />
+    <>
+      <NotificationJourneyBeacon completeOnViewEventKeys={["operations.handoff.human"]} />
+      <ConversationInboxDashboard
+        initialPayload={initialPayload}
+        initialSelectedThreadId={initialSelectedThreadId}
+      />
+    </>
   );
 }
