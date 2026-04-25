@@ -6,6 +6,10 @@ import { ClientModuleBoundary } from "@/components/client-module-boundary";
 import type { ClientUploadState } from "@/components/client-document-upload";
 import { ClientDocumentUploadCard } from "@/components/client-document-upload";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import {
+  PremiumFeatureCard,
+  PremiumStatePanel
+} from "@/components/portal/premium-experience";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SafeModuleCard } from "@/components/safe-module-card";
 import { SectionCard } from "@/components/section-card";
@@ -331,12 +335,54 @@ export default async function DocumentsPage({
               }
         ]}
       >
-        {error ? <div className="error-notice">{error}</div> : null}
-        {success ? <div className="success-notice">{success}</div> : null}
+        {error ? (
+          <PremiumStatePanel
+            tone="error"
+            eyebrow="Documentos internos"
+            title="A central documental precisa de atencao."
+            description={error}
+          />
+        ) : null}
+        {success ? (
+          <PremiumStatePanel
+            tone="success"
+            eyebrow="Documentos internos"
+            title="Fluxo documental atualizado com sucesso."
+            description={success}
+          />
+        ) : null}
+
+        <SectionCard
+          title="Leitura executiva de documentos"
+          description="A central destaca o que ja entrou, o que ainda depende de envio e onde a carteira documental pede acao imediata."
+        >
+          <div className="grid four">
+            <PremiumFeatureCard
+              eyebrow="Documentos recentes"
+              title={`${filteredDocuments.length} item(ns) na leitura`}
+              description="Arquivos e registros que a equipe pode revisar, complementar ou disponibilizar sem dispersar a operacao."
+            />
+            <PremiumFeatureCard
+              eyebrow="Solicitacoes abertas"
+              title={`${openRequests.length} pedido(s) ativos`}
+              description="Pendencias documentais que ainda dependem de resposta do cliente ou fechamento interno."
+            />
+            <PremiumFeatureCard
+              eyebrow="Casos em foco"
+              title={`${caseOptionsForDocuments.length} caso(s) no recorte`}
+              description="A carteira documental segue o mesmo foco de cliente e caso para manter contexto operacional."
+            />
+            <PremiumFeatureCard
+              eyebrow="Notificacoes"
+              title={`${overview.pendingNotifications} envio(s) pendente(s)`}
+              description="Mensagens futuras ligadas a mudancas documentais que ainda precisam ser confirmadas."
+            />
+          </div>
+        </SectionCard>
 
         <SafeModuleCard
           title="Busca e filtros"
-          description="Filtre documentos e solicitacoes para focar no que esta pendente ou localizar um caso rapidamente."
+          description="Refine a leitura por cliente, caso ou status sem perder a visao do que esta travando a carteira documental."
         >
           <form className="stack">
             <div className="fields">
@@ -424,25 +470,6 @@ export default async function DocumentsPage({
             </div>
           </form>
         </SafeModuleCard>
-
-        <div className="metric-grid">
-          <div className="metric-card">
-            <span>Documentos recentes</span>
-            <strong>{filteredDocuments.length}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Solicitacoes abertas</span>
-            <strong>{openRequests.length}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Casos filtrados</span>
-            <strong>{caseOptionsForDocuments.length}</strong>
-          </div>
-          <div className="metric-card">
-            <span>E-mails pendentes</span>
-            <strong>{overview.pendingNotifications}</strong>
-          </div>
-        </div>
 
         <div className="grid two">
           <SectionCard
@@ -760,11 +787,16 @@ export default async function DocumentsPage({
                 ))}
               </ul>
             ) : (
-              <p className="empty-state">
-                {hasFilters
-                  ? "Nenhuma solicitacao aberta corresponde aos filtros atuais."
-                  : "Nenhuma solicitacao documental pendente no momento."}
-              </p>
+              <PremiumStatePanel
+                tone="neutral"
+                eyebrow="Solicitacoes"
+                title="Nenhuma solicitacao aberta nesta leitura."
+                description={
+                  hasFilters
+                    ? "Os filtros atuais nao retornaram pedidos documentais pendentes."
+                    : "Quando uma nova pendencia documental for criada, ela vai aparecer aqui para acompanhamento imediato."
+                }
+              />
             )}
           </SectionCard>
         </div>
@@ -858,12 +890,49 @@ export default async function DocumentsPage({
           { href: "/agenda", label: "Agenda", tone: "secondary" as const }
         ]}
       >
-      {error ? <div className="error-notice">{error}</div> : null}
-      {success ? <div className="success-notice">{success}</div> : null}
+      {error ? (
+        <PremiumStatePanel
+          tone="error"
+          eyebrow="Documentos do cliente"
+          title="Nao foi possivel carregar seus documentos como esperado."
+          description={error}
+        />
+      ) : null}
+      {success ? (
+        <PremiumStatePanel
+          tone="success"
+          eyebrow="Documentos do cliente"
+          title="Sua atualizacao documental foi recebida."
+          description={success}
+        />
+      ) : null}
+
+      <SectionCard
+        title="Sua leitura executiva documental"
+        description="A area de documentos resume o que ja esta liberado, o que ainda depende de envio e o que continua em acompanhamento."
+      >
+        <div className="grid three">
+          <PremiumFeatureCard
+            eyebrow="Disponiveis"
+            title={`${availableDocuments.length} arquivo(s) liberado(s)`}
+            description="Documentos prontos para consulta e download com a mesma base segura do seu portal."
+          />
+          <PremiumFeatureCard
+            eyebrow="Pendencias"
+            title={`${pendingDocuments.length} item(ns) em acompanhamento`}
+            description="Arquivos que ainda dependem de revisao, liberacao ou complemento para seguir adiante."
+          />
+          <PremiumFeatureCard
+            eyebrow="Solicitacoes"
+            title={`${openRequests.length} envio(s) aguardando voce`}
+            description="Pedidos documentais ativos para mostrar com clareza qual e o proximo passo do seu caso."
+          />
+        </div>
+      </SectionCard>
 
       <SafeModuleCard
         title="Encontrar documentos"
-        description="Use a busca e os filtros sem depender do workspace completo para a pagina abrir."
+        description="Use a busca para localizar documentos, pendencias e solicitacoes com clareza e sem perder o contexto do caso."
       >
         <form className="stack">
           <div className="fields">
@@ -912,11 +981,19 @@ export default async function DocumentsPage({
           description="Arquivos liberados pela equipe para consulta e download na sua area do portal."
         >
           {!documentsEnabled ? (
-            <p className="empty-state">O modulo de documentos esta temporariamente desligado por flag.</p>
+            <PremiumStatePanel
+              tone="warning"
+              eyebrow="Documentos"
+              title="Este modulo esta temporariamente pausado."
+              description="A visualizacao de documentos foi desligada por configuracao e volta a aparecer assim que a disponibilidade for retomada."
+            />
           ) : !documentsSummary.ok && !availableDocuments.length ? (
-            <p className="empty-state">
-              Documentos em fallback seguro. Motivo: {documentsSummary.reason || "dados indisponiveis"}.
-            </p>
+            <PremiumStatePanel
+              tone="warning"
+              eyebrow="Documentos"
+              title="Estamos mostrando seus documentos em modo seguro."
+              description={`Motivo: ${documentsSummary.reason || "dados indisponiveis"}.`}
+            />
           ) : availableDocuments.length ? (
             <ul className="update-feed">
               {availableDocuments.map((document) => (
@@ -970,11 +1047,16 @@ export default async function DocumentsPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              {hasFilters
-                ? "Nenhum documento disponivel corresponde aos filtros atuais."
-                : "Nenhum documento foi liberado para o seu portal ate o momento."}
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Documentos disponiveis"
+              title="Nenhum arquivo liberado apareceu nesta leitura."
+              description={
+                hasFilters
+                  ? "Os filtros atuais nao trouxeram documentos disponiveis para consulta."
+                  : "Assim que a equipe liberar um arquivo para o seu portal, ele aparecera aqui com clareza e contexto."
+              }
+            />
           )}
         </SectionCard>
 
@@ -1034,11 +1116,16 @@ export default async function DocumentsPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              {hasFilters
-                ? "Nenhuma pendencia documental corresponde aos filtros atuais."
-                : "Nenhuma pendencia documental visivel foi registrada no momento."}
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Em acompanhamento"
+              title="Nenhuma pendencia documental apareceu nesta leitura."
+              description={
+                hasFilters
+                  ? "Os filtros atuais nao retornaram documentos pendentes ou solicitados."
+                  : "Quando houver itens em revisao, pendencia ou solicitacao, eles vao aparecer aqui para acompanhamento claro."
+              }
+            />
           )}
         </SectionCard>
       </div>
@@ -1049,11 +1136,19 @@ export default async function DocumentsPage({
         description="A equipe precisa destes arquivos para avançar com o seu caso. O envio e seguro e leva menos de um minuto."
       >
         {!requestsEnabled ? (
-          <p className="empty-state">O modulo de solicitacoes esta temporariamente desligado por flag.</p>
+          <PremiumStatePanel
+            tone="warning"
+            eyebrow="Solicitacoes"
+            title="As solicitacoes estao temporariamente pausadas."
+            description="Esta etapa volta a ficar disponivel assim que a configuracao do modulo for retomada."
+          />
         ) : !requestsSummary.ok && !openRequests.length ? (
-          <p className="empty-state">
-            Solicitacoes em fallback seguro. Motivo: {requestsSummary.reason || "dados indisponiveis"}.
-          </p>
+          <PremiumStatePanel
+            tone="warning"
+            eyebrow="Solicitacoes"
+            title="Estamos mostrando as solicitacoes em modo seguro."
+            description={`Motivo: ${requestsSummary.reason || "dados indisponiveis"}.`}
+          />
         ) : openRequests.length ? (
           <ClientModuleBoundary
             title="Upload temporariamente indisponivel"
@@ -1114,11 +1209,16 @@ export default async function DocumentsPage({
           </ul>
           </ClientModuleBoundary>
         ) : (
-          <p className="empty-state">
-            {hasFilters
-              ? "Nenhuma solicitacao aberta corresponde aos filtros atuais."
-              : "Nenhuma acao necessaria no momento. Quando a equipe precisar de um documento, vai aparecer aqui."}
-          </p>
+          <PremiumStatePanel
+            tone="neutral"
+            eyebrow="Solicitacoes abertas"
+            title="Nenhuma acao documental esta pendente agora."
+            description={
+              hasFilters
+                ? "Os filtros atuais nao trouxeram solicitacoes abertas."
+                : "Quando a equipe precisar de um novo documento, o pedido aparecera aqui com orientacao clara do proximo passo."
+            }
+          />
         )}
       </SectionCard>
 

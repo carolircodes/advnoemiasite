@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { PremiumFeatureCard, PremiumSection, PremiumSurface } from "@/components/portal/premium-experience";
+
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -61,30 +63,15 @@ export function PanelCard({
   children: ReactNode;
 }) {
   return (
-    <section
-      className={cx(
-        "rounded-[2rem] border border-[#ddd5c7] bg-white p-5 shadow-[0_14px_34px_rgba(16,38,29,0.06)]",
-        className
-      )}
+    <PremiumSection
+      eyebrow={eyebrow}
+      title={title}
+      description={description}
+      action={actions}
+      className={className}
     >
-      <div className="flex flex-col gap-3 border-b border-[#efe6d8] pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          {eyebrow ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8a6a3d]">
-              {eyebrow}
-            </p>
-          ) : null}
-          <div>
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-[#10261d]">{title}</h2>
-            {description ? (
-              <p className="mt-1 text-sm leading-6 text-[#64746c]">{description}</p>
-            ) : null}
-          </div>
-        </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-      </div>
-      <div className="pt-4">{children}</div>
-    </section>
+      {children}
+    </PremiumSection>
   );
 }
 
@@ -100,7 +87,7 @@ export function MetricTile({
   helper?: string;
 }) {
   return (
-    <div className="rounded-[1.6rem] border border-[#e9e0d1] bg-[linear-gradient(180deg,#fffdfa,#f8f3ea)] p-4">
+    <PremiumSurface className="rounded-[1.7rem] p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a6a3d]">{label}</p>
@@ -113,7 +100,7 @@ export function MetricTile({
           </div>
         ) : null}
       </div>
-    </div>
+    </PremiumSurface>
   );
 }
 
@@ -129,11 +116,11 @@ export function DecisionTile({
   tone?: Tone;
 }) {
   return (
-    <div className={cx("rounded-[1.6rem] border p-4", toneClasses[tone])}>
+    <PremiumSurface className={cx("rounded-[1.7rem] p-5", toneClasses[tone])}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-80">{label}</p>
       <p className="mt-2 text-base font-semibold tracking-[-0.02em] text-[#10261d]">{title}</p>
       {description ? <p className="mt-2 text-sm leading-6 text-[#516158]">{description}</p> : null}
-    </div>
+    </PremiumSurface>
   );
 }
 
@@ -147,7 +134,7 @@ export function InfoPair({
   valueClassName?: string;
 }) {
   return (
-    <div className="rounded-[1.25rem] border border-[#efe6d8] bg-[#fcfaf6] px-4 py-3">
+    <div className="rounded-[1.35rem] border border-[#efe6d8] bg-[#fcfaf6] px-4 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3d]">{label}</p>
       <div className={cx("mt-2 text-sm leading-6 text-[#4d5f56]", valueClassName)}>{value}</div>
     </div>

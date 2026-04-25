@@ -33,6 +33,7 @@ import {
   ConversationBubble,
   InboxThreadListItem
 } from "@/components/inbox/premium-primitives";
+import { PremiumStatePanel } from "@/components/portal/premium-experience";
 
 import {
   presentBoolean,
@@ -1007,9 +1008,12 @@ export function ConversationInboxDashboard({
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-[#f1c7bd] bg-[#fff3ef] px-4 py-3 text-sm leading-6 text-[#8a3e1f]">
-          {error}
-        </div>
+        <PremiumStatePanel
+          tone="error"
+          eyebrow="Falha controlada"
+          title="A central de atendimento nao conseguiu concluir esta leitura."
+          description={error}
+        />
       ) : null}
 
       <PanelCard
@@ -1122,7 +1126,12 @@ export function ConversationInboxDashboard({
           </div>
           <div className="max-h-[980px] overflow-y-auto pr-1">
             {loading && !payload?.threads.length ? (
-              <div className="py-10 text-sm text-[#6b7b72]">Carregando conversas...</div>
+              <PremiumStatePanel
+                tone="neutral"
+                eyebrow="Fila viva"
+                title="Estamos organizando as conversas."
+                description="A fila de relacionamento esta sendo preparada com prioridade, handoff e contexto comercial."
+              />
             ) : payload?.threads.length ? (
               <div className="space-y-3">
                 {payload.threads.map((thread) => (
@@ -1146,7 +1155,12 @@ export function ConversationInboxDashboard({
                 ))}
               </div>
             ) : (
-              <div className="py-10 text-sm text-[#6b7b72]">{buildEmptyStateMessage(filters)}</div>
+              <PremiumStatePanel
+                tone="neutral"
+                eyebrow="Fila viva"
+                title="Nenhuma conversa apareceu neste recorte."
+                description={buildEmptyStateMessage(filters)}
+              />
             )}
           </div>
         </PanelCard>

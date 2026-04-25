@@ -5,6 +5,10 @@ import {
   InstitutionalStatCard,
   StrategicPanel
 } from "@/components/portal/module-primitives";
+import {
+  PremiumFeatureCard,
+  PremiumStatePanel
+} from "@/components/portal/premium-experience";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 import { getAccessMessage } from "@/lib/auth/access-control";
@@ -295,7 +299,14 @@ export default async function InternalCasesPage({
         }
       ]}
     >
-      {error ? <div className="error-notice">{error}</div> : null}
+      {error ? (
+        <PremiumStatePanel
+          tone="error"
+          eyebrow="Central de casos"
+          title="A carteira precisa de atencao antes da proxima decisao."
+          description={error}
+        />
+      ) : null}
 
       <SectionCard
         title="Mesa executiva da carteira"
@@ -509,9 +520,12 @@ export default async function InternalCasesPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              Nenhum caso corresponde aos filtros atuais. Ajuste os filtros ou abra um novo acompanhamento.
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Carteira em andamento"
+              title="Nenhum caso apareceu nesta leitura."
+              description="Ajuste os filtros ou abra um novo acompanhamento para recolocar a carteira em movimento."
+            />
           )}
         </SectionCard>
 
@@ -544,9 +558,12 @@ export default async function InternalCasesPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              Nenhum caso entrou na fila operacional agora. Os novos sinais aparecem aqui assim que houver espera, pendencia ou envelhecimento.
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Fila operacional"
+              title="Nenhum caso entrou na fila agora."
+              description="Novos sinais vao aparecer aqui assim que houver espera, pendencia ou envelhecimento operacional."
+            />
           )}
         </SectionCard>
       </div>
@@ -588,9 +605,12 @@ export default async function InternalCasesPage({
             ))}
           </ul>
         ) : (
-          <p className="empty-state">
-            Nenhuma atualizacao recente para mostrar agora. Os novos registros de caso passarao a aparecer aqui automaticamente.
-          </p>
+          <PremiumStatePanel
+            tone="neutral"
+            eyebrow="Andamentos recentes"
+            title="Ainda nao ha novos movimentos para exibir."
+            description="Assim que a carteira registrar novas atualizacoes, a linha de andamentos sera preenchida automaticamente."
+          />
         )}
       </SectionCard>
     </AppFrame>

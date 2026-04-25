@@ -22,3 +22,13 @@
 - Reutilizar `PremiumStatePanel` para loading, vazio, erro e indisponibilidade parcial.
 - So criar nova variante visual quando houver diferenca semantica real.
 - Preferir refinar tokens e primitives compartilhadas a repetir combinacoes de classes.
+
+## Superficies operacionais densas
+- Inbox, CRM, casos e cockpits devem separar leitura executiva, fila principal e contexto profundo.
+- O que destrava a operacao entra primeiro; detalhes profundos ficam recolhidos ou em paineis laterais.
+- Filtros devem refinar a leitura, nao substituir a hierarquia principal da tela.
+- Estados vazios em telas densas precisam orientar o proximo passo, nao apenas informar ausencia de dados.
+- Casos, agenda e documentos devem expor logo no topo a pressao operacional, o contexto do cliente e o proximo movimento recomendado.
+- Quando houver recorte por cliente ou caso, esse foco precisa aparecer na composicao da tela e nao so dentro dos filtros.
+- Fallback, modulo pausado e base segura devem usar `PremiumStatePanel` com linguagem explicita e sem alertas crus.
+- Listas densas precisam responder de imediato: o que e o item, qual o estado atual e qual acao executiva a equipe ou o cliente deve tomar.

@@ -18,6 +18,13 @@ import {
   X,
 } from 'lucide-react';
 import { presentToken } from '@/app/internal/advogada/atendimento/presentation';
+import {
+  OperationalActionButton as ActionButton,
+  OperationalEmptyState,
+  OperationalMetricCard as MetricCard,
+  OperationalPanelSection as PanelSection,
+  OperationalStatusChip as StatusChip,
+} from '@/components/portal/operational-primitives';
 
 interface OperationalContact {
   clientId: string;
@@ -262,130 +269,6 @@ const initialFilters: FilterState = {
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
-}
-
-function PanelSection({
-  title,
-  description,
-  action,
-  children,
-}: {
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="overflow-hidden rounded-2xl border border-[#d8d2c4] bg-white shadow-[0_10px_30px_rgba(16,38,29,0.06)]">
-      <div className="flex flex-col gap-3 border-b border-[#ece5d8] bg-[#f8f4ec] px-6 py-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-[#10261d]">{title}</h2>
-          {description ? <p className="mt-1 text-sm text-[#5f6f68]">{description}</p> : null}
-        </div>
-        {action}
-      </div>
-      <div className="px-6 py-5">{children}</div>
-    </section>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon,
-  tone = 'default',
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  tone?: 'default' | 'orange' | 'yellow' | 'red';
-}) {
-  const toneClasses: Record<string, string> = {
-    default: 'text-[#10261d]',
-    orange: 'text-[#a45f12]',
-    yellow: 'text-[#9a6a00]',
-    red: 'text-[#9f1d1d]',
-  };
-
-  return (
-    <div className="rounded-2xl border border-[#e7e1d4] bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-[#6a7a73]">{label}</p>
-          <p className={cx('mt-1 text-2xl font-bold', toneClasses[tone])}>{value}</p>
-        </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f5efe2] text-[#10261d]">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusChip({
-  children,
-  tone = 'neutral',
-}: {
-  children: React.ReactNode;
-  tone?: 'neutral' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'gray' | 'gold';
-}) {
-  const tones: Record<string, string> = {
-    neutral: 'border-[#d8d2c4] bg-[#f7f3eb] text-[#3f5149]',
-    blue: 'border-[#cfe0fb] bg-[#edf4ff] text-[#1d4f91]',
-    green: 'border-[#cfe7d7] bg-[#edf8f0] text-[#24613a]',
-    orange: 'border-[#f1dcc0] bg-[#fff4e6] text-[#9a5d09]',
-    red: 'border-[#f0caca] bg-[#fff1f1] text-[#9f1d1d]',
-    purple: 'border-[#ddd0f7] bg-[#f5efff] text-[#5d3aa8]',
-    gray: 'border-[#d9d9d9] bg-[#f4f4f4] text-[#525252]',
-    gold: 'border-[#e4d3a5] bg-[#fbf5df] text-[#87621c]',
-  };
-
-  return (
-    <span
-      className={cx(
-        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',
-        tones[tone]
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function ActionButton({
-  children,
-  onClick,
-  variant = 'outline',
-  disabled = false,
-  type = 'button',
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  variant?: 'primary' | 'outline' | 'ghost';
-  disabled?: boolean;
-  type?: 'button' | 'submit';
-}) {
-  const variants: Record<string, string> = {
-    primary:
-      'border-[#10261d] bg-[#10261d] text-white hover:bg-[#17392c] hover:border-[#17392c]',
-    outline:
-      'border-[#d3c7aa] bg-white text-[#10261d] hover:bg-[#f8f4ec] hover:border-[#bda973]',
-    ghost: 'border-transparent bg-transparent text-[#10261d] hover:bg-[#f5efe2]',
-  };
-
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={cx(
-        'inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
-        variants[variant]
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 export default function OperationalPanel() {
@@ -1169,12 +1052,10 @@ export default function OperationalPanel() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PanelSection title="Cockpit comercial" description="Carregando a leitura comercial desta operação.">
-          <div className="flex items-center gap-3 text-[#10261d]">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#b58d49] border-t-transparent" />
-            <span className="text-sm font-medium">Carregando cockpit comercial...</span>
-          </div>
-        </PanelSection>
+        <OperationalEmptyState
+          title="Estamos organizando o cockpit comercial."
+          description="A leitura executiva de prioridades, retomadas, consulta e fechamento esta sendo preparada para manter a operacao clara e sem ruido."
+        />
       </div>
     );
   }
@@ -1441,9 +1322,10 @@ export default function OperationalPanel() {
         description="A leitura principal prioriza quem e a oportunidade, o momento comercial e a proxima decisao. Contexto profundo e trilhos avancados ficam recolhidos."
       >
         {contacts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d8d2c4] bg-[#fbfaf7] px-6 py-10 text-center">
-            <p className="text-sm text-[#6a7a73]">Nenhum contato encontrado com os filtros atuais.</p>
-          </div>
+          <OperationalEmptyState
+            title="Nenhum contato operacional apareceu neste recorte."
+            description="Ajuste os filtros para reabrir a fila comercial ou limpe o recorte para recuperar a leitura executiva completa."
+          />
         ) : (
           <div className="space-y-4">
             {contacts.map((contact) => (

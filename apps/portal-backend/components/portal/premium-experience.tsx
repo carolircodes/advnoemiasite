@@ -37,6 +37,7 @@ type PremiumFeatureCardProps = {
   title: string;
   description: string;
   className?: string;
+  children?: ReactNode;
 };
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -125,13 +126,15 @@ export function PremiumFeatureCard({
   eyebrow,
   title,
   description,
-  className
+  className,
+  children
 }: PremiumFeatureCardProps) {
   return (
     <div className={cx("premium-feature-card", className)}>
       <p className="premium-feature-card__eyebrow">{eyebrow}</p>
       <strong className="premium-feature-card__title">{title}</strong>
       <p className="premium-feature-card__description">{description}</p>
+      {children}
     </div>
   );
 }

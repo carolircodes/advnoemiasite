@@ -3,6 +3,10 @@ import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
+import {
+  PremiumFeatureCard,
+  PremiumStatePanel
+} from "@/components/portal/premium-experience";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SafeModuleCard } from "@/components/safe-module-card";
 import { SectionCard } from "@/components/section-card";
@@ -404,12 +408,54 @@ export default async function AgendaPage({
           }
         ]}
       >
-        {error ? <div className="error-notice">{error}</div> : null}
-        {success ? <div className="success-notice">{success}</div> : null}
+        {error ? (
+          <PremiumStatePanel
+            tone="error"
+            eyebrow="Agenda interna"
+            title="A agenda precisa de atencao antes da proxima acao."
+            description={error}
+          />
+        ) : null}
+        {success ? (
+          <PremiumStatePanel
+            tone="success"
+            eyebrow="Agenda interna"
+            title="Agenda atualizada com sucesso."
+            description={success}
+          />
+        ) : null}
+
+        <SectionCard
+          title="Leitura executiva da agenda"
+          description="A agenda interna destaca a pressao imediata, a exposicao ao cliente e a fila que ainda precisa de confirmacao."
+        >
+          <div className="grid four">
+            <PremiumFeatureCard
+              eyebrow="Hoje"
+              title={`${sameDayAppointments.length} compromisso(s) no radar`}
+              description="Compromissos do dia para orientar reentrada, preparacao e alinhamento rapido da equipe."
+            />
+            <PremiumFeatureCard
+              eyebrow="Proximas 48 horas"
+              title={`${next48HoursCount} movimento(s) proximos`}
+              description="Janela operacional mais sensivel para reagendamento, confirmacao e organizacao da rotina."
+            />
+            <PremiumFeatureCard
+              eyebrow="Cliente"
+              title={`${visibleToClientCount} item(ns) visiveis no portal`}
+              description="Compromissos ja expostos ao cliente e que pedem coerencia entre comunicacao e execucao."
+            />
+            <PremiumFeatureCard
+              eyebrow="Historico"
+              title={`${filteredAppointmentHistory.length} alteracao(oes) recentes`}
+              description="Trilha de auditoria pronta para revisar decisao, ajuste e notificacao futura."
+            />
+          </div>
+        </SectionCard>
 
         <SectionCard
           title="Busca e filtros"
-          description="Filtre compromissos por cliente, caso, status ou periodo para localizar rapidamente o que importa."
+          description="Refine a leitura por cliente, caso, status ou periodo sem perder a prioridade operacional da agenda."
         >
           <form className="stack">
             <div className="fields">
@@ -498,25 +544,6 @@ export default async function AgendaPage({
             </div>
           </form>
         </SectionCard>
-
-        <div className="metric-grid">
-          <div className="metric-card">
-            <span>Hoje</span>
-            <strong>{sameDayAppointments.length}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Proximas 48h</span>
-            <strong>{next48HoursCount}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Visiveis ao cliente</span>
-            <strong>{visibleToClientCount}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Historico filtrado</span>
-            <strong>{filteredAppointmentHistory.length}</strong>
-          </div>
-        </div>
 
         <div className="grid two">
           <SectionCard
@@ -838,11 +865,16 @@ export default async function AgendaPage({
               ))}
             </div>
           ) : (
-            <p className="empty-state">
-              {hasFilters
-                ? "Nenhum compromisso editavel corresponde aos filtros atuais."
-                : "Os primeiros compromissos editaveis aparecerao aqui assim que forem registrados."}
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Edicao da agenda"
+              title="Nenhum compromisso editavel apareceu nesta leitura."
+              description={
+                hasFilters
+                  ? "Ajuste os filtros para voltar a uma faixa com compromissos que possam ser atualizados."
+                  : "Os primeiros compromissos editaveis vao aparecer aqui assim que a agenda registrar novos itens."
+              }
+            />
           )}
         </SectionCard>
 
@@ -885,11 +917,16 @@ export default async function AgendaPage({
                 ))}
               </ul>
             ) : (
-              <p className="empty-state">
-                {hasFilters
-                  ? "Nenhum item do historico recente corresponde aos filtros atuais."
-                  : "O historico recente da agenda aparecera aqui assim que os primeiros itens forem registrados."}
-              </p>
+              <PremiumStatePanel
+                tone="neutral"
+                eyebrow="Historico recente"
+                title="Sem itens recentes nesta leitura."
+                description={
+                  hasFilters
+                    ? "Os filtros atuais nao trouxeram compromissos concluidos, passados ou cancelados."
+                    : "Assim que a agenda ganhar seus primeiros movimentos, o historico recente vai aparecer aqui."
+                }
+              />
             )}
           </SectionCard>
 
@@ -940,11 +977,16 @@ export default async function AgendaPage({
                 ))}
               </ul>
             ) : (
-              <p className="empty-state">
-                {hasFilters
-                  ? "Nenhuma alteracao de agenda corresponde aos filtros atuais."
-                  : "O historico de alteracoes da agenda aparecera aqui depois da primeira criacao."}
-              </p>
+              <PremiumStatePanel
+                tone="neutral"
+                eyebrow="Auditoria da agenda"
+                title="Sem alteracoes registradas nesta leitura."
+                description={
+                  hasFilters
+                    ? "Os filtros atuais nao retornaram criacoes, reagendamentos ou cancelamentos."
+                    : "A trilha de alteracoes da agenda sera preenchida automaticamente a partir da primeira criacao."
+                }
+              />
             )}
           </SectionCard>
         </div>
@@ -1026,11 +1068,45 @@ export default async function AgendaPage({
           { href: "/documentos", label: "Ver documentos", tone: "secondary" }
         ]}
       >
-      {error ? <div className="error-notice">{error}</div> : null}
+      {error ? (
+        <PremiumStatePanel
+          tone="error"
+          eyebrow="Agenda do cliente"
+          title="Nao foi possivel carregar a agenda como esperado."
+          description={error}
+        />
+      ) : null}
+
+      <SectionCard
+        title="Sua leitura executiva da agenda"
+        description="A agenda do seu caso resume proximos compromissos, historico recente e o nivel de disponibilidade do painel."
+      >
+        <div className="grid three">
+          <PremiumFeatureCard
+            eyebrow="Proximos compromissos"
+            title={`${upcomingAppointments.length} item(ns) no radar`}
+            description="Tudo o que ja foi liberado pela equipe para o seu acompanhamento imediato."
+          />
+          <PremiumFeatureCard
+            eyebrow="Historico recente"
+            title={`${recentHistory.length} registro(s) consultaveis`}
+            description="Compromissos concluidos, passados ou cancelados continuam organizados para consulta sem confundir o proximo passo."
+          />
+          <PremiumFeatureCard
+            eyebrow="Ambiente"
+            title={agendaSummary.ok ? "Agenda em base principal" : "Agenda em base segura"}
+            description={
+              agendaSummary.ok
+                ? "A experiencia esta usando a base principal do portal para refletir os movimentos mais recentes."
+                : `A agenda continua segura enquanto a base principal estabiliza${agendaSummary.reason ? `: ${agendaSummary.reason}.` : "."}`
+            }
+          />
+        </div>
+      </SectionCard>
 
       <SafeModuleCard
         title="Encontrar compromissos"
-        description="Use a busca e os filtros sem depender do workspace monolitico para a pagina abrir."
+        description="Use a busca para localizar rapidamente reunioes, prazos e retornos sem perder a clareza da sua linha do tempo."
       >
         <form className="stack">
           <div className="fields">
@@ -1096,11 +1172,19 @@ export default async function AgendaPage({
           description="Somente itens visiveis ao cliente aparecem aqui, ordenados da data mais proxima para a mais distante."
         >
           {!agendaEnabled ? (
-            <p className="empty-state">O modulo de agenda esta temporariamente desligado por flag.</p>
+            <PremiumStatePanel
+              tone="warning"
+              eyebrow="Agenda"
+              title="Este modulo esta temporariamente pausado."
+              description="A agenda do cliente foi desligada por configuracao e volta a aparecer assim que a disponibilidade for retomada."
+            />
           ) : !agendaSummary.ok && !upcomingAppointments.length ? (
-            <p className="empty-state">
-              Agenda em fallback seguro. Motivo: {agendaSummary.reason || "dados indisponiveis"}.
-            </p>
+            <PremiumStatePanel
+              tone="warning"
+              eyebrow="Agenda"
+              title="Estamos mostrando a agenda em modo seguro."
+              description={`Motivo: ${agendaSummary.reason || "dados indisponiveis"}.`}
+            />
           ) : upcomingAppointments.length ? (
             <ul className="update-feed">
               {upcomingAppointments.map((appointment) => (
@@ -1123,11 +1207,16 @@ export default async function AgendaPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              {hasFilters
-                ? "Nenhum compromisso futuro corresponde aos filtros atuais."
-                : "Ainda nao ha compromissos visiveis vinculados ao seu caso."}
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Proximos compromissos"
+              title="Nenhum compromisso futuro apareceu nesta leitura."
+              description={
+                hasFilters
+                  ? "Os filtros atuais nao retornaram compromissos futuros."
+                  : "Quando a equipe registrar uma nova data visivel para voce, ela vai aparecer aqui automaticamente."
+              }
+            />
           )}
         </SafeModuleCard>
 
@@ -1137,7 +1226,12 @@ export default async function AgendaPage({
           description="Compromissos concluidos, passados ou cancelados continuam disponiveis para consulta sem confundir a sua agenda futura."
         >
           {!agendaEnabled ? (
-            <p className="empty-state">O modulo de agenda esta temporariamente desligado por flag.</p>
+            <PremiumStatePanel
+              tone="warning"
+              eyebrow="Historico"
+              title="O historico da agenda esta temporariamente pausado."
+              description="A visao historica volta a aparecer assim que o modulo for reativado."
+            />
           ) : recentHistory.length ? (
             <ul className="update-feed">
               {recentHistory.map((appointment) => (
@@ -1170,11 +1264,16 @@ export default async function AgendaPage({
               ))}
             </ul>
           ) : (
-            <p className="empty-state">
-              {hasFilters
-                ? "Nenhum item do historico recente corresponde aos filtros atuais."
-                : "O historico recente da agenda aparecera aqui depois dos primeiros compromissos."}
-            </p>
+            <PremiumStatePanel
+              tone="neutral"
+              eyebrow="Historico recente"
+              title="Nada ficou para consulta nesta leitura."
+              description={
+                hasFilters
+                  ? "Os filtros atuais nao trouxeram compromissos ja concluidos, passados ou cancelados."
+                  : "Assim que a agenda acumular seus primeiros movimentos, o historico recente aparecera aqui."
+              }
+            />
           )}
         </SafeModuleCard>
       </div>
