@@ -19,7 +19,7 @@ export function PageContainer({ children, maxWidth = 'xl' }: PageContainerProps)
   return (
     <div className="internal-main flex-1 min-h-screen min-w-0">
       <div
-        className={`mx-auto min-w-0 px-4 py-5 sm:px-6 sm:py-6 xl:px-8 ${maxWidthClasses[maxWidth]}`}
+        className={`mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-7 xl:px-8 xl:py-8 ${maxWidthClasses[maxWidth]}`}
       >
         {children}
       </div>

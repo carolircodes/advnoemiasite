@@ -33,6 +33,11 @@ type AppFrameProps = {
   highlights?: Highlight[];
   utilityContent?: ReactNode;
   children: ReactNode;
+  variant?: "default" | "workspace";
+  rootClassName?: string;
+  headerClassName?: string;
+  mainClassName?: string;
+  hideFooter?: boolean;
 };
 
 export function AppFrame({
@@ -43,7 +48,12 @@ export function AppFrame({
   navigation = [],
   highlights = [],
   utilityContent,
-  children
+  children,
+  variant = "default",
+  rootClassName = "",
+  headerClassName = "",
+  mainClassName = "",
+  hideFooter = false
 }: AppFrameProps) {
   function renderFrameLink({
     href,
@@ -85,8 +95,8 @@ export function AppFrame({
   }
 
   return (
-    <div className="portal-root">
-      <header className="hero-shell">
+    <div className={`portal-root ${variant === "workspace" ? "portal-root--workspace" : ""} ${rootClassName}`.trim()}>
+      <header className={`hero-shell ${variant === "workspace" ? "hero-shell--workspace" : ""} ${headerClassName}`.trim()}>
         <div className="hero-main">
           {utilityContent ? <div className="frame-utility">{utilityContent}</div> : null}
           {navigation.length ? (
@@ -139,7 +149,8 @@ export function AppFrame({
           </div>
         ) : null}
       </header>
-      <main className="page-grid">{children}</main>
+      <main className={`page-grid ${variant === "workspace" ? "page-grid--workspace" : ""} ${mainClassName}`.trim()}>{children}</main>
+      {!hideFooter ? (
       <footer className="site-footer" aria-label="Rodape institucional">
         <div className="site-footer-copy">
           <span className="site-footer-eyebrow">Informacoes institucionais</span>
@@ -163,6 +174,7 @@ export function AppFrame({
           </a>
         </div>
       </footer>
+      ) : null}
     </div>
   );
 }

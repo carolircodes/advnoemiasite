@@ -87,7 +87,7 @@ export default function InternalLayout({ children }: LayoutProps) {
           isMenuOpen={mobileMenuOpen}
           onMenuClick={() => setMobileMenuOpen((open) => !open)}
         />
-        <PageContainer>{children}</PageContainer>
+        <PageContainer maxWidth="full">{children}</PageContainer>
       </div>
     </div>
   );

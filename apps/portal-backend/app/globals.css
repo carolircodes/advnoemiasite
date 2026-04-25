@@ -93,6 +93,11 @@ body:not(.auth-page) textarea {
   padding: 36px 0 72px;
 }
 
+.portal-root--workspace {
+  width: min(100%, 1460px);
+  padding: 10px 0 56px;
+}
+
 .hero-shell {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.88fr);
@@ -107,6 +112,12 @@ body:not(.auth-page) textarea {
   box-shadow: var(--shadow-strong);
   position: relative;
   overflow: hidden;
+}
+
+.hero-shell--workspace {
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.85fr);
+  gap: 22px;
+  padding: 28px;
 }
 
 .hero-copy h1,
@@ -293,6 +304,11 @@ body:not(.auth-page) .button {
   display: grid;
   gap: 26px;
   margin-top: 28px;
+}
+
+.page-grid--workspace {
+  gap: 22px;
+  margin-top: 22px;
 }
 
 .legal-grid {
@@ -1479,6 +1495,31 @@ body:not(.auth-page) .field-full textarea {
   position: relative;
 }
 
+.internal-main .premium-section,
+.internal-main .panel[id] {
+  scroll-margin-top: 148px;
+}
+
+.internal-dashboard-flow .grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.internal-dashboard-flow .grid.three {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.internal-dashboard-flow .operational-band {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.internal-dashboard-flow .section-head h2 {
+  line-height: 1.08;
+}
+
+.internal-dashboard-flow .hero-highlights {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
 .dashboard-grid {
   display: grid;
   gap: 20px;
@@ -1855,6 +1896,17 @@ body:not(.auth-page) .field-full textarea {
   .client-directory-footer {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 1240px) {
+  .hero-shell--workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-root--workspace {
+    width: min(100%, calc(100% - 8px));
+    padding-top: 6px;
   }
 }
 

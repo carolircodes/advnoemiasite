@@ -137,6 +137,12 @@
 - agenda do dia, alertas, handoff e resposta curta
 - sem espelhar o portal interno denso
 
+## M3 implementado nesta fase
+- briefing movel curto dentro de `/internal/advogada`
+- foco em agenda do dia, urgencias, handoff cliente/equipe e caso em foco
+- atalhos rapidos para agenda, fila curta, caso em foco e Noemia
+- nao entra: Inbox completo, CRM denso, cockpit espelhado, configuracoes e listas longas de baixa frequencia
+
 ### M4
 - decidir se app nativo ainda faz sentido
 - criterio: frequencia alta, valor claro de push, necessidade de integracao nativa e friccao relevante no PWA

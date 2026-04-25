@@ -32,3 +32,5 @@
 - Quando houver recorte por cliente ou caso, esse foco precisa aparecer na composicao da tela e nao so dentro dos filtros.
 - Fallback, modulo pausado e base segura devem usar `PremiumStatePanel` com linguagem explicita e sem alertas crus.
 - Listas densas precisam responder de imediato: o que e o item, qual o estado atual e qual acao executiva a equipe ou o cliente deve tomar.
+- Rotas internas sob o shell sticky devem preferir a variante de workspace do `AppFrame`, com largura util real, padding superior proprio e offset de ancora compativel com a altura do topbar.
+- Quando a sidebar reduzir a largura disponivel, `grid.two` e `grid.three` devem colapsar antes de comprimir titulos e cabecalhos de painel.

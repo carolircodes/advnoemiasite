@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AppFrame } from "@/components/app-frame";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { NoemiaAssistant } from "@/components/noemia-assistant";
+import { OperationalMobileBrief } from "@/components/operational-mobile-brief";
 import { OperationalList } from "@/components/operational-list";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
@@ -610,9 +611,97 @@ export default async function InternalLawyerPage({
     } => item !== null
   );
   const cockpitProjection = buildExecutiveCockpitProjection(overview, intelligence);
+  const mobileHighlights = [
+    {
+      label: "Hoje",
+      value: String(operationalSummary.todayCount),
+      description: "Itens que merecem ataque primeiro para a rotina nao abrir em falso."
+    },
+    {
+      label: "Urgencias",
+      value: String(operationalSummary.criticalCount),
+      description: "Triagens, pendencias e compromissos que ja cruzaram o limite de atencao."
+    },
+    {
+      label: "Handoff cliente",
+      value: String(operationalSummary.waitingClientCount),
+      description: "Convites, documentos e retornos travados por resposta do cliente."
+    },
+    {
+      label: "Handoff interno",
+      value: String(operationalSummary.waitingTeamCount),
+      description: "Casos e ajustes internos que ainda pedem um movimento humano."
+    }
+  ];
+  const mobileFocusItems = [
+    {
+      href: upcomingAppointments[0]
+        ? buildInternalAgendaHref(
+            upcomingAppointments[0].client_id,
+            upcomingAppointments[0].case_id
+          )
+        : "/agenda",
+      kicker: "Agenda do dia",
+      title: upcomingAppointments[0]
+        ? upcomingAppointments[0].title
+        : "Abrir agenda interna",
+      detail: upcomingAppointments[0]
+        ? `${upcomingAppointments[0].clientName} em ${formatPortalDateTime(upcomingAppointments[0].starts_at)}.`
+        : "Veja compromissos, prazos e retornos que puxam o dia."
+    },
+    {
+      href: "#central-prioridades",
+      kicker: "Urgencia",
+      title:
+        todayQueue[0]?.title ||
+        awaitingTeamQueue[0]?.title ||
+        "Abrir gargalos e filas",
+      detail:
+        todayQueue[0]?.description ||
+        awaitingTeamQueue[0]?.description ||
+        "A fila curta do dia resume o que precisa de tracao agora."
+    },
+    {
+      href: "#noemia-operacional",
+      kicker: "Handoff",
+      title:
+        awaitingClientQueue[0]?.title ||
+        "Retomar bloqueios com apoio da Noemia",
+      detail:
+        awaitingClientQueue[0]?.description ||
+        "Use a camada assistida para resumir contexto e voltar para a rota certa."
+    }
+  ];
+  const mobileQuickActions = [
+    {
+      href: "/agenda",
+      label: "Agenda do dia",
+      description: "Abrir compromissos, retornos e preparo imediato."
+    },
+    {
+      href: "#central-prioridades",
+      label: "Fila curta",
+      description: "Ir direto para gargalos, handoff e itens que travam a rotina."
+    },
+    {
+      href: preferredCase ? buildInternalCaseHref(preferredCase.id) : "/internal/advogada/casos",
+      label: preferredCase ? "Caso em foco" : "Central de casos",
+      description: "Continuar o acompanhamento mais sensivel sem varrer o cockpit inteiro."
+    },
+    {
+      href: "#noemia-operacional",
+      label: "Usar Noemia",
+      description: "Retomar contexto, sugerir prioridade e encurtar a decisao."
+    }
+  ];
 
   return (
     <AppFrame
+      variant="workspace"
+      rootClassName="internal-dashboard-root"
+      headerClassName="internal-dashboard-hero"
+      mainClassName="internal-dashboard-flow"
+      hideFooter
       eyebrow="Painel executivo"
       title={`Cockpit institucional da operação para ${profile.full_name}.`}
       description="Esta é a leitura central de comando do escritório. Aqui entram prioridades do dia, agenda, monetização, gargalos e próximos passos sem competir com inbox, CRM ou inteligência."
@@ -648,6 +737,12 @@ export default async function InternalLawyerPage({
     >
       {error ? <div className="error-notice">{error}</div> : null}
       {success ? <div className="success-notice">{success}</div> : null}
+
+      <OperationalMobileBrief
+        highlights={mobileHighlights}
+        focusItems={mobileFocusItems}
+        quickActions={mobileQuickActions}
+      />
 
       <SectionCard
         title="Centro executivo do dia"
