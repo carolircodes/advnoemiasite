@@ -9,11 +9,24 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/cliente",
     scope: "/",
     display: "standalone",
+    display_override: ["standalone", "minimal-ui", "browser"],
     orientation: "portrait",
     background_color: "#f7f4ee",
     theme_color: "#f7f4ee",
     lang: "pt-BR",
     categories: ["business", "productivity", "finance"],
+    icons: [
+      {
+        src: "/icon",
+        sizes: "512x512",
+        type: "image/png"
+      },
+      {
+        src: "/apple-icon",
+        sizes: "180x180",
+        type: "image/png"
+      }
+    ],
     shortcuts: [
       {
         name: "Meu painel",
@@ -32,6 +45,12 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: "Documentos",
         description: "Acompanhar documentos, pendencias e envios do caso.",
         url: "/documentos"
+      },
+      {
+        name: "Atendimento",
+        short_name: "Atendimento",
+        description: "Retomar a conversa com o escritorio quando voce precisar de apoio.",
+        url: "/noemia"
       }
     ]
   };

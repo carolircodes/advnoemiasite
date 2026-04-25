@@ -4,10 +4,6 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ClientUploadState =
   | { status: "idle" }
   | { status: "success" }
@@ -17,10 +13,6 @@ type UploadAction = (
   prevState: ClientUploadState,
   formData: FormData
 ) => Promise<ClientUploadState>;
-
-// ---------------------------------------------------------------------------
-// CSS keyframes injected once
-// ---------------------------------------------------------------------------
 
 const KEYFRAMES = `
   @keyframes upload-spin {
@@ -44,21 +36,33 @@ const KEYFRAMES = `
   }
 `;
 
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ---------------------------------------------------------------------------
-// Submit button — must live inside <form> to read useFormStatus
-// ---------------------------------------------------------------------------
+function configurePicker(
+  input: HTMLInputElement | null,
+  mode: "file" | "camera"
+) {
+  if (!input) {
+    return;
+  }
+
+  if (mode === "camera") {
+    input.accept = "image/*";
+    input.setAttribute("capture", "environment");
+  } else {
+    input.accept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.gif";
+    input.removeAttribute("capture");
+  }
+
+  input.click();
+}
 
 function SubmitButton({ hasFile }: { hasFile: boolean }) {
   const { pending } = useFormStatus();
+
   return (
     <button
       type="submit"
@@ -67,7 +71,7 @@ function SubmitButton({ hasFile }: { hasFile: boolean }) {
       style={{
         gap: "10px",
         minWidth: "200px",
-        transition: "opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease",
+        transition: "opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease"
       }}
     >
       {pending ? (
@@ -82,10 +86,10 @@ function SubmitButton({ hasFile }: { hasFile: boolean }) {
               borderTopColor: "#fffaf2",
               borderRadius: "50%",
               animation: "upload-spin 0.7s linear infinite",
-              flexShrink: 0,
+              flexShrink: 0
             }}
           />
-          Enviando com segurança...
+          Enviando com seguranca...
         </>
       ) : (
         "Confirmar envio"
@@ -94,11 +98,7 @@ function SubmitButton({ hasFile }: { hasFile: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Success card
-// ---------------------------------------------------------------------------
-
-function SuccessCard({ requestTitle }: { requestTitle: string }) {
+function SuccessCard() {
   return (
     <div
       role="status"
@@ -111,10 +111,9 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
         background:
           "linear-gradient(160deg, rgba(41,93,69,0.07) 0%, rgba(41,93,69,0.04) 100%)",
         border: "1px solid rgba(41, 93, 69, 0.2)",
-        animation: "fade-up 0.38s ease",
+        animation: "fade-up 0.38s ease"
       }}
     >
-      {/* Icon + headline */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
         <span
           aria-hidden="true"
@@ -127,12 +126,13 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "22px",
+            fontSize: "14px",
+            fontWeight: 700,
             color: "var(--success)",
-            animation: "check-draw 0.35s ease 0.1s both",
+            animation: "check-draw 0.35s ease 0.1s both"
           }}
         >
-          ✓
+          OK
         </span>
         <div>
           <p
@@ -141,7 +141,7 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
               fontWeight: 700,
               fontSize: "1.05rem",
               color: "var(--success)",
-              letterSpacing: "-0.01em",
+              letterSpacing: "-0.01em"
             }}
           >
             Documento recebido
@@ -151,33 +151,32 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
               margin: 0,
               fontSize: "0.9rem",
               color: "var(--muted)",
-              lineHeight: 1.65,
+              lineHeight: 1.65
             }}
           >
-            A Drª.&nbsp;Noemia e a equipe já foram notificadas.
+            A Dra. Noemia e a equipe ja foram notificadas.
             <br />
-            Vamos analisar o arquivo e te confirmar em breve.
+            Vamos analisar o arquivo e confirmar o recebimento em breve.
           </p>
         </div>
       </div>
 
-      {/* Status journey */}
       <div
-        aria-label="Etapas: Recebido, Em análise, Confirmado"
+        aria-label="Etapas: Recebido, Em analise, Confirmado"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "0",
           paddingTop: "4px",
           borderTop: "1px solid rgba(41, 93, 69, 0.12)",
-          animation: "fade-in 0.4s ease 0.2s both",
+          animation: "fade-in 0.4s ease 0.2s both"
         }}
       >
         {(
           [
             { label: "Recebido", done: true },
-            { label: "Em análise", done: false },
-            { label: "Confirmado", done: false },
+            { label: "Em analise", done: false },
+            { label: "Confirmado", done: false }
           ] as const
         ).map((step, i, arr) => (
           <div
@@ -185,10 +184,17 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
             style={{
               display: "flex",
               alignItems: "center",
-              flex: i < arr.length - 1 ? 1 : undefined,
+              flex: i < arr.length - 1 ? 1 : undefined
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "5px"
+              }}
+            >
               <span
                 aria-hidden="true"
                 style={{
@@ -197,7 +203,7 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
                   borderRadius: "50%",
                   background: step.done ? "var(--success)" : "rgba(14,31,27,0.15)",
                   flexShrink: 0,
-                  transition: "background 0.3s",
+                  transition: "background 0.3s"
                 }}
               />
               <span
@@ -206,7 +212,7 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
                   fontWeight: step.done ? 700 : 400,
                   color: step.done ? "var(--success)" : "var(--muted)",
                   letterSpacing: "0.01em",
-                  whiteSpace: "nowrap",
+                  whiteSpace: "nowrap"
                 }}
               >
                 {step.label}
@@ -220,7 +226,7 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
                   height: "1px",
                   background: "rgba(14,31,27,0.1)",
                   margin: "0 10px",
-                  marginBottom: "16px",
+                  marginBottom: "16px"
                 }}
               />
             ) : null}
@@ -231,16 +237,12 @@ function SuccessCard({ requestTitle }: { requestTitle: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export function ClientDocumentUploadCard({
   requestId,
   requestTitle,
   instructions,
   dueAtLabel,
-  uploadAction,
+  uploadAction
 }: {
   requestId: string;
   requestTitle: string;
@@ -266,27 +268,26 @@ export function ClientDocumentUploadCard({
     return (
       <>
         <style>{KEYFRAMES}</style>
-        <SuccessCard requestTitle={requestTitle} />
+        <SuccessCard />
       </>
     );
   }
 
-  // ── Border and background derived from state ────────────────────────────────
   const zoneBorder = isDragging
     ? "2px dashed rgba(142, 106, 59, 0.55)"
     : selectedFile
-    ? "2px dashed rgba(41, 93, 69, 0.35)"
-    : isHoveringZone
-    ? "2px dashed rgba(14, 31, 27, 0.28)"
-    : "2px dashed rgba(14, 31, 27, 0.15)";
+      ? "2px dashed rgba(41, 93, 69, 0.35)"
+      : isHoveringZone
+        ? "2px dashed rgba(14, 31, 27, 0.28)"
+        : "2px dashed rgba(14, 31, 27, 0.15)";
 
   const zoneBg = isDragging
     ? "rgba(142, 106, 59, 0.04)"
     : selectedFile
-    ? "rgba(41, 93, 69, 0.04)"
-    : isHoveringZone
-    ? "rgba(14, 31, 27, 0.02)"
-    : "transparent";
+      ? "rgba(41, 93, 69, 0.04)"
+      : isHoveringZone
+        ? "rgba(14, 31, 27, 0.02)"
+        : "transparent";
 
   return (
     <>
@@ -300,7 +301,6 @@ export function ClientDocumentUploadCard({
       >
         <input type="hidden" name="requestId" value={requestId} />
 
-        {/* ── Context card ────────────────────────────────────────────────── */}
         <div
           style={{
             padding: "16px 18px 16px 20px",
@@ -308,7 +308,7 @@ export function ClientDocumentUploadCard({
             background: "rgba(142, 106, 59, 0.045)",
             borderLeft: "3px solid rgba(142, 106, 59, 0.5)",
             border: "1px solid rgba(142, 106, 59, 0.13)",
-            borderLeftWidth: "3px",
+            borderLeftWidth: "3px"
           }}
         >
           <p
@@ -318,7 +318,7 @@ export function ClientDocumentUploadCard({
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: "var(--accent)",
+              color: "var(--accent)"
             }}
           >
             O que enviar
@@ -329,7 +329,7 @@ export function ClientDocumentUploadCard({
               fontWeight: 700,
               fontSize: "0.97rem",
               color: "var(--text)",
-              lineHeight: 1.4,
+              lineHeight: 1.4
             }}
           >
             {requestTitle}
@@ -340,7 +340,7 @@ export function ClientDocumentUploadCard({
                 margin: "8px 0 0",
                 fontSize: "0.88rem",
                 color: "var(--muted)",
-                lineHeight: 1.7,
+                lineHeight: 1.7
               }}
             >
               {instructions}
@@ -355,28 +355,50 @@ export function ClientDocumentUploadCard({
                 color: "var(--accent-strong)",
                 display: "flex",
                 alignItems: "center",
-                gap: "5px",
+                gap: "5px"
               }}
             >
-              <span aria-hidden="true">◷</span> Prazo: {dueAtLabel}
+              <span aria-hidden="true">•</span> Prazo: {dueAtLabel}
             </p>
           ) : null}
         </div>
 
-        {/* ── Drop zone ───────────────────────────────────────────────────── */}
+        <div
+          style={{
+            display: "grid",
+            gap: "10px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))"
+          }}
+        >
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => configurePicker(inputRef.current, "file")}
+          >
+            Escolher arquivo
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => configurePicker(inputRef.current, "camera")}
+          >
+            Usar camera do celular
+          </button>
+        </div>
+
         <div
           role="button"
           tabIndex={0}
           aria-label={
             selectedFile
               ? `Arquivo selecionado: ${selectedFile.name}. Clique para trocar.`
-              : `Clique ou arraste para selecionar o arquivo`
+              : "Clique ou arraste para selecionar o arquivo"
           }
-          onClick={() => inputRef.current?.click()}
+          onClick={() => configurePicker(inputRef.current, "file")}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              inputRef.current?.click();
+              configurePicker(inputRef.current, "file");
             }
           }}
           onMouseEnter={() => setIsHoveringZone(true)}
@@ -408,8 +430,8 @@ export function ClientDocumentUploadCard({
             background: zoneBg,
             cursor: "pointer",
             transition: "padding 0.22s ease, border-color 0.2s ease, background 0.2s ease",
-            textAlign: selectedFile ? ("left" as const) : ("center" as const),
-            outline: "none",
+            textAlign: selectedFile ? "left" : "center",
+            outline: "none"
           }}
         >
           {selectedFile ? (
@@ -418,11 +440,11 @@ export function ClientDocumentUploadCard({
                 display: "flex",
                 alignItems: "center",
                 gap: "13px",
-                animation: "scale-in 0.2s ease",
+                animation: "scale-in 0.2s ease"
               }}
             >
               <span aria-hidden="true" style={{ fontSize: "24px", flexShrink: 0 }}>
-                📄
+                PDF
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p
@@ -433,12 +455,19 @@ export function ClientDocumentUploadCard({
                     color: "var(--text)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    whiteSpace: "nowrap"
                   }}
                 >
                   {selectedFile.name}
                 </p>
-                <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--success)", fontWeight: 600 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "0.82rem",
+                    color: "var(--success)",
+                    fontWeight: 600
+                  }}
+                >
                   {formatBytes(selectedFile.size)} · pronto para enviar
                 </p>
               </div>
@@ -464,7 +493,7 @@ export function ClientDocumentUploadCard({
                   fontSize: "17px",
                   color: "var(--muted)",
                   lineHeight: 1,
-                  transition: "background 0.15s ease",
+                  transition: "background 0.15s ease"
                 }}
               >
                 ×
@@ -478,13 +507,13 @@ export function ClientDocumentUploadCard({
                   fontSize: "0.97rem",
                   fontWeight: 600,
                   color: isDragging ? "var(--accent-strong)" : "var(--text)",
-                  transition: "color 0.18s ease",
+                  transition: "color 0.18s ease"
                 }}
               >
                 {isDragging ? "Solte o arquivo aqui" : "Clique ou arraste o arquivo aqui"}
               </p>
               <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--muted)" }}>
-                PDF, DOC, DOCX, JPG, PNG · máximo 20&nbsp;MB
+                PDF, DOC, DOCX, JPG e PNG · maximo de 20 MB
               </p>
             </div>
           )}
@@ -502,7 +531,6 @@ export function ClientDocumentUploadCard({
           />
         </div>
 
-        {/* ── Error ───────────────────────────────────────────────────────── */}
         {state.status === "error" ? (
           <div
             role="alert"
@@ -514,7 +542,7 @@ export function ClientDocumentUploadCard({
               borderRadius: "12px",
               background: "rgba(142, 67, 59, 0.07)",
               border: "1px solid rgba(142, 67, 59, 0.15)",
-              animation: "fade-up 0.22s ease",
+              animation: "fade-up 0.22s ease"
             }}
           >
             <span
@@ -531,7 +559,7 @@ export function ClientDocumentUploadCard({
                 justifyContent: "center",
                 fontSize: "11px",
                 color: "var(--danger)",
-                fontWeight: 700,
+                fontWeight: 700
               }}
             >
               !
@@ -541,7 +569,7 @@ export function ClientDocumentUploadCard({
                 margin: 0,
                 fontSize: "0.9rem",
                 color: "var(--danger)",
-                lineHeight: 1.55,
+                lineHeight: 1.55
               }}
             >
               {state.message}
@@ -549,13 +577,12 @@ export function ClientDocumentUploadCard({
           </div>
         ) : null}
 
-        {/* ── Actions ─────────────────────────────────────────────────────── */}
         <div
           style={{
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
-            gap: "12px",
+            gap: "12px"
           }}
         >
           <SubmitButton hasFile={!!selectedFile} />
@@ -573,7 +600,6 @@ export function ClientDocumentUploadCard({
           ) : null}
         </div>
 
-        {/* ── Trust note ──────────────────────────────────────────────────── */}
         <p
           style={{
             margin: 0,
@@ -582,11 +608,13 @@ export function ClientDocumentUploadCard({
             gap: "6px",
             fontSize: "0.78rem",
             color: "rgba(79, 98, 93, 0.65)",
-            lineHeight: 1.5,
+            lineHeight: 1.5
           }}
         >
-          <span aria-hidden="true" style={{ fontSize: "12px" }}>🔒</span>
-          Seus documentos são enviados com criptografia e armazenados com segurança.
+          <span aria-hidden="true" style={{ fontSize: "12px" }}>
+            Seg
+          </span>
+          Seus documentos sao enviados com criptografia e armazenados com seguranca.
         </p>
       </form>
     </>

@@ -2,9 +2,13 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
+import { ClientMobileDock } from "@/components/client-mobile-dock";
+import { ClientPwaInstallPrompt } from "@/components/client-pwa-install-prompt";
+import { ClientQuickActions } from "@/components/client-quick-actions";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import {
   PremiumFeatureCard,
+  PremiumSection,
   PremiumStatePanel
 } from "@/components/portal/premium-experience";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
@@ -1039,7 +1043,7 @@ export default async function AgendaPage({
       <AppFrame
         eyebrow="Agenda"
         title="Sua agenda do caso, organizada para consulta rapida."
-        description="Aqui voce ve os proximos compromissos, os itens recentes e qualquer mudanca importante liberada pela equipe para o seu atendimento."
+        description="Aqui voce acompanha os proximos compromissos, os itens recentes e qualquer mudanca importante sem precisar navegar por telas densas."
         utilityContent={
           <PortalSessionBanner
             role={profile.role}
@@ -1068,6 +1072,61 @@ export default async function AgendaPage({
           { href: "/documentos", label: "Ver documentos", tone: "secondary" }
         ]}
       >
+      <ClientPwaInstallPrompt />
+
+      <PremiumSection
+        title="O que fazer a partir da agenda"
+        description="Use esta pagina para confirmar o proximo horario, voltar ao painel ou abrir documentos sem perder o contexto do atendimento."
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <PremiumFeatureCard
+            eyebrow="Proximo passo"
+            title={
+              upcomingAppointments[0]
+                ? formatPortalDateTime(upcomingAppointments[0].starts_at)
+                : "Sem compromisso imediato"
+            }
+            description={
+              upcomingAppointments[0]
+                ? `${upcomingAppointments[0].title} em ${upcomingAppointments[0].caseTitle}.`
+                : "Assim que uma nova data for liberada, ela aparecera primeiro aqui."
+            }
+          />
+          <PremiumFeatureCard
+            eyebrow="Retomada"
+            title="Volte ao painel em um toque"
+            description="Seu resumo principal continua disponivel para consultar status, pagamentos e proximos movimentos."
+          />
+          <PremiumFeatureCard
+            eyebrow="Documentos"
+            title="Contexto do caso por perto"
+            description="Se um compromisso depender de envio ou revisao documental, a area de documentos fica a um toque daqui."
+          />
+        </div>
+      </PremiumSection>
+
+      <ClientQuickActions
+        title="Atalhos da agenda"
+        description="No celular, a agenda funciona melhor como ponto de consulta rapida e retorno imediato para o que destrava o caso."
+        items={[
+          {
+            href: "/cliente",
+            label: "Meu painel",
+            description: "Voltar ao resumo principal do atendimento."
+          },
+          {
+            href: "/documentos",
+            label: "Documentos",
+            description: "Abrir arquivos e pendencias ligadas ao caso."
+          },
+          {
+            href: "/noemia",
+            label: "Falar com o escritorio",
+            description: "Retomar a conversa se precisar alinhar o compromisso."
+          }
+        ]}
+      />
+
       {error ? (
         <PremiumStatePanel
           tone="error"
@@ -1277,6 +1336,8 @@ export default async function AgendaPage({
           )}
         </SafeModuleCard>
       </div>
+      <div className="h-24 md:hidden" aria-hidden="true" />
+      <ClientMobileDock />
       </AppFrame>
   );
 }

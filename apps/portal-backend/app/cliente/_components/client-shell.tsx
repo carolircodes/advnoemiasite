@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { ClientMobileDock } from "@/components/client-mobile-dock";
+import { ClientPwaInstallPrompt } from "@/components/client-pwa-install-prompt";
+import { ClientQuickActions } from "@/components/client-quick-actions";
 import { PremiumFeatureCard, PremiumStatePanel, PremiumSurface } from "@/components/portal/premium-experience";
 import { logoutAction } from "@/lib/auth/actions";
 
@@ -48,8 +51,9 @@ function ClientShellFrame({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[#f7f4ee] px-5 py-6 text-[#10261d] sm:px-8 lg:px-10 lg:py-8">
+    <main className="min-h-screen bg-[#f7f4ee] px-5 py-6 pb-28 text-[#10261d] sm:px-8 sm:pb-10 lg:px-10 lg:py-8 lg:pb-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">{children}</div>
+      <ClientMobileDock />
     </main>
   );
 }
@@ -77,26 +81,26 @@ export function ClientShell({
             </h1>
 
             <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
-              Este portal foi organizado para mostrar com clareza o momento do seu
-              atendimento, o que ja foi conduzido pela equipe e o que ainda pede
-              sua participacao, sem ruido e sem perder o contexto juridico.
+              Este portal foi organizado para mostrar em segundos o momento do
+              seu atendimento, o que a equipe ja conduziu e o que ainda pede a
+              sua participacao, com menos densidade e mais seguranca de leitura.
             </p>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <PremiumFeatureCard
-                eyebrow="Sessao"
-                title="Acesso validado"
-                description="Seu acompanhamento esta protegido neste ambiente e permanece acessivel com leitura clara."
+                eyebrow="Acesso"
+                title="Sessao validada"
+                description="Seu acompanhamento segue protegido e pronto para retomar agenda, documentos e proximos passos."
               />
               <PremiumFeatureCard
                 eyebrow="Acompanhamento"
                 title="Resumo objetivo"
-                description="Agenda, documentos, pagamentos e historico aparecem com prioridade de leitura."
+                description="Agenda, documentos, pagamentos e historico aparecem primeiro no que ajuda voce a agir."
               />
               <PremiumFeatureCard
                 eyebrow="Proximo passo"
                 title="Acao sem ambiguidades"
-                description="O portal destaca primeiro o que depende de voce e o que a equipe ja conduziu."
+                description="O portal destaca antes o que depende de voce e deixa o restante como contexto confiavel."
               />
             </div>
           </div>
@@ -128,6 +132,35 @@ export function ClientShell({
           </PremiumSurface>
         </div>
       </PremiumSurface>
+
+      <ClientPwaInstallPrompt />
+
+      <ClientQuickActions
+        title="Abrir e continuar"
+        description="Estes atalhos encurtam a retomada no celular e deixam o proximo passo sempre por perto."
+        items={[
+          {
+            href: "/cliente",
+            label: "Meu painel",
+            description: "Voltar para a leitura principal do caso e do atendimento."
+          },
+          {
+            href: "/agenda",
+            label: "Minha agenda",
+            description: "Consultar horarios, retornos e compromissos liberados."
+          },
+          {
+            href: "/documentos",
+            label: "Meus documentos",
+            description: "Ver arquivos, pendencias e envios aguardando voce."
+          },
+          {
+            href: "/noemia",
+            label: "Falar com o escritorio",
+            description: "Retomar o atendimento quando precisar de apoio humano."
+          }
+        ]}
+      />
 
       {notices.map((notice) => (
         <MessageBox
@@ -175,7 +208,7 @@ export function ClientShell({
 
       {children}
 
-      <ClientSafeCard title="Acoes seguras e proximos atalhos">
+      <ClientSafeCard title="Acoes seguras e proximos atalhos" className="scroll-mt-24">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Link
             href="/auth/atualizar-senha"

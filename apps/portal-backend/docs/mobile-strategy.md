@@ -73,6 +73,8 @@
 - solicitacoes de documento com upload
 - pagamento e retorno de confirmacao
 - atalhos claros para atendimento
+- install prompt e abertura pela home screen
+- retomada curta com navegacao focada em painel, agenda e documentos
 
 ### Nice to have do cliente
 - install prompt do PWA
@@ -119,6 +121,16 @@
 - lancar `PWA cliente`
 - focar em painel, agenda, documentos, upload e pagamento
 - testar install, retorno e retomada
+
+## MVP implementado nesta fase
+- manifest com atalhos reais para painel, agenda, documentos e atendimento
+- icon e apple icon para instalacao com identidade minima do portal
+- prompt de instalacao para navegadores suportados e instrucoes leves para iPhone
+- dock mobile curto para cliente, sem espelhar o portal interno
+- painel do cliente refinado para destacar retomada e proximo passo
+- agenda e documentos com atalhos de retorno e leitura mais curta em celular
+- upload documental com caminho direto para arquivo ou camera
+- retorno de pagamento apontando primeiro para o painel do cliente
 
 ### M3
 - criar camada mobile leve para advogada e operacao

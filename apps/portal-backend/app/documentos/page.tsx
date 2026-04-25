@@ -3,11 +3,15 @@ import Link from "next/link";
 
 import { AppFrame } from "@/components/app-frame";
 import { ClientModuleBoundary } from "@/components/client-module-boundary";
+import { ClientMobileDock } from "@/components/client-mobile-dock";
 import type { ClientUploadState } from "@/components/client-document-upload";
 import { ClientDocumentUploadCard } from "@/components/client-document-upload";
+import { ClientPwaInstallPrompt } from "@/components/client-pwa-install-prompt";
+import { ClientQuickActions } from "@/components/client-quick-actions";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import {
   PremiumFeatureCard,
+  PremiumSection,
   PremiumStatePanel
 } from "@/components/portal/premium-experience";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
@@ -890,6 +894,53 @@ export default async function DocumentsPage({
           { href: "/agenda", label: "Agenda", tone: "secondary" as const }
         ]}
       >
+      <ClientPwaInstallPrompt />
+
+      <PremiumSection
+        title="Como usar documentos no celular"
+        description="Esta pagina foi organizada para consulta rapida, envio simples e leitura clara do que esta disponivel, pendente ou aguardando analise."
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <PremiumFeatureCard
+            eyebrow="Disponiveis"
+            title={`${availableDocuments.length} arquivo(s) pronto(s)`}
+            description="Arquivos liberados pela equipe para consulta e download quando voce precisar."
+          />
+          <PremiumFeatureCard
+            eyebrow="Envios"
+            title={`${openRequests.length} pedido(s) aguardando voce`}
+            description="Se houver algum documento importante para o andamento do caso, ele aparece primeiro aqui."
+          />
+          <PremiumFeatureCard
+            eyebrow="Confianca"
+            title="Fluxo seguro e objetivo"
+            description="O portal mostra com clareza o que ja foi recebido, o que segue em analise e qual e o proximo passo."
+          />
+        </div>
+      </PremiumSection>
+
+      <ClientQuickActions
+        title="Atalhos dos documentos"
+        description="Retome rapido o que mais importa no celular: enviar, consultar e voltar ao acompanhamento principal."
+        items={[
+          {
+            href: "/cliente",
+            label: "Meu painel",
+            description: "Voltar ao resumo principal do caso."
+          },
+          {
+            href: "/agenda",
+            label: "Agenda",
+            description: "Consultar compromissos ligados ao andamento do atendimento."
+          },
+          {
+            href: "#solicitacoes-abertas",
+            label: "Enviar agora",
+            description: "Ir direto para os pedidos documentais pendentes."
+          }
+        ]}
+      />
+
       {error ? (
         <PremiumStatePanel
           tone="error"
@@ -1285,6 +1336,8 @@ export default async function DocumentsPage({
         </SectionCard>
       ) : null}
 
+      <div className="h-24 md:hidden" aria-hidden="true" />
+      <ClientMobileDock />
       </AppFrame>
   );
 }

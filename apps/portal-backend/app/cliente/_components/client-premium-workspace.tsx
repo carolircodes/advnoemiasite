@@ -36,7 +36,8 @@ export function ClientPremiumWorkspace({
   return (
     <>
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <ClientSafeCard title="Onde seu atendimento esta agora">
+        <div className="order-2 lg:order-1">
+          <ClientSafeCard title="Onde seu atendimento esta agora">
           <div className="rounded-[28px] border border-[#e7e0d5] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,244,238,0.96))] p-5">
             <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
               Etapa atual
@@ -67,9 +68,11 @@ export function ClientPremiumWorkspace({
               );
             })}
           </div>
-        </ClientSafeCard>
+          </ClientSafeCard>
+        </div>
 
-        <ClientSafeCard title="Proximo passo com clareza">
+        <div className="order-1 lg:order-2">
+          <ClientSafeCard title="Proximo passo com clareza">
           <div className={`rounded-[28px] border p-5 ${getToneClasses(projection.nextStep.tone).card}`}>
             <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${getToneClasses(projection.nextStep.tone).pill}`}>
               {projection.nextStep.ownerLabel}
@@ -91,7 +94,7 @@ export function ClientPremiumWorkspace({
             </p>
           </div>
 
-          <div className="mt-5 flex flex-col gap-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <Link
               href="/documentos"
               className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
@@ -105,7 +108,8 @@ export function ClientPremiumWorkspace({
               Ver agenda e compromissos
             </Link>
           </div>
-        </ClientSafeCard>
+          </ClientSafeCard>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
