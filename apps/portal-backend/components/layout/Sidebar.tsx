@@ -95,7 +95,7 @@ export function Sidebar({
               Camada institucional
             </p>
             <p className="mt-2 text-sm leading-6 text-[#d9e2de]">
-              Navegação organizada por prioridade operacional, contexto e continuidade entre módulos.
+              Navegacao organizada por prioridade operacional, contexto e continuidade entre modulos.
             </p>
           </div>
         </div>
@@ -161,10 +161,10 @@ export function Sidebar({
         <div className="shrink-0 border-t border-white/10 p-4">
           <div className="rounded-[22px] border border-[rgba(212,188,143,0.14)] bg-[rgba(255,248,234,0.05)] p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d5bc8f]">
-              Escritório
+              Escritorio
             </div>
-            <div className="mt-2 text-sm text-[#e7efec]">Noemia Paixão Advocacia</div>
-            <div className="mt-1 text-xs text-[#9db0a9]">© 2026 NoemIA. Operação institucional.</div>
+            <div className="mt-2 text-sm text-[#e7efec]">Noemia Paixao Advocacia</div>
+            <div className="mt-1 text-xs text-[#9db0a9]">© 2026 NoemIA. Operacao institucional.</div>
           </div>
         </div>
       </div>

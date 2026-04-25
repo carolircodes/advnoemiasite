@@ -1,3 +1,5 @@
+import { PremiumFeatureCard, PremiumSection } from "@/components/portal/premium-experience";
+
 type PortalLoadingProps = {
   eyebrow: string;
   title: string;
@@ -81,25 +83,25 @@ export function PortalLoadingPage({
         </div>
 
         <div className="grid two">
-          <section className="panel">
-            <div className="section-head">
-              <h2>Carregando painel</h2>
-            </div>
+          <PremiumSection
+            title="Carregando painel"
+            description="Estamos organizando a leitura principal antes de liberar a experiencia completa."
+          >
             <SkeletonParagraph lines={4} />
-          </section>
-          <section className="panel">
-            <div className="section-head">
-              <h2>Carregando itens importantes</h2>
-            </div>
+          </PremiumSection>
+          <PremiumSection
+            title="Carregando itens importantes"
+            description="Os blocos com maior prioridade entram primeiro para manter a leitura util."
+          >
             <SkeletonParagraph lines={4} />
-          </section>
+          </PremiumSection>
         </div>
 
         <div className="grid two">
-          <section className="panel">
-            <div className="section-head">
-              <h2>Carregando lista principal</h2>
-            </div>
+          <PremiumSection
+            title="Carregando lista principal"
+            description="A timeline principal esta sendo preparada com ordem e contexto."
+          >
             <div className="skeleton-feed">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="update-card skeleton-card" aria-hidden="true">
@@ -107,11 +109,11 @@ export function PortalLoadingPage({
                 </div>
               ))}
             </div>
-          </section>
-          <section className="panel">
-            <div className="section-head">
-              <h2>Carregando detalhes</h2>
-            </div>
+          </PremiumSection>
+          <PremiumSection
+            title="Carregando detalhes"
+            description="O contexto complementar chega em seguida para manter o portal consistente."
+          >
             <div className="skeleton-feed">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="update-card skeleton-card" aria-hidden="true">
@@ -119,7 +121,25 @@ export function PortalLoadingPage({
                 </div>
               ))}
             </div>
-          </section>
+          </PremiumSection>
+        </div>
+
+        <div className="grid three">
+          <PremiumFeatureCard
+            eyebrow="Ritmo"
+            title="Prioridade no que destrava"
+            description="Os primeiros blocos carregam contexto e acao antes de detalhes secundarios."
+          />
+          <PremiumFeatureCard
+            eyebrow="Continuidade"
+            title="Leitura sem quebras bruscas"
+            description="Estados de espera mantem a estrutura do portal e evitam transicoes confusas."
+          />
+          <PremiumFeatureCard
+            eyebrow="Confianca"
+            title="Experiencia segura"
+            description="Quando algo demora, o portal continua honesto sobre o que esta preparando."
+          />
         </div>
       </main>
     </div>

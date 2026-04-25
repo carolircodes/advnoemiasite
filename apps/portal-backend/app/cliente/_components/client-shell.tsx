@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { PremiumFeatureCard, PremiumStatePanel, PremiumSurface } from "@/components/portal/premium-experience";
 import { logoutAction } from "@/lib/auth/actions";
 
 import { ClientSafeCard } from "./client-safe-card";
@@ -25,17 +26,19 @@ function MessageBox({
   title,
   description
 }: ClientShellNotice) {
-  const toneClasses = {
-    success: "border-[#d5e8d8] bg-[#f4fbf4] text-[#245236]",
-    error: "border-[#f0d2d2] bg-[#fff5f5] text-[#8a3f3f]",
-    warning: "border-[#eadfcf] bg-[#fbf7ef] text-[#7b5c31]"
-  };
+  const eyebrowByTone = {
+    success: "Operacao confirmada",
+    error: "Falha controlada",
+    warning: "Atencao importante"
+  } as const;
 
   return (
-    <section className={`rounded-3xl border px-5 py-4 ${toneClasses[tone]}`}>
-      <h2 className="text-sm font-semibold uppercase tracking-[0.14em]">{title}</h2>
-      <p className="mt-2 text-sm leading-6">{description}</p>
-    </section>
+    <PremiumStatePanel
+      tone={tone}
+      eyebrow={eyebrowByTone[tone]}
+      title={title}
+      description={description}
+    />
   );
 }
 
@@ -45,8 +48,8 @@ function ClientShellFrame({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[#f7f4ee] px-6 py-8 text-[#10261d] sm:px-8 lg:px-10">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">{children}</div>
+    <main className="min-h-screen bg-[#f7f4ee] px-5 py-6 text-[#10261d] sm:px-8 lg:px-10 lg:py-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">{children}</div>
     </main>
   );
 }
@@ -62,55 +65,69 @@ export function ClientShell({
 }) {
   return (
     <ClientShellFrame>
-      <section className="rounded-[32px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)] sm:p-8">
-        <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
-          Area do cliente
+      <PremiumSurface className="overflow-hidden rounded-[34px] border-[rgba(142,106,59,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,244,238,0.95))] p-6 sm:p-8">
+        <div className="grid gap-8 xl:grid-cols-[1.3fr_0.7fr]">
+          <div>
+            <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
+              Area do cliente
+            </div>
+
+            <h1 className="mt-6 text-3xl font-semibold tracking-[-0.04em] text-[#10261d] sm:text-4xl">
+              Ola, {profile.displayName}.
+            </h1>
+
+            <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
+              Este portal foi organizado para mostrar com clareza o momento do seu
+              atendimento, o que ja foi conduzido pela equipe e o que ainda pede
+              sua participacao, sem ruido e sem perder o contexto juridico.
+            </p>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <PremiumFeatureCard
+                eyebrow="Sessao"
+                title="Acesso validado"
+                description="Seu acompanhamento esta protegido neste ambiente e permanece acessivel com leitura clara."
+              />
+              <PremiumFeatureCard
+                eyebrow="Acompanhamento"
+                title="Resumo objetivo"
+                description="Agenda, documentos, pagamentos e historico aparecem com prioridade de leitura."
+              />
+              <PremiumFeatureCard
+                eyebrow="Proximo passo"
+                title="Acao sem ambiguidades"
+                description="O portal destaca primeiro o que depende de voce e o que a equipe ja conduziu."
+              />
+            </div>
+          </div>
+
+          <PremiumSurface tone="neutral" className="self-start rounded-[30px] bg-[rgba(252,249,244,0.92)]">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
+                  Leitura executiva
+                </p>
+                <h2 className="mt-3 font-serif text-2xl font-semibold tracking-[-0.03em] text-[#10261d]">
+                  Seu portal foi desenhado para transmitir seguranca.
+                </h2>
+              </div>
+              <p className="text-sm leading-7 text-[#5f6f68]">
+                Quando algum bloco estiver indisponivel, o restante do ambiente
+                continua util e coerente. A experiencia preserva continuidade,
+                linguagem humana e contexto de atendimento.
+              </p>
+              <div className="premium-inline-stat">
+                <span>Perfil identificado</span>
+                <strong>{profile.email || "Email protegido"}</strong>
+              </div>
+              <div className="premium-inline-stat">
+                <span>Primeiro acesso</span>
+                <strong>{profile.firstLoginCompletedLabel}</strong>
+              </div>
+            </div>
+          </PremiumSurface>
         </div>
-
-        <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[#10261d] sm:text-4xl">
-          Ola, {profile.displayName}.
-        </h1>
-
-        <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
-          Este portal foi organizado para mostrar com clareza onde seu
-          atendimento esta, o que ja foi resolvido, o que ainda depende de
-          voce e quais sao os proximos passos acompanhados pela equipe, sem
-          misturar essa leitura juridica com futuras experiencias premium do
-          ecossistema.
-        </p>
-
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Sessao
-            </p>
-            <p className="mt-2 text-lg font-semibold text-[#10261d]">Ativa</p>
-            <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Seu acesso foi validado e o acompanhamento esta protegido neste ambiente.
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Acompanhamento
-            </p>
-            <p className="mt-2 text-lg font-semibold text-[#10261d]">Resumo claro</p>
-            <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              Status, documentos, agenda e timeline aparecem com hierarquia para leitura rapida.
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-[#ece5d9] bg-[#fcfaf6] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-              Proximo passo
-            </p>
-            <p className="mt-2 text-lg font-semibold text-[#10261d]">Tudo em um lugar</p>
-            <p className="mt-2 text-sm leading-6 text-[#66766f]">
-              O portal destaca primeiro o que pede sua acao e o que a equipe ja conduziu.
-            </p>
-          </div>
-        </div>
-      </section>
+      </PremiumSurface>
 
       {notices.map((notice) => (
         <MessageBox
@@ -121,45 +138,36 @@ export function ClientShell({
         />
       ))}
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <ClientSafeCard title="Boas-vindas e acesso">
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <ClientSafeCard title="Boas-vindas e continuidade do atendimento">
           <p>
             Esta area abre com prioridade no que realmente ajuda voce a se orientar:
             etapa atual, pendencias, documentos, agenda e historico do atendimento.
           </p>
           <p className="mt-3">
             Se algum dado estiver temporariamente indisponivel, o restante do
-            portal continua funcionando para manter a leitura clara e segura.
+            portal continua funcionando para manter a leitura clara, segura e sem
+            perda de contexto.
           </p>
         </ClientSafeCard>
 
-        <ClientSafeCard title="Dados basicos seguros">
-          <dl className="space-y-3">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-                Nome
-              </dt>
-              <dd className="text-sm text-[#10261d]">{profile.displayName}</dd>
+        <ClientSafeCard title="Dados essenciais protegidos">
+          <dl className="space-y-4">
+            <div className="premium-definition-row">
+              <dt>Nome</dt>
+              <dd>{profile.displayName}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-                Email
-              </dt>
-              <dd className="text-sm text-[#10261d]">{profile.email || "Nao informado"}</dd>
+            <div className="premium-definition-row">
+              <dt>Email</dt>
+              <dd>{profile.email || "Nao informado"}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-                Telefone
-              </dt>
-              <dd className="text-sm text-[#10261d]">{profile.phoneLabel}</dd>
+            <div className="premium-definition-row">
+              <dt>Telefone</dt>
+              <dd>{profile.phoneLabel}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-                Primeiro acesso
-              </dt>
-              <dd className="text-sm text-[#10261d]">
-                {profile.firstLoginCompletedLabel}
-              </dd>
+            <div className="premium-definition-row">
+              <dt>Primeiro acesso</dt>
+              <dd>{profile.firstLoginCompletedLabel}</dd>
             </div>
           </dl>
         </ClientSafeCard>
@@ -167,42 +175,33 @@ export function ClientShell({
 
       {children}
 
-      <ClientSafeCard title="Links uteis e acoes seguras">
+      <ClientSafeCard title="Acoes seguras e proximos atalhos">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Link
             href="/auth/atualizar-senha"
-            className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#8e6a3b] px-6 text-sm font-semibold text-white no-underline transition hover:bg-[#7b5c31]"
+            className="button"
           >
             Atualizar senha
           </Link>
 
-          <Link
-            href="/portal/login"
-            className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-          >
+          <Link href="/portal/login" className="button secondary">
             Ir para o login
           </Link>
 
-          <Link
-            href="/auth/esqueci-senha"
-            className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] no-underline transition hover:bg-[#faf7f2]"
-          >
+          <Link href="/auth/esqueci-senha" className="button secondary">
             Redefinir senha
           </Link>
 
           <form action={logoutAction}>
-            <button
-              type="submit"
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#d8d2c8] bg-white px-6 text-sm font-semibold text-[#10261d] transition hover:bg-[#faf7f2]"
-            >
+            <button type="submit" className="button secondary">
               Encerrar sessao
             </button>
           </form>
         </div>
         <p className="mt-4">
           Se algum modulo estiver temporariamente vazio ou indisponivel, o
-          portal continua mostrando o restante do acompanhamento com clareza e
-          sem perder a continuidade do caso.
+          portal continua mostrando o restante do acompanhamento com clareza,
+          sem interromper a continuidade do caso.
         </p>
       </ClientSafeCard>
     </ClientShellFrame>
@@ -212,18 +211,12 @@ export function ClientShell({
 export function ClientShellLoading() {
   return (
     <ClientShellFrame>
-      <section className="rounded-[32px] border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)] sm:p-8">
-        <div className="inline-flex rounded-full border border-[#eadfcf] bg-[#fbf7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8e6a3b]">
-          Area do cliente
-        </div>
-        <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[#10261d] sm:text-4xl">
-          Carregando seu painel do cliente.
-        </h1>
-        <p className="mt-4 max-w-3xl text-base leading-8 text-[#5f6f68]">
-          Estamos preparando o resumo do seu acompanhamento antes de carregar os
-          modulos de documentos, agenda e historico.
-        </p>
-      </section>
+      <PremiumStatePanel
+        tone="neutral"
+        eyebrow="Area do cliente"
+        title="Estamos preparando seu painel."
+        description="Organizamos primeiro os blocos que ajudam voce a se orientar: atendimento, documentos, agenda e proximos passos."
+      />
 
       <ClientSafeCard>
         <div className="h-4 w-40 animate-pulse rounded-full bg-[#ebe4d8]" />
@@ -248,31 +241,23 @@ export function ClientShellErrorState({
 }) {
   return (
     <ClientShellFrame>
-      <ClientSafeCard className="border-[#f0d7d7]">
-        <div className="inline-flex rounded-full border border-[#f0d7d7] bg-[#fff4f4] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#a25555]">
-          Falha controlada
-        </div>
-
-        <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[#10261d]">
-          Nao foi possivel carregar todo o painel agora.
-        </h1>
-
-        <p className="mt-4 text-base leading-8 text-[#5f6f68]">
-          O portal protege esta area para evitar tela em branco. Tente novamente
-          em instantes ou use os atalhos abaixo para retomar o acesso.
-        </p>
-
-        <div className="mt-6 rounded-3xl border border-[#efe3d1] bg-[#fbf7ef] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
-            Detalhe tecnico seguro
-          </p>
-          <p className="mt-2 break-words text-sm leading-6 text-[#5f6f68]">
-            {message || "Erro nao identificado durante a renderizacao."}
-          </p>
-        </div>
-
-        {actions ? <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">{actions}</div> : null}
-      </ClientSafeCard>
+      <PremiumStatePanel
+        tone="error"
+        eyebrow="Falha controlada"
+        title="Nao foi possivel carregar todo o painel agora."
+        description="O portal protege esta area para evitar tela em branco. Tente novamente em instantes ou use os atalhos abaixo para retomar o acesso."
+        detail={
+          <div className="rounded-3xl border border-[#efe3d1] bg-[#fbf7ef] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8e6a3b]">
+              Detalhe tecnico seguro
+            </p>
+            <p className="mt-2 break-words text-sm leading-6 text-[#5f6f68]">
+              {message || "Erro nao identificado durante a renderizacao."}
+            </p>
+          </div>
+        }
+        actions={actions}
+      />
     </ClientShellFrame>
   );
 }

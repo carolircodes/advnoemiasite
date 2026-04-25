@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { PremiumSection, PremiumSurface } from "@/components/portal/premium-experience";
+
 type ClientSafeCardProps = {
   title?: string;
   children: ReactNode;
@@ -11,14 +13,17 @@ export function ClientSafeCard({
   children,
   className = ""
 }: ClientSafeCardProps) {
+  if (title) {
+    return (
+      <PremiumSection title={title} className={className}>
+        <div className="text-sm leading-7 text-[#5f6f68]">{children}</div>
+      </PremiumSection>
+    );
+  }
+
   return (
-    <section
-      className={`rounded-3xl border border-[#e7e0d5] bg-white p-6 shadow-[0_20px_60px_rgba(16,38,29,0.05)] ${className}`.trim()}
-    >
-      {title ? (
-        <h2 className="text-lg font-semibold text-[#10261d]">{title}</h2>
-      ) : null}
-      <div className={title ? "mt-4 text-sm leading-7 text-[#5f6f68]" : ""}>{children}</div>
-    </section>
+    <PremiumSurface className={className}>
+      <div className="text-sm leading-7 text-[#5f6f68]">{children}</div>
+    </PremiumSurface>
   );
 }

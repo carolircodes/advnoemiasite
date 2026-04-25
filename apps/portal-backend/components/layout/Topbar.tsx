@@ -17,7 +17,7 @@ export function Topbar({
   onMenuClick,
   isMenuOpen = false,
   userName = 'Advogada',
-  userRole = 'Noemia Paixão'
+  userRole = 'Noemia Paixao'
 }: TopbarProps) {
   const releaseLabel = process.env.NEXT_PUBLIC_PORTAL_RELEASE_LABEL || 'local';
 
@@ -40,7 +40,7 @@ export function Topbar({
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(142,106,59,0.12)] bg-[rgba(249,241,226,0.9)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7b5c31]">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Operação interna protegida
+                Operacao interna protegida
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(19,37,31,0.1)] bg-white/78 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#516158]">
                 Release do portal
@@ -59,7 +59,7 @@ export function Topbar({
         <div className="flex min-w-0 flex-wrap items-center gap-3 lg:justify-end">
           <div className="hidden min-w-[280px] items-center gap-3 rounded-full border border-[rgba(142,106,59,0.12)] bg-white/75 px-4 py-3 text-sm text-[#5b6a63] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] md:flex">
             <Search className="h-4 w-4 text-[#8e6a3b]" />
-            Busca rápida, páginas e atalhos do workspace
+            Busca rapida, paginas e atalhos do workspace
           </div>
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[rgba(142,106,59,0.12)] bg-white/85 text-[#8e6a3b]">
             <Bell className="h-4 w-4" />

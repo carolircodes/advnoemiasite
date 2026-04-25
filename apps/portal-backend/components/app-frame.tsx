@@ -122,7 +122,7 @@ export function AppFrame({
         {actions.length ? (
           <div className="hero-actions">
             <div className="rounded-[28px] border border-[rgba(142,106,59,0.14)] bg-[rgba(255,251,245,0.74)] p-4 text-sm leading-7 text-[#52615b] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-              Navegação executiva com linguagem unificada, superfícies editoriais e prioridade mais clara entre ação, contexto e leitura.
+              Navegacao executiva com linguagem unificada, superficies editoriais e prioridade mais clara entre acao, contexto e leitura.
             </div>
             {actions.map((action) => (
               <div key={`${action.href}-${action.label}`}>
@@ -142,11 +142,11 @@ export function AppFrame({
       <main className="page-grid">{children}</main>
       <footer className="site-footer" aria-label="Rodape institucional">
         <div className="site-footer-copy">
-          <span className="site-footer-eyebrow">Informações institucionais</span>
-          <strong>Noemia Paixão Advocacia</strong>
+          <span className="site-footer-eyebrow">Informacoes institucionais</span>
+          <strong>Noemia Paixao Advocacia</strong>
           <p>
-            Atendimento jurídico com comunicação clara, fluxos organizados e canais
-            oficiais integrados ao ecossistema digital do escritório.
+            Atendimento juridico com comunicacao clara, fluxos organizados e canais
+            oficiais integrados ao ecossistema digital do escritorio.
           </p>
         </div>
         <div className="site-footer-links">
