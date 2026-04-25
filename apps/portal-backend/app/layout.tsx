@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import { PUBLIC_SITE_BASE_URL } from "@/lib/public-site";
@@ -8,6 +8,7 @@ const metadataBase = new URL(PUBLIC_SITE_BASE_URL);
 
 export const metadata: Metadata = {
   metadataBase,
+  manifest: "/manifest.webmanifest",
   title: {
     default: "Noemia Paixao Advocacia | Atendimento e Portal do Cliente",
     template: "%s | Noemia Paixao Advocacia"
@@ -15,6 +16,11 @@ export const metadata: Metadata = {
   description:
     "Atendimento juridico com triagem organizada, portal do cliente, documentos, agenda e acompanhamento claro do caso.",
   applicationName: "Portal Juridico Noemia Paixao Advocacia",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Portal Noemia"
+  },
   robots: {
     index: false,
     follow: false
@@ -36,6 +42,13 @@ export const metadata: Metadata = {
   other: {
     "format-detection": "telephone=no"
   }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f7f4ee"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
