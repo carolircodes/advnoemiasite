@@ -1,3 +1,4 @@
+import { traceOperationalEvent } from "../observability/operational-trace";
 import { conversationPersistence, ConversationMessage } from './conversation-persistence';
 import { buildWebhookEventPayloadHash } from "./webhook-idempotency";
 
@@ -10,6 +11,11 @@ export interface WebhookEvent {
   isEcho?: boolean;
   messageType?: string;
   timestamp?: number;
+  source?: string;
+  threadKey?: string;
+  providerEventType?: string;
+  assetId?: string;
+  commentId?: string;
 }
 
 export interface GuardResult {
@@ -27,19 +33,51 @@ class AntiSpamGuard {
   private static readonly MAX_MESSAGE_LENGTH = 5000;
   private static readonly MIN_MESSAGE_LENGTH = 1;
 
+  private log(
+    level: "info" | "warn" | "error",
+    event: string,
+    webhookEvent: WebhookEvent,
+    metadata: Record<string, unknown> = {},
+    sessionId?: string | null
+  ) {
+    traceOperationalEvent(
+      level,
+      event,
+      {
+        service: "anti_spam_guard",
+        action: event.toLowerCase(),
+        eventId: webhookEvent.externalEventId || webhookEvent.externalMessageId || null,
+        sessionId: sessionId || null,
+        channel: webhookEvent.channel,
+        outcome: metadata.shouldRespond === true ? "allowed" : "blocked",
+        decisionState: typeof metadata.reason === "string" ? metadata.reason : null
+      },
+      {
+        externalUserId: webhookEvent.externalUserId,
+        externalMessageId: webhookEvent.externalMessageId || null,
+        externalEventId: webhookEvent.externalEventId || null,
+        messageType: webhookEvent.messageType || "text",
+        source: webhookEvent.source || null,
+        threadKey: webhookEvent.threadKey || null,
+        providerEventType: webhookEvent.providerEventType || null,
+        assetId: webhookEvent.assetId || null,
+        commentId: webhookEvent.commentId || null,
+        messageLength: webhookEvent.messageText?.length || 0,
+        ...metadata
+      }
+    );
+  }
+
   // Verificar se deve responder ao evento
   async shouldRespondToEvent(event: WebhookEvent): Promise<GuardResult> {
-    console.log('ANTI_SPAM_GUARD_START', {
-      channel: event.channel,
-      externalUserId: event.externalUserId,
-      externalEventId: event.externalEventId,
-      externalMessageId: event.externalMessageId,
-      messageLength: event.messageText?.length || 0
-    });
+    this.log("info", "ANTI_SPAM_GUARD_START", event);
 
     // 1. Verificar se é mensagem própria (echo)
     if (event.isEcho) {
-      console.log('EVENT_IGNORED_SELF_MESSAGE: Ignoring own message');
+      this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+        reason: "self_message",
+        shouldRespond: false
+      });
       return {
         shouldRespond: false,
         reason: 'self_message',
@@ -49,7 +87,10 @@ class AntiSpamGuard {
 
     // 2. Verificar se há texto útil
     if (!event.messageText || !event.messageText.trim()) {
-      console.log('EVENT_IGNORED_NO_TEXT: No useful text content');
+      this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+        reason: "no_text",
+        shouldRespond: false
+      });
       return {
         shouldRespond: false,
         reason: 'no_text',
@@ -59,7 +100,10 @@ class AntiSpamGuard {
 
     // 3. Verificar comprimento da mensagem
     if (event.messageText.length < AntiSpamGuard.MIN_MESSAGE_LENGTH) {
-      console.log('EVENT_IGNORED_TOO_SHORT: Message too short');
+      this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+        reason: "too_short",
+        shouldRespond: false
+      });
       return {
         shouldRespond: false,
         reason: 'too_short'
@@ -67,7 +111,10 @@ class AntiSpamGuard {
     }
 
     if (event.messageText.length > AntiSpamGuard.MAX_MESSAGE_LENGTH) {
-      console.log('EVENT_IGNORED_TOO_LONG: Message too long');
+      this.log("warn", "ANTI_SPAM_GUARD_BLOCKED", event, {
+        reason: "too_long",
+        shouldRespond: false
+      });
       return {
         shouldRespond: false,
         reason: 'too_long'
@@ -82,9 +129,10 @@ class AntiSpamGuard {
       );
 
       if (isDuplicate) {
-        console.log('EVENT_IGNORED_DUPLICATE: Event already processed', {
-          channel: event.channel,
-          externalEventId: event.externalEventId
+        this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+          reason: "duplicate",
+          shouldRespond: false,
+          duplicateBy: "external_event_id"
         });
         return {
           shouldRespond: false,
@@ -102,7 +150,11 @@ class AntiSpamGuard {
         event.externalUserId
       );
     } catch (error) {
-      console.error('ERROR_GETTING_SESSION_FOR_GUARD:', error);
+      this.log("error", "ANTI_SPAM_GUARD_SESSION_ERROR", event, {
+        reason: "session_error",
+        shouldRespond: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return {
         shouldRespond: false,
         reason: 'session_error'
@@ -116,10 +168,11 @@ class AntiSpamGuard {
     );
 
     if (hasRecentResponse) {
-      console.log('EVENT_IGNORED_RECENT_RESPONSE: Response sent recently', {
-        sessionId: session.id,
+      this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+        reason: "recent_response",
+        shouldRespond: false,
         debounceSeconds: AntiSpamGuard.DEBOUNCE_SECONDS
-      });
+      }, session.id);
       return {
         shouldRespond: false,
         reason: 'recent_response',
@@ -135,7 +188,11 @@ class AntiSpamGuard {
       const isRepeatedContent = this.checkRepeatedContent(event.messageText, recentMessages);
 
       if (isRepeatedContent) {
-        console.log('EVENT_IGNORED_REPEATED_CONTENT: Similar message without deterministic message id');
+        this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+          reason: "repeated_content",
+          shouldRespond: false,
+          duplicateBy: "session_content_similarity"
+        }, session.id);
         return {
           shouldRespond: false,
           reason: 'repeated_content',
@@ -144,7 +201,20 @@ class AntiSpamGuard {
       }
     }
 
-    const payloadHash = buildWebhookEventPayloadHash(event);
+    const payloadHash = buildWebhookEventPayloadHash({
+      channel: event.channel,
+      externalEventId: event.externalEventId,
+      externalMessageId: event.externalMessageId,
+      externalUserId: event.externalUserId,
+      messageText: event.messageText,
+      messageType: event.messageType,
+      source: event.source,
+      threadKey: event.threadKey,
+      providerEventType: event.providerEventType,
+      assetId: event.assetId,
+      commentId: event.commentId,
+      timestamp: event.timestamp
+    });
     if (payloadHash) {
       const isDuplicatePayload = await conversationPersistence.isPayloadHashProcessed(
         event.channel,
@@ -153,11 +223,11 @@ class AntiSpamGuard {
       );
 
       if (isDuplicatePayload) {
-        console.log('EVENT_IGNORED_DUPLICATE_MESSAGE: Message retry already processed', {
-          channel: event.channel,
-          externalMessageId: event.externalMessageId,
-          externalUserId: event.externalUserId
-        });
+        this.log("info", "ANTI_SPAM_GUARD_BLOCKED", event, {
+          reason: "duplicate_retry",
+          shouldRespond: false,
+          duplicateBy: "payload_hash"
+        }, session.id);
         return {
           shouldRespond: false,
           reason: 'duplicate_retry',
@@ -166,11 +236,10 @@ class AntiSpamGuard {
       }
     }
 
-    console.log('ANTI_SPAM_GUARD_PASSED', {
-      sessionId: session.id,
-      channel: event.channel,
-      externalUserId: event.externalUserId
-    });
+    this.log("info", "ANTI_SPAM_GUARD_PASSED", event, {
+      shouldRespond: true,
+      debounceSeconds: AntiSpamGuard.DEBOUNCE_SECONDS
+    }, session.id);
 
     return {
       shouldRespond: true,
@@ -258,17 +327,47 @@ class AntiSpamGuard {
 
   // Marcar evento como processado após resposta bem-sucedida
   async markEventProcessed(event: WebhookEvent): Promise<void> {
-    if (event.externalEventId) {
-      const payloadHash = buildWebhookEventPayloadHash(event);
+    const payloadHash = buildWebhookEventPayloadHash({
+      channel: event.channel,
+      externalEventId: event.externalEventId,
+      externalMessageId: event.externalMessageId,
+      externalUserId: event.externalUserId,
+      messageText: event.messageText,
+      messageType: event.messageType,
+      source: event.source,
+      threadKey: event.threadKey,
+      providerEventType: event.providerEventType,
+      assetId: event.assetId,
+      commentId: event.commentId,
+      timestamp: event.timestamp
+    });
+    const resolvedEventId =
+      event.externalEventId ||
+      event.externalMessageId ||
+      (payloadHash ? `payload:${event.channel}:${payloadHash}` : null);
 
-      await conversationPersistence.markEventProcessed(
-        event.channel,
-        event.externalEventId,
-        event.externalMessageId,
-        event.externalUserId,
-        payloadHash || undefined
-      );
+    if (!resolvedEventId) {
+      this.log("warn", "ANTI_SPAM_GUARD_MARK_SKIPPED", event, {
+        reason: "missing_durable_event_identity",
+        shouldRespond: true
+      });
+      return;
     }
+
+    await conversationPersistence.markEventProcessed(
+      event.channel,
+      resolvedEventId,
+      event.externalMessageId,
+      event.externalUserId,
+      payloadHash || undefined
+    );
+
+    this.log("info", "ANTI_SPAM_GUARD_MARKED_PROCESSED", event, {
+      reason: "marked_processed",
+      shouldRespond: true,
+      resolvedEventId,
+      payloadHashPresent: Boolean(payloadHash)
+    });
   }
 
   // Obter estatísticas do guard

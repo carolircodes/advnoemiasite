@@ -1,4 +1,5 @@
 import { buildBackendEnvCompletenessSnapshot } from "../config/backend-env-governance.ts";
+import { getOmnichannelGovernanceReport } from "../channels/omnichannel-governance.ts";
 import { getAuthEnvDiagnostics, getNotificationEnv } from "../config/env.ts";
 import {
   createNotificationWorkerDiagnosticsMetadata
@@ -351,6 +352,68 @@ function buildTelegramSection(): DiagnosticSection {
   });
 }
 
+function buildOmnichannelSection(): DiagnosticSection {
+  const report = getOmnichannelGovernanceReport();
+  const strategicChannels = report.channels.filter((item) =>
+    report.strategicChannels.includes(item.channel)
+  );
+  const missingConfiguration = strategicChannels.filter(
+    (item) => item.status === "missing_configuration"
+  );
+  const degraded = strategicChannels.filter((item) => item.status === "degraded");
+  const optional = report.channels.filter((item) => item.status === "optional_subsystem_gap");
+
+  if (missingConfiguration.length > 0) {
+    return buildDiagnosticSection({
+      status: "missing_configuration",
+      code: "omnichannel_core_missing_configuration",
+      summary: "Canais estrategicos ainda nao fecham a configuracao minima de operacao governada.",
+      operatorAction:
+        "Fechar primeiro Instagram/Facebook/WhatsApp/Telegram antes de ampliar automacao ou ativar novos canais.",
+      verification: [
+        "Confirmar readiness dos quatro canais estrategicos.",
+        "Garantir assinatura, outbound e handoff minimo por canal.",
+        "Nao ativar YouTube/TikTok como automacao plena enquanto houver gaps no core."
+      ],
+      details: report
+    });
+  }
+
+  if (degraded.length > 0) {
+    return buildDiagnosticSection({
+      status: "degraded",
+      code: "omnichannel_core_degraded",
+      summary: "Core omnichannel esta operacional, mas ainda convive com adapters ou garantias desiguais entre canais.",
+      operatorAction:
+        "Usar a matriz canonica para limitar automacao aos escopos seguros e tratar legados/artesanais como divida explicita.",
+      verification: [
+        "Conferir quais canais estao fora do router/traces canonicos.",
+        "Priorizar Telegram e legados Meta na trilha de convergencia."
+      ],
+      details: report
+    });
+  }
+
+  return buildDiagnosticSection({
+    status: optional.length > 0 ? "degraded" : "healthy",
+    code: optional.length > 0 ? "omnichannel_optional_gaps" : "omnichannel_governed",
+    summary:
+      optional.length > 0
+        ? "Core omnichannel esta governado; sobram apenas gaps opcionais de canais futuros ou modos mais agressivos."
+        : "Core omnichannel esta governado com matriz de capabilities, readiness e policy explicitas.",
+    operatorAction:
+      optional.length > 0
+        ? "Manter YouTube/TikTok em ativacao segura ate fechar provider e policy equivalentes."
+        : "Usar este report como source of truth para ativar novos canais sem criar excecoes artesanais.",
+    verification: [
+      "Conferir matriz de capabilities por canal.",
+      "Conferir readiness item a item.",
+      "Conferir escopos seguros de automacao antes de cada rollout."
+    ],
+    details: report
+  });
+}
+
 function buildDurableExpectationsSection(): DiagnosticSection {
   return buildDiagnosticSection({
     status: "healthy",
@@ -420,6 +483,7 @@ export function buildEnvironmentConvergenceSections() {
     perimeter: buildPerimeterSection(),
     payments: buildPaymentReadinessSection(),
     notifications: buildNotificationsSection(),
+    omnichannel: buildOmnichannelSection(),
     telegram: buildTelegramSection(),
     durableExpectations: buildDurableExpectationsSection(),
     environmentCompleteness: buildEnvironmentCompletenessSection()
