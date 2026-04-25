@@ -9,6 +9,8 @@ self.addEventListener("push", (event) => {
     body: payload.body || "Existe uma atualizacao aguardando voce.",
     icon: "/icon",
     badge: "/apple-icon",
+    tag: payload.notificationId || payload.eventKey || "portal-noemia-pilot",
+    renotify: false,
     data: {
       href: payload.href || "/cliente",
       notificationId: payload.notificationId || null

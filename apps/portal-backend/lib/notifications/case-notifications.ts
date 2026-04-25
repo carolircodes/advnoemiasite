@@ -3,6 +3,7 @@ import "server-only";
 import { generateClientMessage, ClientMessageTemplates } from "./client-message-templates";
 import { queueGovernedNotification } from "./governed-outbox";
 import type { NotificationEventKey } from "./policy";
+import { isPushPilotCandidate } from "./push-pilot";
 import {
   buildCaseUpdateWhatsAppMessage,
   buildStatusChangeWhatsAppMessage,
@@ -136,6 +137,41 @@ export async function sendCaseUpdateNotification(input: CaseNotificationInput): 
           }
         });
         results.emailNotificationId = emailNotification.id;
+
+        if (isPushPilotCandidate(eventKey)) {
+          try {
+            await queueGovernedNotification({
+              eventKey,
+              channel: "push",
+              recipientProfileId: input.clientProfileId,
+              recipientAddress: input.clientEmail,
+              subject:
+                eventKey === "client.document.available"
+                  ? "Documento importante liberado no portal"
+                  : professionalSubject,
+              templateKey: resolveCaseNotificationTemplateKey(input),
+              payload: {
+                title: professionalSubject,
+                publicSummary: professionalMessage,
+                pushBody:
+                  eventKey === "client.document.available"
+                    ? "Seu portal recebeu um novo documento. Abra para ler com contexto e tranquilidade."
+                    : professionalMessage
+              },
+              relatedTable: "case_events",
+              relatedId: input.relatedId || input.caseId,
+              decisionContext: {
+                source: "case_notification",
+                caseId: input.caseId,
+                clientId: input.clientId,
+                originalEventType: input.eventType,
+                pilotChannel: "push"
+              }
+            });
+          } catch (pushError) {
+            console.warn("[CaseNotifications] Falha ao enfileirar piloto push:", pushError);
+          }
+        }
       } catch (error) {
         results.errors.push(`Email: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
       }

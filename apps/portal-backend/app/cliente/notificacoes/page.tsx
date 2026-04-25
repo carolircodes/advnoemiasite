@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { NotificationJourneyBeacon } from "@/components/notification-journey-beacon";
+import { PushPilotControls } from "@/components/push-pilot-controls";
 import {
   PremiumFeatureCard,
   PremiumSection,
@@ -15,7 +16,10 @@ import {
   loadNotificationPreferenceState,
   saveNotificationPreferenceState
 } from "@/lib/notifications/preferences";
-import { assessPushPilotReadiness } from "@/lib/notifications/push-pilot";
+import {
+  assessPushPilotReadiness,
+  getPushPilotSubscriptionStatus
+} from "@/lib/notifications/push-pilot";
 
 import { ClientShell } from "../_components/client-shell";
 
@@ -84,9 +88,10 @@ export default async function ClientNotificationPreferencesPage({
   const profile = await requireProfile(["cliente"]);
   const params = await searchParams;
   const success = typeof params.success === "string" ? getSuccessMessage(params.success) : "";
-  const [{ state, source }, pushReadiness] = await Promise.all([
+  const [{ state, source }, pushReadiness, pushSubscriptionStatus] = await Promise.all([
     loadNotificationPreferenceState(profile),
-    assessPushPilotReadiness()
+    assessPushPilotReadiness(),
+    getPushPilotSubscriptionStatus(profile.id)
   ]);
   const controls = getClientNotificationControls();
 
@@ -235,8 +240,8 @@ export default async function ClientNotificationPreferencesPage({
       </SectionCard>
 
       <SectionCard
-        title="Push PWA em preparo controlado"
-        description="A base tecnica ja esta sendo preparada, mas a ativacao continua intencionalmente contida para proteger confianca e utilidade."
+        title="Piloto push controlado"
+        description="Quando estiver ativo, ele continua pequeno, reversivel e reservado para alertas que merecem chegar rapido."
       >
         <div className="grid gap-4 md:grid-cols-3">
           <PremiumFeatureCard
@@ -253,6 +258,16 @@ export default async function ClientNotificationPreferencesPage({
             eyebrow="Regra"
             title="Sem ativacao ampla agora"
             description="Mesmo com interesse registrado, o envio continua desligado ate subscription, VAPID e service worker estarem prontos com governanca."
+          />
+        </div>
+        <div className="mt-5">
+          <PushPilotControls
+            activationFlag={pushReadiness.activationFlag}
+            readinessStatus={pushReadiness.status}
+            readinessSummary={pushReadiness.summary}
+            pushPilotInterested={state.pushPilotInterested}
+            vapidPublicKey={process.env.NEXT_PUBLIC_PUSH_VAPID_PUBLIC_KEY || null}
+            initialSubscriptionStatus={pushSubscriptionStatus}
           />
         </div>
       </SectionCard>

@@ -6,6 +6,7 @@ import {
 } from "../diagnostics/notification-worker";
 import { recordNotificationInteraction } from "../notifications/action-tracking";
 import { renderNotificationEmail } from "../notifications/email-templates";
+import { sendPilotPushNotification } from "../notifications/push-delivery";
 import { routeNotificationByChannel } from "../notifications/channel-router";
 import { traceOperationalEvent } from "../observability/operational-trace";
 import { createAdminSupabaseClient } from "../supabase/admin";
@@ -299,6 +300,8 @@ async function processNotification(record: NotificationRecord) {
         html: "",
         text: whatsappMessage
       });
+    } else if (channel === "push") {
+      await sendPilotPushNotification(claimedRecord);
     } else {
       await routeNotificationByChannel(channel, {
         to: claimedRecord.recipient_email,

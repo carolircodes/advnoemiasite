@@ -46,10 +46,47 @@ export type NotificationReadiness = {
   pushPwaReason: string;
 };
 
+function hasPushPilotVapidConfig() {
+  const publicKey = process.env.NEXT_PUBLIC_PUSH_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.PUSH_VAPID_PRIVATE_KEY;
+
+  return (
+    typeof publicKey === "string"
+    && publicKey.trim().length > 0
+    && typeof privateKey === "string"
+    && privateKey.trim().length > 0
+  );
+}
+
+function resolvePushPilotReadiness(): NotificationReadiness {
+  const activationFlag = process.env.NOTIFICATIONS_PUSH_PILOT_ENABLED === "true";
+  const vapidConfigured = hasPushPilotVapidConfig();
+
+  if (!activationFlag) {
+    return {
+      pushPwaEnabled: false,
+      pushPwaReason:
+        "O piloto push continua desligado por flag e nao deve registrar service worker fora do cohort controlado."
+    };
+  }
+
+  if (!vapidConfigured) {
+    return {
+      pushPwaEnabled: false,
+      pushPwaReason:
+        "O piloto push ainda nao pode enviar porque as chaves VAPID obrigatorias nao estao completas."
+    };
+  }
+
+  return {
+    pushPwaEnabled: true,
+    pushPwaReason:
+      "O piloto push esta pronto apenas para cohort pequeno, opt-in explicito e dois eventos de alto valor."
+  };
+}
+
 const CURRENT_NOTIFICATION_READINESS: NotificationReadiness = {
-  pushPwaEnabled: false,
-  pushPwaReason:
-    "O portal ja e PWA, mas ainda nao existe service worker de push nem assinatura de subscription governada."
+  ...resolvePushPilotReadiness()
 };
 
 const DEFAULT_PREFERENCE_BY_AUDIENCE: Record<NotificationAudience, NotificationPreferenceSnapshot> = {
@@ -307,7 +344,7 @@ function findNextAllowedDate(date: Date, preference: NotificationPreferenceSnaps
 }
 
 export function getNotificationReadiness() {
-  return CURRENT_NOTIFICATION_READINESS;
+  return resolvePushPilotReadiness();
 }
 
 export function getNotificationPolicyMatrix() {
@@ -369,9 +406,9 @@ export function resolveNotificationChannelAvailability(
       return {
         eligible: preference.pushEnabled && CURRENT_NOTIFICATION_READINESS.pushPwaEnabled,
         reason:
-          preference.pushEnabled && CURRENT_NOTIFICATION_READINESS.pushPwaEnabled
+          preference.pushEnabled && resolvePushPilotReadiness().pushPwaEnabled
             ? "channel_enabled"
-            : !CURRENT_NOTIFICATION_READINESS.pushPwaEnabled
+            : !resolvePushPilotReadiness().pushPwaEnabled
               ? "push_not_ready"
               : "push_preference_disabled"
       };

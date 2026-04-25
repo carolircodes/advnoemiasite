@@ -12,6 +12,7 @@ import {
   queueEmailNotification
 } from "../notifications/outbox";
 import { queueGovernedNotification } from "../notifications/governed-outbox";
+import { isPushPilotCandidate } from "../notifications/push-pilot";
 import { createAdminSupabaseClient } from "../supabase/admin";
 
 type AutomationDispatchInput = {
@@ -147,6 +148,39 @@ async function queueAutomationNotification(input: QueuedAutomationNotificationIn
           relatedTable: input.relatedTable,
           relatedId: input.relatedId || null
         });
+
+    if (governedEventKey && isPushPilotCandidate(governedEventKey) && input.recipientProfileId) {
+      try {
+        await queueGovernedNotification({
+          eventKey: governedEventKey,
+          channel: "push",
+          recipientProfileId: input.recipientProfileId,
+          recipientAddress: input.recipientEmail,
+          subject: input.subject,
+          templateKey: input.templateKey,
+          payload: {
+            ...input.payload,
+            pushBody:
+              governedEventKey === "client.appointment.reminder"
+                ? "Seu compromisso esta proximo. Abra a agenda para revisar horario e contexto."
+                : "Um documento importante foi liberado no seu portal. Abra para consultar com calma."
+          },
+          relatedTable: input.relatedTable,
+          relatedId: input.relatedId || null,
+          decisionContext: {
+            automationRuleKey: input.ruleKey,
+            automationEventType: input.eventType,
+            pilotChannel: "push"
+          }
+        });
+      } catch (pushError) {
+        console.warn("[automations.push_pilot] Falha ao enfileirar piloto push", {
+          ruleKey: input.ruleKey,
+          eventType: governedEventKey,
+          message: pushError instanceof Error ? pushError.message : String(pushError)
+        });
+      }
+    }
 
     await finalizeAutomationDispatch(dispatchId, notification.id);
     return notification.id;

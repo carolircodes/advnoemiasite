@@ -14,6 +14,10 @@ import {
   type NotificationPreferenceSnapshot,
   type NotificationPriority
 } from "./policy";
+import {
+  assessPushPilotSubscriptionEligibility,
+  isPushPilotChannelAllowedForEvent
+} from "./push-pilot";
 
 type QueueGovernedNotificationInput = {
   eventKey: NotificationEventKey;
@@ -156,16 +160,30 @@ export async function queueGovernedNotification(
     policy,
     preference
   });
+  const pushPilotEligibility =
+    input.channel === "push"
+      ? await assessPushPilotSubscriptionEligibility({
+          profileId: input.recipientProfileId,
+          eventKey: input.eventKey,
+          audience: policy.audience
+        })
+      : null;
   const expiresAt = buildExpiresAt(input, policy.expiresAfterMinutes);
   const actionLabel = input.actionLabel || policy.actionLabel;
   const actionUrl = input.actionPath || policy.actionPath;
 
   let status = "pending";
   let governanceReason = availability.reason;
+  const channelActiveNow =
+    policy.activeChannelsNow.includes(input.channel)
+    || (input.channel === "push" && isPushPilotChannelAllowedForEvent(input.eventKey));
 
-  if (!policy.activeChannelsNow.includes(input.channel)) {
+  if (!channelActiveNow) {
     status = "blocked";
     governanceReason = "channel_not_in_active_policy";
+  } else if (input.channel === "push" && pushPilotEligibility && !pushPilotEligibility.eligible) {
+    status = "blocked";
+    governanceReason = pushPilotEligibility.reason;
   } else if (!eventPreference.enabled) {
     status = "blocked";
     governanceReason = eventPreference.reason;
@@ -208,6 +226,8 @@ export async function queueGovernedNotification(
         preferenceSource,
         eventPreference: eventPreference.reason,
         channelEligibility: channelEligibility.reason,
+        pushPilotEligibility: pushPilotEligibility?.reason || null,
+        pushSubscriptionCount: pushPilotEligibility?.activeSubscriptions || 0,
         duplicateNotificationId: duplicate?.id || null
       }
     })

@@ -11,6 +11,16 @@
   - `client.payment.confirmed`: e-mail quando houver perfil + e-mail confiaveis
   - `client.portal.return`: lembrete suave de retomada
 
+- Piloto push controlado
+  - publico: cliente autenticado, ativo, com interesse salvo em `/cliente/notificacoes`
+  - gate: `NOTIFICATIONS_PUSH_PILOT_ENABLED=true` + VAPID valido + browser suportado + subscription ativa
+  - eventos ativos:
+    - `client.appointment.reminder`
+    - `client.document.available`
+  - service worker: `public/notification-pilot-sw.js`
+  - registro: apenas por opt-in explicito na UI de preferencias
+  - rollback: desligar a flag ou revogar subscriptions em `/api/notifications/push/subscription`
+
 - Operacao
   - `operations.intake.new`: e-mail para triagem interna
   - `operations.intake.urgent`: e-mail forte e opcao de WhatsApp
@@ -19,14 +29,10 @@
 
 ## O que nao entra agora
 
-- Push PWA/web
-  - O envio continua explicitamente desabilitado nesta fase.
-  - Nesta etapa, a base de readiness passou a incluir:
-    - tabela `notification_push_subscriptions`
-    - interesse de piloto via preferencias (`push_enabled`)
-    - asset `public/notification-pilot-sw.js` ainda nao registrado no cliente
-    - leitura de VAPID e flag de piloto no readiness interno
-  - Resultado: existe preparacao concreta para piloto controlado, sem ativacao ampla.
+- Push PWA/web amplo
+  - O envio nao esta liberado para todos os clientes.
+  - O piloto continua restrito a dois eventos, opt-in explicito e cohort pequeno.
+  - Nenhum outro evento entra em push sem nova prova de utilidade e baixo ruido.
 
 ## Preferencias minimas
 
@@ -35,7 +41,7 @@
   - controles enxutos para compromisso, documento disponivel, documento pendente, pagamento confirmado e retorno ao portal
   - canal principal: e-mail
   - WhatsApp permanece apenas como reforco excepcional
-  - push continua apenas como interesse de piloto, nao como canal ativo
+  - push pode ser ativado apenas no piloto controlado, por dispositivo, com permissao explicita
 
 - Operacao / advogada
   - preferencias reais em `/internal/advogada/configuracoes`
@@ -60,6 +66,8 @@
   - conclusao de retorno ao portal
   - conclusao de pagamento confirmado por visualizacao do proximo passo
   - conclusao de documento pendente por upload efetivo
+  - subscription criada, revogada ou invalidada
+  - permissao de push concedida, negada ou ainda pendente
 
 - Ruido
   - Nao notificar notas internas, reprocessamentos tecnicos, status sem acao, duplicatas dentro de cooldown ou sinais ja absorvidos por outro fluxo.
@@ -85,4 +93,20 @@
 - Observabilidade
   - Cada decisao registra audiencia, prioridade, canal, `canonical_event_key`, motivo de bloqueio/defer e deep link.
   - Agora tambem registramos se houve preferencia armazenada ou default, clique, abertura, acao concluida e expiracao sem retorno.
+  - O piloto push tambem registra permission decision, subscription upsert/revoke, envio, falha e invalidacao por provider/browser.
   - A fila continua sendo a fonte unica de entrega; nao foi criado um sistema paralelo.
+
+## Migrations e envs
+
+- Migrations aplicadas no remoto em `2026-04-25`
+  - `20260425103000_phase7_notification_governance.sql`
+  - `20260425143000_phase8_notification_preferences_action_tracking.sql`
+
+- Env minimo para o piloto
+  - `NEXT_PUBLIC_PUSH_VAPID_PUBLIC_KEY`
+  - `PUSH_VAPID_PRIVATE_KEY`
+  - `NOTIFICATIONS_PUSH_PILOT_ENABLED=true`
+
+- Expansao futura
+  - antes de adicionar novos eventos, validar taxa de clique, abertura, acao concluida e unsubscribe
+  - se houver tradeoff entre alcance e confianca, manter o piloto menor
