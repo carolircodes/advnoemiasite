@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { assertRouteSecret } from "@/lib/http/route-secret";
+import { shouldExposeChannelValidationErrors } from "@/lib/http/webhook-security";
 import { telegramConversationService } from "@/lib/services/telegram-conversation";
 
 export async function POST(request: NextRequest) {
@@ -32,10 +33,13 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Nao foi possivel processar o webhook do Telegram.";
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Nao foi possivel processar o webhook do Telegram."
+        error: "Nao foi possivel processar o webhook do Telegram.",
+        detail: shouldExposeChannelValidationErrors() ? errorMessage : undefined
       },
       { status: 500 }
     );

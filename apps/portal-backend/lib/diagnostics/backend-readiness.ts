@@ -13,6 +13,7 @@ import {
   type DiagnosticSection
 } from "./status.ts";
 import { assessPushPilotReadiness } from "../notifications/push-pilot.ts";
+import { buildChannelWebhookReadinessSection } from "./channel-readiness.ts";
 
 export async function buildBackendReadinessReport(dependencies?: {
   enforcementProfile?: BackendEnforcementProfile;
@@ -95,6 +96,7 @@ export async function buildBackendReadinessReport(dependencies?: {
     abuseProtection,
     durableExpectations: envSections.durableExpectations,
     databaseSecurity: buildDatabaseSecurityReadinessSection(),
+    channelReadiness: buildChannelWebhookReadinessSection(),
     environmentCompleteness: envSections.environmentCompleteness,
     payments: envSections.payments,
     notifications,

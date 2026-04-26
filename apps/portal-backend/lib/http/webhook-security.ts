@@ -34,6 +34,14 @@ export function shouldAllowShadowWebhookAcceptance(flagName: string) {
   return readBooleanFlag(flagName, false);
 }
 
+export function shouldExposeChannelValidationErrors() {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
+  return readBooleanFlag("CHANNEL_VALIDATION_EXPOSE_ERRORS", false);
+}
+
 export function timingSafeEqualText(left: string, right: string) {
   const leftBuffer = Buffer.from(left, "utf8");
   const rightBuffer = Buffer.from(right, "utf8");

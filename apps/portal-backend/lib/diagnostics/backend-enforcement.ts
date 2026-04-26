@@ -6,6 +6,7 @@ import {
   buildEnvironmentConvergenceSections
 } from "./environment-convergence.ts";
 import { buildDatabaseSecurityReadinessSection } from "./database-security.ts";
+import { buildChannelWebhookReadinessSection } from "./channel-readiness.ts";
 import {
   buildDiagnosticSection,
   combineDiagnosticStatuses,
@@ -280,7 +281,8 @@ function inferActionDomain(
     subsystem === "telegram" ||
     subsystem === "meta" ||
     subsystem === "youtube" ||
-    subsystem === "omnichannel"
+    subsystem === "omnichannel" ||
+    subsystem === "channelReadiness"
   ) {
     return "external_provider";
   }
@@ -667,6 +669,19 @@ function evaluateDiagnosticSection(
     level = context.profile === "production" ? "action_required" : "warning";
     reason =
       "Banco exige validacao manual de migrations/RLS/storage no ambiente alvo.";
+  } else if (section.code === "channel_readiness_action_required") {
+    level =
+      context.profile === "production"
+        ? "release_blocker"
+        : context.profile === "preview"
+          ? "action_required"
+          : "action_required";
+    reason =
+      "Canais core ainda nao fecham assinatura/secret/readiness para piloto seguro.";
+  } else if (section.code === "channel_readiness_manual_check_required") {
+    level = context.profile === "production" ? "action_required" : "warning";
+    reason =
+      "Canais core exigem validacao manual em provider antes de producao plena.";
   } else if (subsystem === "environmentCompleteness" && section.status === "degraded") {
     level = context.profile === "production" ? "action_required" : "warning";
     reason = "Existem lacunas de subsistema ou de perfil que merecem acompanhamento.";
@@ -1121,7 +1136,8 @@ export async function buildBackendOperationsVerificationReport(options?: {
 
   const sections: Record<string, DiagnosticSection> = {
     ...envSections,
-    databaseSecurity: buildDatabaseSecurityReadinessSection()
+    databaseSecurity: buildDatabaseSecurityReadinessSection(),
+    channelReadiness: buildChannelWebhookReadinessSection()
   };
 
   if (runtimeMode === "off") {

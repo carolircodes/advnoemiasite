@@ -7,11 +7,6 @@ import {
   getPaymentRuntimeDiagnostics
 } from "@/lib/diagnostics/payment-readiness";
 import {
-  computeHmacSha256Hex,
-  parseMercadoPagoSignatureInput,
-  timingSafeEqualText
-} from "@/lib/http/webhook-security";
-import {
   buildPaymentIgnoredTransitionKey,
   buildPaymentTransitionKey,
   canApplyPaymentTransition,
@@ -22,6 +17,10 @@ import {
   type PaymentFinancialState,
   type PaymentTechnicalState
 } from "@/lib/payment/payment-workflow";
+import {
+  getMercadoPagoWebhookEventId,
+  validateMercadoPagoWebhookSignature
+} from "@/lib/payment/mercado-pago-webhook-security";
 import { getRevenueOfferByCode } from "@/lib/services/revenue-architecture";
 import { recordRevenueTelemetry } from "@/lib/services/revenue-telemetry";
 import { commercialClosingService } from "@/lib/services/commercial-closing";
@@ -123,64 +122,6 @@ function createPaymentWebhookLogger(observation: RequestObservation): PaymentWeb
       error
     );
   };
-}
-
-function getMercadoPagoWebhookEventId(request: NextRequest, event: any) {
-  return (
-    request.nextUrl.searchParams.get("data.id") ||
-    request.nextUrl.searchParams.get("id") ||
-    (typeof event?.data?.id === "string" || typeof event?.data?.id === "number"
-      ? String(event.data.id)
-      : null) ||
-    (typeof event?.id === "string" || typeof event?.id === "number" ? String(event.id) : null)
-  );
-}
-
-function validateMercadoPagoWebhookSignature(args: {
-  request: NextRequest;
-  event: any;
-  webhookSecret?: string;
-}) {
-  if (!args.webhookSecret) {
-    return {
-      ok: false,
-      status: 503,
-      code: "missing_secret"
-    } as const;
-  }
-
-  const signatureInput = parseMercadoPagoSignatureInput({
-    header: args.request.headers.get("x-signature"),
-    requestId: args.request.headers.get("x-request-id"),
-    dataId: getMercadoPagoWebhookEventId(args.request, args.event)
-  });
-
-  if (!signatureInput) {
-    return {
-      ok: false,
-      status: 401,
-      code: "invalid_signature_input"
-    } as const;
-  }
-
-  const expectedSignature = computeHmacSha256Hex(
-    args.webhookSecret,
-    signatureInput.manifest
-  );
-
-  if (!timingSafeEqualText(expectedSignature, signatureInput.version)) {
-    return {
-      ok: false,
-      status: 401,
-      code: "invalid_signature"
-    } as const;
-  }
-
-  return {
-    ok: true,
-    status: 200,
-    code: "validated"
-  } as const;
 }
 
 function parseExternalReference(externalReference: unknown): ParsedExternalReference | null {
@@ -1086,8 +1027,12 @@ export async function POST(request: NextRequest) {
     }
 
     const signatureValidation = validateMercadoPagoWebhookSignature({
-      request,
-      event,
+      signatureHeader: request.headers.get("x-signature"),
+      requestId: request.headers.get("x-request-id"),
+      dataId: getMercadoPagoWebhookEventId({
+        searchParams: request.nextUrl.searchParams,
+        event
+      }),
       webhookSecret
     });
 

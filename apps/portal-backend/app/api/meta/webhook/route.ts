@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   shouldAllowShadowWebhookAcceptance,
-  shouldEnforceWebhookSignature
+  shouldEnforceWebhookSignature,
+  shouldExposeChannelValidationErrors
 } from "@/lib/http/webhook-security";
 import {
   inferMetaWebhookObjectHint,
@@ -405,11 +406,6 @@ export async function POST(request: NextRequest) {
         reason: signatureValidation.reason,
         hasSignatureHeader: Boolean(signatureHeader),
         objectHint,
-        signaturePrefix:
-          typeof signatureHeader === "string" && signatureHeader.length > 0
-            ? signatureHeader.slice(0, 14)
-            : null,
-        expectedSignaturePrefix: signatureValidation.expectedSignaturePrefix,
         attemptedSources: signatureValidation.attemptedSources,
         appSecretSource: config.appSecretSource,
         facebookAppSecretConfigured: config.secretPresence.FACEBOOK_APP_SECRET,
@@ -577,7 +573,7 @@ export async function POST(request: NextRequest) {
       observation,
       {
         error: "Failed to process Meta webhook",
-        detail: process.env.CHANNEL_VALIDATION_EXPOSE_ERRORS === "true" ? errorMessage : undefined
+        detail: shouldExposeChannelValidationErrors() ? errorMessage : undefined
       },
       { status: 500 }
     );

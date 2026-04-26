@@ -1,39 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  computeHmacSha256Hex,
+  resolveWhatsAppWebhookConfig,
+  summarizeWhatsAppWebhookPayload,
+  validateWhatsAppWebhookSignature,
+  verifyWhatsAppWebhookChallenge
+} from "@/lib/channels/whatsapp-webhook";
+import {
   shouldAllowShadowWebhookAcceptance,
   shouldEnforceWebhookSignature,
-  timingSafeEqualText
+  shouldExposeChannelValidationErrors
 } from "@/lib/http/webhook-security";
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
 import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router.ts";
-
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
-const APP_SECRET =
-  process.env.WHATSAPP_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
-const ACCESS_TOKEN =
-  process.env.WHATSAPP_ACCESS_TOKEN?.trim() || process.env.META_WHATSAPP_ACCESS_TOKEN?.trim();
-const PHONE_NUMBER_ID =
-  process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() ||
-  process.env.META_WHATSAPP_PHONE_NUMBER_ID?.trim();
-const APP_SECRET_SOURCE = process.env.WHATSAPP_APP_SECRET?.trim()
-  ? "WHATSAPP_APP_SECRET"
-  : process.env.META_APP_SECRET?.trim()
-    ? "META_APP_SECRET"
-    : null;
-const ACCESS_TOKEN_SOURCE = process.env.WHATSAPP_ACCESS_TOKEN?.trim()
-  ? "WHATSAPP_ACCESS_TOKEN"
-  : process.env.META_WHATSAPP_ACCESS_TOKEN?.trim()
-    ? "META_WHATSAPP_ACCESS_TOKEN"
-    : null;
-const PHONE_NUMBER_ID_SOURCE = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim()
-  ? "WHATSAPP_PHONE_NUMBER_ID"
-  : process.env.META_WHATSAPP_PHONE_NUMBER_ID?.trim()
-    ? "META_WHATSAPP_PHONE_NUMBER_ID"
-    : null;
 
 type WhatsAppOutboundContext = {
   channel?: string;
@@ -85,16 +66,6 @@ function logEvent(
     },
     data ?? {}
   );
-}
-
-function verifySignature(body: string, signature: string) {
-  if (!signature || !APP_SECRET) {
-    return false;
-  }
-
-  const expectedSignature = `sha256=${computeHmacSha256Hex(APP_SECRET, body)}`;
-
-  return timingSafeEqualText(signature, expectedSignature);
 }
 
 function extractMessageInfo(message: Record<string, any>) {
@@ -161,15 +132,17 @@ async function reconcileStatusUpdate(rawStatus: WhatsAppStatusWebhook) {
 }
 
 async function markAsRead(messageId: string) {
-  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+  const config = resolveWhatsAppWebhookConfig();
+
+  if (!config.accessToken || !config.phoneNumberId) {
     return false;
   }
 
   try {
-    const response = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${config.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${config.accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -194,15 +167,17 @@ async function markAsRead(messageId: string) {
 }
 
 async function sendTypingIndicator(to: string) {
-  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+  const config = resolveWhatsAppWebhookConfig();
+
+  if (!config.accessToken || !config.phoneNumberId) {
     return false;
   }
 
   try {
-    const response = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${config.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${config.accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -233,6 +208,8 @@ async function sendWhatsAppResponse(
   message: string,
   context?: WhatsAppOutboundContext
 ): Promise<WhatsAppSendResult> {
+  const config = resolveWhatsAppWebhookConfig();
+
   logEvent("WHATSAPP_OUTBOUND_SEND_START", {
     channel: context?.channel || "whatsapp",
     externalUserId: context?.externalUserId || to,
@@ -245,7 +222,7 @@ async function sendWhatsAppResponse(
     reason: context?.reason || null
   });
 
-  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+  if (!config.accessToken || !config.phoneNumberId) {
     logEvent("WHATSAPP_OUTBOUND_SEND_ERROR", {
       channel: context?.channel || "whatsapp",
       externalUserId: context?.externalUserId || to,
@@ -256,10 +233,10 @@ async function sendWhatsAppResponse(
       responseType: context?.responseType || "text",
       responseLength: context?.responseLength ?? message.length,
       reason: "missing_config",
-      hasAccessToken: !!ACCESS_TOKEN,
-      hasPhoneNumberId: !!PHONE_NUMBER_ID,
-      accessTokenSource: ACCESS_TOKEN_SOURCE,
-      phoneNumberIdSource: PHONE_NUMBER_ID_SOURCE
+      hasAccessToken: config.accessTokenConfigured,
+      hasPhoneNumberId: config.phoneNumberIdConfigured,
+      accessTokenSource: config.accessTokenSource,
+      phoneNumberIdSource: config.phoneNumberIdSource
     }, "error");
     return {
       ok: false,
@@ -269,10 +246,10 @@ async function sendWhatsAppResponse(
   }
 
   try {
-    const response = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v18.0/${config.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${config.accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -308,7 +285,7 @@ async function sendWhatsAppResponse(
         errorStatus: response.status,
         errorCode: errorBody?.error?.code || null,
         errorSubcode: errorBody?.error?.error_subcode || null,
-        errorText: errorText.slice(0, 500)
+        providerErrorShape: errorBody?.error ? "graph_error" : "unstructured"
       }, "error");
       return {
         ok: false,
@@ -370,7 +347,9 @@ async function sendWhatsAppResponse(
 }
 
 export async function GET(request: NextRequest) {
-  if (!VERIFY_TOKEN) {
+  const config = resolveWhatsAppWebhookConfig();
+
+  if (!config.verifyTokenConfigured) {
     logEvent("WHATSAPP_VERIFY_TOKEN_MISSING", undefined, "error");
     return NextResponse.json(
       { error: "Webhook verification unavailable" },
@@ -382,9 +361,15 @@ export async function GET(request: NextRequest) {
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
+  const verification = verifyWhatsAppWebhookChallenge({
+    mode,
+    token,
+    challenge,
+    verifyToken: config.verifyToken
+  });
 
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    return new Response(challenge || "", {
+  if (verification.ok) {
+    return new Response(verification.body, {
       status: 200,
       headers: { "Content-Type": "text/plain" }
     });
@@ -398,6 +383,7 @@ export async function POST(request: NextRequest) {
 
   const signature = request.headers.get("x-hub-signature-256") || "";
   const body = await request.text();
+  const config = resolveWhatsAppWebhookConfig();
   const enforceSignature = shouldEnforceWebhookSignature(
     "WHATSAPP_WEBHOOK_ENFORCE_SIGNATURE"
   );
@@ -405,14 +391,20 @@ export async function POST(request: NextRequest) {
     "WHATSAPP_WEBHOOK_ALLOW_SHADOW_SIGNATURE"
   );
 
-  if (!APP_SECRET) {
+  const signatureValidation = validateWhatsAppWebhookSignature({
+    body,
+    signatureHeader: signature,
+    appSecret: config.appSecret
+  });
+
+  if (!signatureValidation.ok && signatureValidation.code === "app_secret_missing") {
     if (!allowShadowAcceptance) {
       logEvent(
         "WHATSAPP_SIGNATURE_SECRET_MISSING",
         {
           note: "WHATSAPP_APP_SECRET or META_APP_SECRET is required when signature enforcement is active.",
           enforceSignature,
-          appSecretSource: APP_SECRET_SOURCE
+          appSecretSource: config.appSecretSource
         },
         "error"
       );
@@ -429,19 +421,20 @@ export async function POST(request: NextRequest) {
         note: "Signature validation unavailable, but shadow mode was explicitly enabled.",
         enforceSignature,
         shadowMode: true,
-        appSecretSource: APP_SECRET_SOURCE
+        appSecretSource: config.appSecretSource
       },
       "warn"
     );
-  } else if (!verifySignature(body, signature)) {
+  } else if (!signatureValidation.ok) {
       if (enforceSignature || !allowShadowAcceptance) {
         logEvent(
           "WHATSAPP_SIGNATURE_INVALID_REJECTED",
           {
             note: "Webhook rejected because the signature is invalid.",
+            reason: signatureValidation.code,
             enforceSignature,
             shadowMode: allowShadowAcceptance,
-            appSecretSource: APP_SECRET_SOURCE
+            appSecretSource: config.appSecretSource
           },
           "warn"
         );
@@ -453,9 +446,10 @@ export async function POST(request: NextRequest) {
         "WHATSAPP_SIGNATURE_SHADOW_MODE",
         {
           note: "Webhook kept in explicit shadow validation mode.",
+          reason: signatureValidation.code,
           enforceSignature,
           shadowMode: true,
-          appSecretSource: APP_SECRET_SOURCE
+          appSecretSource: config.appSecretSource
         },
         "warn"
       );
@@ -481,6 +475,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
+    const payloadSummary = summarizeWhatsAppWebhookPayload(data);
+    logEvent("WHATSAPP_WEBHOOK_INBOUND_SUMMARY", {
+      object: payloadSummary.object,
+      entryCount: payloadSummary.entryCount,
+      messageCount: payloadSummary.messageCount,
+      statusCount: payloadSummary.statusCount,
+      unknownChangeCount: payloadSummary.unknownChangeCount,
+      appSecretSource: config.appSecretSource
+    });
+
     for (const entry of data.entry || []) {
       for (const change of entry.changes || []) {
         if (change.field !== "messages") {
@@ -496,7 +500,7 @@ export async function POST(request: NextRequest) {
         for (const rawMessage of change.value?.messages || []) {
           const message = extractMessageInfo(rawMessage);
 
-          if (!message.from || message.from === PHONE_NUMBER_ID) {
+          if (!message.from || message.from === config.phoneNumberId) {
             continue;
           }
 
@@ -554,7 +558,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to process WhatsApp webhook",
-        detail: process.env.CHANNEL_VALIDATION_EXPOSE_ERRORS === "true" ? errorMessage : undefined
+        detail: shouldExposeChannelValidationErrors() ? errorMessage : undefined
       },
       { status: 500 }
     );
