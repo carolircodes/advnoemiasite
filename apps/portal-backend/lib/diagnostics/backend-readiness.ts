@@ -7,6 +7,7 @@ import {
   DURABLE_PROTECTION_EXPECTATIONS,
   buildEnvironmentConvergenceSections
 } from "./environment-convergence.ts";
+import { buildDatabaseSecurityReadinessSection } from "./database-security.ts";
 import {
   combineDiagnosticStatuses,
   type DiagnosticSection
@@ -93,6 +94,7 @@ export async function buildBackendReadinessReport(dependencies?: {
     perimeter: envSections.perimeter,
     abuseProtection,
     durableExpectations: envSections.durableExpectations,
+    databaseSecurity: buildDatabaseSecurityReadinessSection(),
     environmentCompleteness: envSections.environmentCompleteness,
     payments: envSections.payments,
     notifications,

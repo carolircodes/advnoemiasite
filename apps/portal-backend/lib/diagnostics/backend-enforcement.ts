@@ -5,6 +5,7 @@ import {
   DURABLE_PROTECTION_EXPECTATIONS,
   buildEnvironmentConvergenceSections
 } from "./environment-convergence.ts";
+import { buildDatabaseSecurityReadinessSection } from "./database-security.ts";
 import {
   buildDiagnosticSection,
   combineDiagnosticStatuses,
@@ -257,6 +258,10 @@ function inferActionDomain(
   code: string
 ): BackendActionDomain {
   if (subsystem === "durableRuntime" || subsystem === "durableExpectations") {
+    return "database_admin";
+  }
+
+  if (subsystem === "databaseSecurity") {
     return "database_admin";
   }
 
@@ -655,6 +660,13 @@ function evaluateDiagnosticSection(
   } else if (subsystem === "durableExpectations") {
     level = "info";
     reason = "Referencia documental de convergencia; nao e um gate por si so.";
+  } else if (section.code === "database_critical_rls_missing") {
+    level = "release_blocker";
+    reason = "Tabelas criticas sem RLS explicito nas migrations locais.";
+  } else if (section.code === "database_manual_check_required") {
+    level = context.profile === "production" ? "action_required" : "warning";
+    reason =
+      "Banco exige validacao manual de migrations/RLS/storage no ambiente alvo.";
   } else if (subsystem === "environmentCompleteness" && section.status === "degraded") {
     level = context.profile === "production" ? "action_required" : "warning";
     reason = "Existem lacunas de subsistema ou de perfil que merecem acompanhamento.";
@@ -1108,7 +1120,8 @@ export async function buildBackendOperationsVerificationReport(options?: {
   };
 
   const sections: Record<string, DiagnosticSection> = {
-    ...envSections
+    ...envSections,
+    databaseSecurity: buildDatabaseSecurityReadinessSection()
   };
 
   if (runtimeMode === "off") {
