@@ -1,12 +1,12 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "../supabase/server";
-import { resolveOperationalLabel } from "../channels/channel-presentation";
+import { createServerSupabaseClient } from "../supabase/server.ts";
+import { resolveOperationalLabel } from "../channels/channel-presentation.ts";
 import {
   buildJourneyTouchLabel,
   normalizeJourneyTaxonomy,
   type JourneyTaxonomy
-} from "../journey/taxonomy";
+} from "../journey/taxonomy.ts";
 
 type IntakeRow = {
   id: string;

@@ -1,10 +1,10 @@
-import { buildPromptContextSections } from "./noemia-context-governance";
+import { buildPromptContextSections } from "./noemia-context-governance.ts";
 import type {
   NoemiaChannel,
   NoemiaContext,
   NoemiaDomain,
   NoemiaUserType
-} from "./core-types";
+} from "./core-types.ts";
 
 function buildBasePrompt() {
   return [

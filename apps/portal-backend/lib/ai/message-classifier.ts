@@ -2,7 +2,7 @@ import type {
   ClassifiedIntent,
   LeadTemperature,
   LegalTheme
-} from "./core-types";
+} from "./core-types.ts";
 
 export function detectUserIntent(message: string): string {
   const lowerMessage = message.toLowerCase();

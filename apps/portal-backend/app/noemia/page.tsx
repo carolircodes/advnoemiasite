@@ -7,8 +7,8 @@ import { NoemiaAssistant } from "@/components/noemia-assistant";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { ProductEventBeacon } from "@/components/product-event-beacon";
 import { SectionCard } from "@/components/section-card";
-import { getCurrentProfile } from "../../lib/auth/guards";
-import { appendEntryContextToPath, getEntryContextPayload, readEntryContext } from "../../lib/entry-context";
+import { getCurrentProfile } from "../../lib/auth/guards.ts";
+import { appendEntryContextToPath, getEntryContextPayload, readEntryContext } from "../../lib/entry-context.ts";
 
 export const metadata: Metadata = {
   title: "Noemia",

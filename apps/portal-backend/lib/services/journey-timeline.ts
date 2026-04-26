@@ -1,11 +1,11 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "../supabase/server";
-import { normalizeJourneyTaxonomy } from "../journey/taxonomy";
+import { createServerSupabaseClient } from "../supabase/server.ts";
+import { normalizeJourneyTaxonomy } from "../journey/taxonomy.ts";
 import {
   presentOperationalChannelLabel,
   presentOperationalSourceLabel
-} from "../channels/channel-presentation";
+} from "../channels/channel-presentation.ts";
 
 export type JourneyTimelineItem = {
   id: string;

@@ -77,6 +77,9 @@ apps/portal-backend/supabase/.branches/
 apps/portal-backend/mp-*.json
 apps/portal-backend/*.dump
 apps/portal-backend/*.bak
+apps/portal-backend/*.cookies.txt
+apps/portal-backend/*.headers.txt
+apps/portal-backend/*response*.txt
 apps/portal-backend/.eslintcache
 apps/portal-backend/.artifacts/
 apps/portal-backend/tmp/

@@ -1,19 +1,19 @@
 import { z } from "zod";
 
-import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
+import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public.ts";
 import {
   buildDurableRateLimitHeaders,
   consumeDurableRateLimit,
   shouldEnforceDurableProtection
-} from "../../../../lib/http/durable-abuse-protection";
-import { getClientIp, parseJsonBody } from "../../../../lib/http/request-guards";
+} from "../../../../lib/http/durable-abuse-protection.ts";
+import { getClientIp, parseJsonBody } from "../../../../lib/http/request-guards.ts";
 import {
   createObservedJsonResponse,
   logObservedRequest,
   startRequestObservation
-} from "../../../../lib/observability/request-observability";
-import { createServerSupabaseClient } from "../../../../lib/supabase/server";
-import { recordProductEvent } from "../../../../lib/services/public-intake";
+} from "../../../../lib/observability/request-observability.ts";
+import { createServerSupabaseClient } from "../../../../lib/supabase/server.ts";
+import { recordProductEvent } from "../../../../lib/services/public-intake.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

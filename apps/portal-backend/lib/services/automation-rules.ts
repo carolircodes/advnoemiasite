@@ -1,19 +1,19 @@
 import "server-only";
 
-import { CLIENT_LOGIN_PATH } from "../auth/access-control";
+import { CLIENT_LOGIN_PATH } from "../auth/access-control.ts";
 import {
   caseAreaLabels,
   formatPortalDateTime,
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels
-} from "../domain/portal";
+} from "../domain/portal.ts";
 import {
   listStaffEmailRecipients,
   queueEmailNotification
-} from "../notifications/outbox";
-import { queueGovernedNotification } from "../notifications/governed-outbox";
-import { isPushPilotCandidate } from "../notifications/push-pilot";
-import { createAdminSupabaseClient } from "../supabase/admin";
+} from "../notifications/outbox.ts";
+import { queueGovernedNotification } from "../notifications/governed-outbox.ts";
+import { isPushPilotCandidate } from "../notifications/push-pilot.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 type AutomationDispatchInput = {
   ruleKey: string;

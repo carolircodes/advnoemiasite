@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useTransition, type ChangeEvent } from "react";
 
-import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
+import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control.ts";
 import {
   getProductSessionId,
   trackProductEventOncePerSession
-} from "../lib/analytics/browser";
+} from "../lib/analytics/browser.ts";
 import {
   caseAreaLabels,
   caseAreas,
@@ -20,13 +20,13 @@ import {
   publicIntakeStages,
   publicIntakeUrgencies,
   publicIntakeUrgencyLabels
-} from "../lib/domain/portal";
+} from "../lib/domain/portal.ts";
 import {
   appendEntryContextToPath,
   getEntryContextPayload,
   resolveEntryCaseArea,
   type EntryContext
-} from "../lib/entry-context";
+} from "../lib/entry-context.ts";
 
 type TriageFormState = {
   fullName: string;

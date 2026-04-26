@@ -21,7 +21,7 @@ import {
   getPushPilotSubscriptionStatus
 } from "@/lib/notifications/push-pilot";
 
-import { ClientShell } from "../_components/client-shell";
+import { ClientShell } from "../_components/client-shell.tsx";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

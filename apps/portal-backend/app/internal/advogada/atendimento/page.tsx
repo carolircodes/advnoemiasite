@@ -2,7 +2,7 @@ import { NotificationJourneyBeacon } from "@/components/notification-journey-bea
 import { requireProfile } from "@/lib/auth/guards";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
 
-import { ConversationInboxDashboard } from "./dashboard";
+import { ConversationInboxDashboard } from "./dashboard.tsx";
 
 export default async function InternalConversationInboxPage() {
   await requireProfile(["advogada", "admin"]);

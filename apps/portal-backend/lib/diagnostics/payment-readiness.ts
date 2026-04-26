@@ -1,4 +1,5 @@
 import { buildDiagnosticSection, type DiagnosticSection } from "./status.ts";
+import { shouldEnforceWebhookSignature } from "../http/webhook-security.ts";
 
 type PaymentSiteUrlSource =
   | "NEXT_PUBLIC_SITE_URL"
@@ -47,7 +48,9 @@ export function getPaymentRuntimeDiagnostics(): PaymentRuntimeDiagnostics {
     ),
     siteUrlConfigured: Boolean(siteUrlSource),
     siteUrlSource,
-    signatureEnforced: webhookSecretConfigured
+    signatureEnforced: shouldEnforceWebhookSignature(
+      "MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE"
+    )
   };
 }
 

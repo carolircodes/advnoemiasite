@@ -1,16 +1,16 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "../supabase/server";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 import {
   getRevenueLayerLabel,
   getRevenueOfferByCode,
   listRevenueOffersByMoment,
   revenueArchitecture
-} from "./revenue-architecture";
+} from "./revenue-architecture.ts";
 import {
   normalizeRevenuePaymentRows,
   type RevenuePaymentRow
-} from "./revenue-intelligence-shared";
+} from "./revenue-intelligence-shared.ts";
 
 type RevenueEventRow = {
   id: string;

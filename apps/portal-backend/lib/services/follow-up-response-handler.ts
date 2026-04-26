@@ -3,8 +3,8 @@
  * Implementa a FASE 7.6 - Preparar estrutura para registro de respostas futuras
  */
 
-import { createWebhookSupabaseClient } from '../supabase/webhook';
-import { recordProductEvent } from './public-intake';
+import { createWebhookSupabaseClient } from '../supabase/webhook.ts';
+import { recordProductEvent } from './public-intake.ts';
 
 interface FollowUpResponse {
   id: string;

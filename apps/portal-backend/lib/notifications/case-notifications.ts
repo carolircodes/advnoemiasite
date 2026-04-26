@@ -1,16 +1,16 @@
 import "server-only";
 
-import { generateClientMessage, ClientMessageTemplates } from "./client-message-templates";
-import { queueGovernedNotification } from "./governed-outbox";
-import type { NotificationEventKey } from "./policy";
-import { isPushPilotCandidate } from "./push-pilot";
+import { generateClientMessage, ClientMessageTemplates } from "./client-message-templates.ts";
+import { queueGovernedNotification } from "./governed-outbox.ts";
+import type { NotificationEventKey } from "./policy.ts";
+import { isPushPilotCandidate } from "./push-pilot.ts";
 import {
   buildCaseUpdateWhatsAppMessage,
   buildStatusChangeWhatsAppMessage,
   clientWantsWhatsAppNotifications,
   getClientWhatsAppPhone
-} from "./whatsapp-delivery";
-import { createAdminSupabaseClient } from "../supabase/admin";
+} from "./whatsapp-delivery.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 export interface CaseNotificationInput {
   clientProfileId: string;

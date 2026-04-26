@@ -1,21 +1,21 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 import {
   commercialClosingService,
   evaluateCommercialClosing,
   type CommercialClosingAssessment
-} from "./commercial-closing";
-import { commercialAppointmentService } from "./commercial-appointment";
+} from "./commercial-closing.ts";
+import { commercialAppointmentService } from "./commercial-appointment.ts";
 import {
   commercialConversionService,
   evaluateCommercialConversion,
   type CommercialConversionAssessment
-} from "./commercial-conversion";
-import { normalizeFollowUpStatus } from "./follow-up-semantics";
-import { clientIdentityService } from "./client-identity";
-import { clientMergeService } from "./client-merge";
-import { sanitizeHumanName } from "./lead-identity";
+} from "./commercial-conversion.ts";
+import { normalizeFollowUpStatus } from "./follow-up-semantics.ts";
+import { clientIdentityService } from "./client-identity.ts";
+import { clientMergeService } from "./client-merge.ts";
+import { sanitizeHumanName } from "./lead-identity.ts";
 
 type SupportedChannel = "instagram" | "facebook" | "youtube" | "whatsapp" | "site" | "portal" | "telegram";
 type InboxFollowUpStatus = "none" | "pending" | "due" | "overdue" | "resolved" | "converted";

@@ -1,11 +1,11 @@
-import { traceOperationalEvent } from "../observability/operational-trace";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
 import type {
   NoemiaChannel,
   NoemiaDomain,
   NoemiaPolicyMode,
   NoemiaPromptContextSummary,
   NoemiaUserType
-} from "./core-types";
+} from "./core-types.ts";
 
 type NoemiaTraceLevel = "info" | "warn" | "error";
 

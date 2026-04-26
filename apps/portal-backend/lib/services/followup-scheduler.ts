@@ -4,8 +4,8 @@
  * Responsável por agendar e executar follow-ups automáticos
  */
 
-import { shouldTriggerFollowUp, ConversationState } from '../ai/noemia-core';
-import { followUpPersistence, FollowUpRecord } from './followup-persistence';
+import { shouldTriggerFollowUp, ConversationState } from '../ai/noemia-core.ts';
+import { followUpPersistence, FollowUpRecord } from './followup-persistence.ts';
 
 export interface FollowUpSchedule {
   sessionId: string;

@@ -17,9 +17,9 @@ import { getClientPremiumJourney } from "@/lib/services/ecosystem-journey";
 import { getClientEcosystemWorkspace } from "@/lib/services/ecosystem-platform";
 import { buildClientPortalPremiumProjection } from "@/lib/services/premium-operational-model";
 
-import { ClientEcosystemFoundation } from "./_components/client-ecosystem-foundation";
-import { ClientShell } from "./_components/client-shell";
-import { ClientPremiumWorkspace } from "./_components/client-premium-workspace";
+import { ClientEcosystemFoundation } from "./_components/client-ecosystem-foundation.tsx";
+import { ClientShell } from "./_components/client-shell.tsx";
+import { ClientPremiumWorkspace } from "./_components/client-premium-workspace.tsx";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

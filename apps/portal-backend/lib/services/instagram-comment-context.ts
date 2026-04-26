@@ -1,4 +1,4 @@
-import { conversationPersistence } from './conversation-persistence';
+import { conversationPersistence } from './conversation-persistence.ts';
 
 export interface CommentContext {
   channel: 'instagram' | 'facebook';

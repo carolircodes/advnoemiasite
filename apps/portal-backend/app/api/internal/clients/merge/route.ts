@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireStaffRouteAccess } from "@/lib/auth/api-authorization";
 import { extractErrorMessage, jsonError } from "@/lib/http/api-response";
-import { clientMergeService } from "../../../../../lib/services/client-merge";
+import { clientMergeService } from "../../../../../lib/services/client-merge.ts";
 
 export async function POST(request: NextRequest) {
   const access = await requireStaffRouteAccess({

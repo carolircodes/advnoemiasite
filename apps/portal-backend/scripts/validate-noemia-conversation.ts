@@ -1,6 +1,6 @@
-import { processNoemiaCore, type ConversationState } from "../lib/ai/noemia-core";
-import { evaluateConversationPolicy } from "../lib/services/channel-conversation-policy";
-import type { ConversationSession } from "../lib/services/conversation-persistence";
+import { processNoemiaCore, type ConversationState } from "../lib/ai/noemia-core.ts";
+import { evaluateConversationPolicy } from "../lib/services/channel-conversation-policy.ts";
+import type { ConversationSession } from "../lib/services/conversation-persistence.ts";
 
 function buildSession(
   conversationState: ConversationState | null,

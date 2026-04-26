@@ -1,4 +1,4 @@
-import { createWebhookSupabaseClient } from '../supabase/webhook';
+import { createWebhookSupabaseClient } from '../supabase/webhook.ts';
 import { generateTrackingLink } from '@/lib/acquisition/link-builder';
 import { LEGAL_TOPICS } from '@/lib/acquisition/topics';
 

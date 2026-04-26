@@ -5,10 +5,10 @@ import {
   publicIntakeReadinessLabels,
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels
-} from "../domain/portal";
-import { normalizeJourneyTaxonomy } from "../journey/taxonomy";
-import { createWebhookSupabaseClient } from "../supabase/webhook";
-import { getBusinessIntelligenceOverview } from "./intelligence";
+} from "../domain/portal.ts";
+import { normalizeJourneyTaxonomy } from "../journey/taxonomy.ts";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
+import { getBusinessIntelligenceOverview } from "./intelligence.ts";
 
 type OperationalGrowthSeed = {
   clientId: string;

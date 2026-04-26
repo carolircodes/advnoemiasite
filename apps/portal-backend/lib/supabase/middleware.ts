@@ -7,9 +7,9 @@ import {
   canAccessPortalPath,
   isInternalApiPath,
   isProtectedPortalPath
-} from "../auth/access-control";
-import { isPortalRole } from "../domain/portal";
-import { getAuthEnvDiagnostics, getPublicEnv } from "../config/env";
+} from "../auth/access-control.ts";
+import { isPortalRole } from "../domain/portal.ts";
+import { getAuthEnvDiagnostics, getPublicEnv } from "../config/env.ts";
 
 function authUnavailableResponse(request: NextRequest, details: Record<string, unknown>) {
   const pathname = request.nextUrl.pathname;

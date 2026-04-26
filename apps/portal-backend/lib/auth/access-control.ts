@@ -1,4 +1,4 @@
-import type { PortalRole } from "../domain/portal";
+import type { PortalRole } from "../domain/portal.ts";
 
 export type AccessProfile = {
   role: PortalRole;

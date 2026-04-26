@@ -27,6 +27,10 @@ export function shouldEnforceWebhookSignature(flagName: string) {
 }
 
 export function shouldAllowShadowWebhookAcceptance(flagName: string) {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
   return readBooleanFlag(flagName, false);
 }
 

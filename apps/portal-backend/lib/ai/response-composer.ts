@@ -4,7 +4,7 @@ import type {
   LeadTemperature,
   LegalTheme,
   NoemiaUserType
-} from "./core-types";
+} from "./core-types.ts";
 
 type LeadIntention = "perdido" | "desconfiado" | "pronto";
 

@@ -2,8 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
-import { normalizeProductEventInput } from "../analytics/funnel-events";
-import { assertStaffActor } from "../auth/guards";
+import { normalizeProductEventInput } from "../analytics/funnel-events.ts";
+import { assertStaffActor } from "../auth/guards.ts";
 import {
   caseAreaLabels,
   intakeRequestStatusLabels,
@@ -13,12 +13,12 @@ import {
   submitLegacySiteTriageSchema,
   submitPublicTriageSchema,
   updateIntakeRequestStatusSchema
-} from "../domain/portal";
-import { calculateLeadScore } from "../growth/lead-scoring";
-import { normalizeJourneyTaxonomy, serializeJourneyTaxonomy } from "../journey/taxonomy";
-import { notifyStaffAboutIntakeRequest } from "./automation-rules";
-import { buildContextRoutingDecision } from "./context-routing";
-import { createAdminSupabaseClient } from "../supabase/admin";
+} from "../domain/portal.ts";
+import { calculateLeadScore } from "../growth/lead-scoring.ts";
+import { normalizeJourneyTaxonomy, serializeJourneyTaxonomy } from "../journey/taxonomy.ts";
+import { notifyStaffAboutIntakeRequest } from "./automation-rules.ts";
+import { buildContextRoutingDecision } from "./context-routing.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 type ProductEventInput = {
   eventKey: string;

@@ -2,8 +2,8 @@ import "server-only";
 
 import { randomUUID } from "crypto";
 
-import { normalizeEntryContextValue, resolveEntryCaseArea } from "../entry-context";
-import type { CaseArea } from "../domain/portal";
+import { normalizeEntryContextValue, resolveEntryCaseArea } from "../entry-context.ts";
+import type { CaseArea } from "../domain/portal.ts";
 
 export type SiteChatOriginInput = {
   audience?: "visitor" | "client" | "staff";

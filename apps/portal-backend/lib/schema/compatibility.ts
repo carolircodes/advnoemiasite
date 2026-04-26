@@ -1,8 +1,8 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { readBooleanFlag } from "../http/webhook-security";
-import { OFFICIAL_SCHEMA_GOVERNANCE } from "./official-schema";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { readBooleanFlag } from "../http/webhook-security.ts";
+import { OFFICIAL_SCHEMA_GOVERNANCE } from "./official-schema.ts";
 
 type OperationalSurface =
   | "meta_webhook"

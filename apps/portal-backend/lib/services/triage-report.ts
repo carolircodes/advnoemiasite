@@ -1,6 +1,6 @@
-import type { SchedulingPreferences } from "./conversation-state";
-import type { CommercialFunnelSnapshot } from "./commercial-funnel";
-import type { SocialAcquisitionSnapshot } from "./social-acquisition";
+import type { SchedulingPreferences } from "./conversation-state.ts";
+import type { CommercialFunnelSnapshot } from "./commercial-funnel.ts";
+import type { SocialAcquisitionSnapshot } from "./social-acquisition.ts";
 
 type PublicCommentPolicySnapshot = {
   decision: string;

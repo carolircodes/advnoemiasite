@@ -7,16 +7,16 @@ import {
   buildAccessDeniedPath,
   buildLoginRedirectPath,
   isStaffRole
-} from "./access-control";
-import { isPortalRole, type PortalRole } from "../domain/portal";
+} from "./access-control.ts";
+import { isPortalRole, type PortalRole } from "../domain/portal.ts";
 import {
   getAuthEnvDiagnostics,
   isPublicAuthEnvConfigurationError
-} from "../config/env";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../config/env.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
-export { getDefaultDestinationForProfile, isStaffRole } from "./access-control";
+export { getDefaultDestinationForProfile, isStaffRole } from "./access-control.ts";
 
 export type PortalProfile = {
   id: string;

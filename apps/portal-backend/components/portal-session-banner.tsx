@@ -1,6 +1,6 @@
 import { FormSubmitButton } from "@/components/form-submit-button";
-import { logoutAction } from "../lib/auth/actions";
-import type { PortalRole } from "../lib/domain/portal";
+import { logoutAction } from "../lib/auth/actions.ts";
+import type { PortalRole } from "../lib/domain/portal.ts";
 
 const roleLabels: Record<PortalRole, string> = {
   admin: "Administração interna",

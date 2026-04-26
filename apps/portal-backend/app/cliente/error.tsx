@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
-import { ClientShellErrorState } from "./_components/client-shell";
+import { ClientShellErrorState } from "./_components/client-shell.tsx";
 
 export default function ClientError({
   error,

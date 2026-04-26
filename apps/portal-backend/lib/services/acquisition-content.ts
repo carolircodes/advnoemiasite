@@ -4,7 +4,7 @@
  * Responsável por gerenciar conteúdos que geram leads
  */
 
-import { LegalTheme } from '../ai/noemia-core';
+import { LegalTheme } from '../ai/noemia-core.ts';
 
 export interface ContentTrigger {
   id: string;

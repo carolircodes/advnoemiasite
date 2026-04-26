@@ -1,6 +1,6 @@
 import "server-only";
 
-import { recordProductEvent } from "./public-intake";
+import { recordProductEvent } from "./public-intake.ts";
 
 type RevenueTelemetryInput = {
   eventKey:

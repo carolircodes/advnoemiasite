@@ -1,14 +1,14 @@
 import "server-only";
 
-import type { PortalProfile } from "../auth/guards";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { getClientNotificationControls, getInternalNotificationControls } from "./preference-catalog";
+import type { PortalProfile } from "../auth/guards.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { getClientNotificationControls, getInternalNotificationControls } from "./preference-catalog.ts";
 import {
   getDefaultPreferenceForAudience,
   type NotificationAudience,
   type NotificationEventKey,
   type NotificationPreferenceSnapshot
-} from "./policy";
+} from "./policy.ts";
 
 type NotificationPreferenceRow = {
   profile_id: string;

@@ -2,12 +2,12 @@
 
 import { redirect } from "next/navigation";
 
-import { CLIENT_LOGIN_PATH } from "../../lib/auth/access-control";
+import { CLIENT_LOGIN_PATH } from "../../lib/auth/access-control.ts";
 import {
   getAuthEnvDiagnostics,
   isAuthEnvConfigurationError
-} from "../../lib/config/env";
-import { createServerSupabaseClient } from "../../lib/supabase/server";
+} from "../../lib/config/env.ts";
+import { createServerSupabaseClient } from "../../lib/supabase/server.ts";
 
 export async function logoutAction() {
   try {

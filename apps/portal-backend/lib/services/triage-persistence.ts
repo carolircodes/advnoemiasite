@@ -5,8 +5,8 @@
  * Integrado com o sistema de conversações existente
  */
 
-import { conversationPersistence, ConversationSession } from './conversation-persistence';
-import { isLegacySchemaFallbackAllowed } from "../schema/compatibility";
+import { conversationPersistence, ConversationSession } from './conversation-persistence.ts';
+import { isLegacySchemaFallbackAllowed } from "../schema/compatibility.ts";
 
 export interface TriageData {
   // Bloco A - Tema Principal

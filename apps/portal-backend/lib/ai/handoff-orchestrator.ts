@@ -1,5 +1,5 @@
-import type { ConversationState } from "./core-types";
-import { determineCommercialStatus } from "./state-manager";
+import type { ConversationState } from "./core-types.ts";
+import { determineCommercialStatus } from "./state-manager.ts";
 
 export function evaluatePolicyHandoff(
   state: ConversationState,

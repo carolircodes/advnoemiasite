@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { PortalProfile } from "../auth/guards";
+import type { PortalProfile } from "../auth/guards.ts";
 import {
   normalizeArray,
   normalizeClientAppointmentSummaryItem,
@@ -11,8 +11,8 @@ import {
   normalizeClientRecordSummary,
   normalizeClientRequestSummaryItem,
   normalizeText
-} from "../portal/client-normalizers";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../portal/client-normalizers.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 export type ClientLoaderResult<T> = {
   ok: boolean;

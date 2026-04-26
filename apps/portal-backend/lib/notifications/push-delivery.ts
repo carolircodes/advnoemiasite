@@ -2,13 +2,13 @@ import "server-only";
 
 import webpush from "web-push";
 
-import { getServerEnv } from "../config/env";
-import { traceOperationalEvent } from "../observability/operational-trace";
+import { getServerEnv } from "../config/env.ts";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
 import {
   listActivePushPilotSubscriptions,
   markPushPilotSubscriptionDeliveryResult
-} from "./push-pilot";
-import { buildNotificationRedirectPath } from "./notification-links";
+} from "./push-pilot.ts";
+import { buildNotificationRedirectPath } from "./notification-links.ts";
 
 type PushNotificationRecord = {
   id: string;

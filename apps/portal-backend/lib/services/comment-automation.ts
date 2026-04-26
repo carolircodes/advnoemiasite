@@ -1,5 +1,5 @@
-import { createWebhookSupabaseClient } from '../supabase/webhook';
-import { commentDuplicateGuard } from './comment-duplicate-guard';
+import { createWebhookSupabaseClient } from '../supabase/webhook.ts';
+import { commentDuplicateGuard } from './comment-duplicate-guard.ts';
 
 export interface CommentCampaign {
   id: string;

@@ -10,12 +10,12 @@ import { TriageForm } from "@/components/triage-form";
 import { getFeaturedArticles } from "@/lib/site/article-content";
 import { getEditorialServicePages } from "@/lib/site/editorial-taxonomy";
 import { buildPublicMetadata } from "@/lib/site/seo";
-import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control";
+import { CLIENT_LOGIN_PATH } from "../lib/auth/access-control.ts";
 import {
   appendEntryContextToPath,
   getEntryContextPayload,
   readEntryContext
-} from "../lib/entry-context";
+} from "../lib/entry-context.ts";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Atendimento juridico estrategico com concierge inteligente",

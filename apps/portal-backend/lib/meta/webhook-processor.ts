@@ -1,7 +1,7 @@
-import { detectThemeFromText } from './theme-detector';
-import { generateContextLink } from './link-generator';
-import { sendWhatsAppMessage } from './whatsapp-service';
-import { logMetaEvent } from './logging';
+import { detectThemeFromText } from './theme-detector.ts';
+import { generateContextLink } from './link-generator.ts';
+import { sendWhatsAppMessage } from './whatsapp-service.ts';
+import { logMetaEvent } from './logging.ts';
 
 function buildLegacySafeTriageLink(theme?: string) {
   return generateContextLink({

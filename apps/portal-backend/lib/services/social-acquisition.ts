@@ -1,10 +1,10 @@
 import "server-only";
 
-import { recordProductEvent } from "./public-intake";
+import { recordProductEvent } from "./public-intake.ts";
 import {
   presentOperationalSourceLabel,
   presentOperationalThreadOriginLabel
-} from "../channels/channel-presentation";
+} from "../channels/channel-presentation.ts";
 
 export type AcquisitionEventGroup =
   | "acquisition"

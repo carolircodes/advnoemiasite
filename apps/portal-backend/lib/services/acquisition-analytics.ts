@@ -1,7 +1,7 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { getProductEventDefinition } from "../analytics/funnel-events";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { getProductEventDefinition } from "../analytics/funnel-events.ts";
 
 export type AnalyticsPeriod = "today" | "7days" | "30days";
 

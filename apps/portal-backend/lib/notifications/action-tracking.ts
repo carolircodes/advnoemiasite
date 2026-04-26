@@ -1,8 +1,8 @@
 import "server-only";
 
-import { traceOperationalEvent } from "../observability/operational-trace";
-import { recordProductEvent } from "../services/public-intake";
-import { createAdminSupabaseClient } from "../supabase/admin";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
+import { recordProductEvent } from "../services/public-intake.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 export type NotificationInteractionType =
   | "cta_clicked"

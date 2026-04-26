@@ -1,15 +1,15 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { antiSpamGuard } from "./anti-spam-guard";
-import { conversationPersistence } from "./conversation-persistence";
-import { processNoemiaCore } from "../ai/noemia-core";
-import { recordProductEvent } from "./public-intake";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { antiSpamGuard } from "./anti-spam-guard.ts";
+import { conversationPersistence } from "./conversation-persistence.ts";
+import { processNoemiaCore } from "../ai/noemia-core.ts";
+import { recordProductEvent } from "./public-intake.ts";
 import {
   normalizeTelegramWebhookUpdate,
   sendTelegramGroupMessage,
   sendTelegramPrivateMessage
-} from "../telegram/telegram-service";
+} from "../telegram/telegram-service.ts";
 
 type GroupSignalKind =
   | "irrelevant"

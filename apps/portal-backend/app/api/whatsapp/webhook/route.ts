@@ -9,7 +9,7 @@ import {
 import { traceOperationalEvent } from "@/lib/observability/operational-trace";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
 import { conversationInboxService } from "@/lib/services/conversation-inbox";
-import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
+import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router.ts";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
 const APP_SECRET =

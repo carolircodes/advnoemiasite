@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 
-import type { ObservedErrorCategory } from "./request-observability";
+import type { ObservedErrorCategory } from "./request-observability.ts";
 
 export function categorizeObservedError(
   error: unknown,

@@ -1,6 +1,6 @@
-import { traceOperationalEvent } from "../observability/operational-trace";
-import { conversationPersistence, ConversationMessage } from './conversation-persistence';
-import { buildWebhookEventPayloadHash } from "./webhook-idempotency";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
+import { conversationPersistence, ConversationMessage } from './conversation-persistence.ts';
+import { buildWebhookEventPayloadHash } from "./webhook-idempotency.ts";
 
 export interface WebhookEvent {
   channel: 'instagram' | 'facebook' | 'whatsapp' | 'telegram' | 'youtube';

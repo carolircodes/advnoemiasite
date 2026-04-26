@@ -22,8 +22,8 @@ import { Badge } from "@/components/ui";
 import { PortalSessionBanner } from "@/components/portal-session-banner";
 import { SectionCard } from "@/components/section-card";
 
-import { PrioridadesDoDia } from "./prioridades";
-import type { AreaConfig, Lead, VisualConfig } from "./types";
+import { PrioridadesDoDia } from "./prioridades.tsx";
+import type { AreaConfig, Lead, VisualConfig } from "./types.ts";
 
 const legalAreaConfig: Record<string, AreaConfig> = {
   previdenciario: {

@@ -4,7 +4,7 @@
  * Responsável por gerenciar testes A/B, variações e métricas de performance
  */
 
-import { LegalTheme } from '../ai/noemia-core';
+import { LegalTheme } from '../ai/noemia-core.ts';
 
 export interface VariationType {
   id: string;

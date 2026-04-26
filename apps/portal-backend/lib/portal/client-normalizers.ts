@@ -7,7 +7,7 @@ import {
   documentStatusLabels,
   formatPortalDateTime,
   portalEventTypeLabels
-} from "../domain/portal";
+} from "../domain/portal.ts";
 
 export function getClientDisplayName(fullName: string | null | undefined, email: string) {
   if (typeof fullName === "string" && fullName.trim().length > 0) {

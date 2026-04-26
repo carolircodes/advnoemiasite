@@ -1,11 +1,11 @@
-import type { ClientContextForAI } from "../services/client-context";
+import type { ClientContextForAI } from "../services/client-context.ts";
 import type {
   NoemiaChannel,
   NoemiaContext,
   NoemiaDomain,
   NoemiaPromptContextSummary,
   NoemiaUserType
-} from "./core-types";
+} from "./core-types.ts";
 
 type MinimizeNoemiaContextInput = {
   domain: NoemiaDomain;

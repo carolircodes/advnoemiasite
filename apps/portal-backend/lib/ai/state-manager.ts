@@ -3,7 +3,7 @@ import type {
   ConversationState,
   LeadTemperature,
   LegalTheme
-} from "./core-types";
+} from "./core-types.ts";
 
 type MessageClassification = {
   theme: LegalTheme;

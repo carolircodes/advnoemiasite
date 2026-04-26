@@ -1,27 +1,27 @@
-import { createWebhookSupabaseClient } from "../supabase/webhook";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
 import {
   commercialClosingService,
   evaluateCommercialClosing
-} from "./commercial-closing";
-import { commercialAppointmentService } from "./commercial-appointment";
-import { evaluateCommercialConversion } from "./commercial-conversion";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { getCommercialAutomationPlans, type CommercialAutomationPlan } from "./commercial-automation";
-import { followUpEngine } from "./follow-up-engine";
+} from "./commercial-closing.ts";
+import { commercialAppointmentService } from "./commercial-appointment.ts";
+import { evaluateCommercialConversion } from "./commercial-conversion.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { getCommercialAutomationPlans, type CommercialAutomationPlan } from "./commercial-automation.ts";
+import { followUpEngine } from "./follow-up-engine.ts";
 import {
   getGrowthContextByItems,
   type GrowthContextByItem
-} from "./growth-item-context";
+} from "./growth-item-context.ts";
 import {
   evaluateOperationalPriority,
   type OperationalAttentionBucket,
   type OperationalNextBestAction
-} from "./operational-priority";
+} from "./operational-priority.ts";
 import {
   isPendingFollowUpStatus,
   normalizeFollowUpStatus
-} from "./follow-up-semantics";
-import { projectPanelConversationState } from "./panel-state-projection";
+} from "./follow-up-semantics.ts";
+import { projectPanelConversationState } from "./panel-state-projection.ts";
 
 export interface OperationalContact {
   clientId: string;

@@ -1,4 +1,4 @@
-import { createAdminSupabaseClient } from "../supabase/admin";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 export interface PaymentRequest {
   leadId: string;

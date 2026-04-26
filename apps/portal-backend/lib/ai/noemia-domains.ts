@@ -3,7 +3,7 @@ import type {
   NoemiaDomain,
   NoemiaPolicyMode,
   NoemiaUserType
-} from "./core-types";
+} from "./core-types.ts";
 
 const NOEMIA_PROMPT_VERSION = "2026-04-phase4";
 

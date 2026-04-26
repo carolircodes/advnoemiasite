@@ -3,7 +3,7 @@ import "server-only";
 import {
   CONSULTATION_ONLINE_AMOUNT_CENTS,
   amountCentsToDecimal
-} from "../payment/pricing";
+} from "../payment/pricing.ts";
 
 export type RevenueMoment = "now" | "next" | "future";
 export type RevenueLayer =

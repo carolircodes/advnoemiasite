@@ -1,4 +1,4 @@
-import { AcquisitionData } from './acquisition-service';
+import { AcquisitionData } from './acquisition-service.ts';
 
 export interface TrackingLinkParams {
   source?: string;

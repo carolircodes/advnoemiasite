@@ -6,11 +6,11 @@
  */
 
 import { OpenAI } from "openai";
-import { clientContextService } from "../services/client-context";
-import { conversationPersistence } from "../services/conversation-persistence";
-import { saveTriageData } from "./triage-persistence";
-import { PortalProfile } from "../auth/guards";
-import { askNoemiaSchema } from "../domain/portal";
+import { clientContextService } from "../services/client-context.ts";
+import { conversationPersistence } from "../services/conversation-persistence.ts";
+import { saveTriageData } from "./triage-persistence.ts";
+import { PortalProfile } from "../auth/guards.ts";
+import { askNoemiaSchema } from "../domain/portal.ts";
 import {
   ClassifiedIntent,
   FollowUpAttempt,
@@ -25,13 +25,13 @@ import {
   NoemiaUserType,
   PriorityLevel,
   RecommendedAction
-} from "./core-types";
+} from "./core-types.ts";
 import {
   classifyMessage as classifyIncomingMessage,
   detectLegalTheme as detectConversationTheme,
   detectUserIntent as detectConversationIntent
-} from "./message-classifier";
-import { minimizeNoemiaContext } from "./noemia-context-governance";
+} from "./message-classifier.ts";
+import { minimizeNoemiaContext } from "./noemia-context-governance.ts";
 import {
   getNoemiaPromptVersion,
   resolveNoemiaDomain,
@@ -39,26 +39,26 @@ import {
   shouldAutoUpdateCommercialPipeline,
   shouldLoadClientContext,
   shouldPersistTriage
-} from "./noemia-domains";
+} from "./noemia-domains.ts";
 import {
   buildNoemiaTraceMetadata,
   traceNoemiaEvent
-} from "./noemia-observability";
-import { runNoemiaModel } from "./noemia-provider";
-import { buildSystemPrompt as buildNoemiaSystemPrompt } from "./system-prompt";
+} from "./noemia-observability.ts";
+import { runNoemiaModel } from "./noemia-provider.ts";
+import { buildSystemPrompt as buildNoemiaSystemPrompt } from "./system-prompt.ts";
 import {
   initializeConversationState as initializeManagedConversationState,
   updateConversationState as updateManagedConversationState
-} from "./state-manager";
+} from "./state-manager.ts";
 import {
   evaluatePolicyHandoff as evaluateManagedPolicyHandoff,
   shouldAdvanceToNextStage as shouldAdvanceManagedStage
-} from "./handoff-orchestrator";
+} from "./handoff-orchestrator.ts";
 import {
   generateFallbackResponse as generateManagedFallbackResponse,
   generateInternalSummary as generateManagedInternalSummary,
   generateTriageResponse as generateManagedTriageResponse
-} from "./response-composer";
+} from "./response-composer.ts";
 
 export type {
   ClassifiedIntent,
@@ -73,7 +73,7 @@ export type {
   NoemiaUserType,
   PriorityLevel,
   RecommendedAction
-} from "./core-types";
+} from "./core-types.ts";
 
 interface FollowUpContext {
   lastMessage: string;

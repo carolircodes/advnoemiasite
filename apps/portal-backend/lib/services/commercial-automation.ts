@@ -1,8 +1,8 @@
 import "server-only";
 
-import { createWebhookSupabaseClient } from "../supabase/webhook";
-import { followUpEngine } from "./follow-up-engine";
-import type { GrowthContextByItem } from "./growth-item-context";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
+import { followUpEngine } from "./follow-up-engine.ts";
+import type { GrowthContextByItem } from "./growth-item-context.ts";
 
 export type CommercialAutomationPlan = {
   ruleKey: string;

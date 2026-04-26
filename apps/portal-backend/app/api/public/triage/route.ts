@@ -1,16 +1,16 @@
-import { extractErrorMessage } from "../../../../lib/http/api-response";
+import { extractErrorMessage } from "../../../../lib/http/api-response.ts";
 import {
   buildDurableRateLimitHeaders,
   consumeDurableRateLimit
-} from "../../../../lib/http/durable-abuse-protection";
-import { getClientIp } from "../../../../lib/http/request-guards";
-import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public";
-import { submitPublicTriage } from "../../../../lib/services/public-intake";
+} from "../../../../lib/http/durable-abuse-protection.ts";
+import { getClientIp } from "../../../../lib/http/request-guards.ts";
+import { corsPreflightResponse, withPublicApiCors } from "../../../../lib/http/cors-public.ts";
+import { submitPublicTriage } from "../../../../lib/services/public-intake.ts";
 import {
   createObservedJsonResponse,
   logObservedRequest,
   startRequestObservation
-} from "../../../../lib/observability/request-observability";
+} from "../../../../lib/observability/request-observability.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

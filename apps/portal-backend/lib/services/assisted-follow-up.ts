@@ -3,11 +3,11 @@
  * Implementa a FASE 7 - Envio assistido pelo painel com aprovação
  */
 
-import { createWebhookSupabaseClient } from '../supabase/webhook';
-import { sendFacebookDirectMessage } from '../meta/facebook-service';
-import { sendInstagramDirectMessage } from '../meta/instagram-service';
-import { sendWhatsAppMessage } from '../meta/whatsapp-service';
-import { conversationInboxService } from './conversation-inbox';
+import { createWebhookSupabaseClient } from '../supabase/webhook.ts';
+import { sendFacebookDirectMessage } from '../meta/facebook-service.ts';
+import { sendInstagramDirectMessage } from '../meta/instagram-service.ts';
+import { sendWhatsAppMessage } from '../meta/whatsapp-service.ts';
+import { conversationInboxService } from './conversation-inbox.ts';
 
 interface SendAssistedFollowUpParams {
   clientId: string;

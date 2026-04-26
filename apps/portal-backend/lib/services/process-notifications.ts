@@ -3,18 +3,18 @@ import "server-only";
 import {
   getNotificationWorkerDiagnostics,
   type NotificationWorkerDiagnosticsAdapter
-} from "../diagnostics/notification-worker";
-import { recordNotificationInteraction } from "../notifications/action-tracking";
-import { renderNotificationEmail } from "../notifications/email-templates";
-import { sendPilotPushNotification } from "../notifications/push-delivery";
-import { routeNotificationByChannel } from "../notifications/channel-router";
-import { traceOperationalEvent } from "../observability/operational-trace";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { runOperationalAutomationRules } from "./automation-rules";
+} from "../diagnostics/notification-worker.ts";
+import { recordNotificationInteraction } from "../notifications/action-tracking.ts";
+import { renderNotificationEmail } from "../notifications/email-templates.ts";
+import { sendPilotPushNotification } from "../notifications/push-delivery.ts";
+import { routeNotificationByChannel } from "../notifications/channel-router.ts";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { runOperationalAutomationRules } from "./automation-rules.ts";
 import {
   classifyNotificationError,
   type NotificationErrorKind
-} from "./notification-error-classification";
+} from "./notification-error-classification.ts";
 
 const MAX_NOTIFICATION_ATTEMPTS = 5;
 const NOTIFICATION_WORKER_ID = `${process.env.VERCEL_REGION || "local"}:${process.pid}`;

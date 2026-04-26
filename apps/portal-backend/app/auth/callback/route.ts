@@ -5,16 +5,16 @@ import {
   buildLoginRedirectPath,
   getPostAuthDestination,
   normalizeNextPath
-} from "../../../lib/auth/access-control";
+} from "../../../lib/auth/access-control.ts";
 import {
   ensureProfileForUser
-} from "../../../lib/auth/guards";
+} from "../../../lib/auth/guards.ts";
 import {
   getAuthEnvDiagnostics,
   getServerEnv,
   isAuthEnvConfigurationError
-} from "../../../lib/config/env";
-import { createServerSupabaseClient } from "../../../lib/supabase/server";
+} from "../../../lib/config/env.ts";
+import { createServerSupabaseClient } from "../../../lib/supabase/server.ts";
 
 function normalizeOtpType(type: string | null): EmailOtpType | null {
   if (!type) {

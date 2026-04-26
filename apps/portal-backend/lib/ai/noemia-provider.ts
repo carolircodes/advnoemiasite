@@ -1,6 +1,6 @@
 import { OpenAI } from "openai";
 
-import type { NoemiaDomain } from "./core-types";
+import type { NoemiaDomain } from "./core-types.ts";
 
 type NoemiaProviderRequest = {
   domain: NoemiaDomain;

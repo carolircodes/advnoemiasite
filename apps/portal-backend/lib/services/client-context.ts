@@ -1,5 +1,5 @@
-import { createWebhookSupabaseClient } from "../supabase/webhook";
-import { clientMergeService } from "./client-merge";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
+import { clientMergeService } from "./client-merge.ts";
 
 export interface ClientContextForAI {
   client: {

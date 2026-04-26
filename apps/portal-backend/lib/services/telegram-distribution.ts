@@ -2,12 +2,12 @@ import "server-only";
 
 import { z } from "zod";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { recordProductEvent } from "./public-intake";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { recordProductEvent } from "./public-intake.ts";
 import {
   getTelegramChannelConfig,
   publishTelegramChannelMessage
-} from "../telegram/telegram-service";
+} from "../telegram/telegram-service.ts";
 
 const publishTelegramPostSchema = z.object({
   content: z.string().trim().min(12).max(4000),

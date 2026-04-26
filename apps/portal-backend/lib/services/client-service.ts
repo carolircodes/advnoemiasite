@@ -1,4 +1,4 @@
-import { createWebhookSupabaseClient } from "../supabase/webhook";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
 
 export interface Client {
   id: string;

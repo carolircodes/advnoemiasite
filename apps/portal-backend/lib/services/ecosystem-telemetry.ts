@@ -2,8 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
-import { ecosystemEventKeys } from "../domain/ecosystem";
-import { recordProductEvent } from "./public-intake";
+import { ecosystemEventKeys } from "../domain/ecosystem.ts";
+import { recordProductEvent } from "./public-intake.ts";
 
 const ecosystemTelemetrySchema = z.object({
   eventKey: z.enum(ecosystemEventKeys),

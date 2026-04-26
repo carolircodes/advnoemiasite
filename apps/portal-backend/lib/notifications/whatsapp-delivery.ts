@@ -1,8 +1,8 @@
 import "server-only";
 
-import { sendWhatsAppMessage, isValidWhatsAppNumber } from "../meta/whatsapp-service";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { logWhatsApp } from "../logging/structured-logger";
+import { sendWhatsAppMessage, isValidWhatsAppNumber } from "../meta/whatsapp-service.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { logWhatsApp } from "../logging/structured-logger.ts";
 
 export type WhatsAppDeliveryInput = {
   to: string;

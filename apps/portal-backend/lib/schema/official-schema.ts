@@ -1,4 +1,4 @@
-import officialSchemaJson from "./official-schema.json";
+import officialSchemaJson from "./official-schema.json" with { type: "json" };
 
 export const OFFICIAL_SCHEMA_GOVERNANCE = officialSchemaJson;
 

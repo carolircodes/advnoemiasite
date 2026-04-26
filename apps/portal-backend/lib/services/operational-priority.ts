@@ -1,4 +1,4 @@
-import type { GrowthContextByItem } from "./growth-item-context";
+import type { GrowthContextByItem } from "./growth-item-context.ts";
 
 export type OperationalPriorityLabel = "high" | "medium" | "low";
 
@@ -302,4 +302,4 @@ export function evaluateOperationalPriority(
     nextBestAction
   };
 }
-import { isPendingFollowUpStatus } from "./follow-up-semantics";
+import { isPendingFollowUpStatus } from "./follow-up-semantics.ts";

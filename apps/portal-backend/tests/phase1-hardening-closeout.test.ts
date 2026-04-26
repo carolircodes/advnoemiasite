@@ -5,6 +5,7 @@ import {
   assertRouteSecret,
   hasInternalServiceSecretAccess
 } from "../lib/http/route-secret.ts";
+import { shouldAllowShadowWebhookAcceptance } from "../lib/http/webhook-security.ts";
 import { buildPublicPaymentPayload } from "../lib/payment/public-payment-payload.ts";
 
 function withEnv(
@@ -129,6 +130,21 @@ test("telegram webhook guard accepts Telegram's official secret header", () => {
   });
 
   assert.deepEqual(result, { ok: true, source: "header" });
+});
+
+test("webhook shadow acceptance is always disabled in production", () => {
+  return withEnv(
+    {
+      NODE_ENV: "production",
+      META_WEBHOOK_ALLOW_SHADOW_ACCEPTANCE: "true"
+    },
+    () => {
+      assert.equal(
+        shouldAllowShadowWebhookAcceptance("META_WEBHOOK_ALLOW_SHADOW_ACCEPTANCE"),
+        false
+      );
+    }
+  );
 });
 
 test("internal service secret helper only grants access with the configured secret", () => {

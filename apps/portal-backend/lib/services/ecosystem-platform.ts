@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { PortalProfile } from "../auth/guards";
+import type { PortalProfile } from "../auth/guards.ts";
 import {
   accessGrantStatusLabels,
   communityMemberStatusLabels,
@@ -15,8 +15,8 @@ import {
   ecosystemVerticalLabels,
   subscriptionCadenceLabels,
   subscriptionStatusLabels
-} from "../domain/ecosystem";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../domain/ecosystem.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 type ClientWorkspaceTone = "success" | "warning" | "muted" | "critical";
 

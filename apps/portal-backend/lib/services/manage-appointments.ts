@@ -1,6 +1,6 @@
 import "server-only";
 
-import { assertStaffActor } from "../auth/guards";
+import { assertStaffActor } from "../auth/guards.ts";
 import {
   appointmentChangeLabels,
   appointmentStatusLabels,
@@ -9,10 +9,10 @@ import {
   cancelCaseAppointmentSchema,
   registerCaseAppointmentSchema,
   updateCaseAppointmentSchema
-} from "../domain/portal";
-import { sendCaseUpdateNotification } from "../notifications/case-notifications";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../domain/portal.ts";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 type AppointmentState = {
   title: string;

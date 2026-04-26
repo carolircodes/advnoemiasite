@@ -7,7 +7,7 @@ import { ClientQuickActions } from "@/components/client-quick-actions";
 import { PremiumFeatureCard, PremiumStatePanel, PremiumSurface } from "@/components/portal/premium-experience";
 import { logoutAction } from "@/lib/auth/actions";
 
-import { ClientSafeCard } from "./client-safe-card";
+import { ClientSafeCard } from "./client-safe-card.tsx";
 
 export type ClientShellProfile = {
   displayName: string;

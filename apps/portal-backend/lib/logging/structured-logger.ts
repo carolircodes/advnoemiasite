@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 export interface LogEntry {
   timestamp: string;
@@ -27,7 +27,7 @@ export interface LogEntry {
  */
 export class StructuredLogger {
   private static instance: StructuredLogger;
-  private supabase = createAdminSupabaseClient();
+  private supabase: ReturnType<typeof createAdminSupabaseClient> | null = null;
 
   static getInstance(): StructuredLogger {
     if (!StructuredLogger.instance) {
@@ -162,17 +162,23 @@ export class StructuredLogger {
 
       // 2. Salvar no banco (assíncrono, não bloqueante)
       this.saveToDatabase(entry).catch((error) => {
-        console.error("[StructuredLogger] Falha ao salvar log no banco:", error);
+        console.warn("[StructuredLogger] Persistencia de log indisponivel", {
+          reason: error instanceof Error ? error.name : "unknown_error"
+        });
       });
 
       // 3. Enviar para serviço externo se configurado
       if (process.env.LOG_SERVICE_URL) {
         this.sendToExternalService(entry).catch((error) => {
-          console.error("[StructuredLogger] Falha ao enviar log para serviço externo:", error);
+          console.warn("[StructuredLogger] Exportacao de log indisponivel", {
+            reason: error instanceof Error ? error.name : "unknown_error"
+          });
         });
       }
     } catch (error) {
-      console.error("[StructuredLogger] Erro crítico no logging:", error);
+      console.warn("[StructuredLogger] Logging degradado", {
+        reason: error instanceof Error ? error.name : "unknown_error"
+      });
     }
   }
 
@@ -180,10 +186,11 @@ export class StructuredLogger {
    * Formata e envia para console
    */
   private logToConsole(entry: LogEntry): void {
-    const { timestamp, level, service, action, message, metadata, error } = entry;
+    const sanitizedEntry = this.sanitizeEntry(entry);
+    const { timestamp, level, service, action, message, metadata, error } = sanitizedEntry;
     
     const emoji = this.getEmoji(level);
-    const context = this.buildContextString(entry);
+    const context = this.buildContextString(sanitizedEntry);
     const metaString = metadata ? ` | ${JSON.stringify(metadata)}` : "";
     const errorString = error ? ` | ERROR: ${error.name}: ${error.message}` : "";
     
@@ -196,27 +203,37 @@ export class StructuredLogger {
    * Salva log no banco de dados
    */
   private async saveToDatabase(entry: LogEntry): Promise<void> {
+    if (
+      !process.env.NEXT_PUBLIC_APP_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
+    ) {
+      return;
+    }
+
     // Limpar dados sensíveis antes de salvar
     const sanitizedEntry = this.sanitizeEntry(entry);
     
-    const { error, ...logData } = sanitizedEntry;
-    
+    if (!this.supabase) {
+      this.supabase = createAdminSupabaseClient();
+    }
+
     await this.supabase.from("structured_logs").insert({
-      timestamp: entry.timestamp,
-      level: entry.level,
-      service: entry.service,
-      action: entry.action,
-      user_id: entry.userId,
-      client_id: entry.clientId,
-      case_id: entry.caseId,
-      notification_id: entry.notificationId,
-      channel: entry.channel,
-      message: entry.message,
-      metadata: entry.metadata,
-      error_name: entry.error?.name,
-      error_message: entry.error?.message,
-      error_stack: entry.error?.stack,
-      sensitive: entry.sensitive || false
+      timestamp: sanitizedEntry.timestamp,
+      level: sanitizedEntry.level,
+      service: sanitizedEntry.service,
+      action: sanitizedEntry.action,
+      user_id: sanitizedEntry.userId,
+      client_id: sanitizedEntry.clientId,
+      case_id: sanitizedEntry.caseId,
+      notification_id: sanitizedEntry.notificationId,
+      channel: sanitizedEntry.channel,
+      message: sanitizedEntry.message,
+      metadata: sanitizedEntry.metadata,
+      error_name: sanitizedEntry.error?.name,
+      error_message: sanitizedEntry.error?.message,
+      error_stack: sanitizedEntry.error?.stack,
+      sensitive: sanitizedEntry.sensitive || false
     });
   }
 

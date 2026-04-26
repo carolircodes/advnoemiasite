@@ -6,8 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireInternalOperatorAccess } from "@/lib/auth/api-authorization";
-import { abTestingService } from "../../../../lib/services/ab-testing";
-import { optimizationIntelligenceService } from "../../../../lib/services/optimization-intelligence";
+import { abTestingService } from "../../../../lib/services/ab-testing.ts";
+import { optimizationIntelligenceService } from "../../../../lib/services/optimization-intelligence.ts";
 
 export async function GET(request: NextRequest) {
   const access = await requireInternalOperatorAccess({

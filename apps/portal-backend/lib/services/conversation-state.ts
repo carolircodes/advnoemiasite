@@ -1,4 +1,4 @@
-import type { ConversationSession } from "./conversation-persistence";
+import type { ConversationSession } from "./conversation-persistence.ts";
 
 export type ConversationPolicyState =
   | "ai_active"

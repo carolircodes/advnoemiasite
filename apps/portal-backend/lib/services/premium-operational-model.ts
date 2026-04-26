@@ -4,14 +4,14 @@ import {
   documentRequestStatusLabels,
   documentStatusLabels,
   formatPortalDateTime
-} from "../domain/portal";
+} from "../domain/portal.ts";
 import type {
   ClientAgendaSummaryData,
   ClientCaseSummaryData,
   ClientDocumentsSummaryData,
   ClientEventsSummaryData,
   ClientRequestsSummaryData
-} from "./client-workspace";
+} from "./client-workspace.ts";
 
 type PremiumTone = "success" | "warning" | "muted" | "critical";
 

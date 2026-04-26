@@ -5,7 +5,7 @@ import { AlertTriangle, CalendarClock, Flame } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { SectionCard } from "@/components/section-card";
 
-import { Lead, PrioridadesProps } from "./types";
+import { Lead, PrioridadesProps } from "./types.ts";
 
 function isValidLeadStatus(status: string): status is Lead["lead_status"] {
   return [

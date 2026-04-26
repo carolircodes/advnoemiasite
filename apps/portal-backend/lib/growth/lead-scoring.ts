@@ -1,4 +1,4 @@
-import type { CaseArea } from "../domain/portal";
+import type { CaseArea } from "../domain/portal.ts";
 
 export type LeadTemperature = "cold" | "warm" | "hot" | "urgent";
 export type LeadLifecycleStage =

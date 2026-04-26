@@ -1,9 +1,9 @@
 import "server-only";
 
-import { CLIENT_LOGIN_PATH } from "../auth/access-control";
-import { getServerEnv } from "../config/env";
-import type { ClientTier } from "../domain/portal";
-import { buildNotificationRedirectPath } from "./notification-links";
+import { CLIENT_LOGIN_PATH } from "../auth/access-control.ts";
+import { getServerEnv } from "../config/env.ts";
+import type { ClientTier } from "../domain/portal.ts";
+import { buildNotificationRedirectPath } from "./notification-links.ts";
 
 // ---------------------------------------------------------------------------
 // Tipos

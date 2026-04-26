@@ -40,7 +40,7 @@ import {
   presentChannelOrigin,
   presentMaybeId,
   presentToken
-} from "./presentation";
+} from "./presentation.ts";
 
 type Metrics = {
   totalOpenThreads: number;

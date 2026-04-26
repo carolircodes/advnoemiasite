@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import { guardSensitiveRoute, isSensitiveRoute } from "./lib/http/sensitive-route";
-import { updateSession } from "./lib/supabase/middleware";
+import { guardSensitiveRoute, isSensitiveRoute } from "./lib/http/sensitive-route.ts";
+import { updateSession } from "./lib/supabase/middleware.ts";
 
 export async function middleware(request: NextRequest) {
   if (isSensitiveRoute(request.nextUrl.pathname)) {

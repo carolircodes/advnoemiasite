@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getServerEnv } from "../config/env";
+import { getServerEnv } from "../config/env.ts";
 
 export type TelegramChannelConfig = {
   botConfigured: boolean;

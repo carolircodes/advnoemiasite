@@ -1,15 +1,15 @@
 import "server-only";
 
-import type { PortalProfile } from "../auth/guards";
+import type { PortalProfile } from "../auth/guards.ts";
 import {
   accessGrantStatusLabels,
   communityMemberStatusLabels,
   ecosystemAvailabilityStatusLabels,
   subscriptionCadenceLabels,
   subscriptionStatusLabels
-} from "../domain/ecosystem";
-import { createServerSupabaseClient } from "../supabase/server";
-import { getCommunityOperationsBlueprint } from "./ecosystem-community-operations";
+} from "../domain/ecosystem.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
+import { getCommunityOperationsBlueprint } from "./ecosystem-community-operations.ts";
 
 export const PREMIUM_JOURNEY_ANCHOR = {
   catalogSlug: "biblioteca-estrategica-premium",

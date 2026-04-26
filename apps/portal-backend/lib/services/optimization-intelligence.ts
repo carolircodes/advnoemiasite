@@ -4,9 +4,9 @@
  * Responsável por analisar dados, identificar padrões e gerar insights automáticos
  */
 
-import { abTestingService, TestResult, ABTest } from './ab-testing';
-import { acquisitionContentService } from './acquisition-content';
-import { LegalTheme } from '../ai/noemia-core';
+import { abTestingService, TestResult, ABTest } from './ab-testing.ts';
+import { acquisitionContentService } from './acquisition-content.ts';
+import { LegalTheme } from '../ai/noemia-core.ts';
 
 export interface OptimizationInsight {
   id: string;

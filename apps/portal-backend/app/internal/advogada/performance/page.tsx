@@ -6,7 +6,7 @@ import { SectionCard } from "@/components/section-card";
 import { requireProfile } from "@/lib/auth/guards";
 import { getBusinessIntelligenceOverview } from "@/lib/services/intelligence";
 
-import PerformanceDashboard from "./dashboard";
+import PerformanceDashboard from "./dashboard.tsx";
 
 export default async function PerformancePage() {
   const profile = await requireProfile(["advogada", "admin"]);

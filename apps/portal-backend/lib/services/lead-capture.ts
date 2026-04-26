@@ -4,8 +4,8 @@
  * Responsável por capturar leads de múltiplas fontes e iniciar conversas com NoemIA
  */
 
-import { acquisitionContentService, ContentTrigger, AcquisitionContent, LeadAcquisition } from './acquisition-content';
-import { processNoemiaCore, NoemiaCoreInput, ConversationState } from '../ai/noemia-core';
+import { acquisitionContentService, ContentTrigger, AcquisitionContent, LeadAcquisition } from './acquisition-content.ts';
+import { processNoemiaCore, NoemiaCoreInput, ConversationState } from '../ai/noemia-core.ts';
 
 export interface CapturedLead {
   id: string;

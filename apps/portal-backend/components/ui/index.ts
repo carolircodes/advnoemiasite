@@ -1,3 +1,3 @@
-export { MetricCard } from './MetricCard';
-export { Card, CardHeader, CardContent } from './Card';
-export { Badge } from './Badge';
+export { MetricCard } from './MetricCard.tsx';
+export { Card, CardHeader, CardContent } from './Card.tsx';
+export { Badge } from './Badge.tsx';

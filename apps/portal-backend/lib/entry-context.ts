@@ -1,4 +1,4 @@
-import type { CaseArea } from "./domain/portal";
+import type { CaseArea } from "./domain/portal.ts";
 
 const ENTRY_CONTEXT_QUERY_KEYS = [
   "origem",

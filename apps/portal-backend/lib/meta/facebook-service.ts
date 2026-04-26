@@ -5,7 +5,7 @@ import {
   sendMetaDirectMessage,
   type MetaSendContext,
   type MetaSendResult
-} from "./instagram-service";
+} from "./instagram-service.ts";
 
 export function sendFacebookDirectMessage(
   recipientId: string,

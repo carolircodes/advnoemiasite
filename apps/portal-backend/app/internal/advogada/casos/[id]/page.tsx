@@ -32,7 +32,7 @@ import {
   registerInternalCaseEventAction,
   updateInternalCaseDetailsAction,
   updateInternalCaseStatusAction
-} from "../actions";
+} from "../actions.ts";
 
 function getStringParam(
   value: string | string[] | undefined,

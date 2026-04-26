@@ -16,15 +16,15 @@ import {
   publicIntakeStageLabels,
   publicIntakeUrgencyLabels,
   portalEventTypeLabels
-} from "../domain/portal";
+} from "../domain/portal.ts";
 import {
   buildInternalAgendaHref,
   buildInternalCaseHref,
   buildInternalClientHref,
   buildInternalDocumentsHref
-} from "../navigation";
-import type { PortalProfile } from "../auth/guards";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../navigation.ts";
+import type { PortalProfile } from "../auth/guards.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 const HOUR_IN_MS = 3_600_000;
 const DAY_IN_MS = 24 * HOUR_IN_MS;

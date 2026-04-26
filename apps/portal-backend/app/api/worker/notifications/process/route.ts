@@ -1,13 +1,13 @@
 import "server-only";
 
-import { requireRouteSecretOrStaffAccess } from "../../../../../lib/auth/api-authorization";
-import { getNotificationEnv } from "../../../../../lib/config/env";
+import { requireRouteSecretOrStaffAccess } from "../../../../../lib/auth/api-authorization.ts";
+import { getNotificationEnv } from "../../../../../lib/config/env.ts";
 import {
   createObservedJsonResponse,
   logObservedRequest,
   startRequestObservation
-} from "../../../../../lib/observability/request-observability";
-import { processPendingNotifications } from "../../../../../lib/services/process-notifications";
+} from "../../../../../lib/observability/request-observability.ts";
+import { processPendingNotifications } from "../../../../../lib/services/process-notifications.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

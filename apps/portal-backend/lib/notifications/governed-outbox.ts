@@ -1,7 +1,7 @@
 import "server-only";
 
-import { traceOperationalEvent } from "../observability/operational-trace";
-import { createAdminSupabaseClient } from "../supabase/admin";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 import {
   getDefaultPreferenceForAudience,
   getNotificationPolicy,
@@ -13,11 +13,11 @@ import {
   type NotificationEventKey,
   type NotificationPreferenceSnapshot,
   type NotificationPriority
-} from "./policy";
+} from "./policy.ts";
 import {
   assessPushPilotSubscriptionEligibility,
   isPushPilotChannelAllowedForEvent
-} from "./push-pilot";
+} from "./push-pilot.ts";
 
 type QueueGovernedNotificationInput = {
   eventKey: NotificationEventKey;

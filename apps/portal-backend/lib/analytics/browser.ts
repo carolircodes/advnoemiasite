@@ -3,7 +3,7 @@
 import {
   buildBrowserEventPayload,
   normalizeProductEventInput
-} from "./funnel-events";
+} from "./funnel-events.ts";
 
 const SESSION_STORAGE_KEY = "portal_product_session_id";
 const SESSION_FLAG_PREFIX = "portal_product_flag:";

@@ -1,5 +1,5 @@
-import type { ConversationState } from "../ai/noemia-core";
-import type { ConversationSession } from "./conversation-persistence";
+import type { ConversationState } from "../ai/noemia-core.ts";
+import type { ConversationSession } from "./conversation-persistence.ts";
 import {
   extractStoredConversationSignals,
   hasCompleteSchedulingPreferences,
@@ -10,7 +10,7 @@ import {
   type ConversationPolicyHandoffStatus,
   type ConversationPolicyState,
   type ConversationPolicyTriageStage
-} from "./conversation-state";
+} from "./conversation-state.ts";
 
 export type ConversationPolicySummary = {
   state: ConversationPolicyState;

@@ -3,8 +3,8 @@ import "server-only";
 import * as net from "node:net";
 import * as tls from "node:tls";
 
-import { getNotificationEnv } from "../config/env";
-import { logger } from "../logging/structured-logger";
+import { getNotificationEnv } from "../config/env.ts";
+import { logger } from "../logging/structured-logger.ts";
 
 type DeliveryInput = {
   to: string;

@@ -5,8 +5,8 @@ import {
   formatPortalDateTime,
   intakeRequestStatusLabels,
   publicIntakeUrgencyLabels
-} from "../domain/portal";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../domain/portal.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 const TRACKED_AUTOMATION_TEMPLATES = new Set([
   "triage-submitted",

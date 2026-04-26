@@ -1,4 +1,4 @@
-import type { PortalProfile } from "../auth/guards";
+import type { PortalProfile } from "../auth/guards.ts";
 
 export type NoemiaChannel =
   | "site"

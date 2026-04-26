@@ -1,8 +1,8 @@
 import "server-only";
 
-import type { AnyCaseEventType } from "../domain/portal";
-import { caseEventTypeLabels } from "../domain/portal";
-import { createAdminSupabaseClient } from "../supabase/admin";
+import type { AnyCaseEventType } from "../domain/portal.ts";
+import { caseEventTypeLabels } from "../domain/portal.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 type QueueEmailInput = {
   eventType: string;

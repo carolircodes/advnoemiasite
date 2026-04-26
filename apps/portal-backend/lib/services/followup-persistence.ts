@@ -4,7 +4,7 @@
  * Responsável por armazenar e recuperar tentativas de follow-up
  */
 
-import { FollowUpAttempt, FollowUpTrigger } from '../ai/noemia-core';
+import { FollowUpAttempt, FollowUpTrigger } from '../ai/noemia-core.ts';
 
 export interface FollowUpRecord {
   id: string;

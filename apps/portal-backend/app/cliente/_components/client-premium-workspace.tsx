@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ClientSafeCard } from "./client-safe-card";
+import { ClientSafeCard } from "./client-safe-card.tsx";
 import type { ClientPortalPremiumProjection } from "@/lib/services/premium-operational-model";
 
 function getToneClasses(tone: "success" | "warning" | "muted" | "critical") {

@@ -24,7 +24,7 @@ import {
 import { getStaffOverview } from "@/lib/services/dashboard";
 import { buildClientJourneyTimeline } from "@/lib/services/journey-timeline";
 
-import { updateInternalClientAction } from "../actions";
+import { updateInternalClientAction } from "../actions.ts";
 
 function getStringParam(
   value: string | string[] | undefined,

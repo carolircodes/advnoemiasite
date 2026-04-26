@@ -1,16 +1,16 @@
 import "server-only";
 
-import { assertStaffActor } from "../auth/guards";
-import { getServerEnv } from "../config/env";
+import { assertStaffActor } from "../auth/guards.ts";
+import { getServerEnv } from "../config/env.ts";
 import {
   caseAreaLabels,
   createClientSchema,
   mapClientStatusToCaseStatus
-} from "../domain/portal";
-import { queueClientInviteTracking } from "../notifications/outbox";
-import { recordProductEvent } from "./public-intake";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../domain/portal.ts";
+import { queueClientInviteTracking } from "../notifications/outbox.ts";
+import { recordProductEvent } from "./public-intake.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 function buildInviteErrorMessage(
   inviteError: {

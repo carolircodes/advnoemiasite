@@ -24,7 +24,7 @@ import {
   startRequestObservation
 } from "@/lib/observability/request-observability";
 import { assertOperationalSchemaCompatibility } from "@/lib/schema/compatibility";
-import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router";
+import { processChannelConversationEvent } from "../../../../lib/services/channel-conversation-router.ts";
 
 type MetaChannel = "instagram" | "facebook";
 

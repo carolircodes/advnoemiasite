@@ -3,7 +3,7 @@ import { EcosystemTelemetryBeacon } from "@/components/ecosystem-telemetry-beaco
 import type { ClientPremiumJourneySnapshot } from "@/lib/services/ecosystem-journey";
 import type { ClientEcosystemWorkspace } from "@/lib/services/ecosystem-platform";
 
-import { ClientSafeCard } from "./client-safe-card";
+import { ClientSafeCard } from "./client-safe-card.tsx";
 
 function getToneClasses(tone: "success" | "warning" | "muted" | "critical") {
   switch (tone) {

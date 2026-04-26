@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import {
   trackProductEvent,
   trackProductEventOncePerSession
-} from "../lib/analytics/browser";
+} from "../lib/analytics/browser.ts";
 
 type ProductEventBeaconProps = {
   eventKey: string;

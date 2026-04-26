@@ -2,10 +2,10 @@ import "server-only";
 
 import { MercadoPagoConfig, PreApproval, PreApprovalPlan } from "mercadopago";
 
-import type { PortalProfile } from "../auth/guards";
-import { getServerEnv } from "../config/env";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { PREMIUM_JOURNEY_ANCHOR } from "./ecosystem-journey";
+import type { PortalProfile } from "../auth/guards.ts";
+import { getServerEnv } from "../config/env.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { PREMIUM_JOURNEY_ANCHOR } from "./ecosystem-journey.ts";
 
 type LifecycleAction = "pause" | "resume" | "cancel" | "sync";
 

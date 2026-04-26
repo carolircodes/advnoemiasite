@@ -1,13 +1,13 @@
 /**
  * Salvar dados da triagem no banco de dados
  */
-import { triagePersistence, TriageData } from "../services/triage-persistence";
+import { triagePersistence, TriageData } from "../services/triage-persistence.ts";
 import {
   buildInternalTriageSummary,
   buildTriageReport,
   buildUserFacingTriageSummary
-} from "../services/triage-report";
-import type { ConversationState, NoemiaCoreInput } from "./core-types";
+} from "../services/triage-report.ts";
+import type { ConversationState, NoemiaCoreInput } from "./core-types.ts";
 
 export async function saveTriageData(
   input: NoemiaCoreInput,

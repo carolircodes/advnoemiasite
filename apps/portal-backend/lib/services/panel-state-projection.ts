@@ -1,4 +1,4 @@
-import type { SchedulingPreferences } from "./conversation-state";
+import type { SchedulingPreferences } from "./conversation-state.ts";
 
 export type PanelConversationStateProjection = {
   conversationStatus?: string | null;

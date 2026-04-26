@@ -1,26 +1,26 @@
-import type { ConversationSession } from "./conversation-persistence";
-import type { ConversationMessageWriteOptions } from "./conversation-persistence";
+import type { ConversationSession } from "./conversation-persistence.ts";
+import type { ConversationMessageWriteOptions } from "./conversation-persistence.ts";
 
-import { processNoemiaCore } from "../ai/noemia-core";
+import { processNoemiaCore } from "../ai/noemia-core.ts";
 import {
   channelAutomationFeatures,
   channelCommercialConfig
-} from "../config/channel-automation-features";
-import { acquisitionContentService } from "./acquisition-content";
-import { antiSpamGuard } from "./anti-spam-guard";
+} from "../config/channel-automation-features.ts";
+import { acquisitionContentService } from "./acquisition-content.ts";
+import { antiSpamGuard } from "./anti-spam-guard.ts";
 import {
   applyCommercialInviteRefinement,
   buildCommercialFunnelSnapshot,
   trackCommercialEvent,
   type CommercialFunnelSnapshot
-} from "./commercial-funnel";
-import { conversationPersistence } from "./conversation-persistence";
-import { evaluateInstagramCommentPolicy } from "./instagram-comment-policy";
-import { instagramCommentContext } from "./instagram-comment-context";
+} from "./commercial-funnel.ts";
+import { conversationPersistence } from "./conversation-persistence.ts";
+import { evaluateInstagramCommentPolicy } from "./instagram-comment-policy.ts";
+import { instagramCommentContext } from "./instagram-comment-context.ts";
 import {
   evaluateConversationPolicy,
   extractConversationStateFromSession
-} from "./channel-conversation-policy";
+} from "./channel-conversation-policy.ts";
 import {
   buildSocialAcquisitionPayload,
   buildSocialAcquisitionSnapshot,
@@ -28,31 +28,31 @@ import {
   promoteCommentSnapshotToDm,
   trackSocialAcquisitionEvent,
   type SocialAcquisitionSnapshot
-} from "./social-acquisition";
-import { triagePersistence, type TriageData } from "./triage-persistence";
+} from "./social-acquisition.ts";
+import { triagePersistence, type TriageData } from "./triage-persistence.ts";
 import {
   buildInternalTriageSummary,
   buildTriageReport,
   buildUserFacingTriageSummary
-} from "./triage-report";
-import { traceOperationalEvent } from "../observability/operational-trace";
+} from "./triage-report.ts";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
 import {
   generatePaymentLink,
   generatePaymentMessage
-} from "../payment/payment-service";
+} from "../payment/payment-service.ts";
 import {
   detectExplicitPaymentLinkRequest,
   extractAmountCentsFromMessage
-} from "../payment/pricing";
+} from "../payment/pricing.ts";
 import {
   getRevenueOfferByCode,
   getRevenueOfferByIntent
-} from "./revenue-architecture";
-import { recordRevenueTelemetry } from "./revenue-telemetry";
+} from "./revenue-architecture.ts";
+import { recordRevenueTelemetry } from "./revenue-telemetry.ts";
 import {
   buildLeadIdentityUpdate,
   buildLeadNamePrompt
-} from "./lead-identity";
+} from "./lead-identity.ts";
 
 type SupportedChannel = "instagram" | "facebook" | "whatsapp";
 type ConversationSource =

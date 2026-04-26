@@ -1,11 +1,11 @@
-import { createWebhookSupabaseClient } from "../supabase/webhook";
-import { clientMergeService } from "./client-merge";
-import { clientContextService } from "./client-context";
-import { recordProductEvent } from "./public-intake";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
+import { clientMergeService } from "./client-merge.ts";
+import { clientContextService } from "./client-context.ts";
+import { recordProductEvent } from "./public-intake.ts";
 import {
   isClosedFollowUpStatus,
   mapFollowUpMessageStatusToFollowUpStatus
-} from "./follow-up-semantics";
+} from "./follow-up-semantics.ts";
 
 export interface FollowUpEligibility {
   clientId: string;

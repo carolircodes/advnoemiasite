@@ -1,6 +1,6 @@
 import "server-only";
 
-import { assertStaffActor } from "../auth/guards";
+import { assertStaffActor } from "../auth/guards.ts";
 import {
   allowedDocumentExtensions,
   allowedDocumentMimeTypes,
@@ -10,11 +10,11 @@ import {
   registerCaseDocumentSchema,
   requestCaseDocumentSchema,
   updateDocumentRequestStatusSchema
-} from "../domain/portal";
-import { recordNotificationInteraction } from "../notifications/action-tracking";
-import { sendCaseUpdateNotification } from "../notifications/case-notifications";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { createServerSupabaseClient } from "../supabase/server";
+} from "../domain/portal.ts";
+import { recordNotificationInteraction } from "../notifications/action-tracking.ts";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { createServerSupabaseClient } from "../supabase/server.ts";
 
 export const CASE_DOCUMENTS_BUCKET = "portal-case-documents";
 

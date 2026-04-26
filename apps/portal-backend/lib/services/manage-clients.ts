@@ -1,8 +1,8 @@
 import "server-only";
 
-import { assertStaffActor } from "../auth/guards";
-import { updateClientSchema } from "../domain/portal";
-import { createAdminSupabaseClient } from "../supabase/admin";
+import { assertStaffActor } from "../auth/guards.ts";
+import { updateClientSchema } from "../domain/portal.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
 
 export async function updateClientRecord(rawInput: unknown, actorProfileId: string) {
   await assertStaffActor(actorProfileId);

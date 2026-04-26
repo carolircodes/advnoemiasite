@@ -1,8 +1,8 @@
-import { createWebhookSupabaseClient } from "../supabase/webhook";
-import { clientService } from "./client-service";
-import { clientIdentityService } from "./client-identity";
-import { isLegacySchemaFallbackAllowed } from "../schema/compatibility";
-import { commercialRelationshipService } from "./commercial-relationship";
+import { createWebhookSupabaseClient } from "../supabase/webhook.ts";
+import { clientService } from "./client-service.ts";
+import { clientIdentityService } from "./client-identity.ts";
+import { isLegacySchemaFallbackAllowed } from "../schema/compatibility.ts";
+import { commercialRelationshipService } from "./commercial-relationship.ts";
 
 export interface ConversationSession {
   id: string;

@@ -1,23 +1,23 @@
 import "server-only";
 
-import { buildContextRoutingDecision } from "./context-routing";
-import { conversationPersistence } from "./conversation-persistence";
-import { recordProductEvent } from "./public-intake";
+import { buildContextRoutingDecision } from "./context-routing.ts";
+import { conversationPersistence } from "./conversation-persistence.ts";
+import { recordProductEvent } from "./public-intake.ts";
 import {
   buildSocialAcquisitionSnapshot,
   buildSocialAcquisitionPayload,
   trackSocialAcquisitionEvent
-} from "./social-acquisition";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { traceOperationalEvent } from "../observability/operational-trace";
-import { channelAutomationFeatures } from "../config/channel-automation-features";
-import { buildWebhookEventPayloadHash } from "./webhook-idempotency";
+} from "./social-acquisition.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { traceOperationalEvent } from "../observability/operational-trace.ts";
+import { channelAutomationFeatures } from "../config/channel-automation-features.ts";
+import { buildWebhookEventPayloadHash } from "./webhook-idempotency.ts";
 import {
   getYouTubeCredentialState,
   getYouTubeGuardrailConfig,
   getYouTubeModeReadiness,
   getYouTubeOperationMode
-} from "../youtube/youtube-config";
+} from "../youtube/youtube-config.ts";
 import {
   buildYouTubeJourneyTaxonomy,
   buildYouTubeReplyDraft,
@@ -25,7 +25,7 @@ import {
   evaluateYouTubeCommentGuardrails,
   normalizeYouTubeAsset,
   type YouTubeCommentInput
-} from "../youtube/youtube-domain";
+} from "../youtube/youtube-domain.ts";
 
 type RegisterYouTubeAssetInput = {
   channelId: string;

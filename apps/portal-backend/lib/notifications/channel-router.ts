@@ -1,7 +1,7 @@
 import "server-only";
 
-import { sendNotificationEmail } from "./email-delivery";
-import { sendViaWhatsApp } from "./whatsapp-delivery";
+import { sendNotificationEmail } from "./email-delivery.ts";
+import { sendViaWhatsApp } from "./whatsapp-delivery.ts";
 
 export type ChannelDeliveryInput = {
   to: string;

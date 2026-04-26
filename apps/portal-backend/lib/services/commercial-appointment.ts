@@ -1,14 +1,14 @@
 import "server-only";
 
-import { createCaseForClient } from "./manage-cases";
+import { createCaseForClient } from "./manage-cases.ts";
 import {
   registerCaseAppointment,
   updateCaseAppointment
-} from "./manage-appointments";
+} from "./manage-appointments.ts";
 import {
   evaluateFormalAppointmentRule,
   type ConsultationAppointmentState
-} from "./commercial-appointment-rule";
+} from "./commercial-appointment-rule.ts";
 
 type SyncFormalConsultationInput = {
   pipelineId: string;

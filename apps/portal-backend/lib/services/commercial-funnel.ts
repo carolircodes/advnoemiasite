@@ -1,7 +1,7 @@
 import "server-only";
 
-import { recordProductEvent } from "./public-intake";
-import type { SocialAcquisitionSnapshot } from "./social-acquisition";
+import { recordProductEvent } from "./public-intake.ts";
+import type { SocialAcquisitionSnapshot } from "./social-acquisition.ts";
 
 export type CommercialFunnelStage =
   | "attention"

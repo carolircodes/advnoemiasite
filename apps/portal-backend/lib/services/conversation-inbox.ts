@@ -1,26 +1,26 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { sendFacebookDirectMessage } from "../meta/facebook-service";
-import { sendInstagramDirectMessage } from "../meta/instagram-service";
-import { sendWhatsAppMessage } from "../meta/whatsapp-service";
-import { sendSiteChatMessage } from "../site/site-chat-service";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { sendFacebookDirectMessage } from "../meta/facebook-service.ts";
+import { sendInstagramDirectMessage } from "../meta/instagram-service.ts";
+import { sendWhatsAppMessage } from "../meta/whatsapp-service.ts";
+import { sendSiteChatMessage } from "../site/site-chat-service.ts";
 import {
   sendTelegramGroupMessage,
   sendTelegramPrivateMessage
-} from "../telegram/telegram-service";
+} from "../telegram/telegram-service.ts";
 import {
   buildOperationalContactLabel,
   resolveLeadIdentity,
   type LeadIdentityStatus
-} from "./lead-identity";
-import { getPersistedFinancialState } from "../payment/payment-workflow";
-import { commercialRelationshipService } from "./commercial-relationship";
+} from "./lead-identity.ts";
+import { getPersistedFinancialState } from "../payment/payment-workflow.ts";
+import { commercialRelationshipService } from "./commercial-relationship.ts";
 import {
   presentOperationalChannelLabel,
   presentOperationalSourceLabel,
   presentOperationalThreadOriginLabel
-} from "../channels/channel-presentation";
+} from "../channels/channel-presentation.ts";
 
 type ConversationChannel =
   | "instagram"

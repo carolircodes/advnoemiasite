@@ -1,7 +1,7 @@
 import "server-only";
 
-import { logger } from "../logging/structured-logger";
-import { getOfficialSchemaVersion } from "../schema/compatibility";
+import { logger } from "../logging/structured-logger.ts";
+import { getOfficialSchemaVersion } from "../schema/compatibility.ts";
 
 export type OperationalTraceContext = {
   eventId?: string | null;
@@ -24,6 +24,63 @@ export type OperationalTraceContext = {
 };
 
 type TraceLevel = "info" | "warn" | "error";
+
+const sensitiveMetadataKeyParts = [
+  "authorization",
+  "body",
+  "content",
+  "cookie",
+  "cpf",
+  "document",
+  "email",
+  "message",
+  "password",
+  "payload",
+  "phone",
+  "raw",
+  "secret",
+  "token"
+];
+
+function sanitizeTraceMetadata(value: unknown, depth = 0): unknown {
+  if (depth > 4) {
+    return "[truncated]";
+  }
+
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: "[redacted]"
+    };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeTraceMetadata(item, depth + 1));
+  }
+
+  if (!value || typeof value !== "object") {
+    if (typeof value === "string" && value.length > 500) {
+      return `${value.slice(0, 500)}...[truncated]`;
+    }
+
+    return value;
+  }
+
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedKey = key.toLowerCase();
+
+    if (sensitiveMetadataKeyParts.some((part) => normalizedKey.includes(part))) {
+      sanitized[key] = "[redacted]";
+      continue;
+    }
+
+    sanitized[key] = sanitizeTraceMetadata(nestedValue, depth + 1);
+  }
+
+  return sanitized;
+}
 
 export function traceOperationalEvent(
   level: TraceLevel,
@@ -53,7 +110,7 @@ export function traceOperationalEvent(
       status: context.status || null,
       error_category: context.errorCategory || null,
       schema_version: getOfficialSchemaVersion(),
-      ...metadata
+      ...(sanitizeTraceMetadata(metadata) as Record<string, unknown>)
     }
   };
 

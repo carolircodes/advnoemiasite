@@ -1,3 +1,3 @@
-export * from "./app-urls";
-export * from "./database-tables";
-export * from "./route-manifest";
+export * from "./app-urls.ts";
+export * from "./database-tables.ts";
+export * from "./route-manifest.ts";

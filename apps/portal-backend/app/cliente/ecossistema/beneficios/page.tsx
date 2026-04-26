@@ -8,8 +8,8 @@ import { getCommunityOperationsBlueprint } from "@/lib/services/ecosystem-commun
 import { getClientProfileSummary } from "@/lib/services/client-workspace";
 import { getClientPremiumJourney } from "@/lib/services/ecosystem-journey";
 
-import { ClientSafeCard } from "../../_components/client-safe-card";
-import { ClientShell } from "../../_components/client-shell";
+import { ClientSafeCard } from "../../_components/client-safe-card.tsx";
+import { ClientShell } from "../../_components/client-shell.tsx";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireStaffRouteAccess } from "../../../../../lib/auth/api-authorization";
-import { triagePersistence } from "../../../../../lib/services/triage-persistence";
+import { requireStaffRouteAccess } from "../../../../../lib/auth/api-authorization.ts";
+import { triagePersistence } from "../../../../../lib/services/triage-persistence.ts";
 
 export async function GET(request: Request) {
   try {

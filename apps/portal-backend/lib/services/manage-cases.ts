@@ -1,16 +1,16 @@
 import "server-only";
 
-import { assertStaffActor } from "../auth/guards";
+import { assertStaffActor } from "../auth/guards.ts";
 import {
   caseAreaLabels,
   caseStatusLabels,
   createCaseSchema,
   updateCaseDetailsSchema,
   updateCaseStatusSchema
-} from "../domain/portal";
-import { sendCaseUpdateNotification } from "../notifications/case-notifications";
-import { createAdminSupabaseClient } from "../supabase/admin";
-import { logger, logCaseUpdate } from "../logging/structured-logger";
+} from "../domain/portal.ts";
+import { sendCaseUpdateNotification } from "../notifications/case-notifications.ts";
+import { createAdminSupabaseClient } from "../supabase/admin.ts";
+import { logger, logCaseUpdate } from "../logging/structured-logger.ts";
 
 type CaseRecord = {
   id: string;

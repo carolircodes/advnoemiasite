@@ -45,9 +45,10 @@ function withEnv(
   }
 }
 
-test("payment readiness reports healthy when webhook secret is configured and enforcement is fail-closed", () => {
+test("payment readiness requires explicit Mercado Pago signature enforcement outside production fallback", () => {
   return withEnv(
     {
+      NODE_ENV: "development",
       MERCADO_PAGO_ACCESS_TOKEN: "token",
       MERCADO_PAGO_WEBHOOK_SECRET: "secret",
       NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY: "public-key",
@@ -55,6 +56,28 @@ test("payment readiness reports healthy when webhook secret is configured and en
       SUPABASE_SECRET_KEY: "service-secret",
       NEXT_PUBLIC_APP_URL: "https://portal.advnoemia.com.br",
       MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE: "false"
+    },
+    () => {
+      const section = buildPaymentReadinessSection();
+
+      assert.equal(section.status, "degraded");
+      assert.equal(section.code, "payments_signature_not_enforced");
+      assert.equal(section.details.signatureEnforced, false);
+    }
+  );
+});
+
+test("payment readiness is healthy when Mercado Pago signature enforcement is enabled", () => {
+  return withEnv(
+    {
+      NODE_ENV: "development",
+      MERCADO_PAGO_ACCESS_TOKEN: "token",
+      MERCADO_PAGO_WEBHOOK_SECRET: "secret",
+      NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY: "public-key",
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SECRET_KEY: "service-secret",
+      NEXT_PUBLIC_APP_URL: "https://portal.advnoemia.com.br",
+      MERCADO_PAGO_WEBHOOK_ENFORCE_SIGNATURE: "true"
     },
     () => {
       const section = buildPaymentReadinessSection();

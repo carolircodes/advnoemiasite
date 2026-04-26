@@ -1,8 +1,8 @@
-import type { PortalProfile } from "../auth/guards";
+import type { PortalProfile } from "../auth/guards.ts";
 import {
   normalizeClientProfileSummary,
   normalizeClientRecordSummary
-} from "../portal/client-normalizers";
+} from "../portal/client-normalizers.ts";
 
 type ClientLoaderResult<T> = {
   ok: boolean;

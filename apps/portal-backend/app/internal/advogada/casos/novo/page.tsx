@@ -20,7 +20,7 @@ import {
 } from "@/lib/navigation";
 import { getStaffOverview } from "@/lib/services/dashboard";
 
-import { createInternalCaseAction } from "../actions";
+import { createInternalCaseAction } from "../actions.ts";
 
 function getStringParam(
   value: string | string[] | undefined,
