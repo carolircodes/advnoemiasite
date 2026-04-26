@@ -128,7 +128,7 @@ Vou te deixar um acesso direto aqui 👇`
 
 Demissões, verbas rescisórias e direitos trabalhistas são áreas onde muitos trabalhadores perdem benefícios importantes.
 
-Se você quiser, posso te ajudar a garantir seus direitos e buscar o que você tem direito.
+Se você quiser, posso te ajudar a organizar as informações iniciais para uma análise responsável.
 
 Vou te deixar um acesso direto aqui 👇`
   },
@@ -340,7 +340,7 @@ Acesse aqui: ${trackingLink}`;
 
   // Mensagem genérica para casos sem tema específico
   contextualMessage = 'vi que você está buscando ajuda jurídica';
-  valueProposition = 'cada caso tem suas particularidades e merece uma análise cuidadosa para garantir seus direitos';
+    valueProposition = 'cada caso tem suas particularidades e merece uma análise cuidadosa antes de qualquer conclusão';
 
   // Ajustar tom baseado no nível de intenção
   let opening = '';

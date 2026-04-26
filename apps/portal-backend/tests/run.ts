@@ -8,6 +8,7 @@ import "./phase2-database-security.test.ts";
 import "./phase3-hardening.test.ts";
 import "./phase3-webhooks-channels.test.ts";
 import "./phase4-hardening.test.ts";
+import "./phase4-noemia-compliance.test.ts";
 import "./phase5-hardening.test.ts";
 import "./phase6-hardening.test.ts";
 import "./phase7-hardening.test.ts";

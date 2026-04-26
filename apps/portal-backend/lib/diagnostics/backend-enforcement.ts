@@ -7,6 +7,7 @@ import {
 } from "./environment-convergence.ts";
 import { buildDatabaseSecurityReadinessSection } from "./database-security.ts";
 import { buildChannelWebhookReadinessSection } from "./channel-readiness.ts";
+import { buildNoemiaComplianceReadinessSection } from "./noemia-compliance-readiness.ts";
 import {
   buildDiagnosticSection,
   combineDiagnosticStatuses,
@@ -264,6 +265,10 @@ function inferActionDomain(
 
   if (subsystem === "databaseSecurity") {
     return "database_admin";
+  }
+
+  if (subsystem === "noemiaCompliance") {
+    return "repo_code";
   }
 
   if (
@@ -682,6 +687,15 @@ function evaluateDiagnosticSection(
     level = context.profile === "production" ? "action_required" : "warning";
     reason =
       "Canais core exigem validacao manual em provider antes de producao plena.";
+  } else if (section.code === "noemia_compliance_blocked_phrases") {
+    level = "release_blocker";
+    reason = "NoemIA contem linguagem proibida para atendimento juridico responsavel.";
+  } else if (section.code === "noemia_compliance_action_required") {
+    level = context.profile === "production" ? "release_blocker" : "action_required";
+    reason = "NoemIA ainda nao tem guardrails/testes minimos para piloto responsavel.";
+  } else if (section.code === "noemia_compliance_pilot_ready_manual_review") {
+    level = context.profile === "production" ? "action_required" : "warning";
+    reason = "NoemIA esta pronta para piloto controlado, mas exige revisao humana antes de escala.";
   } else if (subsystem === "environmentCompleteness" && section.status === "degraded") {
     level = context.profile === "production" ? "action_required" : "warning";
     reason = "Existem lacunas de subsistema ou de perfil que merecem acompanhamento.";
@@ -1137,7 +1151,8 @@ export async function buildBackendOperationsVerificationReport(options?: {
   const sections: Record<string, DiagnosticSection> = {
     ...envSections,
     databaseSecurity: buildDatabaseSecurityReadinessSection(),
-    channelReadiness: buildChannelWebhookReadinessSection()
+    channelReadiness: buildChannelWebhookReadinessSection(),
+    noemiaCompliance: buildNoemiaComplianceReadinessSection()
   };
 
   if (runtimeMode === "off") {

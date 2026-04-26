@@ -242,6 +242,12 @@ export interface NoemiaCoreOutput {
     contextSummary?: NoemiaPromptContextSummary;
     sideEffects?: string[];
     conversationState?: ConversationState;
+    noemiaCompliance?: {
+      requiresHumanHandoff: boolean;
+      riskLevel: "low" | "medium" | "high" | "critical";
+      reasonCodes: string[];
+      surface: "public_comment" | "private_conversation";
+    };
   };
 }
 

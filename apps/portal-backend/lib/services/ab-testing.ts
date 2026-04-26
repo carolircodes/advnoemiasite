@@ -100,7 +100,7 @@ const abTests: ABTest[] = [
         variationType: 'cta',
         name: 'CTA Urgência',
         description: 'Focado em urgência e tempo limitado',
-        value: 'Comente "APOSENTADORIA" agora! Tempo está esgotando para garantir seus direitos.',
+        value: 'Comente "APOSENTADORIA" se quiser receber orientações gerais e entender quando vale buscar uma análise individual.',
         isActive: true,
         weight: 50,
         metadata: {
@@ -115,7 +115,7 @@ const abTests: ABTest[] = [
         variationType: 'cta',
         name: 'CTA Benefício',
         description: 'Focado no benefício direto',
-        value: 'Comente "APOSENTADORIA" e receba o guia completo para garantir seu benefício!',
+        value: 'Comente "APOSENTADORIA" e receba um guia inicial para organizar suas dúvidas sobre benefício.',
         isActive: true,
         weight: 50,
         metadata: {

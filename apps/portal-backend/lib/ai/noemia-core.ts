@@ -44,6 +44,10 @@ import {
   buildNoemiaTraceMetadata,
   traceNoemiaEvent
 } from "./noemia-observability.ts";
+import {
+  evaluateNoemiaCompliance,
+  sanitizeNoemiaReply
+} from "./noemia-compliance.ts";
 import { runNoemiaModel } from "./noemia-provider.ts";
 import { buildSystemPrompt as buildNoemiaSystemPrompt } from "./system-prompt.ts";
 import {
@@ -218,9 +222,9 @@ const TONE_BY_AREA = {
     adaptacao: "mais orientação e clareza"
   },
   bancario: {
-    prefixo: "Cuidado: ",
-    sufixo: " - bancos costumam ter equipe jurídica forte.",
-    adaptacao: "mais firmeza + alerta"
+    prefixo: "",
+    sufixo: " - vale conferir documentos e descontos com cuidado.",
+    adaptacao: "firmeza responsavel"
   },
   familia: {
     prefixo: "",
@@ -406,22 +410,22 @@ const CLOSING_INDICATORS = {
 
 const SMOOTH_TRANSITIONS = [
   "O que você me descreveu merece uma análise mais cuidadosa.",
-  "Pelo que você compartilhou, seu caso precisa de atenção especializada.",
+  "Pelo que você compartilhou, seu caso merece atenção individual.",
   "Sua situação tem particularidades que merecem uma análise individual.",
-  "Esses detalhes que você mencionou indicam que uma análise profunda é necessária.",
-  "O cenário que você apresenta tem marcas de erro na avaliação inicial.",
-  "O cenário que você apresentou exige uma avaliação cuidadosa por um especialista.",
-  "Com base no que você me contou, o próximo passo é uma análise profissional.",
+  "Esses detalhes que você mencionou indicam que uma análise cuidadosa é importante.",
+  "O cenário que você apresenta precisa ser avaliado sem conclusões apressadas.",
+  "O cenário que você apresentou pede uma avaliação cuidadosa pela advogada.",
+  "Com base no que você me contou, o próximo passo é organizar uma análise individual.",
   "Sua história tem elementos que precisam ser estudados com mais atenção.",
   "O que você está passando merece uma orientação especializada e segura."
 ];
 
 const ELEGANT_OFFERS = [
   "Na consulta, conseguimos analisar seu caso com profundidade e te orientar com segurança sobre o que pode ser feito.",
-  "Uma consulta individual permite que a Dra. Noêmia examine todos os detalhes do seu caso e identifique as melhores estratégias.",
-  "Durante a consulta, fazemos uma análise completa da sua situação e traçamos um plano de ação claro e seguro.",
+  "Uma consulta individual permite que a Dra. Noêmia examine os detalhes do seu caso e avalie os caminhos possíveis.",
+  "Durante a consulta, fazemos uma análise cuidadosa da sua situação e organizamos os próximos passos com responsabilidade.",
   "Na consulta, a Dra. Noêmia consegue ver aspectos do seu caso que não ficam evidentes numa conversa inicial.",
-  "A consulta é o momento ideal para analisarmos fundo sua situação e te darmos orientação precisa e definitiva."
+  "A consulta é o momento adequado para avaliar sua situação sem conclusões precipitadas."
 ];
 
 const NATURAL_CALLS = [
@@ -436,23 +440,23 @@ const NATURAL_CALLS = [
 const OBJECTION_HANDLERS = {
   duvida: [
     "Muitas pessoas chegam com a mesma dúvida, e a análise inicial costuma esclarecer muita coisa que não fica clara sozinho.",
-    "É normal ter essa dúvida. A maioria dos nossos clientes começou assim, e a consulta resolveu completamente.",
-    "Compreendo perfeitamente sua dúvida. A verdade é que só uma análise detalhada pode dar segurança real sobre seu caso.",
+    "É normal ter essa dúvida. A análise individual costuma trazer mais clareza para decidir o próximo passo.",
+    "Compreendo sua dúvida. Uma análise detalhada ajuda a evitar orientação incompleta.",
     "Essa dúvida é muito comum. Por isso mesmo que a consulta é importante - para trazer clareza e segurança."
   ],
   
   custo: [
-    "A consulta é um investimento na clareza e segurança do seu caso. Vale muito pela tranquilidade que traz.",
-    "Entendo a preocupação com o valor. A consulta na verdade economiza tempo e evita erros que custariam muito mais.",
-    "O valor da consulta é muito menor que o prejuízo de não resolver seu caso corretamente desde o início.",
-    "Pensando bem, a consulta é o custo mais baixo para garantir que seus direitos sejam protegidos adequadamente."
+    "Entendo a preocupação com o valor. A consulta serve para trazer clareza antes de qualquer decisão.",
+    "A ideia da consulta é evitar orientações incompletas e avaliar o caso com responsabilidade.",
+    "O valor da consulta precisa fazer sentido para você; posso explicar como funciona para decidir com calma.",
+    "Posso te explicar o formato da consulta e você avalia se é o momento de seguir."
   ],
   
   tempo: [
-    "Uma consulta bem feita acelera muito a resolução do caso. Tempo investido agora economiza meses depois.",
-    "A consulta é rápida, mas o impacto é duradouro. Em poucas horas ganhamos clareza que levaria meses sozinho.",
-    "Entendo a preocupação com tempo. Por isso mesmo que a consulta é eficiente - nos dá um caminho claro e rápido.",
-    "A consulta otimiza todo o processo. É o tempo mais bem investido para resolver sua situação com segurança."
+    "Entendo a preocupação com tempo. A consulta ajuda a organizar o caminho com mais clareza.",
+    "A consulta costuma ser objetiva, mas sem prometer prazo ou resultado.",
+    "O importante é avaliar documentos, prazos e detalhes antes de decidir o próximo passo.",
+    "Posso te explicar o formato para você ver se cabe na sua rotina."
   ]
 };
 
@@ -487,8 +491,8 @@ const BUYING_INTENTION_INDICATORS = {
 const FAST_CONVERSION_MESSAGES = {
   preco: [
     "Ótima pergunta! Posso te explicar como funciona a consulta e já te encaminhar para agendamento.",
-    "Sobre o valor, vamos conversar durante a consulta. Posso já te explicar como funciona e te ajudar a marcar?",
-    "O valor da consulta é acessível e vale muito pelo resultado. Quer que eu te explique o processo e já agende?",
+    "Sobre o valor, posso te explicar como funciona a consulta e, se fizer sentido, encaminhar o agendamento.",
+    "Posso te explicar o valor e o formato da consulta, sem pressa e sem promessa de resultado.",
     "Vamos falar sobre valores na consulta. Posso te mostrar como funciona e já te encaminhar para agendamento?"
   ],
   
@@ -1186,6 +1190,12 @@ interface NoemiaCoreOutput {
     };
     sideEffects?: string[];
     conversationState?: ConversationState;
+    noemiaCompliance?: {
+      requiresHumanHandoff: boolean;
+      riskLevel: "low" | "medium" | "high" | "critical";
+      reasonCodes: string[];
+      surface: "public_comment" | "private_conversation";
+    };
   };
 }
 
@@ -1816,16 +1826,16 @@ function generateHandoffMessage(state: ConversationState, handoffType: 'hot_lead
   
   switch (handoffType) {
     case 'hot_lead':
-      return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente precisa de atenção especializada e rápida.\n\nVou organizar todo o contexto que você compartilhou e encaminhar para a equipe da Dra. Noêmia com prioridade máxima. Eles já receberão todas as informações importantes para começar a analisar seu caso.\n\nO que poucos entendem é que cada dia de espera pode impactar diretamente seu resultado. A equipe entrará em contato em até 2 horas úteis.\n\nEnquanto isso, se houver algum agravamento da situação, me avise imediatamente.`;
+      return `Entendi sua situação. Pelo que você descreveu, o mais responsável é encaminhar para avaliação humana sem prometer prazo ou resultado.\n\nVou organizar o contexto que você compartilhou e sinalizar para a equipe da Dra. Noêmia com prioridade adequada. Como isso depende de documentos, prazos e detalhes específicos, a análise individual é importante.\n\nEnquanto isso, se houver algum agravamento real, me avise para registrar no encaminhamento.`;
       
     case 'urgent':
-      return `Compreendo completamente a urgência e complexidade do seu caso. Situações como a sua exigem análise humana especializada imediata.\n\nVou encaminhar seu caso diretamente para a equipe da Dra. Noêmia com prioridade máxima e sinalização de urgência. Você receberá contato em até 1 hora útil.\n\nJá organizei todas as informações que você forneceu para que a equipe possa começar a trabalhar no seu caso assim que receber o encaminhamento.\n\nSe algo mudar ou piorar, me avise imediatamente.`;
+      return `Compreendo a urgência. Quando há prazo, risco ou situação sensível, a IA não deve concluir nada sozinha.\n\nVou encaminhar o contexto para avaliação humana com sinalização de urgência. Se houver audiência, intimação, bloqueio, violência, ameaça ou risco de saúde/sobrevivência, informe apenas o essencial por aqui e aguarde a condução humana.`;
       
     case 'warm_ready':
-      return `Excelente! Já estou entendendo bem seu cenário. Vejo que seu caso tem potencial e merece uma análise cuidadosa por parte da equipe especializada.\n\nVou preparar um resumo completo com todos os detalhes que você compartilhou e encaminhar para a Dra. Noêmia avaliar suas possibilidades reais.\n\nA equipe geralmente entra em contato em até 24 horas úteis para agendar uma conversa individual. Cada caso tem particularidades que só uma análise detalhada pode revelar.\n\nPosso já anotar alguma preferência de contato (WhatsApp, ligação) ou período (manhã, tarde, noite)?`;
+      return `Já estou entendendo melhor seu cenário. Ele merece uma análise cuidadosa, sem conclusão automática.\n\nVou preparar um resumo com o que você compartilhou para a Dra. Noêmia avaliar os caminhos possíveis. Cada caso tem particularidades que só uma análise detalhada revela.\n\nPosso anotar sua preferência de contato ou período para a equipe organizar o retorno?`;
       
     case 'individual_analysis':
-      return `Perfeito! Já consigo ver que há uma situação real que precisa ser entendida melhor por um profissional especializado.\n\nVou organizar todo o contexto que você compartilhou e encaminhar para a equipe da Dra. Noêmia fazer uma análise individual do seu caso.\n\nMuitas vezes o que parece complicado no início se torna mais claro com uma análise profissional. A Dra. Noêmia é especialista em identificar oportunidades que poucos percebem.\n\nA equipe entrará em contato em até 48 horas úteis para explorar suas possibilidades. Há alguma preferência de período para recebermos o contato?`;
+      return `Perfeito. Já existe uma situação concreta que precisa ser entendida com cuidado.\n\nVou organizar o contexto que você compartilhou e encaminhar para a equipe da Dra. Noêmia fazer uma análise individual do caso.\n\nPara evitar uma orientação incompleta, o ideal é avaliar documentos, prazos e detalhes com calma. Há alguma preferência de período para receber contato?`;
       
     default:
       return `Obrigada por compartilhar esses detalhes. Vou organizar sua informação e encaminhar para a equipe especializada analisar seu caso com atenção.`;
@@ -1948,6 +1958,13 @@ export async function processNoemiaCore(
     classification,
     evaluateManagedPolicyHandoff
   );
+  const complianceDecision = evaluateNoemiaCompliance({
+    message: input.message,
+    channel: input.channel,
+    domain,
+    theme: classification.theme,
+    metadata: input.metadata
+  });
 
   traceNoemiaEvent("info", "NOEMIA_CORE_STARTED", {
     channel: input.channel,
@@ -1963,7 +1980,9 @@ export async function processNoemiaCore(
     classification,
     currentStep: currentConversationState.currentStep,
     nextStep: newConversationState.currentStep,
-    messagePreview: input.message.slice(0, 120)
+    complianceRiskLevel: complianceDecision.riskLevel,
+    complianceReasons: complianceDecision.reasonCodes,
+    surface: complianceDecision.surface
   });
 
   console.log(
@@ -1972,11 +1991,74 @@ export async function processNoemiaCore(
   console.log(
     `NOEMIA_CORE_STEP: ${currentConversationState.currentStep} -> ${newConversationState.currentStep}`
   );
-  console.log(
-    `NOEMIA_CORE_MESSAGE: ${input.message.substring(0, 100)}...`
-  );
 
   try {
+    if (complianceDecision.shouldBypassModel && complianceDecision.safeReply) {
+      const safeReply = sanitizeNoemiaReply(complianceDecision.safeReply, {
+        surface: complianceDecision.surface,
+        theme: classification.theme
+      });
+
+      traceNoemiaEvent("warn", "NOEMIA_COMPLIANCE_HANDOFF", {
+        channel: input.channel,
+        domain,
+        userType: input.userType,
+        policyMode,
+        sessionId:
+          typeof input.metadata?.sessionId === "string" ? input.metadata.sessionId : null,
+        clientId:
+          typeof input.metadata?.clientId === "string" ? input.metadata.clientId : null
+      }, {
+        outcome: "compliance_guardrail",
+        riskLevel: complianceDecision.riskLevel,
+        reasonCodes: complianceDecision.reasonCodes,
+        surface: complianceDecision.surface
+      });
+
+      return {
+        reply: safeReply,
+        intent: "human_handoff",
+        audience: input.userType,
+        source: "fallback",
+        usedFallback: true,
+        error: null,
+        metadata: {
+          responseTime: Date.now() - startTime,
+          detectedTheme: classification.theme,
+          channel: input.channel,
+          openaiUsed: false,
+          classification,
+          domain,
+          policyMode,
+          promptVersion,
+          contextSummary: {
+            domain,
+            channel: input.channel,
+            audience: input.userType,
+            sections: [],
+            inputKeys: Object.keys(input.context || {}),
+            hasAcquisitionContext: false,
+            hasClientContext: false,
+            hasPageContext: false,
+            hasJourneyContext: false
+          },
+          sideEffects: ["compliance_handoff"],
+          conversationState: {
+            ...newConversationState,
+            needsHumanAttention: complianceDecision.requiresHumanHandoff,
+            readyForHandoff: complianceDecision.requiresHumanHandoff,
+            handoffReason: complianceDecision.reasonCodes.join("|") || "noemia_compliance"
+          },
+          noemiaCompliance: {
+            requiresHumanHandoff: complianceDecision.requiresHumanHandoff,
+            riskLevel: complianceDecision.riskLevel,
+            reasonCodes: complianceDecision.reasonCodes,
+            surface: complianceDecision.surface
+          }
+        }
+      };
+    }
+
     // Fase 4.2 - Buscar contexto do cliente
     let clientContext = null;
     let enrichedContext = input.context;
@@ -2176,7 +2258,10 @@ export async function processNoemiaCore(
       }));
 
       return {
-        reply: openaiResult.response,
+        reply: sanitizeNoemiaReply(openaiResult.response, {
+          surface: complianceDecision.surface,
+          theme: classification.theme
+        }),
         intent,
         audience: effectiveAudience,
         source: "openai",
@@ -2254,7 +2339,10 @@ export async function processNoemiaCore(
           );
 
     return {
-      reply: fallbackReply,
+      reply: sanitizeNoemiaReply(fallbackReply, {
+        surface: complianceDecision.surface,
+        theme: classification.theme
+      }),
       intent,
       audience: effectiveAudience,
       source: effectiveAudience === "visitor" ? "triage" : "fallback",
@@ -2292,7 +2380,7 @@ export async function processNoemiaCore(
     }, error);
 
     const emergencyResponse =
-      "Oi! Me conta com calma o que está acontecendo no seu caso.";
+      "Tive uma falha temporaria para continuar sem assumir algo errado. Posso organizar o essencial e encaminhar para avaliacao humana, se voce preferir.";
 
     return {
       reply: emergencyResponse,
@@ -2339,9 +2427,17 @@ export async function processComment(
   const promptVersion = getNoemiaPromptVersion();
 
   console.log(`NOEMIA_COMMENT_START: ${platform} | ${commentId} | ${userId}`);
-  console.log(`NOEMIA_COMMENT_TEXT: ${commentText.substring(0, 100)}...`);
 
   const classification = classifyIncomingMessage(commentText);
+  const complianceDecision = evaluateNoemiaCompliance({
+    message: commentText,
+    channel: platform,
+    domain,
+    theme: classification.theme,
+    metadata: {
+      source: `${platform}_comment`
+    }
+  });
 
   const shouldReplyPrivately =
     classification.intent === "lead_interest" ||
@@ -2432,7 +2528,10 @@ export async function processComment(
       }));
 
       return {
-        reply: openaiResult.response,
+        reply: sanitizeNoemiaReply(openaiResult.response, {
+          surface: complianceDecision.surface,
+          theme: classification.theme
+        }),
         shouldReplyPrivately,
         classification,
         metadata: {
@@ -2464,7 +2563,10 @@ export async function processComment(
     const fallbackReply = generateCommentFallback(classification);
 
     return {
-      reply: fallbackReply,
+      reply: sanitizeNoemiaReply(fallbackReply, {
+        surface: complianceDecision.surface,
+        theme: classification.theme
+      }),
       shouldReplyPrivately,
       classification,
       metadata: {
@@ -2493,7 +2595,8 @@ export async function processComment(
 
     return {
       reply:
-        "Oi! Vi seu comentário 💬 Tem alguns detalhes importantes sobre isso que muita gente não sabe. Me chama no direct que eu te explico melhor.",
+        complianceDecision.safeReply ||
+        "Vi seu comentario. Por privacidade, o ideal e continuar no privado para a equipe entender o contexto com cuidado.",
       shouldReplyPrivately: true,
       classification,
       metadata: {
@@ -2514,15 +2617,15 @@ function generateCommentFallback(classification: {
 }): string {
   const responses: Record<LegalTheme, string> = {
     previdenciario:
-      "Oi! Vi seu comentário 💬 Dependendo da situação, pode existir um caminho que muita gente nem imagina. Me chama no direct que eu te explico melhor.",
+      "Vi seu comentario. Em temas previdenciarios, documentos e prazos mudam bastante a analise. Chame no privado para a equipe entender com cuidado.",
     bancario:
-      "Oi! Vi seu comentário 💬 Em casos bancários, às vezes existem detalhes importantes que passam despercebidos. Me chama no direct que eu te explico melhor.",
+      "Vi seu comentario. Em casos bancarios, e melhor olhar documentos e descontos sem expor dados em publico. Chame no privado para a equipe orientar o proximo passo.",
     familia:
-      "Oi! Vi seu comentário 💬 Em questões de família, alguns detalhes mudam tudo. Me chama no direct que eu te explico melhor.",
+      "Vi seu comentario. Como familia envolve detalhes sensiveis, o mais seguro e continuar no privado para preservar sua situacao.",
     civil:
-      "Oi! Vi seu comentário 💬 Dependendo do que aconteceu, pode existir um caminho importante no seu caso. Me chama no direct que eu te explico melhor.",
+      "Vi seu comentario. Em casos civis, documentos e datas fazem diferenca. Chame no privado para a equipe entender melhor, sem expor dados aqui.",
     geral:
-      "Oi! Vi seu comentário 💬 Tem alguns pontos importantes sobre isso que podem fazer diferença. Me chama no direct que eu te explico melhor.",
+      "Vi seu comentario. Para preservar sua privacidade, chame no privado ou pelo WhatsApp para a equipe entender o contexto com cuidado.",
   };
 
   return responses[classification.theme];
