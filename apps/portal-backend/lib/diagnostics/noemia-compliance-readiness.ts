@@ -11,7 +11,26 @@ type NoemiaComplianceReadinessStatus =
   | "blocked"
   | "not_configured";
 
-const REPO_ROOT = process.cwd();
+function resolveRepoRoot() {
+  let current = process.cwd();
+
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (existsSync(path.join(current, "apps/portal-backend/lib/ai/noemia-core.ts"))) {
+      return current;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
+
+    current = parent;
+  }
+
+  return process.cwd();
+}
+
+const REPO_ROOT = resolveRepoRoot();
 
 const TARGET_FILES = [
   "apps/portal-backend/lib/ai/noemia-core.ts",

@@ -17,6 +17,7 @@ import {
 import { conversationPersistence } from "./conversation-persistence.ts";
 import { evaluateInstagramCommentPolicy } from "./instagram-comment-policy.ts";
 import { instagramCommentContext } from "./instagram-comment-context.ts";
+import { matchInstagramKeywordAutomation } from "./instagram-keyword-matcher.ts";
 import {
   evaluateConversationPolicy,
   extractConversationStateFromSession
@@ -368,7 +369,13 @@ function buildDeterministicEventId(event: ChannelConversationEvent) {
 }
 
 function detectThemeFromText(messageText: string) {
-  const normalizedMessage = messageText.toLowerCase();
+  const keywordMatch = matchInstagramKeywordAutomation(messageText);
+
+  if (keywordMatch.matched) {
+    return keywordMatch.topic;
+  }
+
+  const normalizedMessage = keywordMatch.normalizedText;
 
   if (
     normalizedMessage.includes("aposent") ||
@@ -1716,6 +1723,45 @@ async function handleInstagramCommentEntry(args: {
     );
   }
 
+  if (commentPolicy.publicReply && !publicReplySent) {
+    logRouterEvent(
+      "outbound_blocked_missing_config",
+      buildRouterLogContext({
+        event: args.event,
+        eventId: args.eventId,
+        session: args.session,
+        messageType: args.messageType,
+        pipelineId: args.pipelineId,
+        responseType: "public_comment",
+        responseLength: commentPolicy.publicReply.length,
+        reason: publicReplyFeatureEnabled
+          ? "public_comment_reply_not_sent"
+          : "public_comment_reply_disabled",
+        extra: {
+          commentId: commentContext.commentId,
+          publicReplyFeatureEnabled,
+          hasPublicReplyTransport: Boolean(args.transport.sendPublicCommentReply)
+        }
+      }),
+      "warn"
+    );
+
+    await safeCreateConversationEvent({
+      sessionId: args.session.id,
+      eventType: "manual_followup_required",
+      actorType: "system",
+      eventData: {
+        summary: "Outbound publico do comentario nao foi enviado; revisar manualmente no inbox.",
+        commentId: commentContext.commentId,
+        surface: "public_comment",
+        reason: publicReplyFeatureEnabled
+          ? "public_comment_reply_not_sent"
+          : "public_comment_reply_disabled",
+        suggestedReply: commentPolicy.publicReply
+      }
+    });
+  }
+
   if (publicReplySent) {
     await safeSaveMessage(args.session.id, undefined, "assistant", commentPolicy.publicReply!, "outbound", {
       channel: args.event.channel,
@@ -1751,6 +1797,40 @@ async function handleInstagramCommentEntry(args: {
       payload: {
         autoDmSupported: commentPolicy.autoDmSupported,
         humanReviewRequired: commentPolicy.humanReviewRequired
+      }
+    });
+  }
+
+  if (commentPolicy.inviteToDm && !commentPolicy.autoDmSupported) {
+    logRouterEvent(
+      "manual_followup_required",
+      buildRouterLogContext({
+        event: args.event,
+        eventId: args.eventId,
+        session: args.session,
+        messageType: args.messageType,
+        pipelineId: args.pipelineId,
+        responseType: "direct_message",
+        responseLength: commentPolicy.publicReply?.length || null,
+        reason: "comment_auto_dm_unavailable",
+        extra: {
+          commentId: commentContext.commentId,
+          directTransitionStatus: commentPolicy.directTransitionStatus
+        }
+      }),
+      "warn"
+    );
+
+    await safeCreateConversationEvent({
+      sessionId: args.session.id,
+      eventType: "manual_followup_required",
+      actorType: "system",
+      eventData: {
+        summary: "Comentario pediu continuidade privada, mas o Direct automatico esta indisponivel.",
+        commentId: commentContext.commentId,
+        surface: "direct_message",
+        reason: "comment_auto_dm_unavailable",
+        suggestedReply: commentPolicy.publicReply
       }
     });
   }
@@ -1811,6 +1891,37 @@ async function handleInstagramCommentEntry(args: {
         },
         sessionId: args.session.id
       });
+    } else {
+      logRouterEvent(
+        "outbound_blocked_missing_config",
+        buildRouterLogContext({
+          event: args.event,
+          eventId: args.eventId,
+          session: args.session,
+          messageType: args.messageType,
+          pipelineId: args.pipelineId,
+          responseType: "direct_message",
+          responseLength: commentPolicy.publicReply.length,
+          reason: "comment_auto_dm_send_failed",
+          extra: {
+            commentId: commentContext.commentId
+          }
+        }),
+        "warn"
+      );
+
+      await safeCreateConversationEvent({
+        sessionId: args.session.id,
+        eventType: "manual_followup_required",
+        actorType: "system",
+        eventData: {
+          summary: "Direct automatico do comentario nao foi enviado; fazer follow-up manual.",
+          commentId: commentContext.commentId,
+          surface: "direct_message",
+          reason: "comment_auto_dm_send_failed",
+          suggestedReply: commentPolicy.publicReply
+        }
+      });
     }
   }
 
@@ -1821,6 +1932,9 @@ async function handleInstagramCommentEntry(args: {
       : commentPolicy.directTransitionStatus,
     lastResolvedAt: now
   } satisfies SocialAcquisitionSnapshot;
+  const outboundBlocked =
+    Boolean(commentPolicy.publicReply && !publicReplySent) ||
+    Boolean(commentPolicy.inviteToDm && !dmStarted);
 
   const mergedMetadata = {
     ...(args.session.metadata || {}),
@@ -1834,6 +1948,8 @@ async function handleInstagramCommentEntry(args: {
       rationale: commentPolicy.rationale,
       publicReplySent,
       dmStarted,
+      outboundBlocked,
+      manualFollowupRequired: outboundBlocked || commentPolicy.humanReviewRequired,
       updatedAt: now
     },
     router_last_event_id: args.eventId,
@@ -1857,34 +1973,38 @@ async function handleInstagramCommentEntry(args: {
   }
 
   await safeUpdateSession(args.session.id, {
-    lead_stage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+    lead_stage: commentPolicy.humanReviewRequired || outboundBlocked ? "qualified" : "engaged",
     case_area: args.acquisitionSnapshot.topic,
     current_intent: `comment_${commentPolicy.decision}`,
-    handoff_to_human: commentPolicy.humanReviewRequired,
+    handoff_to_human: commentPolicy.humanReviewRequired || outboundBlocked,
     last_inbound_at: now,
     last_outbound_at: publicReplySent || dmStarted ? now : undefined,
     last_summary: buildSessionSummaryPayload({
       acquisitionSummary: buildAcquisitionSummary(finalSnapshot),
       detectedTheme: finalSnapshot.topic,
-      leadStage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+      leadStage: commentPolicy.humanReviewRequired || outboundBlocked ? "qualified" : "engaged",
       triageStatus: "not_started",
-      conversationState: commentPolicy.humanReviewRequired
+      conversationState: commentPolicy.humanReviewRequired || outboundBlocked
         ? "human_followup_pending"
         : "ai_active",
       consultationStage: "not_offered",
-      followUpState: commentPolicy.humanReviewRequired
+      followUpState: commentPolicy.humanReviewRequired || outboundBlocked
         ? "human_handoff_pending"
         : "awaiting_initial_reply",
       conversionSignal: commentPolicy.inviteToDm ? "curiosity" : "none",
       nextBestAction: commentPolicy.inviteToDm ? "answer_and_ask_one_question" : "close",
       materialSent: false,
-      handoffTriggered: commentPolicy.humanReviewRequired,
-      handoffReason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined
+      handoffTriggered: commentPolicy.humanReviewRequired || outboundBlocked,
+      handoffReason: commentPolicy.humanReviewRequired
+        ? "comment_requires_human_review"
+        : outboundBlocked
+          ? "outbound_blocked_missing_config"
+          : undefined
     }),
     thread_status:
       commentPolicy.decision === "no_auto_reply"
         ? "archived"
-        : commentPolicy.humanReviewRequired
+        : commentPolicy.humanReviewRequired || outboundBlocked
           ? "handoff"
           : commentPolicy.inviteToDm || dmStarted
             ? "waiting_client"
@@ -1892,29 +2012,33 @@ async function handleInstagramCommentEntry(args: {
     waiting_for:
       commentPolicy.decision === "no_auto_reply"
         ? "none"
-        : commentPolicy.humanReviewRequired
+        : commentPolicy.humanReviewRequired || outboundBlocked
           ? "human"
           : commentPolicy.inviteToDm || dmStarted
             ? "client"
             : "none",
-    owner_mode: commentPolicy.humanReviewRequired ? "hybrid" : "ai",
+    owner_mode: commentPolicy.humanReviewRequired || outboundBlocked ? "hybrid" : "ai",
     priority:
-      commentPolicy.humanReviewRequired
+      commentPolicy.humanReviewRequired || outboundBlocked
         ? "high"
         : commentPolicy.inviteToDm || dmStarted
           ? "medium"
           : "low",
-    handoff_state: commentPolicy.humanReviewRequired ? "active" : "none",
-    handoff_reason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined,
+    handoff_state: commentPolicy.humanReviewRequired || outboundBlocked ? "active" : "none",
+    handoff_reason: commentPolicy.humanReviewRequired
+      ? "comment_requires_human_review"
+      : outboundBlocked
+        ? "outbound_blocked_missing_config"
+        : undefined,
     ai_enabled: true,
-    unread_count: commentPolicy.humanReviewRequired ? 1 : 0,
+    unread_count: commentPolicy.humanReviewRequired || outboundBlocked ? 1 : 0,
     last_message_at: now,
     last_message_preview: args.event.messageText.slice(0, 240),
     last_message_direction: "inbound",
     next_action_hint:
       commentPolicy.decision === "no_auto_reply"
         ? "Comentario irrelevante mantido apenas como sinal editorial, fora da fila operacional."
-        : commentPolicy.humanReviewRequired
+        : commentPolicy.humanReviewRequired || outboundBlocked
           ? "Comentario sensivel. Assumir no Instagram com continuidade premium."
           : commentPolicy.inviteToDm || dmStarted
             ? "Aguardar continuidade no direct e preservar contexto do comentario."
@@ -1922,7 +2046,7 @@ async function handleInstagramCommentEntry(args: {
     priority_source: "inferred",
     sensitivity_level: commentPolicy.humanReviewRequired ? "high" : "normal",
     follow_up_status:
-      commentPolicy.humanReviewRequired
+      commentPolicy.humanReviewRequired || outboundBlocked
         ? "pending"
         : commentPolicy.inviteToDm || dmStarted
           ? "due"
@@ -1942,8 +2066,12 @@ async function handleInstagramCommentEntry(args: {
     },
     args.event,
     finalSnapshot.topic,
-    commentPolicy.humanReviewRequired ? "qualified" : "engaged",
-    commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined,
+    commentPolicy.humanReviewRequired || outboundBlocked ? "qualified" : "engaged",
+    commentPolicy.humanReviewRequired
+      ? "comment_requires_human_review"
+      : outboundBlocked
+        ? "outbound_blocked_missing_config"
+        : undefined,
     undefined,
     undefined,
     args.pipelineId,
@@ -1969,25 +2097,30 @@ async function handleInstagramCommentEntry(args: {
   });
 
   return {
-    direction: commentPolicy.humanReviewRequired ? "handoff" : publicReplySent ? "reply" : "ignored",
+    direction: commentPolicy.humanReviewRequired || outboundBlocked ? "handoff" : publicReplySent ? "reply" : "ignored",
     sessionId: args.session.id,
     eventId: args.eventId,
     usedFallback: false,
-    handoffTriggered: commentPolicy.humanReviewRequired,
+    handoffTriggered: commentPolicy.humanReviewRequired || outboundBlocked,
     replySent: publicReplySent,
     detectedTheme: finalSnapshot.topic,
     currentIntent: `comment_${commentPolicy.decision}`,
-    leadStage: commentPolicy.humanReviewRequired ? "qualified" : "engaged",
+    leadStage: commentPolicy.humanReviewRequired || outboundBlocked ? "qualified" : "engaged",
     triageStatus: "not_started",
     followUpState: commentPolicy.humanReviewRequired
       ? "human_handoff_pending"
       : "awaiting_initial_reply",
     conversionSignal: commentPolicy.inviteToDm ? "curiosity" : "none",
     nextBestAction: commentPolicy.inviteToDm ? "answer_and_ask_one_question" : "close",
-    handoffReason: commentPolicy.humanReviewRequired ? "comment_requires_human_review" : undefined,
+    handoffReason: commentPolicy.humanReviewRequired
+      ? "comment_requires_human_review"
+      : outboundBlocked
+        ? "outbound_blocked_missing_config"
+        : undefined,
     logs: {
       publicReplySent,
       dmStarted,
+      outboundBlocked,
       commentPolicyDecision: commentPolicy.decision,
       commentSafetyDecision: commentPolicy.safetyDecision,
       autoDmSupported: commentPolicy.autoDmSupported,
@@ -2271,26 +2404,52 @@ export async function processChannelConversationEvent(
     const commentChannel = event.channel === "facebook" ? "facebook" : "instagram";
     const commentSource =
       event.source === "facebook_comment" ? "facebook_comment" : "instagram_comment";
+    const keywordMatch = matchInstagramKeywordAutomation(commentContext.commentText);
+    const detectedTheme = keywordMatch.matched
+      ? keywordMatch.topic
+      : detectThemeFromText(commentContext.commentText);
+
+    logRouterEvent(
+      keywordMatch.matched ? "keyword_matched" : "keyword_not_matched",
+      buildRouterLogContext({
+        event,
+        eventId,
+        session,
+        messageType,
+        pipelineId,
+        reason: keywordMatch.matched ? keywordMatch.keyword : "no_keyword_match",
+        extra: {
+          normalizedText: keywordMatch.normalizedText,
+          matchedAlias: keywordMatch.matchedAlias,
+          confidence: keywordMatch.confidence,
+          commentId: commentContext.commentId,
+          mediaId: commentContext.mediaId
+        }
+      }),
+      keywordMatch.matched ? "info" : "warn"
+    );
 
     session = await instagramCommentContext.createSessionWithCommentContext(event.externalUserId, {
       channel: commentChannel,
       source: commentSource,
       media_id: commentContext.mediaId,
-      keyword: detectThemeFromText(commentContext.commentText),
-      theme: detectThemeFromText(commentContext.commentText),
-      area: detectThemeFromText(commentContext.commentText),
+      keyword: keywordMatch.keyword || detectedTheme,
+      theme: detectedTheme,
+      area: keywordMatch.area || detectedTheme,
       campaign_id: "unified_router_comment",
       comment_id: commentContext.commentId,
       comment_text: commentContext.commentText,
-      detected_topic: detectThemeFromText(commentContext.commentText),
-      detected_keywords: commentContext.commentText
-        .split(/\s+/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-      .slice(0, 5),
+      detected_topic: detectedTheme,
+      detected_keywords: keywordMatch.matchedAlias
+        ? [keywordMatch.matchedAlias]
+        : commentContext.commentText
+            .split(/\s+/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .slice(0, 5),
       priority: "medium",
       intent_level: "medium",
-      confidence: 0.7
+      confidence: keywordMatch.confidence || 0.7
     });
     pipelineId = extractPipelineId(session);
 

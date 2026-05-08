@@ -45,6 +45,16 @@ function includesAny(text: string, values: string[]) {
   return values.some((value) => text.includes(value));
 }
 
+function normalizePolicyText(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function buildTopicAwareAcolhimento(topic: string) {
   if (topic === "previdenciario") {
     return "Obrigada por comentar. Esse ponto merece uma orientacao cuidadosa.";
@@ -75,7 +85,7 @@ function buildDmInvite(channel: "instagram" | "facebook", topic: string) {
 export function evaluateInstagramCommentPolicy(
   input: EvaluateInput
 ): CommentPolicyResult {
-  const normalized = input.commentText.toLowerCase();
+  const normalized = normalizePolicyText(input.commentText);
 
   const inappropriate =
     includesAny(normalized, ["spam", "sorteio", "bitcoin", "url", "link na bio"]) ||
@@ -88,8 +98,19 @@ export function evaluateInstagramCommentPolicy(
   const asksForGuidance =
     includesAny(normalized, ["como", "posso", "devo", "preciso", "me ajuda", "me orienta"]) ||
     includesAny(normalized, ["quero saber", "isso cabe", "o que faco", "o que fazer"]);
+  const keywordInterest =
+    includesAny(normalized, [
+      "negativacao",
+      "negativacao indevida",
+      "nome sujo",
+      "serasa",
+      "spc",
+      "banco negativou",
+      "negativou meu nome"
+    ]);
   const briefSafeQuestion =
     !sensitive &&
+    !keywordInterest &&
     (includesAny(normalized, ["sim", "verdade", "obrigada", "excelente", "boa"]) ||
       normalized.split(/\s+/).length <= 4);
 
@@ -141,6 +162,23 @@ export function evaluateInstagramCommentPolicy(
       directTransitionStatus: input.autoDmSupported ? "auto_dm_supported" : "auto_dm_unavailable",
       operatorAction: "conduzir para direct com discricao e continuar a triagem ali",
       rationale: "comentario indica intencao real de orientacao e pede continuidade privada"
+    };
+  }
+
+  if (keywordInterest) {
+    return {
+      policyName: "meta_comment_premium_v1",
+      decision: "public_reply_and_invite_dm",
+      safetyDecision: "safe_public_reply_with_dm_invite",
+      brevityRule: "short",
+      publicReply: buildDmInvite(input.channel, input.topic),
+      inviteToDm: true,
+      shouldAttemptAutoDm: input.autoDmSupported,
+      autoDmSupported: input.autoDmSupported,
+      humanReviewRequired: false,
+      directTransitionStatus: input.autoDmSupported ? "auto_dm_supported" : "auto_dm_unavailable",
+      operatorAction: "capturar lead de negativacao e conduzir para direct ou follow-up manual",
+      rationale: "comentario contem palavra-chave/alias de negativacao com potencial de conversao"
     };
   }
 

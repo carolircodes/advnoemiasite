@@ -13,6 +13,7 @@ import {
   validateMetaWebhookSignature,
   verifyMetaWebhookChallenge
 } from "@/lib/meta/meta-webhook-config";
+import { isMetaCommentChange } from "@/lib/meta/meta-comment-events";
 import { sendFacebookCommentReply, sendFacebookDirectMessage } from "@/lib/meta/facebook-service";
 import {
   sendInstagramCommentReply,
@@ -98,6 +99,13 @@ async function sendDirectMessage(
     rawStatus: result.rawStatus,
     error: result.error
   }, result.ok ? "info" : "error");
+  logEvent(result.ok ? "outbound_queued" : "outbound_blocked_missing_config", {
+    channel,
+    recipientId,
+    surface: "direct_message",
+    error: result.error,
+    ...result.metadata
+  }, result.ok ? "info" : "warn");
 
   return result;
 }
@@ -133,6 +141,13 @@ async function sendCommentReply(
     rawStatus: result.rawStatus,
     error: result.error
   }, result.ok ? "info" : "error");
+  logEvent(result.ok ? "outbound_queued" : "outbound_blocked_missing_config", {
+    channel,
+    commentId,
+    surface: "public_comment",
+    error: result.error,
+    ...result.metadata
+  }, result.ok ? "info" : "warn");
 
   return result.ok;
 }
@@ -186,12 +201,7 @@ async function processMetaChangeEntry(channel: MetaChannel, entry: Record<string
     const typedChange = change as Record<string, any>;
     const value = (typedChange.value || {}) as Record<string, any>;
 
-    if (
-      (channel === "instagram" && typedChange.field === "comments") ||
-      (channel === "facebook" &&
-        (typedChange.field === "feed" || typedChange.field === "comments") &&
-        (value.item === "comment" || typeof value.comment_id === "string"))
-    ) {
+    if (isMetaCommentChange(channel, typedChange)) {
       const senderId = typeof value.from?.id === "string" ? value.from.id : "";
       const commentId =
         typeof value.comment_id === "string"
@@ -215,6 +225,14 @@ async function processMetaChangeEntry(channel: MetaChannel, entry: Record<string
       if (!senderId || !commentId || !commentText) {
         continue;
       }
+
+      logEvent("instagram_comment_detected", {
+        channel,
+        commentId,
+        mediaId,
+        senderPresent: Boolean(senderId),
+        commentLength: commentText.length
+      });
 
       await processChannelConversationEvent(
         {
@@ -400,7 +418,19 @@ export async function POST(request: NextRequest) {
     });
     const rawBodyBytes = rawBuffer.length;
 
+    logEvent("webhook_received", {
+      objectHint,
+      hasSignatureHeader: Boolean(signatureHeader),
+      rawBodyBytes,
+      enforceSignature
+    });
+
     if (!signatureValidation.ok) {
+      logEvent("signature_invalid", {
+        reason: signatureValidation.reason,
+        objectHint,
+        attemptedSources: signatureValidation.attemptedSources
+      }, "warn");
       const diagnosticData = {
         note: "Meta webhook signature validation failed before payload processing.",
         reason: signatureValidation.reason,
@@ -456,6 +486,10 @@ export async function POST(request: NextRequest) {
         logEvent("META_SIGNATURE_SHADOW_MODE", diagnosticData, "warn");
       }
     } else {
+      logEvent("signature_valid", {
+        objectHint: signatureValidation.objectHint,
+        matchedSecretSource: signatureValidation.matchedSource
+      });
       logEvent("META_SIGNATURE_VALIDATED", {
         objectHint: signatureValidation.objectHint,
         attemptedSources: signatureValidation.attemptedSources,

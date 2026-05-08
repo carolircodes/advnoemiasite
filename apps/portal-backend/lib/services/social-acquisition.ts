@@ -5,6 +5,7 @@ import {
   presentOperationalSourceLabel,
   presentOperationalThreadOriginLabel
 } from "../channels/channel-presentation.ts";
+import { matchInstagramKeywordAutomation } from "./instagram-keyword-matcher.ts";
 
 export type AcquisitionEventGroup =
   | "acquisition"
@@ -152,7 +153,13 @@ function normalizeKey(value: string | null | undefined, fallback: string) {
 }
 
 function detectTopic(messageText: string) {
-  const normalized = messageText.toLowerCase();
+  const keywordMatch = matchInstagramKeywordAutomation(messageText);
+
+  if (keywordMatch.matched) {
+    return keywordMatch.topic;
+  }
+
+  const normalized = keywordMatch.normalizedText;
 
   if (
     normalized.includes("aposent") ||

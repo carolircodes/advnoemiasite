@@ -22,6 +22,9 @@ Meta/Instagram/Facebook:
 - `META_WEBHOOK_ENFORCE_SIGNATURE=true`
 - `FACEBOOK_PAGE_ACCESS_TOKEN`
 - `INSTAGRAM_ACCESS_TOKEN` ou `INSTAGRAM_PAGE_ACCESS_TOKEN`
+- `FACEBOOK_PAGE_ID` para envio via endpoint `/{page-id}/messages`
+- `INSTAGRAM_ENABLE_PUBLIC_COMMENT_REPLY=true` somente quando resposta publica estiver aprovada
+- `INSTAGRAM_ENABLE_COMMENT_AUTO_DM=true` somente depois de validar permissoes Meta para continuidade privada
 
 WhatsApp:
 - `WHATSAPP_VERIFY_TOKEN`
@@ -51,12 +54,36 @@ Notificacoes:
 
 Use somente payloads locais/fakes:
 - `npm test` valida helpers de assinatura Meta, WhatsApp e Mercado Pago.
+- `npm test --workspace portal-backend` inclui simulacao local de comentario Instagram com `negativacao`, `Negativacao!`, `quero saber sobre negativacao`, `nome sujo` e `banco negativou meu nome`.
 - `npm run operations:verify:json --workspace portal-backend` mostra `channelReadiness.details.channels`.
 - Para Meta/WhatsApp, gerar HMAC local com o app secret fake e corpo JSON fake.
 - Para Mercado Pago, gerar assinatura local sobre `id:{dataId};request-id:{requestId};ts:{timestamp};`.
 - Para Telegram, enviar somente payload local com secret fake em ambiente dev/local.
 
 Nao use payloads com dados reais de cliente. Nao use access tokens reais em testes locais.
+
+## Instagram Palavra-Chave Negativacao
+
+Fluxo esperado:
+1. Comentario chega em `/api/meta/webhook` com `object=instagram`, `entry[].changes[].field=comments`.
+2. O parser extrai `comment_id`, `from.id`, `from.username`, `text/message` e `media.id` ou `post_id`.
+3. O matcher normaliza lowercase, trim, acentos e pontuacao irrelevante.
+4. O matcher reconhece `negativacao`, `negativacao indevida`, `nome sujo`, `serasa`, `spc`, `banco negativou` e `negativou meu nome`.
+5. O router cria contexto de lead/conversa, registra evento operacional e prepara resposta segura.
+6. Se outbound real nao estiver configurado, o caso deve ficar como `manual_followup_required`/`outbound_blocked_missing_config`, com sugestao de resposta manual no inbox/CRM.
+
+Comentario publico, private reply e DM:
+- Comentario publico usa `/{comment-id}/comments` e aparece na thread publica.
+- Private reply/DM usa `/{page-id}/messages` e depende de permissao Meta, janela e elegibilidade do usuario/comentario.
+- O projeto nao deve assumir que todo comentario permite DM automatica; quando `INSTAGRAM_ENABLE_COMMENT_AUTO_DM` estiver desligado ou a permissao faltar, registrar follow-up manual em vez de falhar em silencio.
+
+Checklist de producao para a palavra-chave:
+- Confirmar no painel Meta que o app esta inscrito em comentarios do Instagram conectado.
+- Confirmar que o webhook usa a URL publica correta `/api/meta/webhook`.
+- Confirmar assinatura `X-Hub-Signature-256` com `META_WEBHOOK_ENFORCE_SIGNATURE=true`.
+- Confirmar access token e page id sem expor valores em logs.
+- Testar primeiro com payload fake local e depois com comentario controlado em post de teste.
+- Manter auto-DM desligado ate validar permissao de mensagens, politica da Meta e revisao juridica do texto.
 
 ## Piloto Vs Producao
 

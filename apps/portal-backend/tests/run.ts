@@ -25,6 +25,7 @@ import "./notification-governance.test.ts";
 import "./notification-experience.test.ts";
 import "./meta-messenger-audit.test.ts";
 import "./facebook-messenger-closeout.test.ts";
+import "./instagram-keyword-automation.test.ts";
 import "./youtube-omnichannel.test.ts";
 import "./youtube-activation.test.ts";
 import "./payment-pricing.test.ts";
