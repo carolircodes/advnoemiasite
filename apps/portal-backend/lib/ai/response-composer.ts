@@ -110,7 +110,7 @@ function generateConversionMessage(state: ConversationState): string {
 
   if (temperature === "hot" && score >= 70) {
     if (action === "schedule_consultation") {
-      return "Entendi o peso do seu caso. Pelo que você me trouxe, o próximo passo mais adequado é organizar sua consulta com a Dra. Noêmia, para que a análise aconteça com profundidade e segurança.\n\nPara eu deixar isso pronto sem perder o ritmo da conversa, qual dia ou turno costuma funcionar melhor para você?";
+      return "Entendi o peso do seu caso. Pelo que voce me trouxe, faz sentido organizar uma consulta com a Dra. Noemia, para que a analise aconteca com profundidade e responsabilidade.\n\nPara eu deixar isso pronto sem perder o ritmo da conversa, qual dia ou turno costuma funcionar melhor para voce?";
     }
 
     if (action === "human_handoff") {
@@ -119,14 +119,14 @@ function generateConversionMessage(state: ConversationState): string {
   }
 
   if (temperature === "warm" && score >= 45) {
-    return "Já estou entendendo bem o seu cenário, e ele merece uma análise cuidadosa. Para te orientar com precisão, o melhor caminho é avançarmos para a consulta individual.\n\nSe fizer sentido para você, eu já organizo isso agora. Qual dia ou horário costuma ser melhor?";
+    return "Ja estou entendendo bem o seu cenario, e ele merece uma analise cuidadosa. Para evitar uma orientacao incompleta, o caminho mais responsavel e avancarmos para a consulta individual.\n\nSe fizer sentido para voce, eu organizo isso agora. Qual dia ou horario costuma ser melhor?";
   }
 
   if (temperature === "cold" && score >= 25) {
-    return "Já dá para ver que existe uma situação real que merece ser entendida melhor. Muitas vezes o que parece confuso no início fica muito mais claro com uma análise profissional.\n\nSe quiser, posso organizar uma conversa inicial para explorar suas possibilidades com mais segurança.";
+    return "Ja da para ver que existe uma situacao real que merece ser entendida melhor. Muitas vezes o que parece confuso no inicio fica mais claro com uma analise profissional responsavel.\n\nSe fizer sentido, posso organizar uma conversa inicial para entender melhor seu caso.";
   }
 
-  return "Obrigada por compartilhar esses detalhes. Cada informação me ajuda a entender melhor seu cenário.\n\nPara te orientar com mais precisão, preciso esclarecer alguns pontos específicos da sua situação. Podemos continuar?";
+  return "Obrigada por compartilhar esses detalhes. Cada informacao me ajuda a entender melhor seu cenario.\n\nPara organizar uma orientacao inicial responsavel, preciso esclarecer poucos pontos essenciais da sua situacao. Podemos continuar?";
 }
 
 export function generateTriageResponse(

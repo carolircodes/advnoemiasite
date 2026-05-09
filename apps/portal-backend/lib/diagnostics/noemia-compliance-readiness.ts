@@ -38,15 +38,21 @@ const TARGET_FILES = [
   "apps/portal-backend/lib/ai/handoff-orchestrator.ts",
   "apps/portal-backend/lib/services/channel-conversation-router.ts",
   "apps/portal-backend/lib/services/instagram-keyword-automation.ts",
+  "apps/portal-backend/lib/services/instagram-comment-policy.ts",
   "apps/portal-backend/lib/services/ab-testing.ts"
 ];
 
 const BLOCKED_PATTERNS = [
   /causa ganha/i,
   /direito garantido/i,
+  /voc[eê] tem direito/i,
   /com certeza (voce|você)?\s*(ganha|vai ganhar)/i,
+  /indeniza[cç][aã]o certa/i,
+  /juros abusivos confirmados/i,
   /vale muito pelo resultado/i,
   /cada dia de espera pode impactar diretamente seu resultado/i,
+  /n[aã]o perca tempo/i,
+  /vai perder tudo/i,
   /tempo (esta|está) esgotando para garantir/i,
   /orienta[cç][aã]o precisa e definitiva/i
 ];

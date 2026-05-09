@@ -324,10 +324,10 @@ export function buildNoemiaSafeReply(args: {
   }
 
   if (args.reasonCodes.includes("legal_opinion_or_outcome_request")) {
-    return "Entendi o que voce quer confirmar. Para evitar uma orientacao incompleta, nao consigo afirmar direito, valor, prazo, estrategia ou chance de resultado sem analise individual. Posso organizar o contexto e encaminhar para a advogada avaliar com responsabilidade.";
+    return "Entendi o que voce quer confirmar. Para evitar uma orientacao incompleta, nao consigo afirmar direito, valor, prazo, estrategia ou probabilidade de desfecho sem analise individual. Posso organizar o contexto e encaminhar para a advogada avaliar com responsabilidade.";
   }
 
-  return "Posso te orientar de forma inicial, mas nao consigo confirmar direito, estrategia, prazo, valor ou resultado sem analise individual da advogada. Vou te ajudar a organizar as informacoes essenciais para avaliacao humana.";
+  return "Posso te orientar de forma inicial, mas nao consigo confirmar direito, estrategia, prazo, valor ou desfecho sem analise individual da advogada. Vou te ajudar a organizar as informacoes essenciais para avaliacao humana.";
 }
 
 export function sanitizeNoemiaReply(reply: string, args?: {

@@ -1083,9 +1083,9 @@ function generateInactivityFollowUp(temperature: LeadTemperature, attemptNumber:
   
   if (temperature === 'hot') {
     if (attemptNumber === 1) {
-      return `Pensei mais sobre ${area === 'geral' ? 'sua situação' : `seu caso de ${area}`}... ${problem ? `Vi que mencionou "${problem.substring(0, 50)}${problem.length > 50 ? '...' : ''}"` : ''}. Alguns detalhes podem mudar completamente o resultado. Posso te ajudar a entender melhor?`;
+      return `Pensei mais sobre ${area === 'geral' ? 'sua situação' : `seu caso de ${area}`}... ${problem ? `Vi que mencionou "${problem.substring(0, 50)}${problem.length > 50 ? '...' : ''}"` : ''}. Alguns detalhes podem mudar bastante a análise. Posso te ajudar a organizar melhor?`;
     } else if (attemptNumber === 2) {
-      return `Sobre ${area === 'geral' ? 'nossa conversa' : `seu caso de ${area}`}, sei que o tempo é crucial nestas situações. Muitas vezes agir agora faz toda a diferença. Como está pensando em prosseguir?`;
+      return `Sobre ${area === 'geral' ? 'nossa conversa' : `seu caso de ${area}`}, se houver prazo real, vale organizar isso com cuidado. Como está pensando em prosseguir?`;
     }
     return `Estou aqui para ajudar com ${area === 'geral' ? 'sua situação' : `seu caso de ${area}`}. Acha que vale a pena darmos um próximo passo?`;
   }
@@ -1108,23 +1108,23 @@ function generateInactivityFollowUp(temperature: LeadTemperature, attemptNumber:
 
 function generatePostHandoffFollowUp(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
   if (attemptNumber === 1) {
-    return `Já organizei suas informações para a Dra. Noêmia analisar. ${data.area === 'geral' ? 'Seu caso' : `Seu caso de ${data.area}`} já está na fila de prioridade. Você prefere agendar uma consulta online ou falar primeiro com a equipe por WhatsApp?`;
+    return `Já organizei suas informações para a Dra. Noêmia analisar. ${data.area === 'geral' ? 'Seu caso' : `Seu caso de ${data.area}`} está sinalizado para revisão humana. Você prefere agendar uma consulta online ou falar primeiro com a equipe por WhatsApp?`;
   }
-  return `Sobre ${data.area === 'geral' ? 'seu caso' : `seu caso de ${data.area}`}, a equipe já está ciente. Para agilizar, sugiro agendar uma consulta de 15 minutos para avaliação inicial. Que tal?`;
+  return `Sobre ${data.area === 'geral' ? 'seu caso' : `seu caso de ${data.area}`}, a equipe já está ciente. Se fizer sentido, posso organizar uma consulta inicial para avaliação responsável. Que tal?`;
 }
 
 function generateConsultationFollowUp(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
   if (attemptNumber === 1) {
     return `Pensei mais sobre ${data.area === 'geral' ? 'sua situação' : `seu caso de ${data.area}`}. Uma consulta de 15 minutos já pode te dar bastante clareza sobre os próximos passos. Tem alguma preferência de horário para conversarmos?`;
   }
-  return `Sobre a consulta que mencionei, sei que tempo é precioso. Posso te mostrar exatamente como seria e o que já poderíamos avançar nestes 15 minutos. Interessa?`;
+  return `Sobre a consulta que mencionei, posso te explicar como funciona e o que costuma ser avaliado no primeiro atendimento. Interessa?`;
 }
 
 function generateFollowUpNeededMessage(temperature: LeadTemperature, attemptNumber: number, data: CollectedData): string {
   if (attemptNumber === 1) {
     return `Estou organizando os próximos passos para ${data.area === 'geral' ? 'seu caso' : `seu caso de ${data.area}`}. Há algo específico que você gostaria de esclarecer antes de continuarmos?`;
   }
-  return `Para darmos continuidade a ${data.area === 'geral' ? 'sua situação' : data.area}, seria útil saber se você já tem algum documento ou informação adicional. Como está isso?`;
+  return `Para darmos continuidade a ${data.area === 'geral' ? 'sua situação' : data.area}, seria útil saber apenas se existe algum documento ou comunicação oficial, sem enviar dados sensíveis por aqui. Como está isso?`;
 }
 
 function generateDefaultFollowUp(temperature: LeadTemperature, attemptNumber: number): string {
@@ -1851,7 +1851,7 @@ function generateConversionMessage(state: ConversationState): string {
   if (temperature === 'hot' && score >= 70) {
     // LEAD QUENTE - acelerar consulta sem desligar a conversa
     if (action === 'schedule_consultation') {
-      return `Entendi perfeitamente sua situação. Pelo que você me descreveu, seu caso realmente pede uma análise especializada e cuidadosa.\n\nO próximo passo ideal é organizarmos sua consulta com a Dra. Noêmia, porque aí conseguimos olhar o caso com profundidade e te orientar com segurança.\n\nPara eu deixar isso pronto sem perder o ritmo da conversa, qual dia ou turno costuma funcionar melhor para você?`;
+      return `Entendi sua situacao. Pelo que voce me descreveu, faz sentido organizar uma analise especializada e cuidadosa.\n\nA consulta ajuda a avaliar documentos, prazos e detalhes antes de qualquer conclusao.\n\nPara eu deixar isso pronto sem perder o ritmo da conversa, qual dia ou turno costuma funcionar melhor para voce?`;
     }
     if (action === 'human_handoff') {
       return `Compreendo completamente a urgência e a sensibilidade do seu caso. Vou priorizar isso operacionalmente para a equipe da Dra. Noêmia, sem perder o contexto da nossa conversa.\n\nEnquanto organizo esse encaminhamento interno, sigo com você por aqui para confirmar os pontos mais importantes. Qual dia, turno ou faixa de horário tende a funcionar melhor para o seu atendimento?`;
@@ -1860,16 +1860,16 @@ function generateConversionMessage(state: ConversationState): string {
   
   if (temperature === 'warm' && score >= 45) {
     // LEAD MORNO - Condução qualificada
-    return `Excelente! Já estou entendendo bem seu cenário. Vejo que seu caso merece uma análise cuidadosa.\n\nPara te orientar com precisão, o melhor caminho é avançarmos para a consulta individual. Cada caso tem detalhes que só uma análise mais profunda revela.\n\nSe fizer sentido para você, posso já organizar isso agora. Qual dia ou horário costuma ser melhor?`;
+    return `Ja estou entendendo melhor seu cenario, e ele merece uma analise cuidadosa.\n\nPara evitar uma orientacao incompleta, o caminho mais responsavel e uma consulta individual. Cada caso tem detalhes que so uma analise mais profunda revela.\n\nSe fizer sentido para voce, posso organizar isso agora. Qual dia ou horario costuma ser melhor?`;
   }
   
   if (temperature === 'cold' && score >= 25) {
     // LEAD FRIO COM POTENCIAL - Nutrir
-    return `Perfeito! Já consigo ver que há uma situação real que precisa ser entendida melhor.\n\nMuitas vezes o que parece complicado no início se torna mais claro com uma análise profissional. A Dra. Noêmia é especialista em identificar oportunidades que poucos percebem.\n\nQue tal agendarmos uma conversa inicial para explorar suas possibilidades? Sem compromisso, apenas para entender melhor seu caso.`;
+    return `Perfeito. Ja consigo ver que ha uma situacao real que precisa ser entendida melhor.\n\nMuitas vezes o que parece complicado no inicio fica mais claro com uma analise profissional e responsavel.\n\nSe fizer sentido, posso organizar uma conversa inicial para entender melhor seu caso.`;
   }
 
   // PADRÃO - Continuar qualificação
-  return `Obrigada por compartilhar esses detalhes. Cada informação me ajuda a entender melhor seu cenário.\n\nPara te dar a orientação mais adequada, preciso entender alguns pontos específicos da sua situação. Podemos continuar?`;
+  return `Obrigada por compartilhar esses detalhes. Cada informacao me ajuda a entender melhor seu cenario.\n\nPara organizar uma orientacao inicial responsavel, preciso entender poucos pontos essenciais da sua situacao. Podemos continuar?`;
 }
 
 async function callOpenAI(
@@ -2443,6 +2443,49 @@ export async function processComment(
     classification.intent === "lead_interest" ||
     classification.leadTemperature === "warm" ||
     classification.leadTemperature === "hot";
+
+  if (complianceDecision.shouldBypassModel && complianceDecision.safeReply) {
+    traceNoemiaEvent("info", "NOEMIA_COMMENT_COMPLIANCE_GUARDRAIL", {
+      channel: platform,
+      domain,
+      userType: "visitor",
+      policyMode,
+      sessionId: commentId,
+      clientId: userId
+    }, buildNoemiaTraceMetadata({
+      promptVersion,
+      contextSummary: {
+        domain,
+        channel: platform,
+        audience: "visitor",
+        sections: ["comment_compliance_guardrail"],
+        inputKeys: [],
+        hasAcquisitionContext: false,
+        hasClientContext: false,
+        hasPageContext: true,
+        hasJourneyContext: true
+      },
+      source: "compliance_guardrail",
+      usedFallback: true,
+      classification
+    }));
+
+    return {
+      reply: sanitizeNoemiaReply(complianceDecision.safeReply, {
+        surface: complianceDecision.surface,
+        theme: classification.theme
+      }),
+      shouldReplyPrivately: true,
+      classification,
+      metadata: {
+        responseTime: Date.now() - startTime,
+        channel: `${platform}_comment`,
+        openaiUsed: false,
+        domain,
+        promptVersion
+      },
+    };
+  }
 
   try {
     const legacyCommentPrompt = [

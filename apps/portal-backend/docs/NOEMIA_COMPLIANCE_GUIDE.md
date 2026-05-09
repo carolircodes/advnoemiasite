@@ -132,3 +132,20 @@ Se o usuario pedir para ignorar instrucoes, fingir ser advogada, prometer result
 - amostras reais de conversa ainda precisam de revisao humana;
 - LGPD completa depende de politica de retencao/exclusao operacional;
 - ativacao multicanal ampla deve aguardar Fase 5 e validacao de jornada fim a fim.
+
+## Implementacao No Codigo
+
+Arquivos que sustentam esta politica:
+- `lib/ai/noemia-compliance.ts`: guardrails testaveis de promessa juridica, handoff, dados sensiveis, prompt injection, superficie publica/privada e sanitizacao final.
+- `lib/ai/system-prompt.ts`: prompt base com papel da NoemIA, limites juridicos, coleta minima, comentario publico e CTAs seguros.
+- `lib/ai/noemia-core.ts`: roteador principal, fallback, processamento de comentarios e bypass do modelo quando a politica exige.
+- `lib/ai/response-composer.ts`: respostas gerenciadas e conversao responsavel quando OpenAI nao esta disponivel.
+- `lib/diagnostics/noemia-compliance-readiness.ts`: readiness `noemiaCompliance`, `promptSafety`, `legalHandoff`, `aiFallback` e `lgpdConversationSafety`.
+- `tests/phase4-noemia-compliance.test.ts`: cobertura de areas juridicas, handoff, comentario publico, canais privados, dados sensiveis, prompt injection, fraude e saida insegura do modelo.
+
+## Validacao Sem Enviar Mensagem Real
+
+1. Rode `npm test --workspace portal-backend` para validar guardrails puros.
+2. Rode `npm run operations:verify` para conferir readiness humano/operacional.
+3. Rode `npm run operations:verify:json --workspace portal-backend` para consumir o status por automacao.
+4. Use payloads simulados ou testes locais; nao use tokens reais nem endpoints Meta/WhatsApp/Telegram para validar compliance.
