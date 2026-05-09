@@ -176,16 +176,16 @@ const MESSAGE_VARIATIONS = {
   ],
   
   insight: [
-    "Esse tipo de situação é muito comum quando há erro na análise ou um direito não foi corretamente reconhecido.",
+    "Esse tipo de situacao precisa ser visto com cuidado, porque documentos, datas e comunicacoes podem mudar bastante a leitura.",
     "Pelo que você descreveu, há sinais importantes que merecem uma análise mais cuidadosa.",
-    "Sua situação tem características que indicam provável falha na avaliação do caso.",
-    "Os detalhes que você compartilhou apontam para um erro ou direito não reconhecido.",
-    "Essa é uma situação clássica onde a análise inicial provavelmente falhou.",
-    "O que você relata mostra indícios claros de erro na avaliação do seu caso.",
-    "Sua história tem padrões que sugerem direito não reconhecido ou análise equivocada.",
-    "Esses elementos que você descreve são típicos de casos com falha na análise.",
-    "O cenário que você apresenta tem marcas de erro na avaliação inicial.",
-    "Essa situação que você vivencia é característica de análise falha."
+    "Sua situacao tem caracteristicas que pedem uma leitura individual antes de qualquer conclusao.",
+    "Os detalhes que voce compartilhou ajudam a organizar uma analise mais responsavel.",
+    "Essa e uma situacao em que a analise humana evita conclusoes precipitadas.",
+    "O que voce relata merece ser conferido com calma antes de indicar qualquer caminho.",
+    "Sua historia tem pontos que precisam ser avaliados no contexto concreto.",
+    "Esses elementos ajudam a equipe a entender melhor o que deve ser conferido.",
+    "O cenario que voce apresenta pede organizacao dos fatos antes de qualquer orientacao.",
+    "Essa situacao que voce vivencia merece uma avaliacao cuidadosa."
   ],
   
   direcionamento: [
