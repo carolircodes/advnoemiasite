@@ -10,6 +10,7 @@ import "./phase3-webhooks-channels.test.ts";
 import "./phase4-hardening.test.ts";
 import "./phase4-noemia-compliance.test.ts";
 import "./phase5-hardening.test.ts";
+import "./phase5-funnel-journey.test.ts";
 import "./phase6-hardening.test.ts";
 import "./phase7-hardening.test.ts";
 import "./phase8-hardening.test.ts";

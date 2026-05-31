@@ -8,6 +8,7 @@ import {
 import { buildDatabaseSecurityReadinessSection } from "./database-security.ts";
 import { buildChannelWebhookReadinessSection } from "./channel-readiness.ts";
 import { buildNoemiaComplianceReadinessSection } from "./noemia-compliance-readiness.ts";
+import { buildFunnelJourneyReadinessSection } from "./funnel-readiness.ts";
 import {
   buildDiagnosticSection,
   combineDiagnosticStatuses,
@@ -1152,7 +1153,8 @@ export async function buildBackendOperationsVerificationReport(options?: {
     ...envSections,
     databaseSecurity: buildDatabaseSecurityReadinessSection(),
     channelReadiness: buildChannelWebhookReadinessSection(),
-    noemiaCompliance: buildNoemiaComplianceReadinessSection()
+    noemiaCompliance: buildNoemiaComplianceReadinessSection(),
+    funnelReadiness: buildFunnelJourneyReadinessSection()
   };
 
   if (runtimeMode === "off") {

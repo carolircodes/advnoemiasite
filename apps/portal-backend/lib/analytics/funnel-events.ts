@@ -9,6 +9,18 @@ type FunnelStage =
   | "form_submitted"
   | "lead_created"
   | "lead_qualified"
+  | "triage_completed"
+  | "handoff_required"
+  | "inbox_opened"
+  | "consultation_offered"
+  | "consultation_scheduled"
+  | "payment_link_created"
+  | "payment_approved"
+  | "portal_accessed"
+  | "notification_queued"
+  | "notification_failed"
+  | "manual_followup_required"
+  | "conversion_completed"
   | "appointment_started"
   | "appointment_completed"
   | "experiment_impression"
@@ -111,6 +123,78 @@ const PRODUCT_EVENT_DEFINITIONS = [
     eventGroup: "conversion",
     funnelStage: "lead_qualified",
     description: "Lead qualificado."
+  },
+  {
+    eventKey: "triage_completed",
+    eventGroup: "conversion",
+    funnelStage: "triage_completed",
+    description: "Triagem concluida com contexto suficiente para proxima acao."
+  },
+  {
+    eventKey: "handoff_required",
+    eventGroup: "conversion",
+    funnelStage: "handoff_required",
+    description: "Handoff humano exigido por risco, canal ou regra de compliance."
+  },
+  {
+    eventKey: "inbox_opened",
+    eventGroup: "conversion",
+    funnelStage: "inbox_opened",
+    description: "Item disponivel para operacao no inbox."
+  },
+  {
+    eventKey: "consultation_offered",
+    eventGroup: "conversion",
+    funnelStage: "consultation_offered",
+    description: "Consulta oferecida de forma responsavel."
+  },
+  {
+    eventKey: "consultation_scheduled",
+    eventGroup: "conversion",
+    funnelStage: "consultation_scheduled",
+    description: "Consulta marcada ou preconfirmada."
+  },
+  {
+    eventKey: "payment_link_created",
+    eventGroup: "conversion",
+    funnelStage: "payment_link_created",
+    description: "Link de pagamento criado ou mockado para consulta."
+  },
+  {
+    eventKey: "payment_approved",
+    eventGroup: "conversion",
+    funnelStage: "payment_approved",
+    description: "Pagamento aprovado ou simulado como aprovado em teste local."
+  },
+  {
+    eventKey: "portal_accessed",
+    eventGroup: "conversion",
+    funnelStage: "portal_accessed",
+    description: "Portal do cliente acessado ou pronto para ativacao."
+  },
+  {
+    eventKey: "notification_queued",
+    eventGroup: "conversion",
+    funnelStage: "notification_queued",
+    description: "Notificacao enfileirada sem envio externo direto no teste."
+  },
+  {
+    eventKey: "notification_failed",
+    eventGroup: "conversion",
+    funnelStage: "notification_failed",
+    description: "Notificacao bloqueada, ausente ou falha para follow-up operacional."
+  },
+  {
+    eventKey: "manual_followup_required",
+    eventGroup: "conversion",
+    funnelStage: "manual_followup_required",
+    description: "Proxima acao manual registrada para evitar perda silenciosa."
+  },
+  {
+    eventKey: "conversion_completed",
+    eventGroup: "conversion",
+    funnelStage: "conversion_completed",
+    description: "Conversao concluida com pagamento/portal refletidos no funil."
   },
   {
     eventKey: "appointment_started",

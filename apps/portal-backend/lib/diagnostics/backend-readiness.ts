@@ -15,6 +15,7 @@ import {
 import { assessPushPilotReadiness } from "../notifications/push-pilot.ts";
 import { buildChannelWebhookReadinessSection } from "./channel-readiness.ts";
 import { buildNoemiaComplianceReadinessSection } from "./noemia-compliance-readiness.ts";
+import { buildFunnelJourneyReadinessSection } from "./funnel-readiness.ts";
 
 export async function buildBackendReadinessReport(dependencies?: {
   enforcementProfile?: BackendEnforcementProfile;
@@ -99,6 +100,7 @@ export async function buildBackendReadinessReport(dependencies?: {
     databaseSecurity: buildDatabaseSecurityReadinessSection(),
     channelReadiness: buildChannelWebhookReadinessSection(),
     noemiaCompliance: buildNoemiaComplianceReadinessSection(),
+    funnelReadiness: buildFunnelJourneyReadinessSection(),
     environmentCompleteness: envSections.environmentCompleteness,
     payments: envSections.payments,
     notifications,
